@@ -261,8 +261,10 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             className="flex flex-col"
                         >
                             <div className="bg-white rounded-2xl p-6 md:p-8 shadow-lg sticky top-4">
-                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                    Línea Industrial
+                                <span className="text-xs font-bold text-[var(--brand-blue)] uppercase tracking-wider">
+                                    {product.id === 'desengrasante' || product.id === 'bactokill' 
+                                        ? 'USO MULTISUPERFICIES: HOGAR, NEGOCIOS E INDUSTRIA' 
+                                        : (product.categoria ? `LÍNEA ${product.categoria.toUpperCase()}` : 'LÍNEA DE ASEO Y LIMPIEZA PROFESIONAL')}
                                 </span>
                                 <h1 className="text-3xl md:text-4xl font-black text-gray-900 mt-2 mb-4" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
                                     {product.nombre}

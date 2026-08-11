@@ -872,7 +872,7 @@ export const PRODUCTOS: Product[] = [
   },
   {
     "id": "desengrasante",
-    "nombre": "Desengrasante",
+    "nombre": "Desengrasante Multiusos Cortagrasa (Hogar, Negocios e Industria)",
     "precios": {
       "1L": 12500,
       "1/2G": 19000,
@@ -880,7 +880,7 @@ export const PRODUCTOS: Product[] = [
       "10L": 55000,
       "20L": 83000
     },
-    "slogan": "Potencia Cortagrasa Industrial de Alta Concentración",
+    "slogan": "Potencia Cortagrasa Multiusos para el Hogar, Comercio e Industria",
     "descripcion": "Desengrasante líquido concentrado formulado con agentes tensoactivos de alta potencia. Emulsifica y remueve grasas pesadas, aceites quemados y mugre incrustada en estufas, campanas, mesones y maquinaria.",
     "imgFile": "label_desengrasante_desengrasante_hogar_galon.webp",
     "imgFileSmall": "PAJARITO_DESENGRASANTE galón_octubre 2025.webp",
@@ -889,10 +889,10 @@ export const PRODUCTOS: Product[] = [
       "Emulsifica Aceites Pesados",
       "Rendimiento Superior por Litro"
     ],
-    "badge": "PODER TOTAL",
+    "badge": "HOGAR, NEGOCIOS E INDUSTRIA",
     "color": "bg-red-600",
-    "categoria": "Especialidades",
-    "subcategoria": null,
+    "categoria": "Aseo Hogar & Comercio",
+    "subcategoria": "Desengrasantes",
     "faqs": [],
     "competidorPromedio": {
       "1L": 19000,

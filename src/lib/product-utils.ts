@@ -35,7 +35,21 @@ export function generateProductSlug(id: string, nombre: string): string {
  */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
     const products = await getAllProducts();
-    return products.find(p => generateProductSlug(p.id, p.nombre) === slug) || null;
+    const cleanSlug = slug.toLowerCase();
+
+    // 1. Direct match by generated slug or product ID
+    const match = products.find(p => p.id === cleanSlug || generateProductSlug(p.id, p.nombre) === cleanSlug);
+    if (match) return match;
+
+    // 2. Legacy URL fallback aliases
+    if (cleanSlug.includes('desengrasante-multiusos') || cleanSlug === 'desengrasante') {
+        return products.find(p => p.id === 'desengrasante') || null;
+    }
+    if (cleanSlug.includes('bactokill') || cleanSlug.includes('desinfectante')) {
+        return products.find(p => p.id === 'bactokill') || null;
+    }
+
+    return null;
 }
 
 /**
@@ -43,7 +57,16 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
  */
 export async function getAllProductSlugs(): Promise<string[]> {
     const products = await getAllProducts();
-    return products.map(p => generateProductSlug(p.id, p.nombre));
+    const slugSet = new Set<string>();
+    products.forEach(p => {
+        slugSet.add(p.id);
+        slugSet.add(generateProductSlug(p.id, p.nombre));
+    });
+    // Add legacy fallback aliases for SSG page generation
+    slugSet.add('desengrasante-multiusos');
+    slugSet.add('desengrasante-hogar');
+    slugSet.add('desinfectante-bactokill');
+    return Array.from(slugSet);
 }
 
 /**
