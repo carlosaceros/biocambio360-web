@@ -144,56 +144,6 @@ export const PRODUCTOS: Product[] = [
     "shortDescription": "Limpieza precisa para cada carga, desde ropa diaria hasta mantelería. Un litro rinde hasta 14 cargas ligeras con la dosificación recomendada."
   },
   {
-    "id": "kit-super-limpieza-completo-biocambio360",
-    "nombre": "Kit Súper Limpieza Completo (Detergente ECO 10L + Suavizante + Quitamanchas + Desengrasante)",
-    "precios": {
-      "COMBO": 95500
-    },
-    "competidorPromedio": {
-      "COMBO": 135000
-    },
-    "slogan": "Limpieza Profunda e Hipoalergénica",
-    "descripcion": "Detergente ECO Ropa 10 Litros + Suavizante 1/2 Galón + Quitamanchas Ropa Color 1/2 Galón + Desengrasante 1/2 Galón. Domicilio gratis.",
-    "imgFile": "kit-combo-especial-7.webp",
-    "beneficios": [
-      "Detergente ECO 10L",
-      "Suavizante 1/2 Galón",
-      "Quitamanchas 1/2 Galón",
-      "Desengrasante 1/2 Galón"
-    ],
-    "badge": "🌿 LÍNEA ECO AHORRO",
-    "color": "bg-green-600",
-    "categoria": "Kits & Combos",
-    "subcategoria": "Combos Especiales",
-    "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
-  },
-  {
-    "id": "kit-esencial-lavanderia-30-litros",
-    "nombre": "Kit Esencial de Lavandería 30 Litros (Detergente 10L + Suavizante Motas 10L + Blanqueador 10L)",
-    "precios": {
-      "COMBO": 122000
-    },
-    "competidorPromedio": {
-      "COMBO": 143000
-    },
-    "slogan": "30 Litros Totales en 3 Bidones de 10L",
-    "descripcion": "El kit definitivo de lavandería: Detergente Ropa 10L + Suavizante Motas de Algodón 10L + Blanqueador Desinfectante 10L. Domicilio gratis y pago contraentrega.",
-    "imgFile": "kit-combo-especial-8.webp",
-    "beneficios": [
-      "Detergente Ropa 10L",
-      "Suavizante Motas 10L",
-      "Blanqueador Desinfectante 10L",
-      "30 Litros Totales"
-    ],
-    "badge": "🧺 30 LITROS TOTALES .000",
-    "color": "bg-indigo-600",
-    "categoria": "Kits & Combos",
-    "subcategoria": "Combos Especiales",
-    "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
-  },
-  {
     "id": "kit-combo-detergente-20l-suavizante-galon",
     "nombre": "Combo Detergente Ropa 20L + Suavizante 1 Galón",
     "precios": {
@@ -392,31 +342,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Combos Especiales",
     "faqs": [],
     "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
-  },
-  {
-    "id": "kit-combo-ahorro-pajarito-2-garrafas-10l",
-    "nombre": "Combo Ahorro Pajarito (2 Garrafas de 10 Litros: Detergente 10L + Suavizante Motas 10L)",
-    "precios": {
-      "COMBO": 86000
-    },
-    "competidorPromedio": {
-      "COMBO": 105000
-    },
-    "slogan": "2 Garrafas de 10 Litros (Total 20L)",
-    "descripcion": "El combo más vendido del ahorro: 1 Garrafa de Detergente Ropa 10L + 1 Garrafa de Suavizante Motas de Algodón 10L (Total 20 Litros). Domicilio gratis.",
-    "imgFile": "kit-combo-especial-18.webp",
-    "beneficios": [
-      "Detergente Ropa 10L",
-      "Suavizante Motas 10L",
-      "Total 20 Litros",
-      "Los 2 Productos por .000"
-    ],
-    "badge": "🏆 EL MÁS VENDIDO .000",
-    "color": "bg-rose-600",
-    "categoria": "Kits & Combos",
-    "subcategoria": "Combos Especiales",
-    "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
   },
   {
     "id": "alcohol-ethanol-96",

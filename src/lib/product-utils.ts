@@ -35,7 +35,16 @@ export function generateProductSlug(id: string, nombre: string): string {
  */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
     const products = await getAllProducts();
-    const cleanSlug = slug.toLowerCase();
+    // Disabled combos blocklist
+    if (
+        cleanSlug.includes('kit-super-limpieza-completo') ||
+        cleanSlug.includes('kit-esencial-de-lavanderia-30-litros') ||
+        cleanSlug.includes('kit-esencial-lavanderia-30-litros') ||
+        cleanSlug.includes('combo-ahorro-pajarito-2-garrafas') ||
+        cleanSlug.includes('kit-combo-ahorro-pajarito-2-garrafas-10l')
+    ) {
+        return null;
+    }
 
     // 1. Direct match by generated slug or product ID
     const match = products.find(p => p.id === cleanSlug || generateProductSlug(p.id, p.nombre) === cleanSlug);
