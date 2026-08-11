@@ -1,0 +1,20 @@
+# Ignore large media folders and raw heavy MOV files
+node_modules
+.next
+.git
+.vercel
+Fotos_productos
+scratch
+*.mov
+*.MOV
+ocr
+ocr_bin
+parse_kits
+ocr_results.txt
+ocr_out.txt
+kit_ocr.txt
+*.csv
+*.xlsx
+/public/products/*.png
+/public/products/*.jpg
+/public/products/*.jpeg

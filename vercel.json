@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/update-competitor-prices",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/process-abandoned-carts",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}

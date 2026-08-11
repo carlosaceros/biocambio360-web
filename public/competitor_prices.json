@@ -1,0 +1,66 @@
+{
+    "detergente_ropa": {
+        "competidores": [
+            {
+                "marca": "FAB",
+                "url": "https://www.exito.com/fab-detergente-liquido-ropa-2-litros",
+                "selector": ".price-value",
+                "precio_por_litro": 8500
+            },
+            {
+                "marca": "Ariel",
+                "url": "https://www.exito.com/ariel-detergente-liquido",
+                "selector": ".price",
+                "precio_por_litro": 9200
+            }
+        ],
+        "promedio_actual": {
+            "3.8L": 8500,
+            "10L": 4800,
+            "20L": 3400
+        },
+        "ultima_actualizacion": "2026-02-11T13:56:00Z"
+    },
+    "desengrasante": {
+        "competidores": [
+            {
+                "marca": "Mr Músculo",
+                "precio_por_litro": 9200
+            }
+        ],
+        "promedio_actual": {
+            "3.8L": 9200,
+            "10L": 5100,
+            "20L": 3600
+        },
+        "ultima_actualizacion": "2026-02-11T13:56:00Z"
+    },
+    "suavizante": {
+        "competidores": [
+            {
+                "marca": "Suavitel",
+                "precio_por_litro": 8800
+            }
+        ],
+        "promedio_actual": {
+            "3.8L": 8800,
+            "10L": 4900,
+            "20L": 3500
+        },
+        "ultima_actualizacion": "2026-02-11T13:56:00Z"
+    },
+    "blanqueador": {
+        "competidores": [
+            {
+                "marca": "Clorox",
+                "precio_por_litro": 5500
+            }
+        ],
+        "promedio_actual": {
+            "3.8L": 5500,
+            "10L": 4000,
+            "20L": 3100
+        },
+        "ultima_actualizacion": "2026-02-11T13:56:00Z"
+    }
+}

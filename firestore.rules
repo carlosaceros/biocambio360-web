@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Orders collection
+    match /orders/{orderId} {
+      // Anyone can create orders (from checkout)
+      allow create: if true;
+      
+      // Only authenticated admins can read, update, delete
+      allow read, update, delete: if request.auth != null;
+    }
+    
+    // Customers collection
+    match /customers/{customerId} {
+      // Security FIX: Prevent listing all customers (PII leak).
+      // Only allow getting a specific customer if the ID is known
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if true;
+      allow delete: if request.auth != null;
+    }
+    
+    // Products collection (future)
+    match /products/{productId} {
+      // Anyone can read products (for storefront)
+      allow read: if true;
+      
+      // Only authenticated admins can write
+      allow write: if request.auth != null;
+    }
+    
+    // Default: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

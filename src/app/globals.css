@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+:root {
+  /* Brand Colors — Biocambio360 */
+  --brand-blue: #2D6EB5;
+  --brand-blue-dark: #1E4F85;
+  --brand-blue-deeper: #153A64;
+  --brand-blue-light: #E8F0FA;
+  --brand-blue-50: #F0F6FC;
+  --brand-pink: #E91E8C;
+  --brand-pink-dark: #C4176F;
+  --brand-pink-light: #FDF0F7;
+  --brand-pink-50: #FEF5FA;
+
+  /* Neutrals — Slate tones for premium feel */
+  --brand-dark: #0F172A;
+  --brand-dark-secondary: #1E293B;
+  --brand-gray: #64748B;
+  --brand-gray-light: #94A3B8;
+  --brand-surface: #F8FAFC;
+  --brand-surface-raised: #FFFFFF;
+  --brand-border: #E2E8F0;
+  --brand-border-subtle: #F1F5F9;
+
+  /* Semantic */
+  --brand-success: #059669;
+  --brand-success-light: #ECFDF5;
+  --brand-warning: #D97706;
+  --brand-warning-light: #FFFBEB;
+
+  /* Background */
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Brand tokens for Tailwind */
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-dark: var(--brand-blue-dark);
+  --color-brand-blue-light: var(--brand-blue-light);
+  --color-brand-blue-50: var(--brand-blue-50);
+  --color-brand-pink: var(--brand-pink);
+  --color-brand-pink-dark: var(--brand-pink-dark);
+  --color-brand-pink-light: var(--brand-pink-light);
+  --color-brand-pink-50: var(--brand-pink-50);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-dark-secondary: var(--brand-dark-secondary);
+  --color-brand-gray: var(--brand-gray);
+  --color-brand-gray-light: var(--brand-gray-light);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-border: var(--brand-border);
+  --color-brand-border-subtle: var(--brand-border-subtle);
+  --color-brand-success: var(--brand-success);
+  --color-brand-success-light: var(--brand-success-light);
+
+  --font-sans: 'Barlow', sans-serif;
+  --font-display: 'Barlow', sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Barlow', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Premium scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--brand-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--brand-blue);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-blue-dark);
+}
+
+/* Selection color */
+::selection {
+  background: var(--brand-blue-light);
+  color: var(--brand-blue-dark);
+}
+
+/* Typography Base Size (14px default for paragraphs) */
+body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+p {
+  font-size: 14px;
+  line-height: 1.6;
+}
