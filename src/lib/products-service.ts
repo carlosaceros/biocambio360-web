@@ -54,10 +54,21 @@ export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
         console.warn('Warning: Could not fetch products from Firestore during build, using static fallback:', e);
     }
 
-    // Merge hardcoded with DB (DB wins on same ID)
+    // Merge hardcoded with DB (Static code definitions win for catalog metadata)
     const allProductsMap = new Map<string, Product>();
     PRODUCTOS.forEach(p => allProductsMap.set(p.id, p));
-    products.forEach(p => allProductsMap.set(p.id, p));
+    products.forEach(p => {
+        const staticP = PRODUCTOS.find(sp => sp.id === p.id);
+        if (staticP) {
+            allProductsMap.set(p.id, {
+                ...p,
+                ...staticP,
+                precios: { ...staticP.precios, ...(p.precios || {}) }
+            });
+        } else {
+            allProductsMap.set(p.id, p);
+        }
+    });
 
     cachedProducts = Array.from(allProductsMap.values()).filter(p => !isSupplyItem(p));
     lastFetchTime = Date.now();
@@ -70,13 +81,20 @@ export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
 export async function getProductById(id: string): Promise<Product | null> {
     const docRef = doc(db, 'products', id);
     const docSnap = await getDoc(docRef);
+    const fallback = PRODUCTOS.find(p => p.id === id);
 
     if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as Product;
+        const dbData = { id: docSnap.id, ...docSnap.data() } as Product;
+        if (fallback) {
+            return {
+                ...dbData,
+                ...fallback,
+                precios: { ...fallback.precios, ...(dbData.precios || {}) }
+            };
+        }
+        return dbData;
     }
 
-    // Fallback to hardcoded if not found (useful during migration)
-    const fallback = PRODUCTOS.find(p => p.id === id);
     return fallback || null;
 }
 
