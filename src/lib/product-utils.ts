@@ -45,7 +45,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     if (cleanSlug.includes('desengrasante-multiusos') || cleanSlug === 'desengrasante') {
         return products.find(p => p.id === 'desengrasante') || null;
     }
-    if (cleanSlug.includes('bactokill') || cleanSlug.includes('desinfectante')) {
+    if (cleanSlug.includes('bactokill') || cleanSlug.includes('bactokil') || cleanSlug.includes('desinfectante')) {
         return products.find(p => p.id === 'bactokill') || null;
     }
 

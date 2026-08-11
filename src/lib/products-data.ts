@@ -702,30 +702,6 @@ export const PRODUCTOS: Product[] = [
     "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
   },
   {
-    "id": "bactokil",
-    "nombre": "Bactokil",
-    "precios": {
-      "1L": 9500
-    },
-    "slogan": "Desinfección de Amplio Espectro & Bioseguridad Total",
-    "descripcion": "Desinfectante concentrado de alto rendimiento formulado para eliminar microorganismos patógenos, bacterias, virus y hongos en superficies del hogar, comercios e instituciones.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Desinfección de Amplio Espectro",
-      "Elimina Bacterias y Hongos",
-      "Seguro en Superficies Lavables"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Especialidades",
-    "subcategoria": null,
-    "faqs": [],
-    "competidorPromedio": {
-      "1L": 14500
-    },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
-  },
-  {
     "id": "bactokill",
     "nombre": "Bactokill - Desinfectante Multisuperficies (Hogar e Industria)",
     "precios": {
