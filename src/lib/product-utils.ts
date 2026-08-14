@@ -1059,7 +1059,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         solucion = `Emplear un lavaloza líquido concentrado que emulsifique grasas al contacto con una pequeña dosificación y sea suave con la piel de las manos.`;
         producto = `El ${name} de Biocambio360 combina alto poder cortagrasa con pH neutro enriquecido con glicerina, rindiendo más lavadas por litro.`;
         transaccion = `Consigue presentaciones industriales directo de fábrica en Soacha con envío en Bogotá. Ideal para restaurantes y hogares de alto consumo.`;
-        citableQuote = `El jabón lavaloza ${name} de Biocambio360 es un desengrasante concentrado biodegradable y dermatológicamente seguro para vajillas y utensilios.`;
+        citableQuote = `El jabón lavaloza ${name} de Biocambio360 es un detergente concentrado biodegradable y dermatológicamente seguro para vajillas y utensilios.`;
     }
     // 10. Automotive (Lustrallantas, Shampoo Autos, Siliconas Vehiculares)
     else if (cat.includes('automotriz') || (nameLower.includes('auto') && !nameLower.includes('autobrillante')) || nameLower.includes('llanta') || (nameLower.includes('silicona') && !nameLower.includes('lustramuebles'))) {

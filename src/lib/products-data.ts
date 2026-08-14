@@ -2225,30 +2225,6 @@ export const PRODUCTOS: Product[] = [
     "shortDescription": "Combate manchas difíciles sin renunciar a la apariencia de tus prendas de color. Úsalo en agua fría o tibia y trata hasta 50 prendas por cada 5 L de solución."
   },
   {
-    "id": "quitamanchas-ropa-color-500-ml",
-    "nombre": "Quitamanchas ropa color 500 ml",
-    "precios": {
-      "DEFAULT": 5500
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Especialidades",
-    "subcategoria": null,
-    "faqs": [],
-    "competidorPromedio": {
-      "DEFAULT": 8250
-    },
-    "manualContentKey": "quitamanchas-ropa-color",
-    "shortDescription": "Combate manchas difíciles sin renunciar a la apariencia de tus prendas de color. Úsalo en agua fría o tibia y trata hasta 50 prendas por cada 5 L de solución."
-  },
-  {
     "id": "quitamanchas-ropa-color-500ml",
     "nombre": "Quitamanchas ropa color 500Ml",
     "precios": {
@@ -2334,29 +2310,6 @@ export const PRODUCTOS: Product[] = [
       "20L": "label_sellador_polimerico_sellador_polimerico_20_litros.webp",
       "3.8L": "label_sellador_polimerico_sellador_polimerico_galon.webp",
       "1/2G": "label_sellador_polimerico_sellador_polimerico_medio_galon.webp"
-    },
-    "shortDescription": "Sella la porosidad e impermeabiliza pisos de granito, terrazo y concreto. Base ideal contra manchas y tráfico pesado."
-  },
-  {
-    "id": "sellador-polimerico-20-l-amarillo",
-    "nombre": "Sellador Polimérico 20 L Amarillo",
-    "precios": {
-      "DEFAULT": 269
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Especialidades",
-    "subcategoria": "Selladores",
-    "faqs": [],
-    "competidorPromedio": {
-      "DEFAULT": 404
     },
     "shortDescription": "Sella la porosidad e impermeabiliza pisos de granito, terrazo y concreto. Base ideal contra manchas y tráfico pesado."
   },
@@ -2530,62 +2483,6 @@ export const PRODUCTOS: Product[] = [
     "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
   },
   {
-    "id": "shampoo-para-motos",
-    "nombre": "Shampoo para Motos",
-    "precios": {
-      "1/2G": 20000,
-      "20L": 90000,
-      "3.8L": 36000
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Shampoo",
-    "faqs": [],
-    "competidorPromedio": {
-      "1/2G": 30000,
-      "20L": 135000,
-      "3.8L": 54000
-    },
-    "shortDescription": "Shampoo vehicular de pH neutro que remueve suciedad y barro sin deteriorar ceras ni pinturas. Genera espuma activa."
-  },
-  {
-    "id": "siliciona-para-autos",
-    "nombre": "Siliciona Para Autos",
-    "precios": {
-      "20L": 83000,
-      "10L": 55000,
-      "3.8L": 27000,
-      "1/2G": 17000
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Especialidades",
-    "subcategoria": null,
-    "faqs": [],
-    "competidorPromedio": {
-      "20L": 120000,
-      "10L": 80000,
-      "3.8L": 40000,
-      "1/2G": 25000
-    },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
-  },
-  {
     "id": "silicona-autos",
     "nombre": "Silicona Autos",
     "precios": {
@@ -2669,29 +2566,6 @@ export const PRODUCTOS: Product[] = [
       "DEFAULT": 24000
     },
     "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
-  },
-  {
-    "id": "silicona-para-autos",
-    "nombre": "Silicona Para Autos",
-    "precios": {
-      "1L": 23000
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Siliconas",
-    "faqs": [],
-    "competidorPromedio": {
-      "1L": 34500
-    },
-    "shortDescription": "Protege y renueva vinilos, plásticos y tableros vehiculares. Filtro UV activo que repele el polvo y evita la decoloración."
   },
   {
     "id": "silicona-para-motos",
@@ -3227,154 +3101,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Detergentes",
     "faqs": [],
     "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
-  },
-  {
-    "id": "shampoo-muebles-tapiceria",
-    "nombre": "Shampoo para Muebles y Tapicería",
-    "precios": {
-      "20L": 85000,
-      "10L": 57000,
-      "3.8L": 33000
-    },
-    "competidorPromedio": {
-      "20L": 127500,
-      "10L": 85500,
-      "3.8L": 49500
-    },
-    "slogan": "Limpieza Profunda de Telas y Tapizados",
-    "descripcion": "Shampoo espuma controlada para el lavado e higienización de muebles, colchones, sillería y tapicería textil del hogar e industria.",
-    "imgFile": "placeholder_shampoo_muebles.webp",
-    "beneficios": [
-      "Espuma Controlada",
-      "Desmanchador de Telas",
-      "Aroma Fresco Duradero"
-    ],
-    "badge": "",
-    "color": "bg-amber-600",
-    "categoria": "Especialidades",
-    "subcategoria": "Limpieza de Muebles",
-    "faqs": [],
-    "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
-  },
-  {
-    "id": "limpiavidrios-concentrado",
-    "nombre": "Limpiavidrios Concentrado",
-    "precios": {
-      "20L": 83000,
-      "10L": 55000,
-      "3.8L": 34000
-    },
-    "competidorPromedio": {
-      "20L": 124500,
-      "10L": 82500,
-      "3.8L": 51000
-    },
-    "slogan": "Transparencia Cero Vetas y Brillo Cristalino",
-    "descripcion": "Fórmula antiempañante de secado rápido para la limpieza de cristales, espejos, ventanales y superficies vidriadas sin dejar marcas ni velos.",
-    "imgFile": "placeholder_limpiavidrios.webp",
-    "beneficios": [
-      "Secado Rápido",
-      "Cero Vetas ni Marcas",
-      "Efecto Antiempañante"
-    ],
-    "badge": "",
-    "color": "bg-cyan-600",
-    "categoria": "Superficies",
-    "subcategoria": "Vidrios",
-    "faqs": [],
-    "shortDescription": "Limpia vidrios, espejos y cristales devolviendo la máxima transparencia. Remueve huellas y polvo sin dejar vetas."
-  },
-  {
-    "id": "lustrallantas-protector-cauchos",
-    "nombre": "Lustrallantas y Protector de Cauchos",
-    "precios": {
-      "20L": 125000,
-      "10L": 83000,
-      "3.8L": 47000
-    },
-    "competidorPromedio": {
-      "20L": 187500,
-      "10L": 124500,
-      "3.8L": 70500
-    },
-    "slogan": "Brillo Humedo Intenso y Protección UV",
-    "descripcion": "Acondicionador de caucho y neumáticos con acabado de brillo húmedo de larga duración. Protege contra la resequedad y cuarteamiento por radiación solar.",
-    "imgFile": "placeholder_lustrallantas.webp",
-    "beneficios": [
-      "Brillo Húmedo Duradero",
-      "Protección UV para Caucho",
-      "Repelente al Polvo"
-    ],
-    "badge": "",
-    "color": "bg-neutral-900",
-    "categoria": "Automotriz",
-    "subcategoria": "Llantas",
-    "faqs": [],
-    "shortDescription": "Otorga un acabado negro profundo y humectante a las llantas. Protege contra el agrietamiento y la radiación UV."
-  },
-  {
-    "id": "shampoo-autos-motos",
-    "nombre": "Shampoo para Autos y Motos",
-    "precios": {
-      "1L": 13000,
-      "1/2G": 20000,
-      "3.8L": 36000,
-      "10L": 60000,
-      "20L": 90000
-    },
-    "competidorPromedio": {
-      "1L": 19500,
-      "1/2G": 30000,
-      "3.8L": 54000,
-      "10L": 90000,
-      "20L": 135000
-    },
-    "slogan": "pH Neutro con Cera Protectora de Pintura",
-    "descripcion": "Shampoo automotriz de espuma densa y pH neutro. Remueve la mugre de carretera sin remover capas de cera ni opacar el barniz de la carrocería.",
-    "imgFile": "placeholder_shampoo_autos.webp",
-    "beneficios": [
-      "pH Neutro Seguro",
-      "Cera Protectora",
-      "Espuma Densa"
-    ],
-    "badge": "",
-    "color": "bg-red-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Lavado Exterior",
-    "faqs": [],
-    "shortDescription": "Shampoo vehicular de pH neutro que remueve suciedad y barro sin deteriorar ceras ni pinturas. Genera espuma activa."
-  },
-  {
-    "id": "silicona-muebles-autos",
-    "nombre": "Silicona para Muebles, Autos y Motos",
-    "precios": {
-      "1L": 12000,
-      "1/2G": 18000,
-      "3.8L": 33000,
-      "10L": 57000,
-      "20L": 85000
-    },
-    "competidorPromedio": {
-      "1L": 18000,
-      "1/2G": 27000,
-      "3.8L": 49500,
-      "10L": 85500,
-      "20L": 127500
-    },
-    "slogan": "Protección Multisuperficie y Renovador de Plásticos",
-    "descripcion": "Silicona emulsionada para renovar y proteger tableros de vehículos, partes plásticas, cueros, vinilos y muebles del desgaste ambiental.",
-    "imgFile": "placeholder_silicona.webp",
-    "beneficios": [
-      "Renueva Plásticos y Vinilos",
-      "Protección contra Resequedad",
-      "Fragancia Agradable"
-    ],
-    "badge": "",
-    "color": "bg-emerald-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Interiores",
-    "faqs": [],
-    "shortDescription": "Protege y renueva vinilos, plásticos y tableros vehiculares. Filtro UV activo que repele el polvo y evita la decoloración."
   },
   {
     "id": "jabon-manos-antibacterial",
