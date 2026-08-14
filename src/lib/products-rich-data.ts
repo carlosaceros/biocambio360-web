@@ -285,7 +285,7 @@ export const PRODUCT_MANUAL_KEY_MAP: Record<string, ManualFamilyKey> = {
     // 1. Detergentes
     'detergente-liquido-multiusos': 'detergente',
     'detergente-liquido-industrial-heavy-duty': 'detergente',
-    'detergente-ropa-negra': 'detergente',
+    'detergente-ropa-negra-oscura': 'detergente',
     'kit-combo-duo-10-10-detergente-desengrasante': 'detergente',
     'kit-combo-lavanderia-cocina': 'detergente',
     'kit-limpieza-completo-3-galones': 'detergente',
@@ -297,42 +297,33 @@ export const PRODUCT_MANUAL_KEY_MAP: Record<string, ManualFamilyKey> = {
 
     // 3. Blanqueadores
     'blanqueador': 'blanqueador',
-    'blanqueador-desinfectante-desinfectante': 'blanqueador',
 
     // 4. Ambientadores Multiusos
     'ambientador': 'ambientador-multiusos',
-    'ambientador-multiusos-250ml': 'ambientador-multiusos',
-    'ambientador-multiusos-500ml': 'ambientador-multiusos',
-    'ambientador-lavanda': 'ambientador-multiusos',
-    'ambientador-manzana-verde': 'ambientador-multiusos',
-    'ambientador-brisa-marina': 'ambientador-multiusos',
+    'ambientador-canela': 'ambientador-multiusos',
+    'ambientador-chicle': 'ambientador-multiusos',
+    'ambientador-kiwi': 'ambientador-multiusos',
+    'ambientador-talco': 'ambientador-multiusos',
+    'ambientador-tutti-frutti': 'ambientador-multiusos',
 
     // 5. Lavaloza
     'lavaloza-liquido': 'lavaloza',
-    'lavaloza-liquido-concentrado': 'lavaloza',
 
     // 6. Desengrasantes
     'desengrasante': 'desengrasante',
     'desengrasante-industrial': 'desengrasante',
-    'desengrasante-textil-dxf': 'desengrasante',
-    'desengrasante-superficies-dxf': 'desengrasante',
 
     // 7. Oxígeno Activo
-    'oxigeno-activo': 'oxigeno-activo',
-    'oxigeno-activo-1kg': 'oxigeno-activo',
-    'oxigeno-activo-4kg': 'oxigeno-activo',
-    'oxigeno-activo-10kg': 'oxigeno-activo',
-    'oxigeno-activo-20kg': 'oxigeno-activo',
+    'oxigeno-activo-desinfectante': 'oxigeno-activo',
 
     // 8. Suavizantes
     'suavizante': 'suavizante',
-    'suavizante-floral-primavera': 'suavizante',
+    'suavizante-manzan-verde': 'suavizante',
+    'suavizante-motas-de-algodon': 'suavizante',
     'suavizante-sueno-lavanda': 'suavizante',
-    'suavizante-manzana-verde': 'suavizante',
 
     // 9. Desincrustante Descarbonizante
-    'desincrustante': 'desincrustante-descarbonizante',
-    'descarbonizante': 'desincrustante-descarbonizante'
+    'desincrustante': 'desincrustante-descarbonizante'
 };
 
 export const TABLA_MEZCLAS_OFICIAL: MezclaEntry[] = [

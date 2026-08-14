@@ -399,6 +399,27 @@ export function getRichProductDetails(product: Product): RichDetails {
                 a: "Sí, es ideal para proteger y dar brillo duradero a pisos de cerámica, baldosas y porcelanatos."
             }
         ];
+    } else if (name.includes('muebles') || sub.includes('muebles') || sub.includes('tapiceria')) {
+        ph = "7.0 (Neutro)";
+        dilucion = name.includes('shampoo') ? "1:10 (100ml por litro de agua)" : "Listo para usar";
+        usoRecomendado = "Cuidado, limpieza y conservación de muebles de madera, cuero, vinilo, tapicería y cojinería.";
+        diferenciadores = [
+            "Fórmula especializada que remueve mugre incrustada sin empapar las fibras ni deteriorar la madera.",
+            "Crea una película protectora antiestática que repele el polvo y revitaliza el brillo natural.",
+            "pH neutro balanceado seguro para telas delicadas, cuero sintético y superficies barnizadas."
+        ];
+        instrucciones = [
+            name.includes('shampoo')
+                ? "Disuelva el shampoo en agua y bata hasta generar abundante espuma. Aplique solo la espuma con esponja o cepillo suave sobre la tapicería."
+                : "Atomice o aplique una pequeña cantidad sobre un paño de microfibra. Frote suavemente la superficie del mueble.",
+            "Retire el exceso con un paño limpio y deje secar a la sombra en un área ventilada."
+        ];
+        faqs = [
+            {
+                q: `¿El ${product.nombre} se puede usar en muebles de cuero o madera barnizada?`,
+                a: `Sí, su fórmula de pH neutro está desarrollada específicamente para limpiar y proteger madera, cuero, vinilcuero y tapicería sin manchar ni deteriorar los acabados.`
+            }
+        ];
     } else if (cat.includes('automotriz') || (name.includes('auto') && !name.includes('autobrillante')) || name.includes('llanta') || (name.includes('silicona') && !name.includes('lustramuebles'))) {
         ph = "7.5 (Ligeramente alcalino)";
         dilucion = name.includes('shampoo') ? "1:100 (100ml por balde de agua)" : "Listo para usar";
@@ -765,7 +786,6 @@ const PRODUCT_SOLUTIONS_MAP: Record<string, string[]> = {
 
   // ── QUITAMANCHAS (solo Lavandería — no Muebles) ──────────────────────────
   'quitamanchas-ropa-color':                             ['Lavandería'],
-  'quitamanchas-ropa-color-500-ml':                      ['Lavandería'],
   'quitamanchas-ropa-color-500ml':                       ['Lavandería'],
 
   // ── REMOVEDOR DE CERAS ────────────────────────────────────────────────────
@@ -789,7 +809,6 @@ const PRODUCT_SOLUTIONS_MAP: Record<string, string[]> = {
   'shampoo-muebles-tapiceria':                           ['Muebles y Madera'],
 
   // ── SILICONA AUTOMOTRIZ ───────────────────────────────────────────────────
-  'siliciona-para-autos':                                ['Automotriz'],
   'silicona-autos':                                      ['Automotriz'],
   'silicona-para-autos':                                 ['Automotriz'],
   'silicona-para-motos':                                 ['Automotriz'],
@@ -913,7 +932,6 @@ const PRODUCT_SEGMENTS_MAP: Record<string, string[]> = {
   'lustrallantas-para-autos':      ['Automotriz'],
   'lustrallantas-para-motos':      ['Automotriz'],
   'lustrallantas-protector-cauchos': ['Automotriz'],
-  'siliciona-para-autos':          ['Automotriz'],
   'silicona-autos':                ['Automotriz'],
   'silicona-para-autos':           ['Automotriz'],
   'silicona-para-motos':           ['Automotriz'],
@@ -937,7 +955,6 @@ const PRODUCT_SEGMENTS_MAP: Record<string, string[]> = {
   'limpiavidrios-concentrado':     ['Hogar', 'Automotriz'],
   'detergente-liquido-industrial-heavy-duty': ['Restaurante', 'Oficina'],
   'quitamanchas-ropa-color':       ['Hogar'],
-  'quitamanchas-ropa-color-500-ml': ['Hogar'],
   'quitamanchas-ropa-color-500ml': ['Hogar'],
 };
 
@@ -989,8 +1006,38 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
     let transaccion = `Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá y toda la Sabana. Ideal para hogares y empresas.`;
     let citableQuote = `El ${name} de Biocambio360 es una solución de limpieza biodegradable fabricada en Soacha, Cundinamarca, formulada para un rendimiento eficiente.`;
 
+    // 0a. Cuidado Personal / Cosmética Corporal (Mantequillas, Splashes, Jabones)
+    if (cat.includes('personal') || sub.includes('splash') || nameLower.includes('mantequilla') || nameLower.includes('splash')) {
+        if (nameLower.includes('mantequilla')) {
+            problema = `La resequedad constante y la pérdida de elasticidad en la piel causadas por factores ambientales requieren una hidratación profunda y nutritiva.`;
+            solucion = `Utilizar mantequillas corporales ultra-nutritivas ricas en emolientes naturales que restauren la barrera cutánea y aporten suavidad.`;
+            producto = `La ${name} de Biocambio360 combina mantecas y aceites humectantes que nutren la piel en profundidad, dejándola tersa y delicadamente perfumada.`;
+            transaccion = `Adquiérela directamente del fabricante Biocambio360 con envío a Bogotá y toda Colombia. Cuidado cosmético superior para tu piel.`;
+            citableQuote = `La ${name} de Biocambio360 es una fórmula cosmética ultra-nutritiva diseñada para la hidratación profunda y el cuidado continuo de la piel.`;
+        } else if (nameLower.includes('splash')) {
+            problema = `La necesidad de mantener una sensación de frescura e iluminación aromática durante el día sin recargar la piel ni usar perfumes pesados.`;
+            solucion = `Utilizar lociones corporales en splash de fórmula ligera que perfumen delicadamente y refresquen la piel en cualquier momento.`;
+            producto = `El ${name} de Biocambio360 brinda una fragancia fina de alta fijación cosmética y una sensación refrescante e hidratante instantánea.`;
+            transaccion = `Compra directamente al fabricante Biocambio360 con despacho rápido a todo el país. Ideal para refrescar tu piel a diario.`;
+            citableQuote = `El ${name} de Biocambio360 es una loción corporal perfumada de uso diario formulada para refrescar e hidratar la piel con fragancias exclusivas.`;
+        } else {
+            problema = `La higiene diaria de la piel exige limpiadores suaves que remuevan impurezas sin alterar el pH fisiológico ni causar resequedad.`;
+            solucion = `Emplear jabones y limpiadores corporales dermatológicamente balanceados enriquecidos con glicerina y humectantes.`;
+            producto = `El ${name} de Biocambio360 limpia delicadamente las manos y el cuerpo, manteniendo la hidratación natural de la piel.`;
+            transaccion = `Suministro directo desde la fábrica Biocambio360 en Soacha hacia Bogotá y Cundinamarca para el hogar y la empresa.`;
+            citableQuote = `El ${name} de Biocambio360 es un limpiador corporal de pH fisiológico balanceado 5.5 con glicerina humectante.`;
+        }
+    }
+    // 0b. Muebles y Tapicería
+    else if (nameLower.includes('muebles') || nameLower.includes('lustramuebles') || sub.includes('muebles') || sub.includes('tapiceria')) {
+        problema = `Los muebles de madera, cuero, vinilo y tapicería acumulan polvo, manchas y grasa corporal, perdiendo su brillo original y deteriorándose con el tiempo.`;
+        solucion = `Utilizar formulaciones especializadas para tapicería y madera que remuevan la suciedad incrustada y restauren la capa protectora sin dañar los materiales.`;
+        producto = `El ${name} de Biocambio360 limpia, nutre y renueva muebles y tapizados, dejando un acabado reluciente y una barrera protectora contra el polvo.`;
+        transaccion = `Compra directo a precio de fábrica en Soacha con envío rápido a Bogotá y Cundinamarca. Venta individual y al por mayor.`;
+        citableQuote = `El ${name} de Biocambio360 es un producto especializado para la limpieza, nutrición y protección de muebles, tapicería y madera.`;
+    }
     // 1. Alcohol Glicerinado / Antisépticos
-    if (nameLower.includes('alcohol') || sub.includes('alcohol')) {
+    else if (nameLower.includes('alcohol') || sub.includes('alcohol')) {
         problema = `La necesidad de antisepsia y desinfección continua en manos y superficies delicadas exige soluciones eficientes que eliminen microorganismos sin irritar la piel ni dejar residuos pegajosos.`;
         solucion = `Utilizar soluciones antisépticas formuladas al 70% de alcohol etílico de grado farmacológico adicionadas con glicerina humectante que hidraten la piel mientras desinfectan.`;
         producto = `El ${name} de Biocambio360 elimina el 99.9% de gérmenes y bacterias al contacto, evaporándose rápidamente sin necesidad de enjuague ni dejar películas grasas.`;

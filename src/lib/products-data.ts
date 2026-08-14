@@ -50,7 +50,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Desinfectante de amplio espectro contra bacterias, virus y hongos. Protege e higieniza áreas del hogar e instituciones."
+    "shortDescription": "Kit completo de aseo para el hogar y negocio. Incluye detergente 20L, suavizante galón, desengrasante y desinfectante Bactokill."
   },
   {
     "id": "lavaloza-liquido",
@@ -115,7 +115,7 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Combos Especiales",
     "faqs": [],
     "manualContentKey": "detergente",
-    "shortDescription": "Limpieza precisa para cada carga, desde ropa diaria hasta mantelería. Un litro rinde hasta 14 cargas ligeras con la dosificación recomendada."
+    "shortDescription": "Combo integral de 4 productos para lavandería y cocina. Solución completa de detergente, suavizante, lavaloza y quitamanchas."
   },
   {
     "id": "kit-limpieza-completo-3-galones",
@@ -141,7 +141,7 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Combos Especiales",
     "faqs": [],
     "manualContentKey": "detergente",
-    "shortDescription": "Limpieza precisa para cada carga, desde ropa diaria hasta mantelería. Un litro rinde hasta 14 cargas ligeras con la dosificación recomendada."
+    "shortDescription": "Kit completo de 3 galones concentrados (detergente, suavizante y desengrasante) más 1 litro de desinfectante Bactokill."
   },
   {
     "id": "kit-combo-detergente-20l-suavizante-galon",
@@ -166,7 +166,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
+    "shortDescription": "Combo de lavado completo: Detergente Ropa 20L con bicarbonato más Suavizante 1 Galón con microcápsulas de aroma."
   },
   {
     "id": "kit-combo-detergente-20l-desengrasante-galon",
@@ -191,7 +191,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
+    "shortDescription": "Combo de fuerza limpia: Detergente Ropa 20L más Desengrasante Industrial 1 Galón e incluye dispensador de regalo."
   },
   {
     "id": "kit-combo-detergente-20l-limpiapisos-galon",
@@ -216,7 +216,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Limpia profundamente y aromatiza pisos de cerámica, porcelanato y baldosas sin dejar vetas ni marcas opacas."
+    "shortDescription": "Combo de aseo total: Detergente Ropa 20L más Limpiapisos Aromático 1 Galón con dispensador de regalo."
   },
   {
     "id": "kit-combo-detergente-20l-quitamanchas-galon",
@@ -241,7 +241,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
+    "shortDescription": "Combo para prendas impecables: Detergente Ropa 20L más Quitamanchas Ropa Color 1 Galón con dispensador gratis."
   },
   {
     "id": "kit-combo-detergente-20l-bactokill-galon",
@@ -266,7 +266,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Desinfectante de amplio espectro contra bacterias, virus y hongos. Protege e higieniza áreas del hogar e instituciones."
+    "shortDescription": "Combo de desinfección y lavado: Detergente Ropa 20L más Bactokill Cloro Gel 1 Galón con dispensador gratis."
   },
   {
     "id": "kit-combo-detergente-20l-vinagre-galon",
@@ -291,7 +291,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
+    "shortDescription": "Combo de limpieza profunda: Detergente Ropa 20L más Vinagre de Limpieza 1 Galón con dispensador de regalo."
   },
   {
     "id": "kit-combo-detergente-20l-desengrasante-pro",
@@ -316,7 +316,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Combo sinérgico de insumos de aseo concentrados. Solución integral que maximiza el rendimiento y ahorra en tu presupuesto."
+    "shortDescription": "Combo Pro: Detergente Ropa 20L más Desengrasante Industrial Potenciado 1 Galón para remoción pesada."
   },
   {
     "id": "kit-combo-detergente-20l-shampoo-muebles-galon",
@@ -341,7 +341,7 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
     "faqs": [],
-    "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
+    "shortDescription": "Combo textil y hogar: Detergente Ropa 20L más Shampoo Espumoso para Muebles y Tapicería 1 Galón."
   },
   {
     "id": "alcohol-ethanol-96",
@@ -351,8 +351,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 45000,
       "20L": 177000
     },
-    "slogan": "Alcohol Glicerinado 70% Antiséptico y Desinfectante",
-    "descripcion": "Fórmula antiséptica de grado profesional con 70% de alcohol etílico y glicerina humectante. Diseñado para la desinfección efectiva de manos y superficies.",
+    "slogan": "Alcohol Etílico al 96% de Alta Pureza de Grado Industrial",
+    "descripcion": "Alcohol etílico al 96% de alta pureza sin aditivos. Diseñado para desinfección profunda de superficies y equipos, procesos técnicos e insumo en formulaciones industriales.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -418,8 +418,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 97000,
       "20L": 147000
     },
-    "slogan": "Alcohol Glicerinado 70% Antiséptico y Desinfectante",
-    "descripcion": "Fórmula antiséptica de grado profesional con 70% de alcohol etílico y glicerina humectante. Diseñado para la desinfección efectiva de manos y superficies.",
+    "slogan": "Base Solvente Extra Pureza para Perfumería y Cosmetología",
+    "descripcion": "Alcohol de extra pureza desodorizado y refinado al 96% para la elaboración de perfumes, colonias, splashes corporales y ambientadores finos. Solvente cosmético de evaporación limpia.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -437,7 +437,7 @@ export const PRODUCTOS: Product[] = [
       "10L": 145500,
       "20L": 220500
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Alcohol desodorizado de alta pureza ideal para perfumería, colonias y cosmética. Excelente fijación y evaporación limpia."
   },
   {
     "id": "ambientador",
@@ -500,7 +500,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 165000,
       "20L": 249000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "ambientador-multiusos",
+    "shortDescription": "Limpia superficies y neutraliza olores mientras refresca cada espacio. Un litro listo para usar puede ambientar hasta 800 m²."
   },
   {
     "id": "ambientador-chicle",
@@ -531,7 +532,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 165000,
       "20L": 249000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "ambientador-multiusos",
+    "shortDescription": "Limpia superficies y neutraliza olores mientras refresca cada espacio. Un litro listo para usar puede ambientar hasta 800 m²."
   },
   {
     "id": "ambientador-kiwi",
@@ -562,7 +564,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 165000,
       "20L": 249000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "ambientador-multiusos",
+    "shortDescription": "Limpia superficies y neutraliza olores mientras refresca cada espacio. Un litro listo para usar puede ambientar hasta 800 m²."
   },
   {
     "id": "ambientador-talco",
@@ -593,7 +596,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 165000,
       "20L": 249000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "ambientador-multiusos",
+    "shortDescription": "Limpia superficies y neutraliza olores mientras refresca cada espacio. Un litro listo para usar puede ambientar hasta 800 m²."
   },
   {
     "id": "ambientador-tutti-frutti",
@@ -624,7 +628,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 165000,
       "20L": 249000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "ambientador-multiusos",
+    "shortDescription": "Limpia superficies y neutraliza olores mientras refresca cada espacio. Un litro listo para usar puede ambientar hasta 800 m²."
   },
   {
     "id": "bactokill",
@@ -885,8 +890,8 @@ export const PRODUCTOS: Product[] = [
       "20L": 92000,
       "3.8L": 34000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
+    "slogan": "Poder Desinfectante Neutralizador de Olores con Bicarbonato",
+    "descripcion": "Desinfectante líquido multisuperficies potenciado con bicarbonato de sodio. Neutraliza olores desagradables y elimina el 99.9% de gérmenes y bacterias.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -904,7 +909,7 @@ export const PRODUCTOS: Product[] = [
       "20L": 138000,
       "3.8L": 51000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Desinfectante multiusos potenciado con bicarbonato de sodio para neutralizar olores y eliminar el 99.9% de gérmenes."
   },
   {
     "id": "destapacanerias-1-kg",
@@ -912,8 +917,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 28000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
+    "slogan": "Fórmula Química de Alto Poder para Desobstrucción de Cañerías",
+    "descripcion": "Limpiador químico concentrado formulado para disolver obstrucciones de grasa, residuos orgánicos, jabón y cabello en tuberías y desagües.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -927,7 +932,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 42000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Fórmula concentrada de alto poder para disolver obstrucciones orgánicas, grasa y cabello en tuberías y cañerías."
   },
   {
     "id": "destapacanerias-250gr",
@@ -935,8 +940,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 8500
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
+    "slogan": "Fórmula Química de Alto Poder para Desobstrucción de Cañerías",
+    "descripcion": "Limpiador químico concentrado formulado para disolver obstrucciones de grasa, residuos orgánicos, jabón y cabello en tuberías y desagües.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -950,7 +955,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 12750
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Fórmula concentrada de alto poder para disolver obstrucciones orgánicas, grasa y cabello en tuberías y cañerías."
   },
   {
     "id": "detergente-liquido-multiusos",
@@ -1842,7 +1847,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 27000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Crema corporal ultra-nutritiva con aroma a café. Hidratación profunda, suavidad prolongada y nutrición para la piel."
   },
   {
     "id": "mantequilla-corporal-churumbelos",
@@ -1865,7 +1870,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 27000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Crema corporal ultra-nutritiva enriquecida para hidratación intensa y suavidad prolongada en la piel."
   },
   {
     "id": "mantequilla-corporal-fiesta-caribe",
@@ -1888,7 +1893,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 27750
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Crema corporal nutritiva de rápida absorción con fragancia tropical para una piel suave e hidratada."
   },
   {
     "id": "mantequilla-corporal-mistery-gorgona",
@@ -1911,7 +1916,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 27000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Crema corporal humectante de textura rica que cuida, nutre y suaviza la piel diariamente."
   },
   {
     "id": "mantequilla-corporal-nieve-del-cocuy",
@@ -1934,7 +1939,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 27000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Crema corporal ultra-hidratante y refrescante que restaura la humedad natural y flexibilidad de la piel."
   },
   {
     "id": "oxigeno-activo-desinfectante",
@@ -2023,8 +2028,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 50000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Fragancia Fina de Larga Duración para el Vehículo",
+    "descripcion": "Perfume ambiental para vehículos formulado con fragancias finas cosméticas. Neutraliza malos olores y ambienta el habitáculo de tu auto.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2038,7 +2043,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 75000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Fragancia fina para autos de larga duración que neutraliza olores y refresca el ambiente vehicular."
   },
   {
     "id": "perfume-autos-citrufresh-110-ml",
@@ -2046,8 +2051,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 50000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Fragancia Fina de Larga Duración para el Vehículo",
+    "descripcion": "Perfume ambiental para vehículos formulado con fragancias finas cosméticas. Neutraliza malos olores y ambienta el habitáculo de tu auto.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2061,7 +2066,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 75000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Fragancia fina para autos de larga duración que neutraliza olores y refresca el ambiente vehicular."
   },
   {
     "id": "perfume-autos-festivo-drive-110-ml",
@@ -2069,8 +2074,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 50000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Fragancia Fina de Larga Duración para el Vehículo",
+    "descripcion": "Perfume ambiental para vehículos formulado con fragancias finas cosméticas. Neutraliza malos olores y ambienta el habitáculo de tu auto.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2084,7 +2089,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 75000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Fragancia fina para autos de larga duración que neutraliza olores y refresca el ambiente vehicular."
   },
   {
     "id": "perfume-autos-tropico-110-ml",
@@ -2092,8 +2097,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 50000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Fragancia Fina de Larga Duración para el Vehículo",
+    "descripcion": "Perfume ambiental para vehículos formulado con fragancias finas cosméticas. Neutraliza malos olores y ambienta el habitáculo de tu auto.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2107,7 +2112,7 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "DEFAULT": 75000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Fragancia fina para autos de larga duración que neutraliza olores y refresca el ambiente vehicular."
   },
   {
     "id": "quita-oxido",
@@ -2438,8 +2443,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 57000,
       "20L": 85000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Limpieza Espumosa Profunda para Tapicería y Sofás",
+    "descripcion": "Shampoo especial concentrado para la limpieza profunda y remoción de manchas en muebles, sofás, colchones y tapicería.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2447,8 +2452,8 @@ export const PRODUCTOS: Product[] = [
     ],
     "badge": "",
     "color": "bg-gray-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Shampoo",
+    "categoria": "Aseo Hogar",
+    "subcategoria": "Muebles y Tapicería",
     "faqs": [],
     "competidorPromedio": {
       "1L": 18000,
@@ -2457,7 +2462,7 @@ export const PRODUCTOS: Product[] = [
       "10L": 85500,
       "20L": 127500
     },
-    "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
+    "shortDescription": "Limpia y remueve manchas en muebles, tapicería y cojinería sin empapar las fibras ni alterar los colores."
   },
   {
     "id": "shampoo-muebles-500ml",
@@ -2465,8 +2470,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 7500
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Limpieza Espumosa Profunda para Tapicería y Sofás",
+    "descripcion": "Shampoo especial concentrado para la limpieza profunda y remoción de manchas en muebles, sofás, colchones y tapicería.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2474,13 +2479,13 @@ export const PRODUCTOS: Product[] = [
     ],
     "badge": "",
     "color": "bg-gray-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Shampoo",
+    "categoria": "Aseo Hogar",
+    "subcategoria": "Muebles y Tapicería",
     "faqs": [],
     "competidorPromedio": {
       "DEFAULT": 11250
     },
-    "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
+    "shortDescription": "Limpia y remueve manchas en muebles, tapicería y cojinería sin empapar las fibras ni alterar los colores."
   },
   {
     "id": "silicona-autos",
@@ -2523,8 +2528,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 180000,
       "20L": 274000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Brillo Natural y Protección Antiestática para Muebles",
+    "descripcion": "Silicona lustramuebles formulada para nutrir, proteger y dar brillo a muebles de madera, cuero, vinilo y cuerotex.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2532,8 +2537,8 @@ export const PRODUCTOS: Product[] = [
     ],
     "badge": "",
     "color": "bg-gray-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Siliconas",
+    "categoria": "Aseo Hogar",
+    "subcategoria": "Muebles y Tapicería",
     "faqs": [],
     "competidorPromedio": {
       "1L": 18000,
@@ -2550,8 +2555,8 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "DEFAULT": 16000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para automotriz.",
+    "slogan": "Brillo Natural y Protección Antiestática para Muebles",
+    "descripcion": "Silicona lustramuebles formulada para nutrir, proteger y dar brillo a muebles de madera, cuero, vinilo y cuerotex.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2559,8 +2564,8 @@ export const PRODUCTOS: Product[] = [
     ],
     "badge": "",
     "color": "bg-gray-600",
-    "categoria": "Automotriz",
-    "subcategoria": "Siliconas",
+    "categoria": "Aseo Hogar",
+    "subcategoria": "Muebles y Tapicería",
     "faqs": [],
     "competidorPromedio": {
       "DEFAULT": 24000
@@ -2605,8 +2610,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2623,7 +2628,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-cafettal",
@@ -2634,8 +2639,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2652,7 +2657,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-churumbelos",
@@ -2663,8 +2668,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2681,7 +2686,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-fiesta-caribe",
@@ -2692,8 +2697,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2710,7 +2715,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-macarena",
@@ -2721,8 +2726,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2739,7 +2744,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-mysterium-gorgona",
@@ -2750,8 +2755,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2768,7 +2773,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-nieve-del-cocuy",
@@ -2779,8 +2784,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2797,7 +2802,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-orinoco-flow",
@@ -2808,8 +2813,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2826,7 +2831,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-rey-andino",
@@ -2837,8 +2842,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2855,7 +2860,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "splash-cuerpo-tesoro-tayrona",
@@ -2866,8 +2871,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 27000,
       "1/2G": 17000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para cuidado personal.",
+    "slogan": "Frescura Aromática y Sensación Refrescante Diaria",
+    "descripcion": "Loción corporal en splash de fórmula ligera y fragancia fina de larga duración. Refresca e hidrata suavemente la piel durante todo el día.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2884,7 +2889,7 @@ export const PRODUCTOS: Product[] = [
       "3.8L": 40000,
       "1/2G": 25000
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "shortDescription": "Loción corporal perfumada y refrescante de uso diario. Brinda una sensación de frescura duradera y aroma delicado sobre la piel."
   },
   {
     "id": "suavizante",
@@ -2937,8 +2942,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 66000,
       "20L": 103000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para aseo hogar.",
+    "slogan": "Máxima Suavidad y Fragancia Prolongada para la Ropa",
+    "descripcion": "Suavizante de telas concentrado con agentes acondicionadores de fibra y microcápsulas de aroma. Deja la ropa suave, fácil de planchar y perfumada.",
     "imgFile": "label_suavizante_suavizante_manzana_verde_galon.webp",
     "beneficios": [
       "Calidad Industrial",
@@ -2962,7 +2967,8 @@ export const PRODUCTOS: Product[] = [
       "3.8L": "label_suavizante_suavizante_manzana_verde_galon.webp",
       "1/2G": "label_suavizante_suavizante_manzana_verde_medio_galon.webp"
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "suavizante",
+    "shortDescription": "Suaviza, facilita el planchado y deja una fragancia agradable en cada ciclo. Un litro rinde hasta 20 cargas pequeñas."
   },
   {
     "id": "suavizante-motas-de-algodon",
@@ -2974,8 +2980,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 66000,
       "20L": 103000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para aseo hogar.",
+    "slogan": "Máxima Suavidad y Fragancia Prolongada para la Ropa",
+    "descripcion": "Suavizante de telas concentrado con agentes acondicionadores de fibra y microcápsulas de aroma. Deja la ropa suave, fácil de planchar y perfumada.",
     "imgFile": "placeholder.png",
     "beneficios": [
       "Calidad Industrial",
@@ -2993,7 +2999,8 @@ export const PRODUCTOS: Product[] = [
       "10L": 99000,
       "20L": 154500
     },
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "suavizante",
+    "shortDescription": "Suaviza, facilita el planchado y deja una fragancia agradable en cada ciclo. Un litro rinde hasta 20 cargas pequeñas."
   },
   {
     "id": "suavizante-sueno-lavanda",
@@ -3100,7 +3107,8 @@ export const PRODUCTOS: Product[] = [
     "categoria": "Línea Ropa",
     "subcategoria": "Detergentes",
     "faqs": [],
-    "shortDescription": "Solución de limpieza concentrada de grado profesional. Alto rendimiento por litro y resultados superiores en cada aplicación."
+    "manualContentKey": "detergente",
+    "shortDescription": "Detergente especial para ropa negra y oscura. Protege los colores oscuros, evita residuos blancos y rinde hasta 14 cargas por litro."
   },
   {
     "id": "jabon-manos-antibacterial",
