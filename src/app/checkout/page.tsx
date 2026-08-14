@@ -595,7 +595,7 @@ export default function CheckoutPage() {
                                                                 {shippingInfo.dias ? ` · ${shippingInfo.dias} días hábiles` : ''}
                                                             </span>
                                                             <span className="font-bold ml-auto flex-shrink-0">
-                                                                {shippingCost === 0 ? 'GRATIS' : `$${shippingCost.toLocaleString('es-CO')}`}
+                                                                {(shippingCost === 0 && (subtotal >= 100000 || shippingInfo.source === 'free_shipping')) ? 'GRATIS' : shippingCost > 0 ? `$${shippingCost.toLocaleString('es-CO')}` : 'Por calcular'}
                                                             </span>
                                                         </>
                                                     )}
@@ -603,7 +603,7 @@ export default function CheckoutPage() {
                                                         <>
                                                             <span>Envío estimado{shippingInfo.mensaje ? ` · ${shippingInfo.mensaje}` : ''}</span>
                                                             <span className="font-bold ml-auto flex-shrink-0">
-                                                                {shippingCost === 0 ? 'GRATIS' : `$${shippingCost.toLocaleString('es-CO')}`}
+                                                                {(shippingCost === 0 && subtotal >= 100000) ? 'GRATIS' : shippingCost > 0 ? `$${shippingCost.toLocaleString('es-CO')}` : 'Por calcular'}
                                                             </span>
                                                         </>
                                                     )}
@@ -781,15 +781,33 @@ export default function CheckoutPage() {
                                     <span className="text-gray-600">Subtotal</span>
                                     <span className="font-bold">{formatCurrency(subtotal)}</span>
                                 </div>
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-sm items-center">
                                     <span className="text-gray-600">Envío</span>
-                                    <span className="font-bold text-green-600">
-                                        {shippingCost === 0 ? 'GRATIS' : formatCurrency(shippingCost)}
-                                    </span>
+                                    {shippingInfo.loading ? (
+                                        <span className="font-medium text-amber-600 text-xs flex items-center gap-1.5">
+                                            <span className="animate-spin">⏳</span> Cotizando...
+                                        </span>
+                                    ) : !formData.ciudad || !destinoCodigo ? (
+                                        subtotal >= 100000 ? (
+                                            <span className="font-bold text-green-600">GRATIS</span>
+                                        ) : (
+                                            <span className="font-medium text-gray-400 text-xs">Por calcular</span>
+                                        )
+                                    ) : shippingInfo.sinCobertura ? (
+                                        <span className="font-bold text-red-600 text-xs">Sin cobertura</span>
+                                    ) : (subtotal >= 100000 || shippingInfo.source === 'free_shipping' || shippingCost === 0) ? (
+                                        <span className="font-bold text-green-600">GRATIS</span>
+                                    ) : (
+                                        <span className="font-bold text-gray-900">{formatCurrency(shippingCost)}</span>
+                                    )}
                                 </div>
-                                {subtotal >= 100000 && (
+                                {subtotal >= 100000 ? (
                                     <p className="text-xs text-green-600 font-bold">
                                         ✓ Envío gratis por compra superior a $100,000
+                                    </p>
+                                ) : (!formData.ciudad || !destinoCodigo) && (
+                                    <p className="text-[11px] text-gray-400">
+                                        * Selecciona tu ciudad para calcular el costo de envío
                                     </p>
                                 )}
                             </div>
