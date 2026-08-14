@@ -69,7 +69,9 @@ export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
         // Obsolete/deleted DB documents NOT present in static PRODUCTOS are excluded
     });
 
-    cachedProducts = Array.from(allProductsMap.values()).filter(p => !isSupplyItem(p));
+    cachedProducts = Array.from(allProductsMap.values())
+        .filter(p => !isSupplyItem(p))
+        .map(p => ensureStockDefaults(p));
     lastFetchTime = Date.now();
     return cachedProducts;
 }
@@ -82,19 +84,49 @@ export async function getProductById(id: string): Promise<Product | null> {
     const docSnap = await getDoc(docRef);
     const fallback = PRODUCTOS.find(p => p.id === id);
 
+    let res: Product | null = null;
     if (docSnap.exists()) {
         const dbData = { id: docSnap.id, ...docSnap.data() } as Product;
         if (fallback) {
-            return {
+            res = {
                 ...dbData,
                 ...fallback,
                 precios: fallback.precios
             };
+        } else {
+            res = dbData;
         }
-        return dbData;
+    } else {
+        res = fallback || null;
     }
 
-    return fallback || null;
+    return res ? ensureStockDefaults(res) : null;
+}
+
+/**
+ * Helper to ensure a product has valid stock data per size
+ */
+function ensureStockDefaults(product: Product): Product {
+    const stock: Record<string, number> = product.stock ? { ...product.stock } : {};
+    const defaultThreshold = product.minStockThreshold ?? 5;
+    const sku = product.sku || `BIO-${product.id.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 10)}`;
+
+    // Initialize stock for all price sizes if not present
+    if (product.precios) {
+        Object.keys(product.precios).forEach(size => {
+            if (stock[size] === undefined) {
+                // Default initial stock per size
+                stock[size] = size === '20L' ? 10 : size === '10L' ? 15 : size === '3.8L' ? 30 : 25;
+            }
+        });
+    }
+
+    return {
+        ...product,
+        stock,
+        minStockThreshold: defaultThreshold,
+        sku
+    };
 }
 
 /**
@@ -108,6 +140,20 @@ export async function saveProduct(product: Product): Promise<void> {
     await setDoc(docRef, data);
     
     // Invalidate cache
+    cachedProducts = null;
+}
+
+/**
+ * Updates stock quantity for a specific product size
+ */
+export async function updateProductStock(id: string, size: string, newStockQuantity: number): Promise<void> {
+    const product = await getProductById(id);
+    if (!product) throw new Error('Producto no encontrado');
+
+    const updatedStock = { ...(product.stock || {}), [size]: Math.max(0, newStockQuantity) };
+    const docRef = doc(db, 'products', id);
+    await updateDoc(docRef, { stock: updatedStock });
+
     cachedProducts = null;
 }
 

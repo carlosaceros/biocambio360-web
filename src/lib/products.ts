@@ -25,6 +25,10 @@ export interface Product {
     competidorPromedio: Record<string, number>;
     shortDescription?: string;
     manualContentKey?: string;
+    stock?: Record<string, number>; // Existencias por tamaño (ej: { '3.8L': 30, '10L': 5 })
+    minStockThreshold?: number; // Umbral de alerta para stock bajo (default: 5)
+    sku?: string; // Código de referencia único de inventario
+    isFeatured?: boolean; // Destacado en vitrina o catálogo principal
 }
 
 import { PRODUCTOS } from './products-data';
