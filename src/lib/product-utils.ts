@@ -35,6 +35,8 @@ export function generateProductSlug(id: string, nombre: string): string {
  */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
     const products = await getAllProducts();
+    const cleanSlug = slug.toLowerCase().trim();
+
     // Disabled combos blocklist
     if (
         cleanSlug.includes('kit-super-limpieza-completo') ||
