@@ -2465,29 +2465,6 @@ export const PRODUCTOS: Product[] = [
     "shortDescription": "Limpia y remueve manchas en muebles, tapicería y cojinería sin empapar las fibras ni alterar los colores."
   },
   {
-    "id": "shampoo-muebles-500ml",
-    "nombre": "Shampoo Muebles 500Ml",
-    "precios": {
-      "DEFAULT": 7500
-    },
-    "slogan": "Limpieza Espumosa Profunda para Tapicería y Sofás",
-    "descripcion": "Shampoo especial concentrado para la limpieza profunda y remoción de manchas en muebles, sofás, colchones y tapicería.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Aseo Hogar",
-    "subcategoria": "Muebles y Tapicería",
-    "faqs": [],
-    "competidorPromedio": {
-      "DEFAULT": 11250
-    },
-    "shortDescription": "Limpia y remueve manchas en muebles, tapicería y cojinería sin empapar las fibras ni alterar los colores."
-  },
-  {
     "id": "silicona-autos",
     "nombre": "Silicona Autos",
     "precios": {

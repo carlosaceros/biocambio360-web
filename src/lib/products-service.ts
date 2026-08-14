@@ -54,7 +54,7 @@ export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
         console.warn('Warning: Could not fetch products from Firestore during build, using static fallback:', e);
     }
 
-    // Merge hardcoded with DB (Static code definitions win for catalog metadata)
+    // Merge hardcoded with DB (Static code definitions win for catalog metadata and prices)
     const allProductsMap = new Map<string, Product>();
     PRODUCTOS.forEach(p => allProductsMap.set(p.id, p));
     products.forEach(p => {
@@ -63,11 +63,10 @@ export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
             allProductsMap.set(p.id, {
                 ...p,
                 ...staticP,
-                precios: { ...staticP.precios, ...(p.precios || {}) }
+                precios: staticP.precios
             });
-        } else {
-            allProductsMap.set(p.id, p);
         }
+        // Obsolete/deleted DB documents NOT present in static PRODUCTOS are excluded
     });
 
     cachedProducts = Array.from(allProductsMap.values()).filter(p => !isSupplyItem(p));
@@ -89,7 +88,7 @@ export async function getProductById(id: string): Promise<Product | null> {
             return {
                 ...dbData,
                 ...fallback,
-                precios: { ...fallback.precios, ...(dbData.precios || {}) }
+                precios: fallback.precios
             };
         }
         return dbData;
