@@ -1940,10 +1940,10 @@ export const PRODUCTOS: Product[] = [
     "id": "oxigeno-activo-desinfectante",
     "nombre": "Oxígeno Activo Blanqueador & Desinfectante en Polvo",
     "precios": {
-      "1KG": 18000,
-      "4KG": 45000,
-      "10KG": 82000,
-      "20KG": 145000
+      "1KG": 21000,
+      "4KG": 64000,
+      "10KG": 144000,
+      "20KG": 251000
     },
     "slogan": "Calidad Biocambio360",
     "descripcion": "Producto de alta eficiencia para especialidades.",
@@ -1975,7 +1975,7 @@ export const PRODUCTOS: Product[] = [
     "id": "pastillas-de-cloro-48-unidades",
     "nombre": "Pastillas de cloro 48 unidades",
     "precios": {
-      "DEFAULT": 35000
+      "DEFAULT": 37000
     },
     "slogan": "Calidad Biocambio360",
     "descripcion": "Producto de alta eficiencia para especialidades.",
@@ -2167,7 +2167,7 @@ export const PRODUCTOS: Product[] = [
     "id": "quita-oxido-60-ml",
     "nombre": "Quita óxido 60 Ml",
     "precios": {
-      "DEFAULT": 10500
+      "DEFAULT": 10000
     },
     "slogan": "Calidad Biocambio360",
     "descripcion": "Producto de alta eficiencia para especialidades.",
@@ -2620,11 +2620,11 @@ export const PRODUCTOS: Product[] = [
     "id": "silicona-lustramuebles",
     "nombre": "Silicona Lustramuebles",
     "precios": {
-      "1L": 12000,
-      "1/2G": 18000,
-      "3.8L": 33000,
-      "10L": 57000,
-      "20L": 85000
+      "1L": 23000,
+      "1/2G": 38000,
+      "3.8L": 72000,
+      "10L": 180000,
+      "20L": 274000
     },
     "slogan": "Calidad Biocambio360",
     "descripcion": "Producto de alta eficiencia para automotriz.",
