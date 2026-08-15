@@ -204,8 +204,8 @@ export async function validateCouponCode(
         return { valid: false, reason: 'Este cupón ya ha expirado.' };
     }
 
-    // Minimum Subtotal Check
-    if (coupon.minSubtotal && subtotal < coupon.minSubtotal) {
+    // Minimum Subtotal Check (solo aplica si el subtotal es mayor a 0 para permitir guardar el cupón con carrito vacío)
+    if (coupon.minSubtotal && subtotal > 0 && subtotal < coupon.minSubtotal) {
         return { 
             valid: false, 
             reason: `Este cupón requiere un subtotal mínimo de $${coupon.minSubtotal.toLocaleString('es-CO')} COP.` 

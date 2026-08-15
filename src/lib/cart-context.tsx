@@ -77,8 +77,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('biocambio360_cart', JSON.stringify(cart));
         } else {
             localStorage.removeItem('biocambio360_cart');
-            setAppliedCoupon(null);
-            localStorage.removeItem('biocambio360_coupon');
         }
     }, [cart]);
 
