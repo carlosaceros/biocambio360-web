@@ -92,10 +92,14 @@ export const DEFAULT_WHEEL_CONFIG: WheelConfig = {
     description: 'Prueba tu suerte y obtén cupones instantáneos para tu pedido de productos de aseo.',
     validUntil: '2026-12-31T23:59:59.000Z',
     segments: [
-        { id: 'seg_1', label: '10% OFF 1ra Compra', couponCode: 'PRIMERAZO10', color: '#E11D48', probabilityWeight: 4 },
-        { id: 'seg_2', label: '$5.000 COP Dto.', couponCode: 'AHORRO5K', color: '#2563EB', probabilityWeight: 3 },
-        { id: 'seg_3', label: '15% OFF Ruleta', couponCode: 'RULETA15', color: '#059669', probabilityWeight: 2 },
-        { id: 'seg_4', label: 'Envío Gratis VIP', couponCode: 'ENVIOVIP', color: '#7C3AED', probabilityWeight: 1 }
+        { id: 'seg_1', label: '10% OFF 1ra Compra', couponCode: 'PRIMERAZO10', color: '#DC2626', probabilityWeight: 4 },
+        { id: 'seg_2', label: 'A la próxima contarás con mejor suerte 🍀', couponCode: '', color: '#2563EB', probabilityWeight: 3 },
+        { id: 'seg_3', label: '$5.000 COP Dto.', couponCode: 'AHORRO5K', color: '#EC4899', probabilityWeight: 3 },
+        { id: 'seg_4', label: 'Envío Gratis VIP', couponCode: 'ENVIOVIP', color: '#10B981', probabilityWeight: 2 },
+        { id: 'seg_5', label: 'A la próxima contarás con mejor suerte 💫', couponCode: '', color: '#0284C7', probabilityWeight: 3 },
+        { id: 'seg_6', label: '15% OFF Ruleta', couponCode: 'RULETA15', color: '#7C3AED', probabilityWeight: 2 },
+        { id: 'seg_7', label: 'Sigue intentando 🎯', couponCode: '', color: '#F59E0B', probabilityWeight: 3 },
+        { id: 'seg_8', label: 'Combo Especial Pajarito', couponCode: 'PRIMERAZO10', color: '#1D4ED8', probabilityWeight: 2 }
     ]
 };
 

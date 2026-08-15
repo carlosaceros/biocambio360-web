@@ -435,28 +435,94 @@ export default function AdminCouponsPage() {
 
                         {/* Segments configuration */}
                         <div className="space-y-4 pt-2">
-                            <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider">Segmentos de la Ruleta (Premios)</h3>
-                            
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider">
+                                        Segmentos de la Ruleta ({wheelConfig.segments.length} / 15 Máximo)
+                                    </h3>
+                                    <p className="text-xs text-gray-500">
+                                        Puedes agregar cupones con descuento o casillas sin premio ("A la próxima contarás con mejor suerte").
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (wheelConfig.segments.length >= 15) return alert('Máximo 15 segmentos permitidos');
+                                        const biocambioColors = ['#DC2626', '#2563EB', '#EC4899', '#10B981', '#0284C7', '#7C3AED', '#F59E0B', '#1D4ED8'];
+                                        const nextColor = biocambioColors[wheelConfig.segments.length % biocambioColors.length];
+                                        const newSeg: WheelSegment = {
+                                            id: `seg_${Date.now()}`,
+                                            label: wheelConfig.segments.length % 2 === 1 ? 'A la próxima contarás con mejor suerte 🍀' : '10% OFF Especial',
+                                            couponCode: wheelConfig.segments.length % 2 === 1 ? '' : 'PRIMERAZO10',
+                                            color: nextColor,
+                                            probabilityWeight: 3
+                                        };
+                                        setWheelConfig({ ...wheelConfig, segments: [...wheelConfig.segments, newSeg] });
+                                    }}
+                                    disabled={wheelConfig.segments.length >= 15}
+                                    className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                    <Plus size={16} />
+                                    Agregar Premio / Casilla (+1)
+                                </button>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {wheelConfig.segments.map((seg, idx) => (
-                                    <div key={seg.id} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-3">
+                                    <div key={seg.id || idx} className="p-4 rounded-2xl border border-gray-200 bg-gray-50/60 space-y-3 relative">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs font-black text-gray-600">Segmento #{idx + 1}</span>
-                                            <input
-                                                type="color"
-                                                value={seg.color}
-                                                onChange={(e) => {
-                                                    const newSegs = [...wheelConfig.segments];
-                                                    newSegs[idx].color = e.target.value;
-                                                    setWheelConfig({ ...wheelConfig, segments: newSegs });
-                                                }}
-                                                className="w-8 h-8 rounded border-none cursor-pointer"
-                                            />
+                                            <span className="text-xs font-black text-gray-700 bg-gray-200 px-2 py-0.5 rounded-md">
+                                                Casilla #{idx + 1} {!seg.couponCode && '(Sin Premio)'}
+                                            </span>
+                                            
+                                            <div className="flex items-center gap-2">
+                                                {/* Palette Quick Pick */}
+                                                <div className="flex items-center gap-1">
+                                                    {['#DC2626', '#2563EB', '#EC4899', '#10B981', '#7C3AED', '#F59E0B'].map(hex => (
+                                                        <button
+                                                            key={hex}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newSegs = [...wheelConfig.segments];
+                                                                newSegs[idx].color = hex;
+                                                                setWheelConfig({ ...wheelConfig, segments: newSegs });
+                                                            }}
+                                                            style={{ backgroundColor: hex }}
+                                                            className={`w-4 h-4 rounded-full border ${seg.color === hex ? 'ring-2 ring-black scale-110' : 'opacity-80 hover:opacity-100'}`}
+                                                            title={`Color Biocambio ${hex}`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <input
+                                                    type="color"
+                                                    value={seg.color}
+                                                    onChange={(e) => {
+                                                        const newSegs = [...wheelConfig.segments];
+                                                        newSegs[idx].color = e.target.value;
+                                                        setWheelConfig({ ...wheelConfig, segments: newSegs });
+                                                    }}
+                                                    className="w-7 h-7 rounded-lg border-none cursor-pointer"
+                                                    title="Color personalizado"
+                                                />
+                                                {wheelConfig.segments.length > 2 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newSegs = wheelConfig.segments.filter((_, sIdx) => sIdx !== idx);
+                                                            setWheelConfig({ ...wheelConfig, segments: newSegs });
+                                                        }}
+                                                        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Eliminar esta casilla"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label className="block text-[11px] font-bold text-gray-600">Etiqueta Visible</label>
+                                            <div className="col-span-2">
+                                                <label className="block text-[11px] font-bold text-gray-600 mb-1">Texto Visible en Ruleta *</label>
                                                 <input
                                                     type="text"
                                                     value={seg.label}
@@ -465,11 +531,12 @@ export default function AdminCouponsPage() {
                                                         newSegs[idx].label = e.target.value;
                                                         setWheelConfig({ ...wheelConfig, segments: newSegs });
                                                     }}
-                                                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white"
+                                                    placeholder="Ej: A la próxima contarás con mejor suerte 🍀 o 10% OFF"
+                                                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white text-gray-900 font-medium"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[11px] font-bold text-gray-600">Código Cupón Ganador</label>
+                                                <label className="block text-[11px] font-bold text-gray-600 mb-1">Código Cupón (Vacío = Sin Premio)</label>
                                                 <input
                                                     type="text"
                                                     value={seg.couponCode}
@@ -478,7 +545,23 @@ export default function AdminCouponsPage() {
                                                         newSegs[idx].couponCode = e.target.value.toUpperCase();
                                                         setWheelConfig({ ...wheelConfig, segments: newSegs });
                                                     }}
+                                                    placeholder="Ej: PRIMERAZO10 o dejar vacío"
                                                     className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white uppercase font-mono font-bold"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-gray-600 mb-1">Peso Probabilidad (1-10)</label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={10}
+                                                    value={seg.probabilityWeight || 3}
+                                                    onChange={(e) => {
+                                                        const newSegs = [...wheelConfig.segments];
+                                                        newSegs[idx].probabilityWeight = Number(e.target.value);
+                                                        setWheelConfig({ ...wheelConfig, segments: newSegs });
+                                                    }}
+                                                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white text-center font-bold"
                                                 />
                                             </div>
                                         </div>

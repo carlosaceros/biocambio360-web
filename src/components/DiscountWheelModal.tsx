@@ -318,33 +318,64 @@ export default function DiscountWheelModal() {
                                             {isSpinning ? '🌀 GIRANDO RULETA...' : '🎯 ¡GIRAR RULETA AHORA!'}
                                         </button>
                                     ) : (
-                                        /* Winner Result Box */
+                                        /* Winner / Result Box */
                                         <motion.div
                                             initial={{ scale: 0.8, opacity: 0 }}
                                             animate={{ scale: 1, opacity: 1 }}
-                                            className="w-full mt-3 bg-green-50 border-2 border-green-300 p-4 rounded-2xl space-y-2.5"
+                                            className={`w-full mt-3 p-4 rounded-2xl space-y-2.5 border-2 ${
+                                                wonCoupon?.code 
+                                                    ? 'bg-green-50 border-green-300' 
+                                                    : 'bg-blue-50 border-blue-300'
+                                            }`}
                                         >
-                                            <div className="flex items-center justify-center gap-1.5 text-green-700 font-extrabold text-sm">
-                                                <CheckCircle2 size={18} />
-                                                ¡FELICITACIONES! GANASTE:
-                                            </div>
-                                            <div className="text-xl sm:text-2xl font-black text-gray-900">
-                                                {wonCoupon?.label}
-                                            </div>
-                                            <div className="bg-white border-2 border-green-400 px-5 py-2 rounded-xl font-mono font-black text-xl text-green-800 tracking-widest inline-block shadow-sm">
-                                                {wonCoupon?.code}
-                                            </div>
-                                            <p className="text-[11px] text-green-700 font-bold">
-                                                ✓ Tu cupón ha sido guardado exitosamente. Se aplicará a tu primer producto.
-                                            </p>
+                                            {wonCoupon?.code ? (
+                                                <>
+                                                    <div className="flex items-center justify-center gap-1.5 text-green-700 font-extrabold text-sm">
+                                                        <CheckCircle2 size={18} />
+                                                        ¡FELICITACIONES! GANASTE:
+                                                    </div>
+                                                    <div className="text-xl sm:text-2xl font-black text-gray-900">
+                                                        {wonCoupon?.label}
+                                                    </div>
+                                                    <div className="bg-white border-2 border-green-400 px-5 py-2 rounded-xl font-mono font-black text-xl text-green-800 tracking-widest inline-block shadow-sm">
+                                                        {wonCoupon?.code}
+                                                    </div>
+                                                    <p className="text-[11px] text-green-700 font-bold">
+                                                        ✓ Tu cupón ha sido guardado exitosamente. Se aplicará automáticamente al agregar productos.
+                                                    </p>
 
-                                            <button
-                                                onClick={handleApplyAndClose}
-                                                className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3.5 rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
-                                            >
-                                                <Ticket size={16} />
-                                                ¡IR A AGREGAR PRODUCTOS Y VER MI CARRITO!
-                                            </button>
+                                                    <button
+                                                        onClick={handleApplyAndClose}
+                                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3.5 rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+                                                    >
+                                                        <Ticket size={16} />
+                                                        ¡IR A AGREGAR PRODUCTOS Y VER CARRITO!
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center justify-center gap-1.5 text-blue-700 font-extrabold text-sm">
+                                                        <Sparkles size={18} />
+                                                        ¡GRACIAS POR PARTICIPAR!
+                                                    </div>
+                                                    <div className="text-lg sm:text-xl font-black text-gray-900">
+                                                        {wonCoupon?.label || 'A la próxima contarás con mejor suerte 🍀'}
+                                                    </div>
+                                                    <p className="text-xs text-gray-600 font-medium">
+                                                        Recuerda que en Biocambio360 compras directo de fábrica con hasta 60% de ahorro vs marcas comerciales.
+                                                    </p>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsOpen(false);
+                                                        }}
+                                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+                                                    >
+                                                        <ArrowRight size={16} />
+                                                        ¡EXPLORAR CATÁLOGO DE FÁBRICA!
+                                                    </button>
+                                                </>
+                                            )}
                                         </motion.div>
                                     )}
                                 </div>
