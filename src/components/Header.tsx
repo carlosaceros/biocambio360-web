@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingCart, Menu, Building2, Sparkles, PhoneCall } from 'lucide-react';
+import { ShoppingCart, Building2 } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 
 export default function Header() {
@@ -9,9 +9,9 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-xs">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4">
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-2">
+                <Link href="/" className="flex items-center gap-2 shrink-0">
                     <img
                         src="/images/logo-biocambio360.png"
                         alt="Biocambio360"
@@ -19,8 +19,8 @@ export default function Header() {
                     />
                 </Link>
 
-                {/* Navigation Links */}
-                <nav className="hidden md:flex items-center gap-6 font-bold text-xs sm:text-sm text-gray-700">
+                {/* Navigation Links - Centered */}
+                <nav className="hidden md:flex items-center justify-center gap-6 font-bold text-xs sm:text-sm text-gray-700 flex-1">
                     <Link href="/" className="hover:text-red-600 transition-colors">
                         Catálogo Fábrica
                     </Link>
@@ -40,7 +40,7 @@ export default function Header() {
                 </nav>
 
                 {/* Right Action Buttons */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                     <Link
                         href="/cotizador-b2b"
                         className="md:hidden bg-teal-50 text-teal-700 px-3 py-1.5 rounded-full text-xs font-black border border-teal-200 flex items-center gap-1"

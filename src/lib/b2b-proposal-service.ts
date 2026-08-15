@@ -47,9 +47,8 @@ const proposalsRef = collection(db, 'b2b_proposals');
  */
 export async function createB2BProposal(proposalData: Omit<B2BProposal, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'status'>): Promise<B2BProposal> {
     const now = new Date().toISOString();
-    const countSnap = await getDocs(proposalsRef);
-    const count = countSnap.size + 101;
-    const code = `COT-${new Date().getFullYear()}-${count.toString().padStart(4, '0')}`;
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const code = `COT-${new Date().getFullYear()}-${randomSuffix}`;
 
     const newProposal: B2BProposal = {
         ...proposalData,
@@ -63,7 +62,7 @@ export async function createB2BProposal(proposalData: Omit<B2BProposal, 'id' | '
         const docRef = await addDoc(proposalsRef, newProposal);
         return { ...newProposal, id: docRef.id };
     } catch (e) {
-        console.warn('Error saving B2B proposal to Firestore, returning local fallback:', e);
+        console.warn('Error saving B2B proposal to Firestore, returning local proposal:', e);
         return { ...newProposal, id: `local_${Date.now()}` };
     }
 }
