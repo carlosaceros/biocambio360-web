@@ -48,7 +48,7 @@ export default function DiscountWheelModal() {
         }
     }, []);
 
-    // Draw canvas wheel with HD resolution and text flipping logic for 100% legibility
+    // Draw canvas wheel with HD resolution and crisp legible text
     useEffect(() => {
         if (!config || !canvasRef.current || !config.segments.length) return;
         const canvas = canvasRef.current;
@@ -67,10 +67,10 @@ export default function DiscountWheelModal() {
         // 1. Draw outer gold decorative rim
         ctx.beginPath();
         ctx.arc(center, center, radius + 12, 0, 2 * Math.PI);
-        ctx.fillStyle = '#1E293B';
+        ctx.fillStyle = '#0F172A';
         ctx.fill();
 
-        // 2. Draw segments
+        // 2. Draw pie slices
         segments.forEach((seg, i) => {
             const angle = i * arc;
             ctx.beginPath();
@@ -83,7 +83,7 @@ export default function DiscountWheelModal() {
             ctx.strokeStyle = '#FFFFFF';
             ctx.stroke();
 
-            // 3. Draw text label with smart orientation (flipping left-side text right-side up)
+            // 3. Draw text label centered inside slice with smart orientation & line wrapping
             ctx.save();
             ctx.translate(center, center);
             const midAngle = angle + arc / 2;
@@ -94,22 +94,40 @@ export default function DiscountWheelModal() {
 
             ctx.rotate(midAngle);
 
+            ctx.font = numSegments > 10 ? '900 13px system-ui, sans-serif' : '900 16px system-ui, sans-serif';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+            ctx.shadowBlur = 4;
+
+            // Line wrap algorithm for long labels
+            const words = seg.label.split(' ');
+            let line1 = seg.label;
+            let line2 = '';
+
+            if (seg.label.length > 12 && words.length > 1) {
+                const mid = Math.ceil(words.length / 2);
+                line1 = words.slice(0, mid).join(' ');
+                line2 = words.slice(mid).join(' ');
+            }
+
+            const dist = radius * 0.62;
+
             if (isLeftSide) {
-                // Flip text 180 degrees so it reads right-side up left-to-right!
                 ctx.rotate(Math.PI);
-                ctx.textAlign = 'left';
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = '900 18px system-ui, sans-serif';
-                ctx.shadowColor = 'rgba(0,0,0,0.7)';
-                ctx.shadowBlur = 6;
-                ctx.fillText(seg.label, -(radius - 30), 6);
+                if (line2) {
+                    ctx.fillText(line1, -dist, -6);
+                    ctx.fillText(line2, -dist, 12);
+                } else {
+                    ctx.fillText(line1, -dist, 4);
+                }
             } else {
-                ctx.textAlign = 'right';
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = '900 18px system-ui, sans-serif';
-                ctx.shadowColor = 'rgba(0,0,0,0.7)';
-                ctx.shadowBlur = 6;
-                ctx.fillText(seg.label, radius - 30, 6);
+                if (line2) {
+                    ctx.fillText(line1, dist, -6);
+                    ctx.fillText(line2, dist, 12);
+                } else {
+                    ctx.fillText(line1, dist, 4);
+                }
             }
             ctx.restore();
         });
@@ -129,13 +147,13 @@ export default function DiscountWheelModal() {
             ctx.stroke();
         }
 
-        // 5. Center pin (base placeholder on canvas)
+        // 5. Clean white center circle on canvas (logo sits on top via JSX overlay)
         ctx.beginPath();
         ctx.arc(center, center, 44, 0, 2 * Math.PI);
         ctx.fillStyle = '#FFFFFF';
         ctx.fill();
         ctx.lineWidth = 5;
-        ctx.strokeStyle = '#1E293B';
+        ctx.strokeStyle = '#0F172A';
         ctx.stroke();
     }, [config, isOpen, isFormSubmitted]);
 
@@ -175,14 +193,16 @@ export default function DiscountWheelModal() {
             randomWeight -= w;
         }
 
-        // 2. Dynamic angle calculation with continuous cumulative rotation & jitter
+        // 2. Exact Angle Alignment for 12 o'clock (270°) Top Pointer
         const segmentAngle = 360 / numSegments;
-        const segmentCenterAngle = (360 - (selectedIdx * segmentAngle + segmentAngle / 2));
+        // Pointer arrow is at 12 o'clock (270 degrees).
+        // Align segment selectedIdx center to 270 degrees:
+        const segmentCenterAngle = 270 - (selectedIdx * segmentAngle + segmentAngle / 2);
         
-        // Random jitter inside the segment slice (-35% to +35% of segment width)
+        // Random jitter inside segment slice (-35% to +35% of slice width)
         const randomJitter = (Math.random() - 0.5) * (segmentAngle * 0.7);
         
-        // Random extra turns (5 to 8 full revolutions)
+        // Continuous multi-turn spin (5 to 8 full 360° revolutions)
         const extraSpins = (5 + Math.floor(Math.random() * 4)) * 360;
 
         const currentBase = Math.ceil(rotationDegree / 360) * 360;
@@ -199,7 +219,7 @@ export default function DiscountWheelModal() {
             setWonCoupon(wonObj);
             localStorage.setItem('biocambio360_wheel_won', JSON.stringify(wonObj));
 
-            // Auto apply coupon immediately (persists even if cart is empty!)
+            // Auto apply coupon immediately if coupon code exists
             if (winningSeg.couponCode) {
                 await applyCoupon(winningSeg.couponCode, emailOrPhone, emailOrPhone);
             }
@@ -207,7 +227,7 @@ export default function DiscountWheelModal() {
     };
 
     const handleApplyAndClose = async () => {
-        if (wonCoupon) {
+        if (wonCoupon && wonCoupon.code) {
             await applyCoupon(wonCoupon.code, emailOrPhone, emailOrPhone);
         }
         setIsOpen(false);
@@ -226,7 +246,7 @@ export default function DiscountWheelModal() {
                 className="fixed bottom-6 left-6 z-40 bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 text-white font-black px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 text-xs border-2 border-white/40 cursor-pointer animate-pulse"
             >
                 <Sparkles size={18} className="text-yellow-300" />
-                <span>{hasSpun && wonCoupon ? `🎁 Tu Cupón: ${wonCoupon.code}` : '🎁 Gira la Ruleta de Descuentos'}</span>
+                <span>{hasSpun && wonCoupon ? (wonCoupon.code ? `🎁 Tu Cupón: ${wonCoupon.code}` : '🎁 Ruleta Biocambio360') : '🎁 Gira la Ruleta de Descuentos'}</span>
             </motion.button>
 
             {/* Modal */}
@@ -258,7 +278,7 @@ export default function DiscountWheelModal() {
 
                             <div className="flex items-center justify-center gap-2 mb-1 text-red-600 font-extrabold text-xs uppercase tracking-wider">
                                 <Sparkles size={16} />
-                                PROMOCIÓN EXCLUSIVA PAJARITO 2026
+                                PROMOCIÓN EXCLUSIVA BIOCAMBIO360
                             </div>
                             <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-1">{config.title}</h2>
                             <p className="text-xs text-gray-500 mb-5">{config.description}</p>
@@ -303,23 +323,16 @@ export default function DiscountWheelModal() {
                                 <div className="flex flex-col items-center">
                                     {/* Wheel Pointer Indicator & Outer Container */}
                                     <div className="relative w-72 h-72 sm:w-96 sm:h-96 flex items-center justify-center my-3">
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[24px] border-t-red-600 drop-shadow-lg" />
+                                        {/* Red Arrow Pointer at Top 12 o'clock */}
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-40 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[24px] border-t-red-600 drop-shadow-xl" />
 
-                                        {/* Center Fixed Logo Badge (Biocambio360) */}
-                                        <div className="absolute inset-0 m-auto z-20 w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-full border-4 border-slate-800 shadow-2xl flex flex-col items-center justify-center p-1 pointer-events-none">
+                                        {/* Center Fixed Header Logo Badge (Biocambio360) */}
+                                        <div className="absolute inset-0 m-auto z-30 w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-full border-4 border-slate-900 shadow-2xl flex items-center justify-center p-2.5 pointer-events-none">
                                             <img
                                                 src="/images/logo-biocambio360.png"
-                                                alt="Biocambio360"
+                                                alt="Biocambio360 Logo"
                                                 className="w-full h-full object-contain"
-                                                onError={(e) => {
-                                                    // Fallback stylized brand text if image fails to load
-                                                    (e.target as HTMLElement).style.display = 'none';
-                                                }}
                                             />
-                                            <div className="text-[10px] sm:text-[11px] font-black leading-tight text-center">
-                                                <span className="text-red-600 block">BIOCAMBIO</span>
-                                                <span className="text-blue-600 block">360</span>
-                                            </div>
                                         </div>
 
                                         {/* Canvas Wheel */}
