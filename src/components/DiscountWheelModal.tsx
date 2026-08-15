@@ -129,19 +129,14 @@ export default function DiscountWheelModal() {
             ctx.stroke();
         }
 
-        // 5. Center pin
+        // 5. Center pin (base placeholder on canvas)
         ctx.beginPath();
-        ctx.arc(center, center, 32, 0, 2 * Math.PI);
+        ctx.arc(center, center, 44, 0, 2 * Math.PI);
         ctx.fillStyle = '#FFFFFF';
         ctx.fill();
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         ctx.strokeStyle = '#1E293B';
         ctx.stroke();
-
-        ctx.fillStyle = '#DC2626';
-        ctx.font = '900 12px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('PAJARITO', center, center + 4);
     }, [config, isOpen, isFormSubmitted]);
 
     if (!config || !config.isActive) return null;
@@ -159,22 +154,40 @@ export default function DiscountWheelModal() {
         const segments = config.segments;
         const numSegments = segments.length;
 
-        // Weighted random selection
-        const totalWeight = segments.reduce((sum, s) => sum + s.probabilityWeight, 0);
-        let randomWeight = Math.random() * totalWeight;
+        // 1. Cryptographic weighted random selection
+        const totalWeight = segments.reduce((sum, s) => sum + (s.probabilityWeight || 1), 0);
+        let randomVal = Math.random();
+        if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+            const arr = new Uint32Array(1);
+            window.crypto.getRandomValues(arr);
+            randomVal = arr[0] / (0xFFFFFFFF + 1);
+        }
+
+        let randomWeight = randomVal * totalWeight;
         let selectedIdx = 0;
 
         for (let i = 0; i < numSegments; i++) {
-            if (randomWeight < segments[i].probabilityWeight) {
+            const w = segments[i].probabilityWeight || 1;
+            if (randomWeight < w) {
                 selectedIdx = i;
                 break;
             }
-            randomWeight -= segments[i].probabilityWeight;
+            randomWeight -= w;
         }
 
+        // 2. Dynamic angle calculation with continuous cumulative rotation & jitter
         const segmentAngle = 360 / numSegments;
-        // Offset angle so winning segment points up to 12 o'clock (270 degrees)
-        const targetAngle = 360 * 5 + (360 - (selectedIdx * segmentAngle + segmentAngle / 2));
+        const segmentCenterAngle = (360 - (selectedIdx * segmentAngle + segmentAngle / 2));
+        
+        // Random jitter inside the segment slice (-35% to +35% of segment width)
+        const randomJitter = (Math.random() - 0.5) * (segmentAngle * 0.7);
+        
+        // Random extra turns (5 to 8 full revolutions)
+        const extraSpins = (5 + Math.floor(Math.random() * 4)) * 360;
+
+        const currentBase = Math.ceil(rotationDegree / 360) * 360;
+        const targetAngle = currentBase + extraSpins + segmentCenterAngle + randomJitter;
+
         setRotationDegree(targetAngle);
 
         setTimeout(async () => {
@@ -291,6 +304,23 @@ export default function DiscountWheelModal() {
                                     {/* Wheel Pointer Indicator & Outer Container */}
                                     <div className="relative w-72 h-72 sm:w-96 sm:h-96 flex items-center justify-center my-3">
                                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[24px] border-t-red-600 drop-shadow-lg" />
+
+                                        {/* Center Fixed Logo Badge (Biocambio360) */}
+                                        <div className="absolute inset-0 m-auto z-20 w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-full border-4 border-slate-800 shadow-2xl flex flex-col items-center justify-center p-1 pointer-events-none">
+                                            <img
+                                                src="/images/logo-biocambio360.png"
+                                                alt="Biocambio360"
+                                                className="w-full h-full object-contain"
+                                                onError={(e) => {
+                                                    // Fallback stylized brand text if image fails to load
+                                                    (e.target as HTMLElement).style.display = 'none';
+                                                }}
+                                            />
+                                            <div className="text-[10px] sm:text-[11px] font-black leading-tight text-center">
+                                                <span className="text-red-600 block">BIOCAMBIO</span>
+                                                <span className="text-blue-600 block">360</span>
+                                            </div>
+                                        </div>
 
                                         {/* Canvas Wheel */}
                                         <div
