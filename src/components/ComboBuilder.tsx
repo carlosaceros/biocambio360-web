@@ -353,7 +353,7 @@ function CustomComboBuilder({ products, onAddToCart }: { products: Product[]; on
                         </div>
                         <div>
                             <span className="text-sm font-black text-[var(--brand-dark)] block">
-                                Ahorras {formatCurrency(pricing.ahorroDinero)} en este Combo
+                                Ahorras {formatCurrency(pricing.descuento)} en este Combo
                             </span>
                             <span className="text-xs text-gray-500">
                                 Precio directo de fábrica Biocambio360
