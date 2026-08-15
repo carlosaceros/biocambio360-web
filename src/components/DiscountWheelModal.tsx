@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Gift, ArrowRight, CheckCircle2, Ticket } from 'lucide-react';
 import { WheelConfig, WheelSegment } from '@/lib/coupon-types';
-import { getWheelConfig } from '@/lib/coupons-service';
+import { configDocRef } from '@/lib/coupons-service';
+import { onSnapshot } from 'firebase/firestore';
 import { useCart } from '@/lib/cart-context';
 
 export default function DiscountWheelModal() {
@@ -28,14 +29,28 @@ export default function DiscountWheelModal() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        // Load wheel config - always fetch live from Firestore
-        getWheelConfig().then(cfg => {
-            setConfig(cfg);
-            setIsLoaded(true);
-        }).catch(() => {
-            // On error, mark as loaded but config stays null → wheel hidden
-            setIsLoaded(true);
-        });
+        // Use onSnapshot for REAL-TIME updates from Firestore
+        // This way when admin toggles isActive, the change reflects immediately
+        // without the user needing to reload the page.
+        const unsubscribe = onSnapshot(
+            configDocRef,
+            (snap) => {
+                if (snap.exists()) {
+                    const data = snap.data() as WheelConfig;
+                    setConfig(data);
+                } else {
+                    // Document doesn't exist → wheel never configured → stay hidden
+                    setConfig(null);
+                }
+                setIsLoaded(true);
+            },
+            (error) => {
+                // On Firestore error → hide wheel (safe default)
+                console.warn('Wheel config read error:', error);
+                setConfig(null);
+                setIsLoaded(true);
+            }
+        );
 
         // Check if user previously spun
         const savedSpin = localStorage.getItem('biocambio360_wheel_won');
@@ -49,6 +64,8 @@ export default function DiscountWheelModal() {
                 // ignore
             }
         }
+
+        return () => unsubscribe();
     }, []);
 
     // Draw canvas wheel with HD resolution and crisp legible text

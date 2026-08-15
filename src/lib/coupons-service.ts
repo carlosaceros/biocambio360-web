@@ -18,7 +18,7 @@ import {
 } from './coupon-types';
 
 const couponsCollection = collection(db, 'coupons');
-const configDocRef = doc(db, 'wheel_config', 'main');
+export const configDocRef = doc(db, 'wheel_config', 'main');
 
 // Default initial coupons for Colombian e-commerce retail
 export const INITIAL_COUPONS: Coupon[] = [

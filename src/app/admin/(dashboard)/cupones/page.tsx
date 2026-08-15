@@ -59,6 +59,8 @@ export default function AdminCouponsPage() {
 
     // Wheel configuration state
     const [wheelConfig, setWheelConfig] = useState<WheelConfig | null>(null);
+    const [toggleSaving, setToggleSaving] = useState(false);
+    const [toggleMessage, setToggleMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
     const loadData = async () => {
         setLoading(true);
@@ -404,21 +406,33 @@ export default function AdminCouponsPage() {
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-3 bg-gray-50 px-4 py-2.5 rounded-2xl border border-gray-200">
+                            <div className="flex flex-wrap items-center gap-3 bg-gray-50 px-4 py-3 rounded-2xl border border-gray-200">
                                 <span className="text-xs font-black uppercase text-gray-700">Estado de la Ruleta:</span>
                                 <button
                                     type="button"
+                                    disabled={toggleSaving}
                                     onClick={async () => {
+                                        if (!wheelConfig) return;
                                         const nextState = !wheelConfig.isActive;
                                         const updatedConfig = { ...wheelConfig, isActive: nextState };
+                                        // Optimistic UI update
                                         setWheelConfig(updatedConfig);
+                                        setToggleSaving(true);
+                                        setToggleMessage(null);
                                         try {
                                             await saveWheelConfig(updatedConfig);
-                                        } catch (err) {
+                                            setToggleMessage({ type: 'ok', text: nextState ? '✅ Ruleta activada y guardada' : '✅ Ruleta desactivada y guardada' });
+                                        } catch (err: any) {
+                                            // Revert on failure
+                                            setWheelConfig({ ...updatedConfig, isActive: !nextState });
+                                            setToggleMessage({ type: 'err', text: `❌ Error al guardar: ${err?.message || 'Revisa la consola'}` });
                                             console.error('Error auto-saving wheel status:', err);
+                                        } finally {
+                                            setToggleSaving(false);
+                                            setTimeout(() => setToggleMessage(null), 4000);
                                         }
                                     }}
-                                    className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                    className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
                                         wheelConfig.isActive ? 'bg-emerald-600' : 'bg-gray-300'
                                     }`}
                                 >
@@ -429,8 +443,15 @@ export default function AdminCouponsPage() {
                                     />
                                 </button>
                                 <span className={`text-xs font-extrabold ${wheelConfig.isActive ? 'text-emerald-700' : 'text-gray-500'}`}>
-                                    {wheelConfig.isActive ? '🟢 ACTIVA EN TIENDA' : '🔴 INACTIVA'}
+                                    {toggleSaving ? '⏳ Guardando...' : (wheelConfig.isActive ? '🟢 ACTIVA EN TIENDA' : '🔴 INACTIVA')}
                                 </span>
+                                {toggleMessage && (
+                                    <span className={`text-xs font-bold px-3 py-1 rounded-lg ${
+                                        toggleMessage.type === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                    }`}>
+                                        {toggleMessage.text}
+                                    </span>
+                                )}
                             </div>
                         </div>
 
