@@ -29,7 +29,7 @@ export default function DiscountWheelModal() {
     useEffect(() => {
         // Load wheel config
         getWheelConfig().then(cfg => {
-            if (cfg && cfg.isActive) {
+            if (cfg) {
                 setConfig(cfg);
             }
         });
@@ -286,6 +286,10 @@ export default function DiscountWheelModal() {
         setIsOpen(false);
         setIsCartOpen(true);
     };
+
+    if (!config || !config.isActive) {
+        return null;
+    }
 
     return (
         <>
