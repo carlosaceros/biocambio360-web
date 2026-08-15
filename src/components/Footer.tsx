@@ -41,7 +41,9 @@ export default function Footer() {
                         <h4 className="font-extrabold text-xs uppercase tracking-wider text-teal-400 mb-3">Contacto de Fábrica</h4>
                         <ul className="space-y-2 text-xs text-gray-300">
                             <li>📍 Planta: Soacha / Cundinamarca</li>
-                            <li>📱 WhatsApp: +57 322 911 5942</li>
+                            <li>
+                                📱 WhatsApp: <a href="https://wa.me/573241005353" target="_blank" rel="noopener noreferrer" className="hover:text-teal-400 font-bold transition-colors">+57 324 100 5353</a>
+                            </li>
                             <li>✉️ Email: ventas@biocambio360.com</li>
                             <li>🏢 NIT: 901.847.392-1</li>
                         </ul>

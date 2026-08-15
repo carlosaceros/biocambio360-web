@@ -66,7 +66,7 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
     }
 
     const whatsappMessage = `Hola! Acabo de hacer un pedido (${orderId}) por ${formatCurrency(order.total)} y quiero confirmar los detalles.`;
-    const whatsappUrl = `https://wa.me/573026406089?text=${encodeURIComponent(whatsappMessage)}`;
+    const whatsappUrl = `https://wa.me/573241005353?text=${encodeURIComponent(whatsappMessage)}`;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-gray-50 py-12">

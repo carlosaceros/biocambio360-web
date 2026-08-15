@@ -690,7 +690,9 @@ function HomeContent() {
               <h4 className="font-black text-sm mb-4">¿Necesitas ayuda?</h4>
               <p className="text-white/40 text-xs mb-6 font-medium">Atención personalizada por WhatsApp de Lunes a Sábado.</p>
               <a 
-                href="https://wa.me/57300XXXXXXX" 
+                href="https://wa.me/573241005353?text=Hola%20Biocambio360%20👋%20quiero%20informaci%C3%B3n%20sobre%20sus%20productos" 
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-white text-[var(--brand-dark)] px-6 py-3 rounded-2xl font-black text-xs shadow-xl"
               >
                 HABLAR CON EXPERTO

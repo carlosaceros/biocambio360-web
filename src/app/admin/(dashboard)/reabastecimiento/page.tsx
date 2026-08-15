@@ -54,9 +54,9 @@ export default function ReabastecimientoBIAdminPage() {
         let msg = '';
 
         if (r.customerType === 'b2c') {
-            msg = `Hola ${r.customerName} 👋. En Biocambio360 nos importa que nunca te quedes sin tus productos de aseo. Calculamos que tu último pedido (*${r.itemsSummary}*) está próximo a agotarse (fecha est. ${dueDateStr}). ¿Te programamos el envío de reabastecimiento directo de fábrica para esta semana? Compra en 1-clic aquí: https://biocambio360-web.vercel.app/`;
+            msg = `Hola ${r.customerName} 👋. En Biocambio360 queremos que tu hogar nunca se quede sin tus productos de aseo favoritos (*${r.itemsSummary}*). Calculamos que tu fecha sugerida de reabastecimiento es este ${dueDateStr}. ¿Te programamos el despacho directo de fábrica para esta semana? Compra en 1-clic aquí: https://biocambio360-web.vercel.app/`;
         } else {
-            msg = `Hola ${r.customerName} 👋, saludos de Biocambio360 Fábrica. Registramos que tus garrafas de insumos industriales (*${r.itemsSummary}*) vencerán ciclo de consumo este ${dueDateStr}. ¿Deseas autorizar la orden de reabastecimiento corporativo?`;
+            msg = `Hola ${r.customerName} 👋, saludos de Biocambio360 Fábrica. Registramos que el stock de insumos de tu organización (*${r.itemsSummary}*) tiene fecha estimada de reabastecimiento para el ${dueDateStr}. ¿Deseas autorizar la orden de reabastecimiento corporativo para esta semana?`;
         }
 
         window.open(`https://wa.me/57${r.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');

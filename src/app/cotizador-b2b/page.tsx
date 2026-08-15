@@ -21,7 +21,7 @@ import {
     Factory
 } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
-import { createB2BProposal, B2BProposalItem } from '@/lib/b2b-proposal-service';
+import { createB2BProposal, updateB2BProposalStatus, B2BProposalItem } from '@/lib/b2b-proposal-service';
 import HeaderMessage from '@/components/HeaderMessage';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -199,6 +199,17 @@ export default function CotizadorB2BPage() {
 
     const handleDownloadPDF = async () => {
         if (!generatedProposal) return;
+
+        // Trazabilidad CRM B2B: Registrar estado 'descargado' en Firestore automáticamente
+        if (generatedProposal.id && generatedProposal.status !== 'contactado' && generatedProposal.status !== 'negociacion' && generatedProposal.status !== 'cerrado') {
+            try {
+                await updateB2BProposalStatus(generatedProposal.id, 'descargado');
+                setGeneratedProposal((prev: any) => prev ? { ...prev, status: 'descargado' } : null);
+            } catch (err) {
+                console.warn('No se pudo actualizar estado a descargado:', err);
+            }
+        }
+
         const res = await fetch('/api/b2b/generate-pdf', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -230,9 +241,21 @@ export default function CotizadorB2BPage() {
         setIsCartOpen(true);
     };
 
-    const handleOpenWhatsApp = () => {
-        const msg = `Hola Biocambio360 👋. Represento a *${nombreEmpresa}* (${selectedSector.title} en ${ciudad}). Acabo de calcular un ahorro de *$${ahorroMes.toLocaleString('es-CO')}/mes* en la web. Deseo acordar la entrega de nuestra primera orden corporativa.`;
-        window.open(`https://wa.me/573229115942?text=${encodeURIComponent(msg)}`, '_blank');
+    const handleOpenWhatsApp = async () => {
+        if (!generatedProposal) return;
+
+        // Trazabilidad CRM B2B: Registrar estado 'contactado' en Firestore automáticamente
+        if (generatedProposal.id && generatedProposal.status !== 'negociacion' && generatedProposal.status !== 'cerrado') {
+            try {
+                await updateB2BProposalStatus(generatedProposal.id, 'contactado');
+                setGeneratedProposal((prev: any) => prev ? { ...prev, status: 'contactado' } : null);
+            } catch (err) {
+                console.warn('No se pudo actualizar estado a contactado:', err);
+            }
+        }
+
+        const msg = `Hola Biocambio360 👋. Represento a *${nombreEmpresa}* (${selectedSector.title} en ${ciudad}). Acabo de generar la cotización *${generatedProposal.code}* en la web con un ahorro de *$${ahorroMes.toLocaleString('es-CO')}/mes*. Deseo acordar la entrega de nuestra primera orden corporativa.`;
+        window.open(`https://wa.me/573241005353?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
     return (
