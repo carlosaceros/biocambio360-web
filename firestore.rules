@@ -29,10 +29,15 @@ service cloud.firestore {
 
     // Wheel Config & Spins collections
     match /wheel_config/{configId} {
-      allow read, create, update: if true;
+      allow read, write: if true;
     }
     match /wheel_spins/{spinId} {
       allow read, create, update: if true;
+    }
+
+    // Promo Modal Config collection
+    match /promo_config/{configId} {
+      allow read, write: if true;
     }
 
     // Coupons collection

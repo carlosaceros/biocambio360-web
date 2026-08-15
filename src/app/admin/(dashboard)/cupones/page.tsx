@@ -16,7 +16,9 @@ import {
     Users, 
     ShieldCheck, 
     Sliders,
-    Award
+    Award,
+    Gift,
+    AlertTriangle
 } from 'lucide-react';
 import { 
     Coupon, 
@@ -30,12 +32,21 @@ import {
     deleteCoupon, 
     getWheelConfig, 
     saveWheelConfig,
-    DEFAULT_WHEEL_CONFIG
+    DEFAULT_WHEEL_CONFIG,
+    configDocRef
 } from '@/lib/coupons-service';
+import { 
+    PromoModalConfig,
+    DEFAULT_PROMO_CONFIG,
+    savePromoConfig,
+    subscribePromoConfig,
+    promoConfigDocRef
+} from '@/lib/promo-modal-service';
+import { onSnapshot } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/products';
 
 export default function AdminCouponsPage() {
-    const [activeTab, setActiveTab] = useState<'coupons' | 'wheel'>('coupons');
+    const [activeTab, setActiveTab] = useState<'coupons' | 'wheel' | 'promo'>('coupons');
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -62,6 +73,11 @@ export default function AdminCouponsPage() {
     const [toggleSaving, setToggleSaving] = useState(false);
     const [toggleMessage, setToggleMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+    // Promo modal configuration state
+    const [promoConfig, setPromoConfig] = useState<PromoModalConfig>(DEFAULT_PROMO_CONFIG);
+    const [promoSaving, setPromoSaving] = useState(false);
+    const [promoMessage, setPromoMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
     const loadData = async () => {
         setLoading(true);
         try {
@@ -80,7 +96,49 @@ export default function AdminCouponsPage() {
 
     useEffect(() => {
         loadData();
+        // Subscribe to promo config in real-time
+        const unsubPromo = subscribePromoConfig((cfg) => {
+            if (cfg) setPromoConfig(cfg);
+        });
+        return () => unsubPromo();
     }, []);
+
+    const handleSavePromo = async () => {
+        setPromoSaving(true);
+        setPromoMessage(null);
+        try {
+            await savePromoConfig(promoConfig);
+            setPromoMessage({ type: 'ok', text: '✅ Modal de primera compra guardado' });
+        } catch (err: any) {
+            setPromoMessage({ type: 'err', text: `❌ Error: ${err?.message}` });
+        } finally {
+            setPromoSaving(false);
+            setTimeout(() => setPromoMessage(null), 4000);
+        }
+    };
+
+    const handlePromoToggle = async () => {
+        const next = !promoConfig.isActive;
+        // Mutual exclusion: deactivate wheel if activating promo
+        if (next && wheelConfig?.isActive) {
+            const updatedWheel = { ...wheelConfig, isActive: false };
+            setWheelConfig(updatedWheel);
+            try { await saveWheelConfig(updatedWheel); } catch (e) {}
+        }
+        const updated = { ...promoConfig, isActive: next };
+        setPromoConfig(updated);
+        setPromoSaving(true);
+        try {
+            await savePromoConfig(updated);
+            setPromoMessage({ type: 'ok', text: next ? '✅ Modal activado en tienda' : '✅ Modal desactivado' });
+        } catch (err: any) {
+            setPromoConfig({ ...updated, isActive: !next });
+            setPromoMessage({ type: 'err', text: `❌ Error: ${err?.message}` });
+        } finally {
+            setPromoSaving(false);
+            setTimeout(() => setPromoMessage(null), 4000);
+        }
+    };
 
     const openCreateModal = () => {
         setEditingCoupon(null);
@@ -289,7 +347,19 @@ export default function AdminCouponsPage() {
                         }`}
                     >
                         <Sparkles size={18} />
-                        Ruleta de Descuentos (Spin-to-Win)
+                        Ruleta Spin-to-Win
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('promo')}
+                        className={`pb-3 font-extrabold text-sm border-b-2 transition-colors flex items-center gap-2 ${
+                            activeTab === 'promo'
+                                ? 'border-teal-600 text-teal-700'
+                                : 'border-transparent text-gray-500 hover:text-gray-900'
+                        }`}
+                    >
+                        <Gift size={18} />
+                        Modal 1ra Compra
+                        {promoConfig.isActive && <span className="text-[9px] bg-teal-100 text-teal-700 font-black px-1.5 py-0.5 rounded-full">LIVE</span>}
                     </button>
                 </div>
 
@@ -620,6 +690,145 @@ export default function AdminCouponsPage() {
                                 className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl shadow-md transition-all text-sm disabled:opacity-50"
                             >
                                 {saving ? 'Guardando...' : 'Guardar Configuración de Ruleta'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 3: Promo Modal - Primera Compra */}
+                {activeTab === 'promo' && (
+                    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                            <div>
+                                <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                                    <Gift className="text-teal-600" size={20} />
+                                    Modal de Primera Compra
+                                </h2>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                    Pop-up elegante con cupón de bienvenida. <strong>Mutuamente exclusivo con la Ruleta.</strong>
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Mutual exclusion warning */}
+                        {wheelConfig?.isActive && (
+                            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+                                <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                                <p className="text-xs text-amber-800 font-bold">
+                                    La Ruleta Spin-to-Win está activa. Al activar el Modal de Primera Compra, la ruleta se desactivará automáticamente.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Toggle */}
+                        <div className="flex flex-wrap items-center gap-3 bg-gray-50 px-4 py-3 rounded-2xl border border-gray-200">
+                            <span className="text-xs font-black uppercase text-gray-700">Estado del Modal:</span>
+                            <button
+                                type="button"
+                                disabled={promoSaving}
+                                onClick={handlePromoToggle}
+                                className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                                    promoConfig.isActive ? 'bg-teal-600' : 'bg-gray-300'
+                                }`}
+                            >
+                                <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                    promoConfig.isActive ? 'translate-x-7' : 'translate-x-0'
+                                }`} />
+                            </button>
+                            <span className={`text-xs font-extrabold ${promoConfig.isActive ? 'text-teal-700' : 'text-gray-500'}`}>
+                                {promoSaving ? '⏳ Guardando...' : (promoConfig.isActive ? '🟢 ACTIVO EN TIENDA' : '🔴 INACTIVO')}
+                            </span>
+                            {promoMessage && (
+                                <span className={`text-xs font-bold px-3 py-1 rounded-lg ${
+                                    promoMessage.type === 'ok' ? 'bg-teal-100 text-teal-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                    {promoMessage.text}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Config form */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Código de Cupón</label>
+                                <input
+                                    type="text"
+                                    value={promoConfig.couponCode}
+                                    onChange={(e) => setPromoConfig({ ...promoConfig, couponCode: e.target.value.toUpperCase() })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono font-black uppercase focus:border-teal-600 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Texto del Descuento (ej: 10% OFF)</label>
+                                <input
+                                    type="text"
+                                    value={promoConfig.discountText}
+                                    onChange={(e) => setPromoConfig({ ...promoConfig, discountText: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-teal-600 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Badge Superior</label>
+                                <input
+                                    type="text"
+                                    value={promoConfig.badgeText}
+                                    onChange={(e) => setPromoConfig({ ...promoConfig, badgeText: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-teal-600 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Countdown (minutos, 0 = sin timer)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={60}
+                                    value={promoConfig.countdownMinutes}
+                                    onChange={(e) => setPromoConfig({ ...promoConfig, countdownMinutes: Number(e.target.value) })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-teal-600 focus:outline-none"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Titular (Headline)</label>
+                                <input
+                                    type="text"
+                                    value={promoConfig.headline}
+                                    onChange={(e) => setPromoConfig({ ...promoConfig, headline: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-teal-600 focus:outline-none"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Subtitulo / Descripción</label>
+                                <textarea
+                                    value={promoConfig.subheadline}
+                                    onChange={(e) => setPromoConfig({ ...promoConfig, subheadline: e.target.value })}
+                                    rows={2}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-teal-600 focus:outline-none resize-none"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Texto de Pedido Mínimo</label>
+                                <input
+                                    type="text"
+                                    value={promoConfig.minOrderText}
+                                    onChange={(e) => setPromoConfig({ ...promoConfig, minOrderText: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-teal-600 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t pt-4">
+                            {promoMessage && (
+                                <span className={`text-sm font-bold ${promoMessage.type === 'ok' ? 'text-teal-700' : 'text-red-700'}`}>
+                                    {promoMessage.text}
+                                </span>
+                            )}
+                            <button
+                                onClick={handleSavePromo}
+                                disabled={promoSaving}
+                                className="ml-auto px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-black rounded-xl shadow-md transition-all text-sm disabled:opacity-50"
+                            >
+                                {promoSaving ? 'Guardando...' : 'Guardar Configuración del Modal'}
                             </button>
                         </div>
                     </div>
