@@ -401,15 +401,34 @@ export default function AdminCouponsPage() {
                                 </p>
                             </div>
 
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <span className="text-sm font-bold text-gray-700">Estado de la Ruleta:</span>
-                                <input
-                                    type="checkbox"
-                                    checked={wheelConfig.isActive}
-                                    onChange={(e) => setWheelConfig({ ...wheelConfig, isActive: e.target.checked })}
-                                    className="w-5 h-5 accent-red-600 rounded cursor-pointer"
-                                />
-                            </label>
+                            <div className="flex items-center gap-3 bg-gray-50 px-4 py-2.5 rounded-2xl border border-gray-200">
+                                <span className="text-xs font-black uppercase text-gray-700">Estado de la Ruleta:</span>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const nextState = !wheelConfig.isActive;
+                                        const updatedConfig = { ...wheelConfig, isActive: nextState };
+                                        setWheelConfig(updatedConfig);
+                                        try {
+                                            await saveWheelConfig(updatedConfig);
+                                        } catch (err) {
+                                            console.error('Error auto-saving wheel status:', err);
+                                        }
+                                    }}
+                                    className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                        wheelConfig.isActive ? 'bg-emerald-600' : 'bg-gray-300'
+                                    }`}
+                                >
+                                    <span
+                                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                            wheelConfig.isActive ? 'translate-x-7' : 'translate-x-0'
+                                        }`}
+                                    />
+                                </button>
+                                <span className={`text-xs font-extrabold ${wheelConfig.isActive ? 'text-emerald-700' : 'text-gray-500'}`}>
+                                    {wheelConfig.isActive ? '🟢 ACTIVA EN TIENDA' : '🔴 INACTIVA'}
+                                </span>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
