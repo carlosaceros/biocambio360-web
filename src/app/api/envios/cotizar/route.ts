@@ -87,7 +87,13 @@ export async function POST(request: Request) {
         const costoBrutoTotal = cotizacionBruta99 + valorContrapago;
         
         // 2. Aplicar Fórmula Universal: Flete Cliente = (Flete + Contrapago) - Subsidio Fábrica
-        const fleteCliente = Math.max(0, costoBrutoTotal - subsidioFabrica);
+        // IMPORTANTE: El subsidio está LIMITADO al 50% del flete bruto de 99envios para rutas
+        // nacionales, para evitar que pedidos grandes (muchos productos) aparezcan como "gratis"
+        // cuando se envían a ciudades lejanas como Bucaramanga, Medellín, etc.
+        // El subsidio sólo puede llevar el flete a $0 en rutas locales (Soacha/Bogotá).
+        const subsidioMaxPermitido = Math.floor(costoBrutoTotal * 0.5);
+        const subsidioEfectivo = Math.min(subsidioFabrica, subsidioMaxPermitido);
+        const fleteCliente = Math.max(0, costoBrutoTotal - subsidioEfectivo);
         const esGratis = fleteCliente === 0;
 
         // 3. Trazabilidad & Auditoría en Firestore
@@ -96,7 +102,9 @@ export async function POST(request: Request) {
             destinoNombre,
             subtotal,
             totalWeightKg,
-            subsidioFabrica,
+            subsidioFabricaBruto: subsidioFabrica,
+            subsidioEfectivo,
+            subsidioMaxPermitido,
             cotizacionBruta99,
             valorContrapago,
             costoBrutoTotal,
@@ -120,14 +128,15 @@ export async function POST(request: Request) {
             cotizacionBruta99,
             valorContrapago,
             costoBrutoTotal,
-            subsidioFabrica,
+            subsidioFabrica: subsidioEfectivo,
+            subsidioFabricaBruto: subsidioFabrica,
             transportadora: quote99.cheapest.transportadora,
             dias: quote99.cheapest.dias,
             esLocal,
             source: '99envios',
             mensaje: esGratis
                 ? '¡Envío GRATIS asumido por la fábrica!'
-                : `Flete de $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora.toUpperCase()}). Fábrica subsidia $${subsidioFabrica.toLocaleString('es-CO')}.`,
+                : `Flete de $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora?.toUpperCase()}). Fábrica subsidia $${subsidioEfectivo.toLocaleString('es-CO')}.`,
         });
     } catch (e: any) {
         console.error('[Cotizar API] Error:', e);
