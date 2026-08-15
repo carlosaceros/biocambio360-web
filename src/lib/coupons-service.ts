@@ -99,7 +99,7 @@ export const DEFAULT_WHEEL_CONFIG: WheelConfig = {
         { id: 'seg_5', label: 'A la próxima contarás con mejor suerte 💫', couponCode: '', color: '#0284C7', probabilityWeight: 3 },
         { id: 'seg_6', label: '15% OFF Ruleta', couponCode: 'RULETA15', color: '#7C3AED', probabilityWeight: 2 },
         { id: 'seg_7', label: 'Sigue intentando 🎯', couponCode: '', color: '#F59E0B', probabilityWeight: 3 },
-        { id: 'seg_8', label: 'Combo Especial Pajarito', couponCode: 'PRIMERAZO10', color: '#1D4ED8', probabilityWeight: 2 }
+        { id: 'seg_8', label: 'Combo Especial Biocambio360', couponCode: 'PRIMERAZO10', color: '#1D4ED8', probabilityWeight: 2 }
     ]
 };
 

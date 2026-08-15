@@ -44,6 +44,11 @@ interface AuditLog {
     fallbackZona?: string;
     errorMessage?: string;
     durationMs?: number;
+    // Campos nuevos (a partir de 2026-08-15)
+    subsidioBruto?: number;
+    subsidioEfectivo?: number;
+    subsidioFabricaBruto?: number;
+    subsidioMaxNacional?: number;
 }
 
 const SOURCE_CONFIG = {
@@ -305,7 +310,10 @@ export default function ShippingAuditPage() {
                                                         { label: 'Subtotal pedido', value: fmt(log.subtotal) },
                                                         { label: 'Peso total', value: `${log.totalWeightKg || 5} kg` },
                                                         { label: 'Bultos', value: bultosCalculados },
-                                                        { label: 'Subsidio Pajarito', value: fmt(subsidioCalculado) },
+                                                        { label: 'Subsidio Biocambio360', value: fmt(log.subsidioEfectivo ?? log.subsidioBruto ?? log.subsidioFabrica ?? log.subsidioFabricaBruto ?? 0) },
+                                                        ...(log.subsidioBruto !== undefined && log.subsidioBruto !== log.subsidioEfectivo ? [
+                                                            { label: '  └ Subsidio bruto (teórico)', value: fmt(log.subsidioBruto) },
+                                                        ] : []),
                                                         ...(log.cotizacionBruta99 !== undefined || log.valorBase99 !== undefined ? [
                                                             { label: 'Flete 99envíos', value: fmt(log.cotizacionBruta99 || log.valorBase99) },
                                                             { label: 'Cargo contrapago', value: fmt(log.valorContrapago || log.valorContrapago99 || 0) },

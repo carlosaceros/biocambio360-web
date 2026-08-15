@@ -57,7 +57,7 @@ export const CIUDADES_POR_DEPARTAMENTO: Record<string, string[]> = {
     'San Andrés y Providencia': ['San Andrés']
 };
 
-// Shipping cost calculation by region (BioCambio360 / Pajarito Logistics)
+// Shipping cost calculation by region (Biocambio360 Logistics)
 export function calculateShipping(departamento: string, ciudad: string): number {
     const isLocal = departamento === 'Cundinamarca' && 
         ['Bogotá D.C.', 'Soacha', 'Sibaté', 'Chía', 'Cota', 'Mosquera', 'Funza', 'Madrid', 'Cajicá', 'Fusagasugá', 'Zipaquirá'].includes(ciudad);

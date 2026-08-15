@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { cotizarEnvio } from '@/lib/99envios-service';
 import { getAdminDB } from '@/lib/firebase-admin';
-import { calcularSubsidioReal, isVeciSoacha } from '@/lib/shipping-zones';
+import {
+    calcularSubsidioReal,
+    isZonaLocal,
+    SUBSIDIO_MAX_NACIONAL_COP,
+} from '@/lib/shipping-zones';
 
 const LOGS_COLLECTION = 'shipping_audit_logs';
 
@@ -31,21 +35,25 @@ export async function POST(request: Request) {
             itemsSizes = [],
         } = body;
 
-        const esLocal = isVeciSoacha(destinoCodigo);
-        const subsidioFabrica = calcularSubsidioReal(itemsSizes, totalWeightKg);
+        const esLocal = isZonaLocal(destinoCodigo);
 
+        // Subsidio bruto (suma por item, refleja el costo real de la fábrica)
+        const subsidioBruto = calcularSubsidioReal(itemsSizes, totalWeightKg);
+
+        // ── ZONA LOCAL → Flota propia Biocambio360, GRATIS ──────────────────────
         if (esLocal) {
             const auditData = {
                 destinoCodigo,
                 destinoNombre,
                 subtotal,
                 totalWeightKg,
-                subsidioFabrica,
+                subsidioBruto,
+                subsidioEfectivo: subsidioBruto,   // absorbe todo el flete
                 cotizacionBruta99: 0,
                 fleteCliente: 0,
                 esGratis: true,
                 esLocal: true,
-                transportadora: 'Flota Propia Pajarito',
+                transportadora: 'Flota Propia Biocambio360',
                 dias: '1-2',
                 durationMs: Date.now() - startTime,
             };
@@ -56,16 +64,17 @@ export async function POST(request: Request) {
                 gratis: true,
                 precio: 0,
                 cotizacionBruta99: 0,
-                subsidioFabrica: 0,
-                transportadora: 'Flota Propia Pajarito',
+                subsidioBruto,
+                subsidioEfectivo: subsidioBruto,
+                transportadora: 'Flota Propia Biocambio360',
                 dias: '1-2',
                 esLocal,
                 source: 'free_shipping',
-                mensaje: '🚚 Entrega gratuita con flota propia.',
+                mensaje: '🚚 Entrega gratuita con flota propia Biocambio360.',
             });
         }
 
-        // 1. Cotizar en tiempo real con 99 Envíos API
+        // ── ZONA NACIONAL → 99 Envíos API ────────────────────────────────────────
         let quote99;
         try {
             quote99 = await cotizarEnvio(destinoCodigo, destinoNombre, subtotal, aplicaContrapago, totalWeightKg);
@@ -74,9 +83,9 @@ export async function POST(request: Request) {
             quote99 = {
                 cheapest: {
                     transportadora: 'interrapidisimo',
-                    valor: esLocal ? 12000 : 25000,
+                    valor: 25000,
                     valor_contrapago: 0,
-                    dias: 2,
+                    dias: 3,
                 },
                 all: {},
             };
@@ -85,26 +94,26 @@ export async function POST(request: Request) {
         const cotizacionBruta99 = quote99.cheapest.valor;
         const valorContrapago = aplicaContrapago ? (quote99.cheapest.valor_contrapago || 0) : 0;
         const costoBrutoTotal = cotizacionBruta99 + valorContrapago;
-        
-        // 2. Aplicar Fórmula Universal: Flete Cliente = (Flete + Contrapago) - Subsidio Fábrica
-        // IMPORTANTE: El subsidio está LIMITADO al 50% del flete bruto de 99envios para rutas
-        // nacionales, para evitar que pedidos grandes (muchos productos) aparezcan como "gratis"
-        // cuando se envían a ciudades lejanas como Bucaramanga, Medellín, etc.
-        // El subsidio sólo puede llevar el flete a $0 en rutas locales (Soacha/Bogotá).
-        const subsidioMaxPermitido = Math.floor(costoBrutoTotal * 0.5);
-        const subsidioEfectivo = Math.min(subsidioFabrica, subsidioMaxPermitido);
+
+        // ── SUBSIDIO NACIONAL ────────────────────────────────────────────────────
+        // Regla: el subsidio de fábrica para rutas nacionales tiene un TOPE FIJO
+        // de SUBSIDIO_MAX_NACIONAL_COP ($15.000) sin importar el tamaño del pedido.
+        // Esto evita que pedidos grandes (17 garrafas = $204.000 subsidio bruto)
+        // terminen con flete $0 en ciudades como Bucaramanga o Medellín.
+        // La zona local (Bogotá/Soacha) ya queda cubierta con flota propia arriba.
+        const subsidioEfectivo = Math.min(subsidioBruto, SUBSIDIO_MAX_NACIONAL_COP);
         const fleteCliente = Math.max(0, costoBrutoTotal - subsidioEfectivo);
         const esGratis = fleteCliente === 0;
 
-        // 3. Trazabilidad & Auditoría en Firestore
+        // ── AUDITORÍA ─────────────────────────────────────────────────────────────
         const auditData = {
             destinoCodigo,
             destinoNombre,
             subtotal,
             totalWeightKg,
-            subsidioFabricaBruto: subsidioFabrica,
+            subsidioBruto,
             subsidioEfectivo,
-            subsidioMaxPermitido,
+            subsidioMaxNacional: SUBSIDIO_MAX_NACIONAL_COP,
             cotizacionBruta99,
             valorContrapago,
             costoBrutoTotal,
@@ -119,7 +128,6 @@ export async function POST(request: Request) {
             durationMs: Date.now() - startTime,
         };
 
-        // Escribir log en Firestore (await obligatorio para serverless Vercel)
         await writeAuditLog(auditData);
 
         return NextResponse.json({
@@ -128,15 +136,15 @@ export async function POST(request: Request) {
             cotizacionBruta99,
             valorContrapago,
             costoBrutoTotal,
-            subsidioFabrica: subsidioEfectivo,
-            subsidioFabricaBruto: subsidioFabrica,
+            subsidioBruto,
+            subsidioEfectivo,
             transportadora: quote99.cheapest.transportadora,
             dias: quote99.cheapest.dias,
             esLocal,
             source: '99envios',
             mensaje: esGratis
-                ? '¡Envío GRATIS asumido por la fábrica!'
-                : `Flete de $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora?.toUpperCase()}). Fábrica subsidia $${subsidioEfectivo.toLocaleString('es-CO')}.`,
+                ? '¡Envío GRATIS asumido por Biocambio360!'
+                : `Flete $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora?.toUpperCase()}). Biocambio360 subsidia $${subsidioEfectivo.toLocaleString('es-CO')}.`,
         });
     } catch (e: any) {
         console.error('[Cotizar API] Error:', e);
