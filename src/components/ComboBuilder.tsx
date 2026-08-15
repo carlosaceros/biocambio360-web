@@ -176,9 +176,6 @@ function CustomComboBuilder({ products, onAddToCart }: { products: Product[]; on
     }, [customItems]);
 
     const totalItems = customItems.reduce((sum, i) => sum + i.quantity, 0);
-    const isFreeShipping = pricing ? pricing.precioCombo >= 100000 : false;
-    const amountToFreeShipping = pricing ? Math.max(0, 100000 - pricing.precioCombo) : 100000;
-    const progress = pricing ? Math.min((pricing.precioCombo / 100000) * 100, 100) : 0;
 
     const handleAddAllToCart = () => {
         if (!pricing || customItems.length === 0) return;
@@ -344,36 +341,33 @@ function CustomComboBuilder({ products, onAddToCart }: { products: Product[]; on
                 })}
             </div>
 
-            {/* Free Shipping Progress */}
-            <motion.div
-                layout
-                className="bg-white rounded-2xl border border-gray-100 p-5 mb-6 shadow-sm"
-            >
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <Truck size={18} className={isFreeShipping ? "text-[var(--brand-success)]" : "text-gray-400"} />
-                        <span className="text-sm font-bold text-[var(--brand-dark)]">
-                            {isFreeShipping
-                                ? '¡Envío GRATIS desbloqueado! 🎉'
-                                : `Te faltan ${formatCurrency(amountToFreeShipping)} para envío GRATIS`
-                            }
-                        </span>
+            {/* Combo Savings Banner */}
+            {pricing && (
+                <motion.div
+                    layout
+                    className="bg-gradient-to-r from-blue-50 to-pink-50 rounded-2xl border border-blue-100 p-5 mb-6 shadow-xs flex items-center justify-between"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-white rounded-xl text-[var(--brand-pink)] shadow-xs">
+                            <Sparkles size={20} />
+                        </div>
+                        <div>
+                            <span className="text-sm font-black text-[var(--brand-dark)] block">
+                                Ahorras {formatCurrency(pricing.ahorroDinero)} en este Combo
+                            </span>
+                            <span className="text-xs text-gray-500">
+                                Precio directo de fábrica Biocambio360
+                            </span>
+                        </div>
                     </div>
-                    {pricing && pricing.porcentaje > 0 && (
-                        <span className="text-xs font-extrabold text-[var(--brand-pink)] bg-[var(--brand-pink-light)] px-3 py-1 rounded-full">
-                            Descuento: {pricing.porcentaje}%
+
+                    {pricing.porcentaje > 0 && (
+                        <span className="text-xs font-black text-white bg-[var(--brand-pink)] px-3.5 py-1.5 rounded-full shadow-xs">
+                            -{pricing.porcentaje}% OFF
                         </span>
                     )}
-                </div>
-                <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
-                        transition={{ duration: 0.6, ease: 'easeOut' }}
-                        className={`h-full rounded-full transition-colors ${isFreeShipping ? 'bg-[var(--brand-success)]' : 'bg-gradient-to-r from-[var(--brand-blue)] to-[var(--brand-pink)]'}`}
-                    />
-                </div>
-            </motion.div>
+                </motion.div>
+            )}
 
             {/* Summary + Add to Cart */}
             <AnimatePresence>

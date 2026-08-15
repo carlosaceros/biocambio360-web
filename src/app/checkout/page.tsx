@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ShoppingBag, MapPin, CreditCard, Loader } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, MapPin, CreditCard, Loader, Ticket } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { useCart } from '@/lib/cart-context';
+import { recordCouponRedemption } from '@/lib/coupons-service';
 import {
     DEPARTAMENTOS,
     CIUDADES_POR_DEPARTAMENTO,
@@ -38,7 +39,18 @@ interface FormErrors {
 
 export default function CheckoutPage() {
     const router = useRouter();
-    const { cart, getTotalPrice, getTotalWeightKg, isHydrated } = useCart();
+    const { 
+        cart, 
+        getTotalPrice, 
+        getTotalWeightKg, 
+        isHydrated,
+        appliedCoupon,
+        applyCoupon,
+        removeCoupon,
+        getDiscountAmount,
+        getFinalTotal
+    } = useCart();
+    
     const [formData, setFormData] = useState<FormData>({
         nombre: '',
         cedula: '',
@@ -59,15 +71,34 @@ export default function CheckoutPage() {
         mensaje?: string;
         loading?: boolean;
     }>({});
-    const [destinoCodigo, setDestinoCodigo] = useState('');
-    const [citySearch, setCitySearch] = useState('');
-    const [citySearchOpen, setCitySearchOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<'contraentrega' | 'wompi'>('contraentrega');
+
+    const [couponCodeInput, setCouponCodeInput] = useState('');
+    const [couponError, setCouponError] = useState('');
+    const [couponSuccess, setCouponSuccess] = useState('');
+    const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+    const handleCheckoutApplyCoupon = async () => {
+        if (!couponCodeInput.trim()) return;
+        setIsValidatingCoupon(true);
+        setCouponError('');
+        setCouponSuccess('');
+
+        const res = await applyCoupon(couponCodeInput.trim(), formData.email, formData.celular);
+        setIsValidatingCoupon(false);
+
+        if (res.success) {
+            setCouponSuccess(res.message);
+            setCouponCodeInput('');
+        } else {
+            setCouponError(res.message);
+        }
+    };
 
     const subtotal = getTotalPrice();
     const totalKg = getTotalWeightKg();
-    const total = subtotal + shippingCost;
+    const discountAmount = getDiscountAmount();
+    const effectiveShippingCost = appliedCoupon?.type === 'free_shipping' ? 0 : shippingCost;
+    const total = Math.max(0, subtotal - discountAmount) + effectiveShippingCost;
 
     // Cotizar envío con 99 Envíos cuando cambia la ciudad destino
     useEffect(() => {
@@ -271,13 +302,34 @@ export default function CheckoutPage() {
                 },
                 productos: cart,
                 subtotal,
-                envio: shippingCost,
+                envio: effectiveShippingCost,
                 total,
                 metodoPago: paymentMethod,
-                status: 'pendiente'
+                status: 'pendiente',
+                cuponAplicado: appliedCoupon ? {
+                    code: appliedCoupon.code,
+                    type: appliedCoupon.type,
+                    value: appliedCoupon.value,
+                    discountAmount
+                } : undefined
             };
 
-            const orderId = await createOrder(orderData);
+            const orderId = await createOrder(orderData as any);
+
+            // Record coupon usage in database for analytics & security limits
+            if (appliedCoupon && orderId) {
+                try {
+                    await recordCouponRedemption(
+                        appliedCoupon.code,
+                        orderId,
+                        formData.email || 'sin-email@biocambio360.com',
+                        formData.celular,
+                        discountAmount
+                    );
+                } catch (cErr) {
+                    console.warn('Error al registrar redención de cupón:', cErr);
+                }
+            }
 
             // Send push + email notifications — await to ensure request reaches server before navigation
             try {
@@ -776,36 +828,83 @@ export default function CheckoutPage() {
                                 ))}
                             </div>
 
-                            <div className="border-t pt-4 space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Subtotal</span>
-                                    <span className="font-bold">{formatCurrency(subtotal)}</span>
+                            {/* Module Cupón de Descuento */}
+                            <div className="border-t border-b border-gray-100 py-3.5 my-3">
+                                <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                    <Ticket size={14} className="text-blue-600" />
+                                    ¿Tienes un cupón de descuento?
+                                </label>
+                                {appliedCoupon ? (
+                                    <div className="flex items-center justify-between bg-green-50 border border-green-200 px-3 py-2 rounded-xl">
+                                        <div className="flex items-center gap-2 text-xs font-bold text-green-700">
+                                            <span>Cupón <strong>{appliedCoupon.code}</strong> (-{appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}%` : formatCurrency(discountAmount)})</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={removeCoupon}
+                                            className="text-xs text-red-500 hover:text-red-700 font-bold underline"
+                                        >
+                                            Quitar
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={couponCodeInput}
+                                                onChange={(e) => {
+                                                    setCouponCodeInput(e.target.value.toUpperCase());
+                                                    setCouponError('');
+                                                }}
+                                                placeholder="CÓDIGO (Ej: PRIMERAZO10)"
+                                                className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none uppercase bg-white text-gray-900"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleCheckoutApplyCoupon}
+                                                disabled={isValidatingCoupon || !couponCodeInput.trim()}
+                                                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors disabled:opacity-50"
+                                            >
+                                                {isValidatingCoupon ? '...' : 'Aplicar'}
+                                            </button>
+                                        </div>
+                                        {couponError && <p className="text-[11px] text-red-600 font-medium">{couponError}</p>}
+                                        {couponSuccess && <p className="text-[11px] text-green-600 font-medium">{couponSuccess}</p>}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-2 space-y-2 text-sm">
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Subtotal</span>
+                                    <span className="font-bold text-gray-900">{formatCurrency(subtotal)}</span>
                                 </div>
-                                <div className="flex justify-between text-sm items-center">
-                                    <span className="text-gray-600">Envío</span>
+
+                                {discountAmount > 0 && (
+                                    <div className="flex justify-between text-green-600 font-bold">
+                                        <span>Descuento Cupón ({appliedCoupon?.code})</span>
+                                        <span>-{formatCurrency(discountAmount)}</span>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-center text-gray-600">
+                                    <span>Envío</span>
                                     {shippingInfo.loading ? (
                                         <span className="font-medium text-amber-600 text-xs flex items-center gap-1.5">
                                             <span className="animate-spin">⏳</span> Cotizando...
                                         </span>
+                                    ) : appliedCoupon?.type === 'free_shipping' || shippingInfo.source === 'free_shipping' ? (
+                                        <span className="font-bold text-green-600">GRATIS</span>
                                     ) : !formData.ciudad || !destinoCodigo ? (
-                                        subtotal >= 100000 ? (
-                                            <span className="font-bold text-green-600">GRATIS</span>
-                                        ) : (
-                                            <span className="font-medium text-gray-400 text-xs">Por calcular</span>
-                                        )
+                                        <span className="font-medium text-gray-400 text-xs">Por calcular</span>
                                     ) : shippingInfo.sinCobertura ? (
                                         <span className="font-bold text-red-600 text-xs">Sin cobertura</span>
-                                    ) : (subtotal >= 100000 || shippingInfo.source === 'free_shipping' || shippingCost === 0) ? (
-                                        <span className="font-bold text-green-600">GRATIS</span>
                                     ) : (
                                         <span className="font-bold text-gray-900">{formatCurrency(shippingCost)}</span>
                                     )}
                                 </div>
-                                {subtotal >= 100000 ? (
-                                    <p className="text-xs text-green-600 font-bold">
-                                        ✓ Envío gratis por compra superior a $100,000
-                                    </p>
-                                ) : (!formData.ciudad || !destinoCodigo) && (
+                                {(!formData.ciudad || !destinoCodigo) && (
                                     <p className="text-[11px] text-gray-400">
                                         * Selecciona tu ciudad para calcular el costo de envío
                                     </p>
@@ -814,7 +913,7 @@ export default function CheckoutPage() {
 
                             <div className="border-t mt-4 pt-4">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-lg font-black">Total</span>
+                                    <span className="text-lg font-black text-gray-900">Total a pagar</span>
                                     <span className="text-2xl font-black text-red-600">
                                         {formatCurrency(total)}
                                     </span>

@@ -20,7 +20,7 @@ export interface ShippingConfig {
 }
 
 const DEFAULT_CONFIG: ShippingConfig = {
-    envioGratis: 100000,
+    envioGratis: 0, // Desactivado por defecto (se administra via Cupones)
     precioDefault: 18000,
     zonas: [
         {

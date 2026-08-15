@@ -37,7 +37,7 @@ const STEPS: Step[] = [
         icon: <ShoppingCart size={32} />,
         color: 'text-green-600',
         bgColor: 'bg-green-50',
-        tip: '💡 Tip: En pedidos superiores a $100.000 COP el envío es completamente GRATIS a toda Colombia.'
+        tip: '💡 Tip: Aplica tu cupón de descuento en el proceso de compra para ahorrar aún más en tu pedido.'
     },
     {
         id: 3,

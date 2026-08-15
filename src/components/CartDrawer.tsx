@@ -1,18 +1,55 @@
 'use client';
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Plus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { X, Minus, Plus, ShoppingBag, ArrowRight, Truck, Sparkles, Ticket } from 'lucide-react';
 import Link from 'next/link';
 import { useCart } from '@/lib/cart-context';
 import { formatCurrency } from '@/lib/products';
 import { getProductImage } from '@/lib/product-utils';
-import { Truck, Sparkles } from 'lucide-react';
 
 export default function CartDrawer() {
-    const { cart, removeFromCart, updateQuantity, getTotalPrice, getTotalSavings, isCartOpen, setIsCartOpen } = useCart();
+    const { 
+        cart, 
+        removeFromCart, 
+        updateQuantity, 
+        getTotalPrice, 
+        getTotalSavings, 
+        isCartOpen, 
+        setIsCartOpen,
+        appliedCoupon,
+        applyCoupon,
+        removeCoupon,
+        getDiscountAmount,
+        getFinalTotal
+    } = useCart();
 
     const totalPrice = getTotalPrice();
     const totalSavings = getTotalSavings();
+    const discountAmount = getDiscountAmount();
+    const finalTotal = getFinalTotal();
+
+    const [couponCodeInput, setCouponCodeInput] = useState('');
+    const [couponError, setCouponError] = useState('');
+    const [couponSuccess, setCouponSuccess] = useState('');
+    const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+    const handleApplyCoupon = async () => {
+        if (!couponCodeInput.trim()) return;
+        setIsValidatingCoupon(true);
+        setCouponError('');
+        setCouponSuccess('');
+
+        const res = await applyCoupon(couponCodeInput.trim());
+        setIsValidatingCoupon(false);
+
+        if (res.success) {
+            setCouponSuccess(res.message);
+            setCouponCodeInput('');
+        } else {
+            setCouponError(res.message);
+        }
+    };
 
     return (
         <AnimatePresence>
@@ -191,17 +228,73 @@ export default function CartDrawer() {
                                     </div>
                                 )}
 
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-gray-600 text-lg">Total a pagar:</span>
-                                    <motion.span
-                                        key={totalPrice}
-                                        initial={{ scale: 1.3, color: 'var(--brand-blue)' }}
-                                        animate={{ scale: 1, color: 'var(--brand-dark)' }}
-                                        className="font-extrabold text-3xl"
-                                    >
-                                        {formatCurrency(totalPrice)}
-                                    </motion.span>
-                                </div>
+                                 {/* Coupon Code Section */}
+                                 <div className="border-t border-b border-gray-100 py-3 my-2">
+                                     {appliedCoupon ? (
+                                         <div className="flex items-center justify-between bg-green-50 border border-green-200 px-3 py-2 rounded-xl">
+                                             <div className="flex items-center gap-2 text-xs font-bold text-green-700">
+                                                 <Ticket size={16} />
+                                                 <span>Cupón <strong>{appliedCoupon.code}</strong> (-{appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}%` : formatCurrency(appliedCoupon.discountAmount)})</span>
+                                             </div>
+                                             <button
+                                                 onClick={removeCoupon}
+                                                 className="text-xs text-red-500 hover:text-red-700 font-bold underline"
+                                             >
+                                                 Quitar
+                                             </button>
+                                         </div>
+                                     ) : (
+                                         <div className="space-y-1.5">
+                                             <div className="flex gap-2">
+                                                 <input
+                                                     type="text"
+                                                     value={couponCodeInput}
+                                                     onChange={(e) => {
+                                                         setCouponCodeInput(e.target.value.toUpperCase());
+                                                         setCouponError('');
+                                                     }}
+                                                     placeholder="Código de cupón (Ej: PRIMERAZO10)"
+                                                     className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none uppercase bg-white text-gray-900"
+                                                 />
+                                                 <button
+                                                     onClick={handleApplyCoupon}
+                                                     disabled={isValidatingCoupon || !couponCodeInput.trim()}
+                                                     className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors disabled:opacity-50"
+                                                 >
+                                                     {isValidatingCoupon ? '...' : 'Aplicar'}
+                                                 </button>
+                                             </div>
+                                             {couponError && <p className="text-[11px] text-red-600 font-medium">{couponError}</p>}
+                                             {couponSuccess && <p className="text-[11px] text-green-600 font-medium">{couponSuccess}</p>}
+                                         </div>
+                                     )}
+                                 </div>
+
+                                 <div className="space-y-1.5">
+                                     <div className="flex justify-between items-center text-sm text-gray-600">
+                                         <span>Subtotal:</span>
+                                         <span className="font-bold text-gray-900">{formatCurrency(totalPrice)}</span>
+                                     </div>
+
+                                     {discountAmount > 0 && (
+                                         <div className="flex justify-between items-center text-sm text-green-600 font-bold">
+                                             <span>Descuento Cupón:</span>
+                                             <span>-{formatCurrency(discountAmount)}</span>
+                                         </div>
+                                     )}
+
+                                     <div className="flex justify-between items-center border-t pt-2">
+                                         <span className="font-extrabold text-gray-900 text-lg">Total a pagar:</span>
+                                         <motion.span
+                                             key={finalTotal}
+                                             initial={{ scale: 1.2, color: 'var(--brand-blue)' }}
+                                             animate={{ scale: 1, color: 'var(--brand-dark)' }}
+                                             className="font-black text-2xl text-[var(--brand-dark)]"
+                                         >
+                                             {formatCurrency(finalTotal)}
+                                         </motion.span>
+                                     </div>
+                                 </div>
                                 <Link href="/checkout">
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}

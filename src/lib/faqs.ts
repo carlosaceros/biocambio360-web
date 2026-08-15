@@ -56,7 +56,7 @@ export const FAQS_GENERALES: FAQItem[] = [
     },
     {
         question: "¿Cuál es el pedido mínimo?",
-        answer: "No hay pedido mínimo de productos. Sin embargo, el costo de envío contraentrega estándar es $15,000-$18,000 según la ciudad. Para pedidos superiores a $100,000 el envío es GRATIS a capitales.",
+        answer: "No hay pedido mínimo de productos. Puedes pedir desde 1 presentación individual. El costo de envío se calcula de forma transparente al momento del checkout y puedes aplicar cupones promocionales de descuento.",
         category: 'compra'
     },
     {

@@ -13,6 +13,8 @@ const PESOS_POR_TALLA: Record<ProductSize, number> = {
     '20L': 20.0,
 };
 
+import { AppliedCoupon } from './coupon-types';
+
 export interface CartItem {
     product: Product;
     size: ProductSize;
@@ -33,6 +35,11 @@ interface CartContextType {
     getTotalWeightKg: () => number;
     isCartOpen: boolean;
     setIsCartOpen: (open: boolean) => void;
+    appliedCoupon: AppliedCoupon | null;
+    applyCoupon: (code: string, email?: string, phone?: string) => Promise<{ success: boolean; message: string }>;
+    removeCoupon: () => void;
+    getDiscountAmount: () => number;
+    getFinalTotal: () => number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -41,8 +48,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isHydrated, setIsHydrated] = useState(false);
+    const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
 
-    // Load cart from localStorage on mount
+    // Load cart & coupon from localStorage on mount
     useEffect(() => {
         const savedCart = localStorage.getItem('biocambio360_cart');
         if (savedCart) {
@@ -50,6 +58,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 setCart(JSON.parse(savedCart));
             } catch (e) {
                 console.error('Error loading cart:', e);
+            }
+        }
+        const savedCoupon = localStorage.getItem('biocambio360_coupon');
+        if (savedCoupon) {
+            try {
+                setAppliedCoupon(JSON.parse(savedCoupon));
+            } catch (e) {
+                console.error('Error loading saved coupon:', e);
             }
         }
         setIsHydrated(true);
@@ -61,8 +77,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('biocambio360_cart', JSON.stringify(cart));
         } else {
             localStorage.removeItem('biocambio360_cart');
+            setAppliedCoupon(null);
+            localStorage.removeItem('biocambio360_coupon');
         }
     }, [cart]);
+
+    // Save coupon to localStorage
+    useEffect(() => {
+        if (appliedCoupon) {
+            localStorage.setItem('biocambio360_coupon', JSON.stringify(appliedCoupon));
+        } else {
+            localStorage.removeItem('biocambio360_coupon');
+        }
+    }, [appliedCoupon]);
 
     const addToCart = (product: Product, size: ProductSize, price: number, cantidad: number = 1) => {
         setCart(prevCart => {
@@ -105,6 +132,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const clearCart = () => {
         setCart([]);
+        setAppliedCoupon(null);
     };
 
     const getTotalItems = () => {
@@ -113,6 +141,48 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const getTotalPrice = () => {
         return cart.reduce((total, item) => total + (item.price * item.cantidad), 0);
+    };
+
+    const getDiscountAmount = () => {
+        if (!appliedCoupon) return 0;
+        const subtotal = getTotalPrice();
+        if (appliedCoupon.type === 'percentage') {
+            return Math.round((subtotal * appliedCoupon.value) / 100);
+        } else if (appliedCoupon.type === 'fixed_amount') {
+            return Math.min(subtotal, appliedCoupon.value);
+        } else if (appliedCoupon.type === 'buy_x_get_y') {
+            return Math.round(subtotal * 0.15);
+        }
+        return appliedCoupon.discountAmount || 0;
+    };
+
+    const getFinalTotal = () => {
+        return Math.max(0, getTotalPrice() - getDiscountAmount());
+    };
+
+    const applyCoupon = async (code: string, email?: string, phone?: string) => {
+        try {
+            const subtotal = getTotalPrice();
+            const res = await fetch('/api/coupons/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, subtotal, customerEmail: email, customerPhone: phone })
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.valid) {
+                return { success: false, message: data.reason || 'Cupón no válido' };
+            }
+
+            setAppliedCoupon(data.appliedCoupon);
+            return { success: true, message: data.appliedCoupon.message };
+        } catch (e: any) {
+            return { success: false, message: e.message || 'Error al validar cupón' };
+        }
+    };
+
+    const removeCoupon = () => {
+        setAppliedCoupon(null);
     };
 
     const getTotalSavings = () => {
@@ -148,6 +218,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 getTotalWeightKg,
                 isCartOpen,
                 setIsCartOpen,
+                appliedCoupon,
+                applyCoupon,
+                removeCoupon,
+                getDiscountAmount,
+                getFinalTotal,
             }}
         >
             {children}

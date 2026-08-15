@@ -50,9 +50,8 @@ export default function PoliticaEnviosPage() {
 
             <h2>3. Costos de Envío</h2>
             <ul>
-                <li><strong>Envío gratis:</strong> En pedidos superiores a <strong>$100.000 COP</strong>.</li>
-                <li><strong>Pedidos menores a $100.000 COP:</strong> Se aplica una tarifa de envío calculada al
-                    momento del checkout según las dimensiones del pedido y la dirección de destino.</li>
+                <li><strong>Tarifa calculada:</strong> El costo de envío se calcula de forma transparente al momento del checkout según el peso, volumen y transportadora seleccionada hacia tu ciudad de destino.</li>
+                <li><strong>Cupones de Envío Gratis:</strong> Puedes acceder a envío sin costo aplicando cupones promocionales o participando en nuestra Ruleta de Descuentos.</li>
             </ul>
 
             <h2>4. Proceso de Despacho</h2>

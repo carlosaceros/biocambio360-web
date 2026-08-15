@@ -96,6 +96,7 @@ const organizationSchema = {
 };
 
 import CartDrawer from "@/components/CartDrawer";
+import DiscountWheelModal from "@/components/DiscountWheelModal";
 
 export default function RootLayout({
   children,
@@ -118,6 +119,7 @@ export default function RootLayout({
           <CartProvider>
             {children}
             <CartDrawer />
+            <DiscountWheelModal />
             <Analytics />
           </CartProvider>
         </AuthProvider>

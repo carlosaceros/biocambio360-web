@@ -13,8 +13,8 @@ const MESSAGES = [
     },
     {
         icon: TruckIcon,
-        textFull: 'Envío GRATIS en compras +$100k',
-        textMobile: 'Envío GRATIS +$100k',
+        textFull: '🎁 10% OFF en 1ra compra con cupón PRIMERAZO10',
+        textMobile: '10% OFF 1ra compra',
         color: 'text-[var(--brand-blue)]'
     },
     {

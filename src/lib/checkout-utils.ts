@@ -58,17 +58,15 @@ export const CIUDADES_POR_DEPARTAMENTO: Record<string, string[]> = {
 };
 
 // Shipping cost calculation by region (BioCambio360 / Pajarito Logistics)
-export function calculateShipping(departamento: string, ciudad: string, subtotal: number): number {
+export function calculateShipping(departamento: string, ciudad: string): number {
     const isLocal = departamento === 'Cundinamarca' && 
         ['Bogotá D.C.', 'Soacha', 'Sibaté', 'Chía', 'Cota', 'Mosquera', 'Funza', 'Madrid', 'Cajicá', 'Fusagasugá', 'Zipaquirá'].includes(ciudad);
 
     if (isLocal) {
-        if (subtotal >= 100000) return 0;
         return 9000;
     }
 
     // National
-    if (subtotal >= 180000) return 0;
     return 18000;
 }
 

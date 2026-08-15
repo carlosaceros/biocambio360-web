@@ -11,7 +11,8 @@ import {
     ArrowUpRight,
     LogOut,
     Truck,
-    Activity
+    Activity,
+    Ticket
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -374,11 +375,12 @@ export default function AdminDashboard() {
                         <motion.button
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-green-200 transition-colors"
+                            onClick={() => router.push('/admin/cupones')}
+                            className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-red-200 transition-colors"
                         >
-                            <DollarSign className="text-green-600 mb-3" size={24} />
-                            <p className="font-black text-gray-900 mb-1">Reportes</p>
-                            <p className="text-xs text-gray-600">Analytics y finanzas</p>
+                            <Ticket className="text-red-600 mb-3" size={24} />
+                            <p className="font-black text-gray-900 mb-1">Cupones & Ruleta</p>
+                            <p className="text-xs text-gray-600">Promociones y reglas 2026</p>
                         </motion.button>
 
                         <motion.button
