@@ -293,7 +293,18 @@ export default function PedidosPage() {
     });
 
     const ordersByStatus = ALL_STATUSES.reduce((acc, status) => {
-        acc[status] = filteredOrders.filter(order => order.status === status);
+        acc[status] = filteredOrders
+            .filter(order => order.status === status)
+            .sort((a, b) => {
+                // Más reciente primero dentro de cada columna
+                const getMs = (ts: any): number => {
+                    if (!ts) return 0;
+                    if (typeof ts.toMillis === 'function') return ts.toMillis();
+                    if (ts.seconds) return ts.seconds * 1000;
+                    return new Date(ts).getTime();
+                };
+                return getMs(b.createdAt) - getMs(a.createdAt);
+            });
         return acc;
     }, {} as Record<OrderStatus, (Order & { id: string })[]>);
 
