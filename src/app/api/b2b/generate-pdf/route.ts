@@ -77,8 +77,8 @@ export async function POST(request: Request) {
     <div class="quote-card">
         <div class="header-bar">
             <div>
-                <div class="brand-logo"><span class="brand-red">BIOCAMBIO</span><span class="brand-blue">360</span></div>
-                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Fábrica Directa de Productos de Aseo Industrial y Hogar</div>
+                <img src="/images/logo-biocambio360.png" alt="Biocambio360" style="height: 48px; width: auto; object-fit: contain; display: block; margin-bottom: 6px;" />
+                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Fábrica Directa de Productos de Aseo Industrial y Hogar</div>
                 <div style="font-size: 11px; color: #94A3B8;">NIT: 901.847.392-1 · Soacha / Cundinamarca</div>
             </div>
             <div style="text-align: right;">

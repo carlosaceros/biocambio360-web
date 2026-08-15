@@ -72,12 +72,22 @@ export async function createB2BProposal(proposalData: Omit<B2BProposal, 'id' | '
  */
 export async function getAllB2BProposals(): Promise<B2BProposal[]> {
     try {
-        const q = query(proposalsRef, orderBy('createdAt', 'desc'));
-        const snap = await getDocs(q);
+        let snap;
+        try {
+            const q = query(proposalsRef, orderBy('createdAt', 'desc'));
+            snap = await getDocs(q);
+        } catch (idxErr) {
+            console.warn('Index error or permission on ordered query, falling back to simple getDocs:', idxErr);
+            snap = await getDocs(proposalsRef);
+        }
+
         const list: B2BProposal[] = [];
         snap.forEach(doc => {
             list.push({ id: doc.id, ...doc.data() } as B2BProposal);
         });
+
+        // Sort locally in JS by createdAt desc
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         return list;
     } catch (e) {
         console.warn('Error fetching B2B proposals from Firestore:', e);
