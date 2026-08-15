@@ -72,6 +72,12 @@ export default function CheckoutPage() {
         loading?: boolean;
     }>({});
 
+    const [destinoCodigo, setDestinoCodigo] = useState('');
+    const [citySearch, setCitySearch] = useState('');
+    const [citySearchOpen, setCitySearchOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<'contraentrega' | 'wompi'>('contraentrega');
+
     const [couponCodeInput, setCouponCodeInput] = useState('');
     const [couponError, setCouponError] = useState('');
     const [couponSuccess, setCouponSuccess] = useState('');

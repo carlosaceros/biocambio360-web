@@ -47,6 +47,12 @@ export interface Order {
     total: number;
     metodoPago: 'contraentrega' | 'wompi';
     status: OrderStatus;
+    cuponAplicado?: {
+        code: string;
+        type: string;
+        value: number;
+        discountAmount: number;
+    };
     timeline: TimelineEvent[];
     whatsappConversation?: string[];
     notas?: string[];
