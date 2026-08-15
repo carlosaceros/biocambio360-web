@@ -139,13 +139,13 @@ export default function FirstPurchaseModal() {
                                 >
                                     {config.discountText}
                                 </span>
-                                <p className="text-[17px] text-white/70 font-semibold max-w-xs leading-snug">
+                                <p className="text-[22px] sm:text-[24px] text-white font-extrabold max-w-md leading-tight drop-shadow-sm">
                                     {config.headline}
                                 </p>
                             </div>
 
                             {/* Subheadline */}
-                            <p className="text-[14px] text-white/45 leading-relaxed max-w-sm">
+                            <p className="text-[16px] sm:text-[17px] text-teal-100/90 font-bold max-w-md leading-snug">
                                 {config.subheadline}
                             </p>
 
