@@ -11,6 +11,7 @@ export default function DiscountWheelModal() {
     const { applyCoupon, setIsCartOpen } = useCart();
 
     const [config, setConfig] = useState<WheelConfig | null>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [hasSpun, setHasSpun] = useState(false);
     const [wonCoupon, setWonCoupon] = useState<{ label: string; code: string } | null>(null);
@@ -27,11 +28,13 @@ export default function DiscountWheelModal() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        // Load wheel config
+        // Load wheel config - always fetch live from Firestore
         getWheelConfig().then(cfg => {
-            if (cfg) {
-                setConfig(cfg);
-            }
+            setConfig(cfg);
+            setIsLoaded(true);
+        }).catch(() => {
+            // On error, mark as loaded but config stays null → wheel hidden
+            setIsLoaded(true);
         });
 
         // Check if user previously spun
@@ -160,6 +163,11 @@ export default function DiscountWheelModal() {
     const [isValidating, setIsValidating] = useState(false);
     const [validationError, setValidationError] = useState('');
 
+    // All hooks declared above. Now safe to conditionally render:
+    // - While loading: show nothing (no flash)
+    // - If loaded and isActive===false: show nothing
+    // - If loaded and isActive===true: show the wheel
+    if (!isLoaded) return null;
     if (!config || !config.isActive) return null;
 
     const handleFormSubmit = async (e: React.FormEvent) => {
@@ -286,10 +294,6 @@ export default function DiscountWheelModal() {
         setIsOpen(false);
         setIsCartOpen(true);
     };
-
-    if (!config || !config.isActive) {
-        return null;
-    }
 
     return (
         <>

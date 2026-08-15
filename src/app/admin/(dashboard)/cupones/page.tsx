@@ -29,7 +29,8 @@ import {
     saveCoupon, 
     deleteCoupon, 
     getWheelConfig, 
-    saveWheelConfig 
+    saveWheelConfig,
+    DEFAULT_WHEEL_CONFIG
 } from '@/lib/coupons-service';
 import { formatCurrency } from '@/lib/products';
 
@@ -65,7 +66,9 @@ export default function AdminCouponsPage() {
             const list = await getAllCoupons();
             setCoupons(list);
             const wConf = await getWheelConfig();
-            setWheelConfig(wConf);
+            // If null (never configured), seed with default so admin can configure it.
+            // Admin sees DEFAULT_WHEEL_CONFIG with isActive=false until they explicitly enable it.
+            setWheelConfig(wConf ?? DEFAULT_WHEEL_CONFIG);
         } catch (e) {
             console.error('Error al cargar cupones:', e);
         } finally {

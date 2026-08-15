@@ -87,7 +87,7 @@ export const INITIAL_COUPONS: Coupon[] = [
 ];
 
 export const DEFAULT_WHEEL_CONFIG: WheelConfig = {
-    isActive: true,
+    isActive: false,
     title: '¡Gira la Ruleta y Gana Descuentos Exclusivos!',
     description: 'Prueba tu suerte y obtén cupones instantáneos para tu pedido de productos de aseo.',
     validUntil: '2026-12-31T23:59:59.000Z',
@@ -313,18 +313,25 @@ export async function recordCouponRedemption(
 }
 
 /**
- * Gets Wheel of Fortune Config
+ * Gets Wheel of Fortune Config.
+ * Returns null if the document doesn't exist or an error occurs.
+ * This ensures the wheel stays hidden if admin hasn't configured it
+ * or has deactivated it — never falls back to a "always active" default.
  */
-export async function getWheelConfig(): Promise<WheelConfig> {
+export async function getWheelConfig(): Promise<WheelConfig | null> {
     try {
         const snap = await getDoc(configDocRef);
         if (snap.exists()) {
+            // Firestore data overrides DEFAULT. If isActive is stored as false, it stays false.
             return { ...DEFAULT_WHEEL_CONFIG, ...snap.data() } as WheelConfig;
         }
+        // Document doesn't exist yet → wheel has never been configured → hide it
+        return null;
     } catch (e) {
-        console.warn('Error fetching wheel config, returning default:', e);
+        console.warn('Error fetching wheel config:', e);
+        // On error → hide wheel (safe default)
+        return null;
     }
-    return DEFAULT_WHEEL_CONFIG;
 }
 
 /**
