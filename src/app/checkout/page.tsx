@@ -20,6 +20,7 @@ const ALL_CITIES_99 = Object.entries(citiesData as Record<string, { codigo: stri
     .map(([key, v]) => ({ key, ...v }))
     .sort((a, b) => a.ciudad.localeCompare(b.ciudad));
 import { createOrder } from '@/lib/orders-service';
+import { processOrderReplenishment, saveReplenishmentRecord } from '@/lib/replenishment-service';
 import { Order } from '@/types/order';
 
 interface FormData {
@@ -321,6 +322,16 @@ export default function CheckoutPage() {
             };
 
             const orderId = await createOrder(orderData as any);
+
+            // Record replenishment BI timer (works for B2C & B2B)
+            if (orderId) {
+                try {
+                    const replRecord = processOrderReplenishment({ ...orderData, id: orderId } as any);
+                    await saveReplenishmentRecord(replRecord);
+                } catch (rErr) {
+                    console.warn('Error al registrar timer de reabastecimiento BI:', rErr);
+                }
+            }
 
             // Record coupon usage in database for analytics & security limits
             if (appliedCoupon && orderId) {

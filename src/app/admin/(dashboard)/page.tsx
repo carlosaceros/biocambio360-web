@@ -12,7 +12,9 @@ import {
     LogOut,
     Truck,
     Activity,
-    Ticket
+    Ticket,
+    Building2,
+    Clock
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -403,6 +405,28 @@ export default function AdminDashboard() {
                             <Activity className="text-indigo-600 mb-3" size={24} />
                             <p className="font-black text-gray-900 mb-1">Auditoría Envíos</p>
                             <p className="text-xs text-gray-600">Logs en tiempo real API 99Envíos</p>
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => router.push('/admin/cotizaciones-b2b')}
+                            className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-teal-200 transition-colors"
+                        >
+                            <Building2 className="text-teal-600 mb-3" size={24} />
+                            <p className="font-black text-gray-900 mb-1">Cotizaciones B2B</p>
+                            <p className="text-xs text-gray-600">Embudo CRM & leads de empresas</p>
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => router.push('/admin/reabastecimiento')}
+                            className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-red-200 transition-colors"
+                        >
+                            <Clock className="text-red-600 mb-3" size={24} />
+                            <p className="font-black text-gray-900 mb-1">Reabastecimiento BI</p>
+                            <p className="text-xs text-gray-600">Timers de consumo B2C y B2B</p>
                         </motion.button>
                     </div>
                 </div>
