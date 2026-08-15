@@ -245,7 +245,7 @@ export default function CotizadorB2BPage() {
                 <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white py-12 px-4 sm:px-6 relative overflow-hidden border-b border-teal-800/40">
                     <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#0D9488_1px,transparent_1px)] [background-size:16px_16px]" />
 
-                    <div className="max-w-5xl mx-mx-auto text-center relative z-10 space-y-3">
+                    <div className="max-w-5xl mx-auto text-center relative z-10 space-y-3 flex flex-col items-center justify-center">
                         <span className="bg-teal-500/20 text-teal-300 font-extrabold text-xs px-4 py-1.5 rounded-full border border-teal-500/30 uppercase tracking-widest inline-flex items-center gap-1.5">
                             <Factory size={14} />
                             FÁBRICA DIRECTA BOGOTÁ & CUNDINAMARCA
