@@ -21,7 +21,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   Droplets,
-  Package
+  Package,
+  Building2
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback, useDeferredValue, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -705,32 +706,40 @@ function HomeContent() {
       </footer>
 
       {/* Floating Thumb-Bar for Mobile Nav */}
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[55] w-[90%] max-w-sm">
-        <div className="bg-[var(--brand-dark)]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-2 flex items-center justify-between shadow-2xl">
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[55] w-[92%] max-w-md">
+        <div className="bg-[var(--brand-dark)]/95 backdrop-blur-xl border border-white/10 rounded-3xl p-2 flex items-center justify-between shadow-2xl">
           <button 
             onClick={() => setIsSidebarOpen(true)}
-            className="flex-1 flex flex-col items-center gap-1 py-2 text-white/60 hover:text-white transition-colors"
+            className="flex-1 flex flex-col items-center gap-1 py-1.5 text-white/70 hover:text-white transition-colors"
           >
-            <Menu size={20} />
-            <span className="text-[9px] font-bold">MENÚ</span>
+            <Menu size={18} />
+            <span className="text-[9px] font-extrabold">MENÚ</span>
           </button>
-          <div className="w-px h-8 bg-white/10" />
+          <div className="w-px h-7 bg-white/10" />
+          <Link
+            href="/cotizador-b2b"
+            className="flex-1 flex flex-col items-center gap-1 py-1.5 text-teal-400 hover:text-teal-300 transition-colors"
+          >
+            <Building2 size={18} />
+            <span className="text-[9px] font-black tracking-tight">B2B/EMPRESAS</span>
+          </Link>
+          <div className="w-px h-7 bg-white/10" />
           <button 
             onClick={() => applyFilter(null, null)}
-            className="flex-1 flex flex-col items-center gap-1 py-2 text-white/60 hover:text-white transition-colors"
+            className="flex-1 flex flex-col items-center gap-1 py-1.5 text-white/70 hover:text-white transition-colors"
           >
-            <LayoutGrid size={20} />
-            <span className="text-[9px] font-bold">TIENDA</span>
+            <LayoutGrid size={18} />
+            <span className="text-[9px] font-extrabold">TIENDA</span>
           </button>
-          <div className="w-px h-8 bg-white/10" />
+          <div className="w-px h-7 bg-white/10" />
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="flex-1 flex flex-col items-center gap-1 py-2 text-[var(--brand-pink)] transition-colors relative"
+            className="flex-1 flex flex-col items-center gap-1 py-1.5 text-[var(--brand-pink)] transition-colors relative"
           >
-            <ShoppingCart size={20} />
-            <span className="text-[9px] font-bold">CARRITO</span>
+            <ShoppingCart size={18} />
+            <span className="text-[9px] font-extrabold">CARRITO</span>
             {getTotalItems() > 0 && (
-                <span className="absolute top-1 right-4 bg-white text-[var(--brand-pink)] text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="absolute top-0.5 right-3 bg-white text-[var(--brand-pink)] text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center">
                     {getTotalItems()}
                 </span>
             )}

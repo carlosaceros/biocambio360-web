@@ -1,6 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import { 
     ChevronRight, 
     ChevronDown, 
@@ -21,7 +22,9 @@ import {
     Bath,
     Sofa,
     Factory,
-    FlaskConical
+    FlaskConical,
+    Building2,
+    ArrowRight
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -230,10 +233,28 @@ export default function SidebarMenu({
                         </div>
                     </nav>
 
-                    <div className="p-4 bg-gray-50 border-t border-[var(--brand-border)]">
-                        <div className="bg-white p-4 rounded-2xl border border-[var(--brand-border)] shadow-sm">
+                    <div className="p-4 bg-gray-50 border-t border-[var(--brand-border)] space-y-2.5">
+                        {/* CTA B2B Cotizador */}
+                        <Link
+                            href="/cotizador-b2b"
+                            onClick={onClose}
+                            className="w-full bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 hover:opacity-95 text-white p-3 rounded-2xl shadow-md border border-teal-500/30 flex items-center justify-between transition-all group cursor-pointer"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-teal-500/20 text-teal-300 rounded-xl">
+                                    <Building2 size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-xs font-black text-white tracking-wide">COTIZADOR B2B / EMPRESAS</p>
+                                    <p className="text-[10px] text-teal-300 font-medium">Ahorra 38% en Garrafas 20L</p>
+                                </div>
+                            </div>
+                            <ArrowRight size={16} className="text-teal-300 group-hover:translate-x-1 transition-transform" />
+                        </Link>
+
+                        <div className="bg-white p-3.5 rounded-2xl border border-[var(--brand-border)] shadow-xs">
                             <p className="text-[10px] font-bold text-[var(--brand-success)] flex items-center gap-1.5 mb-1">
-                                <span className="w-1.5 h-1.5 bg-[var(--brand-success)] rounded-full" />
+                                <span className="w-1.5 h-1.5 bg-[var(--brand-success)] rounded-full animate-pulse" />
                                 STOCK ACTUALIZADO
                             </p>
                             <p className="text-[9px] text-gray-500 font-medium">
