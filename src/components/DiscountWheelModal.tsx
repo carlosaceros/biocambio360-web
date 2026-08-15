@@ -157,12 +157,47 @@ export default function DiscountWheelModal() {
         ctx.stroke();
     }, [config, isOpen, isFormSubmitted]);
 
+    const [isValidating, setIsValidating] = useState(false);
+    const [validationError, setValidationError] = useState('');
+
     if (!config || !config.isActive) return null;
 
-    const handleFormSubmit = (e: React.FormEvent) => {
+    const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim() || !emailOrPhone.trim()) return;
-        setIsFormSubmitted(true);
+        
+        setIsValidating(true);
+        setValidationError('');
+
+        try {
+            const res = await fetch('/api/coupons/wheel-spin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    emailOrPhone,
+                    action: 'validate'
+                })
+            });
+
+            const data = await res.json();
+            setIsValidating(false);
+
+            if (!data.allowed) {
+                setValidationError(data.reason || 'Ya participaste en la ruleta en los últimos 30 días.');
+                if (data.previousCoupon) {
+                    setWonCoupon({ label: data.previousCoupon.label, code: data.previousCoupon.code });
+                    setHasSpun(true);
+                    setIsFormSubmitted(true);
+                }
+                return;
+            }
+
+            setIsFormSubmitted(true);
+        } catch (e) {
+            setIsValidating(false);
+            setIsFormSubmitted(true); // fallback si falla red
+        }
     };
 
     const handleSpin = () => {
@@ -195,8 +230,6 @@ export default function DiscountWheelModal() {
 
         // 2. Exact Angle Alignment for 12 o'clock (270°) Top Pointer
         const segmentAngle = 360 / numSegments;
-        // Pointer arrow is at 12 o'clock (270 degrees).
-        // Align segment selectedIdx center to 270 degrees:
         const segmentCenterAngle = 270 - (selectedIdx * segmentAngle + segmentAngle / 2);
         
         // Random jitter inside segment slice (-35% to +35% of slice width)
@@ -215,9 +248,29 @@ export default function DiscountWheelModal() {
             setHasSpun(true);
 
             const winningSeg = segments[selectedIdx];
-            const wonObj = { label: winningSeg.label, code: winningSeg.couponCode };
+            const wonObj = { label: winningSeg.label, code: winningSeg.couponCode, spunAt: new Date().toISOString() };
             setWonCoupon(wonObj);
             localStorage.setItem('biocambio360_wheel_won', JSON.stringify(wonObj));
+
+            // Record redemption in Firestore backend
+            try {
+                await fetch('/api/coupons/wheel-spin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        emailOrPhone,
+                        action: 'spin',
+                        winningSegment: {
+                            id: winningSeg.id,
+                            label: winningSeg.label,
+                            couponCode: winningSeg.couponCode
+                        }
+                    })
+                });
+            } catch (e) {
+                console.error('Error recording spin to API:', e);
+            }
 
             // Auto apply coupon immediately if coupon code exists
             if (winningSeg.couponCode) {
@@ -310,11 +363,18 @@ export default function DiscountWheelModal() {
                                         />
                                     </div>
 
+                                    {validationError && (
+                                        <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-amber-800 text-xs font-bold text-center">
+                                            ⚠️ {validationError}
+                                        </div>
+                                    )}
+
                                     <button
                                         type="submit"
-                                        className="w-full bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 hover:opacity-95 text-white font-black py-4 rounded-xl shadow-xl shadow-red-200 transition-all text-sm mt-3 flex items-center justify-center gap-2 cursor-pointer"
+                                        disabled={isValidating}
+                                        className="w-full bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 hover:opacity-95 text-white font-black py-4 rounded-xl shadow-xl shadow-red-200 transition-all text-sm mt-3 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                                     >
-                                        DESBLOQUEAR RULETA DE REGALOS
+                                        {isValidating ? 'VERIFICANDO DISPONIBILIDAD...' : 'DESBLOQUEAR RULETA DE REGALOS'}
                                         <ArrowRight size={18} />
                                     </button>
                                 </form>
