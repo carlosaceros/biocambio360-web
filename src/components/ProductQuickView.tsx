@@ -105,7 +105,7 @@ export default function ProductQuickView({ product, isOpen, onClose, onAddToCart
                                 <h2 className="text-3xl font-extrabold text-[var(--brand-dark)] leading-tight mb-2">
                                     {product.nombre}
                                 </h2>
-                                <p className="text-gray-500 leading-relaxed text-sm">
+                                <p className="text-gray-500 leading-relaxed text-sm whitespace-pre-line">
                                     {product.descripcion}
                                 </p>
                             </div>

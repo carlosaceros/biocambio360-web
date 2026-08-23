@@ -270,33 +270,33 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                     {product.nombre}
                                 </h1>
                                 <div className="space-y-4 mb-6">
-                                    <p className="text-gray-700 font-medium leading-relaxed border-l-4 border-[var(--brand-blue)] pl-4">
+                                    <div className="text-gray-700 font-medium leading-relaxed border-l-4 border-[var(--brand-blue)] pl-4 whitespace-pre-line text-sm md:text-base">
                                         {product.descripcion}
-                                    </p>
+                                    </div>
                                     
                                     {/* Ficha de Conciencia & Valor (Schwartz SEO/AEO/GEO) */}
                                     <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4 text-sm text-gray-700">
                                         <div id="schwartz-problema" className="space-y-1">
                                             <h4 className="font-bold uppercase tracking-wider text-xs text-[var(--brand-pink)]">El Problema de Limpieza</h4>
-                                            <p className="text-sm leading-relaxed">{schwartzCopy.problema}</p>
+                                            <p className="text-sm leading-relaxed whitespace-pre-line">{schwartzCopy.problema}</p>
                                         </div>
                                         <div id="schwartz-solucion" className="space-y-1">
                                             <h4 className="font-bold uppercase tracking-wider text-xs text-[var(--brand-blue)]">La Alternativa Inteligente</h4>
-                                            <p className="text-sm leading-relaxed">{schwartzCopy.solucion}</p>
+                                            <p className="text-sm leading-relaxed whitespace-pre-line">{schwartzCopy.solucion}</p>
                                         </div>
                                         <div id="schwartz-producto" className="space-y-1">
                                             <h4 className="font-bold uppercase tracking-wider text-xs text-green-700">Ventaja Activa Biocambio360</h4>
-                                            <p className="text-sm leading-relaxed">{schwartzCopy.producto}</p>
+                                            <p className="text-sm leading-relaxed whitespace-pre-line">{schwartzCopy.producto}</p>
                                         </div>
                                         <div id="schwartz-geo" className="space-y-1">
                                             <h4 className="font-bold uppercase tracking-wider text-xs text-gray-500">Distribución en Bogotá</h4>
-                                            <p className="text-sm leading-relaxed">{schwartzCopy.transaccion}</p>
+                                            <p className="text-sm leading-relaxed whitespace-pre-line">{schwartzCopy.transaccion}</p>
                                         </div>
                                         
                                         {/* Bloque de Cita RAG/LLM */}
                                         <div id="aeo-fact-sheet" className="pt-3 mt-3 border-t border-gray-200 bg-white p-3.5 rounded-xl border border-gray-100">
                                             <span className="font-black text-xs uppercase tracking-[0.15em] text-gray-400 block mb-1">Ficha Informativa (Citable por LLM/AI)</span>
-                                            <blockquote className="italic text-sm text-gray-600 font-medium leading-relaxed">
+                                            <blockquote className="italic text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-line">
                                                 "{schwartzCopy.citableQuote}"
                                             </blockquote>
                                         </div>
