@@ -7,15 +7,19 @@ import {
     Search, Filter, Download, ArrowUpDown, AlertTriangle, CheckCircle2, 
     XCircle, RefreshCw, MessageSquare, TrendingUp, DollarSign, Layers,
     Copy, ExternalLink, ShieldCheck, Zap, Eye, Check, Tag, HelpCircle,
-    Boxes, Smartphone, Image as ImageIcon, SlidersHorizontal
+    Boxes, Smartphone, Image as ImageIcon, SlidersHorizontal, FileText,
+    ClipboardList, FlaskConical, Lightbulb, BookOpen, Shield
 } from 'lucide-react';
-import { Product } from '@/lib/products';
+import { Product, UsageRow, SchwartzCopyData, ManualContentData } from '@/lib/products';
 import { getAllProducts, saveProduct, deleteProduct, updateProductStock } from '@/lib/products-service';
+import { getRichProductDetails, getSchwartzCopy } from '@/lib/product-utils';
+import { getManualContentForProduct } from '@/lib/products-rich-data';
 import Image from 'next/image';
 import Link from 'next/link';
 
 type ViewTab = 'inventory' | 'catalog' | 'ai-assistant' | 'margins';
 type StockFilter = 'all' | 'in-stock' | 'low-stock' | 'out-of-stock' | 'archived';
+type ModalTab = 'general' | 'schwartz' | 'beneficios' | 'tecnica' | 'dosificacion' | 'faqs' | 'imagenes';
 
 const STANDARD_CATEGORIES = [
     'Aseo Hogar',
@@ -56,6 +60,7 @@ export default function InventoryAdminPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [modalTab, setModalTab] = useState<ModalTab>('general');
     const [isSaving, setIsSaving] = useState(false);
     const [availableImages, setAvailableImages] = useState<string[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -72,9 +77,12 @@ export default function InventoryAdminPage() {
     const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock' | 'category'>('name');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-    // New tag / Benefit input in edit modal
+    // Sub-inputs for modal lists
     const [newBenefitInput, setNewBenefitInput] = useState('');
-    // New presentation size input in edit modal
+    const [newDiferenciadorInput, setNewDiferenciadorInput] = useState('');
+    const [newInstruccionInput, setNewInstruccionInput] = useState('');
+    const [newRecommendationInput, setNewRecommendationInput] = useState('');
+    const [newWarningInput, setNewWarningInput] = useState('');
     const [newSizeInput, setNewSizeInput] = useState('');
 
     // AI Assistant state
@@ -332,17 +340,138 @@ export default function InventoryAdminPage() {
         const clonedId = `${product.id}-copia-${timestamp}`;
         const clonedSku = `BIO-${product.id.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)}-COP${timestamp}`;
 
+        const rich = getRichProductDetails(product);
+        const schwartz = getSchwartzCopy(product);
+        const manual = getManualContentForProduct(product);
+
         const cloned: Product = {
             ...product,
             id: clonedId,
             sku: clonedSku,
             nombre: `${product.nombre} (Copia)`,
             createdAt: new Date().toISOString(),
-            status: 'draft'
+            status: 'draft',
+            beneficios: [...(product.beneficios || [])],
+            diferenciadores: [...(product.diferenciadores || rich.diferenciadores)],
+            instrucciones: [...(product.instrucciones || rich.instrucciones)],
+            faqs: product.faqs ? product.faqs.map(f => ({ ...f })) : [...rich.faqs],
+            schwartzCopy: { ...(product.schwartzCopy || schwartz) },
+            manualContent: {
+                enrichedIntroduction: product.manualContent?.enrichedIntroduction || manual?.enrichedIntroduction || '',
+                usageRows: (product.manualContent?.usageRows || manual?.usageRows || []).map(r => ({ ...r })),
+                recommendations: [...(product.manualContent?.recommendations || manual?.recommendations || [])],
+                warnings: [...(product.manualContent?.warnings || manual?.warnings || [])]
+            }
         };
 
         setEditingProduct(cloned);
+        setModalTab('general');
         showToast('✨ Producto duplicado en modo borrador. Puedes editarlo y guardarlo.');
+    };
+
+    // Open Edit Modal with full pre-population from Rich Data & Schwartz Copy
+    const handleOpenEdit = (prod: Product) => {
+        const rich = getRichProductDetails(prod);
+        const schwartz = getSchwartzCopy(prod);
+        const manual = getManualContentForProduct(prod);
+
+        setEditingProduct({
+            ...prod,
+            beneficios: prod.beneficios || [],
+            diferenciadores: prod.diferenciadores && prod.diferenciadores.length > 0 ? prod.diferenciadores : rich.diferenciadores,
+            instrucciones: prod.instrucciones && prod.instrucciones.length > 0 ? prod.instrucciones : rich.instrucciones,
+            ph: prod.ph || rich.ph,
+            dilucion: prod.dilucion || rich.dilucion,
+            biodegradabilidad: prod.biodegradabilidad || rich.biodegradabilidad,
+            usoRecomendado: prod.usoRecomendado || rich.usoRecomendado,
+            faqs: prod.faqs && prod.faqs.length > 0 ? prod.faqs : rich.faqs,
+            schwartzCopy: {
+                problema: prod.schwartzCopy?.problema || schwartz.problema,
+                solucion: prod.schwartzCopy?.solucion || schwartz.solucion,
+                producto: prod.schwartzCopy?.producto || schwartz.producto,
+                transaccion: prod.schwartzCopy?.transaccion || schwartz.transaccion,
+                citableQuote: prod.schwartzCopy?.citableQuote || schwartz.citableQuote,
+            },
+            manualContent: {
+                enrichedIntroduction: prod.manualContent?.enrichedIntroduction || manual?.enrichedIntroduction || '',
+                usageRows: prod.manualContent?.usageRows || manual?.usageRows || [],
+                recommendations: prod.manualContent?.recommendations || manual?.recommendations || [],
+                warnings: prod.manualContent?.warnings || manual?.warnings || []
+            }
+        });
+        setModalTab('general');
+    };
+
+    // Open Create New Product Modal
+    const handleOpenCreate = () => {
+        const tempId = `nuevo-producto-${Date.now().toString().slice(-4)}`;
+        setEditingProduct({
+            id: tempId,
+            nombre: '',
+            slogan: '',
+            descripcion: '',
+            shortDescription: '',
+            imgFile: 'placeholder.png',
+            beneficios: ['Fórmula Concentrada', 'Alto Rendimiento', 'Biodegradable'],
+            diferenciadores: [
+                'Fórmula ultra concentrada que rinde hasta 3 veces más que productos convencionales.',
+                'Desarrollado con materias primas colombianas de alta pureza y calidad garantizada.',
+                'Empaque industrial de alta resistencia con diseño ergonómico para dosificación segura.'
+            ],
+            instrucciones: [
+                'Identifique el área o superficie a limpiar.',
+                'Aplique el producto de forma uniforme (puro o diluido según necesidad).',
+                'Deje actuar por 2 a 3 minutos para máxima eficiencia.',
+                'Retire con un paño limpio o enjuague con agua si es necesario.'
+            ],
+            ph: '7.0 (Neutro)',
+            dilucion: 'Listo para usar',
+            biodegradabilidad: 'Fórmula biodegradable certificada libre de fosfatos',
+            usoRecomendado: 'Uso general doméstico, comercial e industrial',
+            badge: '🔥 NUEVO',
+            color: 'bg-blue-600',
+            categoria: 'Aseo Hogar',
+            subcategoria: null,
+            faqs: [
+                {
+                    q: '¿Cómo se debe utilizar este producto?',
+                    a: 'Aplicar directamente o diluido según la tabla de dosificación y retirar con agua o paño limpio.'
+                },
+                {
+                    q: '¿Es seguro para el medio ambiente?',
+                    a: 'Sí, formulado con tensoactivos biodegradables libres de fosfatos y metales pesados.'
+                }
+            ],
+            precios: { '3.8L': 35000, '10L': 57000, '20L': 86000 },
+            competidorPromedio: { '3.8L': 52500, '10L': 85500, '20L': 129000 },
+            stock: { '3.8L': 30, '10L': 15, '20L': 10 },
+            minStockThreshold: 5,
+            sku: 'BIO-PROD-01',
+            status: 'active',
+            schwartzCopy: {
+                problema: 'La acumulación de suciedad requiere soluciones de limpieza eficientes, concentradas y confiables.',
+                solucion: 'Utilizar productos de grado profesional biodegradables que optimicen los procesos de aseo.',
+                producto: 'Formulado con ingredientes activos de alta pureza que aseguran resultados superiores.',
+                transaccion: 'Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá y toda la Sabana.',
+                citableQuote: 'Solución de limpieza biodegradable fabricada en Soacha, Cundinamarca, formulada para alto rendimiento.'
+            },
+            manualContent: {
+                enrichedIntroduction: 'Guía técnica oficial de aplicación y rendimiento por litro.',
+                usageRows: [
+                    {
+                        useOrSurface: 'Limpieza General',
+                        concentration: 'Normal',
+                        dilution: '1:10 a 1:20',
+                        amount: '50-100 ml / L',
+                        contactTime: '2-5 min',
+                        approximateYield: '10-20 m² / L'
+                    }
+                ],
+                recommendations: ['Aplicar sobre superficie fría y no exponer al sol directo durante el secado.'],
+                warnings: ['Mantener fuera del alcance de niños. No mezclar con otros productos químicos no recomendados.']
+            }
+        });
+        setModalTab('general');
     };
 
     // Execute Delete
@@ -390,6 +519,25 @@ export default function InventoryAdminPage() {
         }
     };
 
+    // Schwartz Copy Change Handler
+    const handleSchwartzChange = (field: keyof SchwartzCopyData, value: string) => {
+        if (!editingProduct) return;
+        const current = { ...(editingProduct.schwartzCopy || {}) };
+        current[field] = value;
+        setEditingProduct({
+            ...editingProduct,
+            schwartzCopy: current
+        });
+    };
+
+    // Manual Content Intro Change
+    const handleManualIntroChange = (val: string) => {
+        if (!editingProduct) return;
+        const current = { ...(editingProduct.manualContent || {}) };
+        current.enrichedIntroduction = val;
+        setEditingProduct({ ...editingProduct, manualContent: current });
+    };
+
     // Add Benefit Tag
     const handleAddBenefit = () => {
         if (!newBenefitInput.trim() || !editingProduct) return;
@@ -409,6 +557,130 @@ export default function InventoryAdminPage() {
         const current = [...(editingProduct.beneficios || [])];
         current.splice(idx, 1);
         setEditingProduct({ ...editingProduct, beneficios: current });
+    };
+
+    // Add / Update / Remove Diferenciadores
+    const handleAddDiferenciador = () => {
+        if (!newDiferenciadorInput.trim() || !editingProduct) return;
+        const current = editingProduct.diferenciadores || [];
+        setEditingProduct({
+            ...editingProduct,
+            diferenciadores: [...current, newDiferenciadorInput.trim()]
+        });
+        setNewDiferenciadorInput('');
+    };
+
+    const handleUpdateDiferenciador = (idx: number, val: string) => {
+        if (!editingProduct) return;
+        const current = [...(editingProduct.diferenciadores || [])];
+        current[idx] = val;
+        setEditingProduct({ ...editingProduct, diferenciadores: current });
+    };
+
+    const handleRemoveDiferenciador = (idx: number) => {
+        if (!editingProduct) return;
+        const current = [...(editingProduct.diferenciadores || [])];
+        current.splice(idx, 1);
+        setEditingProduct({ ...editingProduct, diferenciadores: current });
+    };
+
+    // Add / Update / Remove Instrucciones
+    const handleAddInstruccion = () => {
+        if (!newInstruccionInput.trim() || !editingProduct) return;
+        const current = editingProduct.instrucciones || [];
+        setEditingProduct({
+            ...editingProduct,
+            instrucciones: [...current, newInstruccionInput.trim()]
+        });
+        setNewInstruccionInput('');
+    };
+
+    const handleUpdateInstruccion = (idx: number, val: string) => {
+        if (!editingProduct) return;
+        const current = [...(editingProduct.instrucciones || [])];
+        current[idx] = val;
+        setEditingProduct({ ...editingProduct, instrucciones: current });
+    };
+
+    const handleRemoveInstruccion = (idx: number) => {
+        if (!editingProduct) return;
+        const current = [...(editingProduct.instrucciones || [])];
+        current.splice(idx, 1);
+        setEditingProduct({ ...editingProduct, instrucciones: current });
+    };
+
+    // Usage Rows (Dosificación)
+    const handleAddUsageRow = () => {
+        if (!editingProduct) return;
+        const current = editingProduct.manualContent?.usageRows || [];
+        const newRow: UsageRow = {
+            useOrSurface: 'Nueva Superficie / Uso',
+            concentration: 'Normal',
+            dilution: '1:10',
+            amount: '50 ml / L',
+            contactTime: '3 min',
+            approximateYield: '15 m² / L'
+        };
+        const manual = { ...(editingProduct.manualContent || {}) };
+        manual.usageRows = [...current, newRow];
+        setEditingProduct({ ...editingProduct, manualContent: manual });
+    };
+
+    const handleUpdateUsageRow = (idx: number, field: keyof UsageRow, val: string) => {
+        if (!editingProduct) return;
+        const rows = [...(editingProduct.manualContent?.usageRows || [])];
+        if (!rows[idx]) return;
+        rows[idx] = { ...rows[idx], [field]: val };
+        const manual = { ...(editingProduct.manualContent || {}) };
+        manual.usageRows = rows;
+        setEditingProduct({ ...editingProduct, manualContent: manual });
+    };
+
+    const handleRemoveUsageRow = (idx: number) => {
+        if (!editingProduct) return;
+        const rows = [...(editingProduct.manualContent?.usageRows || [])];
+        rows.splice(idx, 1);
+        const manual = { ...(editingProduct.manualContent || {}) };
+        manual.usageRows = rows;
+        setEditingProduct({ ...editingProduct, manualContent: manual });
+    };
+
+    // Manual Recommendations
+    const handleAddRecommendation = () => {
+        if (!newRecommendationInput.trim() || !editingProduct) return;
+        const current = editingProduct.manualContent?.recommendations || [];
+        const manual = { ...(editingProduct.manualContent || {}) };
+        manual.recommendations = [...current, newRecommendationInput.trim()];
+        setEditingProduct({ ...editingProduct, manualContent: manual });
+        setNewRecommendationInput('');
+    };
+
+    const handleRemoveRecommendation = (idx: number) => {
+        if (!editingProduct) return;
+        const current = [...(editingProduct.manualContent?.recommendations || [])];
+        current.splice(idx, 1);
+        const manual = { ...(editingProduct.manualContent || {}) };
+        manual.recommendations = current;
+        setEditingProduct({ ...editingProduct, manualContent: manual });
+    };
+
+    // Manual Warnings
+    const handleAddWarning = () => {
+        if (!newWarningInput.trim() || !editingProduct) return;
+        const current = editingProduct.manualContent?.warnings || [];
+        const manual = { ...(editingProduct.manualContent || {}) };
+        manual.warnings = [...current, newWarningInput.trim()];
+        setEditingProduct({ ...editingProduct, manualContent: manual });
+        setNewWarningInput('');
+    };
+
+    const handleRemoveWarning = (idx: number) => {
+        if (!editingProduct) return;
+        const current = [...(editingProduct.manualContent?.warnings || [])];
+        current.splice(idx, 1);
+        const manual = { ...(editingProduct.manualContent || {}) };
+        manual.warnings = current;
+        setEditingProduct({ ...editingProduct, manualContent: manual });
     };
 
     // Add FAQ
@@ -644,30 +916,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
     };
 
     const createNewProduct = () => {
-        const timestamp = Date.now().toString().slice(-4);
-        setEditingProduct({
-            id: `nuevo-producto-${timestamp}`,
-            nombre: '',
-            slogan: 'Calidad y Rendimiento Industrial Biocambio360',
-            descripcion: '',
-            shortDescription: '',
-            imgFile: 'placeholder.png',
-            imgFiles: {},
-            beneficios: ['Fórmula Concentrada', 'Alto Rendimiento', 'Biodegradable'],
-            badge: '🔥 NUEVO',
-            color: 'bg-blue-600',
-            categoria: 'Aseo Hogar',
-            subcategoria: '',
-            faqs: [
-                { q: '¿Cuál es la dosificación recomendada?', a: 'Diluir 50ml por litro de agua para limpieza general.' }
-            ],
-            precios: { '3.8L': 35000, '10L': 55000, '20L': 83000 },
-            competidorPromedio: { '3.8L': 52000, '10L': 82000, '20L': 125000 },
-            stock: { '3.8L': 30, '10L': 15, '20L': 10 },
-            minStockThreshold: 5,
-            sku: `BIO-NUEVO-${timestamp}`,
-            status: 'active'
-        });
+        handleOpenCreate();
     };
 
     if (loading) {
@@ -1069,7 +1318,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
 
                                                     {/* Edit */}
                                                     <button
-                                                        onClick={() => setEditingProduct(product)}
+                                                        onClick={() => handleOpenEdit(product)}
                                                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                                         title="Editar producto completo"
                                                     >
@@ -1187,7 +1436,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                             <Eye size={16} />
                                         </Link>
                                         <button
-                                            onClick={() => setEditingProduct(product)}
+                                            onClick={() => handleOpenEdit(product)}
                                             className="bg-gray-100 hover:bg-red-600 hover:text-white text-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                                         >
                                             Editar
@@ -1280,10 +1529,10 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             onSubmit={handleSave}
-                            className="bg-white border rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-y-auto flex flex-col my-auto"
+                            className="bg-white border rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col my-auto"
                         >
                             {/* Modal Header */}
-                            <div className="p-5 border-b bg-gray-50 flex items-center justify-between sticky top-0 z-20 bg-white/95 backdrop-blur-md">
+                            <div className="p-4 sm:p-5 border-b bg-gray-50 flex items-center justify-between sticky top-0 z-20 bg-white/95 backdrop-blur-md">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2.5 bg-red-50 text-red-600 rounded-xl">
                                         <Package size={22} />
@@ -1304,365 +1553,967 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                 </button>
                             </div>
 
-                            {/* Modal Body with 2-Column Responsive Layout */}
-                            <div className="p-6 space-y-6 flex-1">
+                            {/* 📑 Modal Sub-Tabs Bar */}
+                            <div className="bg-slate-900 text-white px-4 py-2 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs font-bold">
+                                <button
+                                    type="button"
+                                    onClick={() => setModalTab('general')}
+                                    className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        modalTab === 'general' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <Boxes size={14} /> 1. General & Precios
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setModalTab('schwartz')}
+                                    className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        modalTab === 'schwartz' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <Sparkles size={14} /> 2. Ficha Conciencia & Valor (Schwartz SEO/AEO)
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setModalTab('beneficios')}
+                                    className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        modalTab === 'beneficios' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <ShieldCheck size={14} /> 3. Beneficios & Diferenciadores
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setModalTab('tecnica')}
+                                    className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        modalTab === 'tecnica' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <FlaskConical size={14} /> 4. Ficha Técnica & Specs
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setModalTab('dosificacion')}
+                                    className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        modalTab === 'dosificacion' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <ClipboardList size={14} /> 5. Dosificación & Rendimiento (Manual ML-01)
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setModalTab('faqs')}
+                                    className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        modalTab === 'faqs' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <HelpCircle size={14} /> 6. Preguntas Frecuentes (FAQs)
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setModalTab('imagenes')}
+                                    className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        modalTab === 'imagenes' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <ImageIcon size={14} /> 7. Multimedia & Fotos
+                                </button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="p-6 space-y-6 flex-1 overflow-y-auto max-h-[calc(92vh-180px)]">
                                 
-                                {/* Row 1: Identification & Classification */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Nombre Comercial del Producto *</label>
-                                        <input 
-                                            required
-                                            type="text" 
-                                            value={editingProduct.nombre} 
-                                            onChange={e => handleNameChange(e.target.value)}
-                                            placeholder="Ej: Desengrasante Industrial Cítrico"
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white font-bold"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">SKU Almacén</label>
-                                        <input 
-                                            type="text" 
-                                            value={editingProduct.sku || ''} 
-                                            onChange={e => handleEditChange('sku', e.target.value.toUpperCase())}
-                                            placeholder="Ej: BIO-DES-IND"
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white font-mono text-sm"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Categoría Principal *</label>
-                                        <select
-                                            value={editingProduct.categoria || ''}
-                                            onChange={e => handleEditChange('categoria', e.target.value)}
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white"
-                                        >
-                                            {categories.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Subcategoría (Opcional)</label>
-                                        <input 
-                                            type="text" 
-                                            value={editingProduct.subcategoria || ''} 
-                                            onChange={e => handleEditChange('subcategoria', e.target.value || null)}
-                                            placeholder="Ej: Desengrasantes, Lavandería, Pisos"
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Estado de Publicación</label>
-                                        <select
-                                            value={editingProduct.status || 'active'}
-                                            onChange={e => handleEditChange('status', e.target.value)}
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white font-bold"
-                                        >
-                                            <option value="active">🟢 Activo (Visible en tienda)</option>
-                                            <option value="draft">🟡 Borrador (Solo admin)</option>
-                                            <option value="archived">📦 Archivado (Oculto)</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* Row 2: Marketing Copy & Descriptions */}
-                                <div className="space-y-3 border-t pt-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Eslogan Comercial</label>
-                                        <input 
-                                            type="text" 
-                                            value={editingProduct.slogan || ''} 
-                                            onChange={e => handleEditChange('slogan', e.target.value)}
-                                            placeholder="Ej: Máxima Acción Cortagrasa y Rendimiento de Fábrica"
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Descripción Breve (Resumen Catálogo & Google SEO)</label>
-                                        <textarea 
-                                            rows={2}
-                                            value={editingProduct.shortDescription || ''} 
-                                            onChange={e => handleEditChange('shortDescription', e.target.value)}
-                                            placeholder="Resumen corto del producto para las tarjetas del catálogo..."
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white text-sm"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Descripción Completa</label>
-                                        <textarea 
-                                            rows={3}
-                                            value={editingProduct.descripcion || ''} 
-                                            onChange={e => handleEditChange('descripcion', e.target.value)}
-                                            placeholder="Descripción detallada de la fórmula, aplicaciones, modo de empleo y precauciones..."
-                                            className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white text-sm"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Row 3: Multi-Presentation Pricing & Stock Grid */}
-                                <div className="border-t pt-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div>
-                                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                                                <DollarSign size={16} className="text-emerald-600" />
-                                                Presentaciones, Precios y Control de Stock
-                                            </h3>
-                                            <p className="text-xs text-gray-400">Configura los precios de venta, precios de referencia de mercado y existencias por formato</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Presets to quickly add a presentation */}
-                                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                                        <span className="text-xs text-gray-500 font-bold">Agregar presentación:</span>
-                                        {STANDARD_SIZES.map(s => {
-                                            const exists = Boolean(editingProduct.precios?.[s]);
-                                            return (
-                                                <button
-                                                    key={s}
-                                                    type="button"
-                                                    disabled={exists}
-                                                    onClick={() => handleAddSize(s)}
-                                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                                        exists 
-                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                                            : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                                                    }`}
-                                                >
-                                                    + {s}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Presentaciones Grid */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                        {Object.keys(editingProduct.precios || {}).map((size) => (
-                                            <div key={size} className="p-3.5 border rounded-2xl bg-gray-50/70 space-y-2.5 relative group">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-black text-xs text-gray-900 uppercase bg-white border border-gray-200 px-2 py-0.5 rounded-md">
-                                                        {size}
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveSize(size)}
-                                                        className="text-gray-400 hover:text-red-600 p-1 cursor-pointer"
-                                                        title={`Eliminar presentación ${size}`}
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500">Precio Biocambio360 (COP) *</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={editingProduct.precios[size] || 0} 
-                                                        onChange={e => handleEditChange('precios', { ...editingProduct.precios, [size]: parseInt(e.target.value) || 0 })}
-                                                        className="w-full border border-gray-200 rounded-lg p-1.5 text-sm font-mono font-bold text-gray-900 bg-white"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500">Precio Competencia (COP)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={editingProduct.competidorPromedio?.[size] || 0} 
-                                                        onChange={e => handleEditChange('competidorPromedio', { ...(editingProduct.competidorPromedio || {}), [size]: parseInt(e.target.value) || 0 })}
-                                                        className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-mono text-gray-600 bg-white"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-emerald-700">Stock Actual (Bodega)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={editingProduct.stock?.[size] ?? 0} 
-                                                        onChange={e => handleEditChange('stock', { ...(editingProduct.stock || {}), [size]: parseInt(e.target.value) || 0 })}
-                                                        className="w-full border border-emerald-200 rounded-lg p-1.5 text-sm font-mono font-bold text-emerald-700 bg-white"
-                                                    />
-                                                </div>
+                                {/* 🏷️ TAB 1: GENERAL & PRECIOS */}
+                                {modalTab === 'general' && (
+                                    <div className="space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Nombre Comercial del Producto *</label>
+                                                <input 
+                                                    required
+                                                    type="text" 
+                                                    value={editingProduct.nombre} 
+                                                    onChange={e => handleNameChange(e.target.value)}
+                                                    placeholder="Ej: Desengrasante Industrial Cítrico"
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white font-bold"
+                                                />
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
 
-                                {/* Row 4: Benefits & FAQs */}
-                                <div className="border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Benefits Tag List */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
-                                            <Tag size={14} className="text-red-500" />
-                                            Puntos Fuertes & Beneficios
-                                        </label>
-                                        <div className="flex gap-2 mb-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Ej: Biodegradable, pH Neutro..."
-                                                value={newBenefitInput}
-                                                onChange={e => setNewBenefitInput(e.target.value)}
-                                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddBenefit(); } }}
-                                                className="flex-1 border border-gray-200 rounded-xl p-2 text-xs bg-white text-gray-900"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={handleAddBenefit}
-                                                className="bg-gray-800 hover:bg-black text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer"
-                                            >
-                                                + Añadir
-                                            </button>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {(editingProduct.beneficios || []).map((ben, idx) => (
-                                                <span 
-                                                    key={idx}
-                                                    className="bg-red-50 text-red-700 border border-red-200 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1"
-                                                >
-                                                    {ben}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveBenefit(idx)}
-                                                        className="text-red-400 hover:text-red-700 cursor-pointer"
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">SKU Almacén</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={editingProduct.sku || ''} 
+                                                    onChange={e => handleEditChange('sku', e.target.value.toUpperCase())}
+                                                    placeholder="Ej: BIO-DES-IND"
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white font-mono text-sm"
+                                                />
+                                            </div>
 
-                                    {/* Visual Badges & Theme */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Insignia Promocional (Badge)</label>
-                                        <input
-                                            type="text"
-                                            value={editingProduct.badge || ''}
-                                            onChange={e => handleEditChange('badge', e.target.value)}
-                                            placeholder="Ej: 🔥 MÁS VENDIDO"
-                                            className="w-full border border-gray-200 rounded-xl p-2 text-xs bg-white text-gray-900 mb-2 font-bold"
-                                        />
-                                        <div className="flex flex-wrap gap-1">
-                                            {BADGE_PRESETS.map(badge => (
-                                                <button
-                                                    key={badge}
-                                                    type="button"
-                                                    onClick={() => handleEditChange('badge', badge)}
-                                                    className="text-[10px] font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md cursor-pointer"
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Categoría Principal *</label>
+                                                <select
+                                                    value={editingProduct.categoria || ''}
+                                                    onChange={e => handleEditChange('categoria', e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white font-bold"
                                                 >
-                                                    {badge}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
+                                                    {categories.map(cat => (
+                                                        <option key={cat} value={cat}>{cat}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
 
-                                {/* Row 5: FAQs Section */}
-                                <div className="border-t pt-4 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                                            <HelpCircle size={14} className="text-blue-500" />
-                                            Preguntas Frecuentes del Producto (FAQs para SEO en Google)
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={handleAddFAQ}
-                                            className="text-xs text-blue-600 hover:underline font-bold cursor-pointer"
-                                        >
-                                            + Agregar Pregunta
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {(editingProduct.faqs || []).map((faq, index) => (
-                                            <div key={index} className="p-3 border rounded-xl bg-gray-50 space-y-2 relative">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveFAQ(index)}
-                                                    className="absolute top-2 right-2 text-gray-400 hover:text-red-600 cursor-pointer"
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Subcategoría</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={editingProduct.subcategoria || ''} 
+                                                    onChange={e => handleEditChange('subcategoria', e.target.value || null)}
+                                                    placeholder="Ej: Desengrasantes, Lavandería, Pisos"
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Estado de Publicación</label>
+                                                <select
+                                                    value={editingProduct.status || 'active'}
+                                                    onChange={e => handleEditChange('status', e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white font-bold"
                                                 >
-                                                    <X size={14} />
-                                                </button>
+                                                    <option value="active">🟢 Activo (Visible en tienda)</option>
+                                                    <option value="draft">🟡 Borrador (Solo admin)</option>
+                                                    <option value="archived">📦 Archivado (Oculto)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 border-t pt-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Eslogan Comercial</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={editingProduct.slogan || ''} 
+                                                    onChange={e => handleEditChange('slogan', e.target.value)}
+                                                    placeholder="Ej: Máxima Acción Cortagrasa y Rendimiento de Fábrica"
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Descripción Breve (Resumen Catálogo & Google SEO)</label>
+                                                <textarea 
+                                                    rows={2}
+                                                    value={editingProduct.shortDescription || ''} 
+                                                    onChange={e => handleEditChange('shortDescription', e.target.value)}
+                                                    placeholder="Resumen corto del producto para las tarjetas del catálogo..."
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white text-xs"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Descripción Completa</label>
+                                                <textarea 
+                                                    rows={3}
+                                                    value={editingProduct.descripcion || ''} 
+                                                    onChange={e => handleEditChange('descripcion', e.target.value)}
+                                                    placeholder="Descripción detallada de la fórmula y aplicaciones..."
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 focus:border-red-500 focus:outline-none text-gray-900 bg-white text-xs"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Insignia & Color */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Insignia Promocional (Badge)</label>
                                                 <input
                                                     type="text"
-                                                    placeholder="Pregunta (ej: ¿Es apto para pisos delicados?)"
-                                                    value={faq.q}
-                                                    onChange={e => handleUpdateFAQ(index, 'q', e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-lg p-2 text-xs bg-white text-gray-900 font-bold"
+                                                    value={editingProduct.badge || ''}
+                                                    onChange={e => handleEditChange('badge', e.target.value)}
+                                                    placeholder="Ej: 🔥 MÁS VENDIDO"
+                                                    className="w-full border border-gray-200 rounded-xl p-2 text-xs bg-white text-gray-900 mb-2 font-bold"
                                                 />
+                                                <div className="flex flex-wrap gap-1">
+                                                    {BADGE_PRESETS.map(b => (
+                                                        <button
+                                                            key={b}
+                                                            type="button"
+                                                            onClick={() => handleEditChange('badge', b)}
+                                                            className="text-[10px] font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md cursor-pointer"
+                                                        >
+                                                            {b}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Color del Tema de Tarjeta</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {COLOR_PRESETS.map(c => (
+                                                        <button
+                                                            key={c.value}
+                                                            type="button"
+                                                            onClick={() => handleEditChange('color', c.value)}
+                                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border cursor-pointer transition-all ${
+                                                                editingProduct.color === c.value 
+                                                                    ? 'border-gray-900 shadow-md font-black ring-2 ring-gray-900' 
+                                                                    : 'border-gray-200 text-gray-600'
+                                                            }`}
+                                                        >
+                                                            <span className={`w-3.5 h-3.5 rounded-full ${c.value}`} />
+                                                            {c.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Multi-presentation Pricing & Stock */}
+                                        <div className="border-t pt-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs font-bold text-gray-700">Matriz de Presentaciones, Precios y Stock *</label>
+                                                <div className="flex items-center gap-1.5">
+                                                    <input
+                                                        type="text"
+                                                        value={newSizeInput}
+                                                        onChange={e => setNewSizeInput(e.target.value)}
+                                                        placeholder="Ej: 5L o 500ML"
+                                                        className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-28 text-gray-900 bg-white"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAddSize(newSizeInput)}
+                                                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer"
+                                                    >
+                                                        + Añadir
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                {Object.entries(editingProduct.precios || {}).map(([size, price]) => {
+                                                    const compPrice = editingProduct.competidorPromedio?.[size] || 0;
+                                                    const stockQty = editingProduct.stock?.[size] ?? 10;
+
+                                                    return (
+                                                        <div key={size} className="p-3.5 border rounded-2xl bg-gray-50/70 space-y-2">
+                                                            <div className="flex items-center justify-between border-b pb-1.5">
+                                                                <span className="font-black text-sm text-gray-900">{size}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveSize(size)}
+                                                                    className="text-red-500 hover:text-red-700 text-xs font-bold cursor-pointer"
+                                                                >
+                                                                    Eliminar
+                                                                </button>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold text-gray-500">Precio COP *</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={price}
+                                                                        onChange={e => {
+                                                                            const val = Number(e.target.value);
+                                                                            setEditingProduct({
+                                                                                ...editingProduct,
+                                                                                precios: { ...(editingProduct.precios || {}), [size]: val }
+                                                                            });
+                                                                        }}
+                                                                        className="w-full border rounded-lg p-1.5 text-xs font-bold text-blue-900 bg-white"
+                                                                    />
+                                                                </div>
+
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold text-gray-500">Mercado COP</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={compPrice}
+                                                                        onChange={e => {
+                                                                            const val = Number(e.target.value);
+                                                                            setEditingProduct({
+                                                                                ...editingProduct,
+                                                                                competidorPromedio: { ...(editingProduct.competidorPromedio || {}), [size]: val }
+                                                                            });
+                                                                        }}
+                                                                        className="w-full border rounded-lg p-1.5 text-xs text-gray-600 bg-white"
+                                                                    />
+                                                                </div>
+
+                                                                <div className="col-span-2">
+                                                                    <label className="block text-[10px] font-bold text-gray-500">Existencias en Almacén (Stock)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={stockQty}
+                                                                        onChange={e => {
+                                                                            const val = Number(e.target.value);
+                                                                            setEditingProduct({
+                                                                                ...editingProduct,
+                                                                                stock: { ...(editingProduct.stock || {}), [size]: val }
+                                                                            });
+                                                                        }}
+                                                                        className="w-full border rounded-lg p-1.5 text-xs font-bold text-emerald-800 bg-white"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 🧠 TAB 2: SCHWARTZ COPY (CONCIENCIA & VALOR SEO/AEO) */}
+                                {modalTab === 'schwartz' && (
+                                    <div className="space-y-5">
+                                        <div className="bg-blue-50/80 p-4 rounded-2xl border border-blue-100 text-xs text-blue-900 leading-relaxed flex items-start gap-2.5">
+                                            <Sparkles className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                                            <div>
+                                                <strong className="block font-black text-sm">Ficha de Conciencia & Valor (Schwartz SEO / GEO / AEO)</strong>
+                                                Estos textos estructurados se muestran directamente a la derecha de la imagen en la tienda virtual y alimentan a los motores de búsqueda e inteligencias artificiales (ChatGPT, Gemini, Perplexity).
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-xs font-black text-pink-600 mb-1 uppercase tracking-wider">
+                                                    🔴 1. El Problema de Limpieza
+                                                </label>
                                                 <textarea
-                                                    rows={2}
-                                                    placeholder="Respuesta detallada..."
-                                                    value={faq.a}
-                                                    onChange={e => handleUpdateFAQ(index, 'a', e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-lg p-2 text-xs bg-white text-gray-900"
+                                                    rows={3}
+                                                    value={editingProduct.schwartzCopy?.problema || ''}
+                                                    onChange={e => handleSchwartzChange('problema', e.target.value)}
+                                                    placeholder="Ej: El lavado frecuente de prendas textiles puede decolorar las telas o dejarlas rígidas..."
+                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs focus:border-red-500 focus:outline-none text-gray-900 bg-white leading-relaxed"
                                                 />
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
 
-                                {/* Row 6: Image Optimizer & Background Removal */}
-                                <div className="border-t pt-4">
-                                    <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                                        <ImageIcon size={16} className="text-purple-600" />
-                                        Imagen Principal & Remoción de Fondo con IA
-                                    </h3>
-                                    <div className="flex gap-3 items-center flex-wrap">
-                                        <select
-                                            value={editingProduct.imgFile || ''}
-                                            onChange={e => handleEditChange('imgFile', e.target.value)}
-                                            className="flex-1 border border-gray-200 rounded-xl p-2.5 text-sm text-gray-900 bg-white min-w-[200px]"
-                                        >
-                                            <option value="placeholder.png">placeholder.png</option>
-                                            {availableImages.map(img => (
-                                                <option key={img} value={img}>{img}</option>
-                                            ))}
-                                        </select>
+                                            <div>
+                                                <label className="block text-xs font-black text-blue-600 mb-1 uppercase tracking-wider">
+                                                    🔵 2. La Alternativa Inteligente
+                                                </label>
+                                                <textarea
+                                                    rows={3}
+                                                    value={editingProduct.schwartzCopy?.solucion || ''}
+                                                    onChange={e => handleSchwartzChange('solucion', e.target.value)}
+                                                    placeholder="Ej: Utilizar detergentes líquidos concentrados con tensoactivos biodegradables y bicarbonato..."
+                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs focus:border-red-500 focus:outline-none text-gray-900 bg-white leading-relaxed"
+                                                />
+                                            </div>
 
-                                        <label className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer border border-gray-300 transition-colors">
-                                            <Upload size={16} />
-                                            Subir Foto con IA
-                                            <input 
-                                                type="file" 
-                                                accept="image/*" 
-                                                className="hidden" 
-                                                onChange={e => processAndUploadImage(e.target.files?.[0]!, 'imgFile')}
-                                            />
-                                        </label>
-                                    </div>
+                                            <div>
+                                                <label className="block text-xs font-black text-emerald-700 mb-1 uppercase tracking-wider">
+                                                    🟢 3. Ventaja Activa Biocambio360
+                                                </label>
+                                                <textarea
+                                                    rows={3}
+                                                    value={editingProduct.schwartzCopy?.producto || ''}
+                                                    onChange={e => handleSchwartzChange('producto', e.target.value)}
+                                                    placeholder="Ej: El Detergente Líquido Multiusos de Biocambio360 limpia profundamente cuidando los colores..."
+                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs focus:border-red-500 focus:outline-none text-gray-900 bg-white leading-relaxed"
+                                                />
+                                            </div>
 
-                                    {isUploading && (
-                                        <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-xs font-bold text-purple-700">
-                                            <Loader2 className="animate-spin" size={16} />
-                                            {uploadProgress}
+                                            <div>
+                                                <label className="block text-xs font-black text-gray-600 mb-1 uppercase tracking-wider">
+                                                    📍 4. Distribución en Bogotá & Cobertura
+                                                </label>
+                                                <textarea
+                                                    rows={2}
+                                                    value={editingProduct.schwartzCopy?.transaccion || ''}
+                                                    onChange={e => handleSchwartzChange('transaccion', e.target.value)}
+                                                    placeholder="Ej: Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá..."
+                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs focus:border-red-500 focus:outline-none text-gray-900 bg-white leading-relaxed"
+                                                />
+                                            </div>
+
+                                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                                                <label className="block text-xs font-black text-gray-700 mb-1 uppercase tracking-wider">
+                                                    💬 5. Ficha Informativa (Citable por LLM / IA)
+                                                </label>
+                                                <textarea
+                                                    rows={3}
+                                                    value={editingProduct.schwartzCopy?.citableQuote || ''}
+                                                    onChange={e => handleSchwartzChange('citableQuote', e.target.value)}
+                                                    placeholder='Ej: "El Detergente Líquido Multiusos de Biocambio360 es un detergente líquido biodegradable fabricado en Colombia..."'
+                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs focus:border-red-500 focus:outline-none text-gray-900 bg-white italic leading-relaxed"
+                                                />
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
+
+                                {/* 🛡️ TAB 3: BENEFICIOS & DIFERENCIADORES */}
+                                {modalTab === 'beneficios' && (
+                                    <div className="space-y-6">
+                                        {/* Beneficios */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                                                    Beneficios Principales del Producto (Etiquetas en Vitrina)
+                                                </label>
+                                                <span className="text-[11px] text-gray-400">({editingProduct.beneficios?.length || 0} configurados)</span>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newBenefitInput}
+                                                    onChange={e => setNewBenefitInput(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddBenefit(); } }}
+                                                    placeholder="Ej: Apto para Ropa Blanca y de Color"
+                                                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-900 bg-white"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddBenefit}
+                                                    className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer"
+                                                >
+                                                    + Añadir
+                                                </button>
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-2 pt-2">
+                                                {editingProduct.beneficios?.map((b, idx) => (
+                                                    <span 
+                                                        key={idx}
+                                                        className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 px-3 py-1 rounded-xl text-xs font-bold border border-blue-100"
+                                                    >
+                                                        {b}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveBenefit(idx)}
+                                                            className="text-red-500 hover:text-red-700 font-black cursor-pointer ml-1"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Diferenciadores */}
+                                        <div className="space-y-3 border-t pt-6">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <ShieldCheck size={16} className="text-emerald-600" />
+                                                    Diferenciadores Clave de Fábrica (Puntos de Valor)
+                                                </label>
+                                                <span className="text-[11px] text-gray-400">({editingProduct.diferenciadores?.length || 0} ítems)</span>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newDiferenciadorInput}
+                                                    onChange={e => setNewDiferenciadorInput(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddDiferenciador(); } }}
+                                                    placeholder="Ej: Fórmula ultra concentrada que rinde hasta 3 veces más..."
+                                                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-900 bg-white"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddDiferenciador}
+                                                    className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer"
+                                                >
+                                                    + Añadir Diferenciador
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-2 pt-2">
+                                                {editingProduct.diferenciadores?.map((dif, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+                                                        <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                                                        <input
+                                                            type="text"
+                                                            value={dif}
+                                                            onChange={e => handleUpdateDiferenciador(idx, e.target.value)}
+                                                            className="flex-1 bg-white border rounded-lg px-2.5 py-1 text-xs font-medium text-gray-800"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveDiferenciador(idx)}
+                                                            className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 🧪 TAB 4: FICHA TÉCNICA & ESPECIFICACIONES */}
+                                {modalTab === 'tecnica' && (
+                                    <div className="space-y-6">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Nivel de pH Oficial</label>
+                                                <input
+                                                    type="text"
+                                                    value={editingProduct.ph || ''}
+                                                    onChange={e => handleEditChange('ph', e.target.value)}
+                                                    placeholder="Ej: 7.0 (Neutro) o 10.5 - 11.5 (Alcalino)"
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 bg-white font-bold"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Dilución Sugerida</label>
+                                                <input
+                                                    type="text"
+                                                    value={editingProduct.dilucion || ''}
+                                                    onChange={e => handleEditChange('dilucion', e.target.value)}
+                                                    placeholder="Ej: Listo para usar o 1:10 a 1:50 en agua"
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 bg-white font-bold"
+                                                />
+                                            </div>
+
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Sostenibilidad & Biodegradabilidad</label>
+                                                <input
+                                                    type="text"
+                                                    value={editingProduct.biodegradabilidad || ''}
+                                                    onChange={e => handleEditChange('biodegradabilidad', e.target.value)}
+                                                    placeholder="Ej: Fórmula biodegradable certificada libre de fosfatos y metales pesados"
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 bg-white"
+                                                />
+                                            </div>
+
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">Uso Recomendado Oficial</label>
+                                                <textarea
+                                                    rows={2}
+                                                    value={editingProduct.usoRecomendado || ''}
+                                                    onChange={e => handleEditChange('usoRecomendado', e.target.value)}
+                                                    placeholder="Ej: Lavado y desinfección de prendas textiles en lavanderías industriales, hoteles y hogares..."
+                                                    className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 bg-white"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Instrucciones de Uso Paso a Paso */}
+                                        <div className="border-t pt-6 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <ClipboardList size={16} className="text-blue-600" />
+                                                    Instrucciones de Uso Paso a Paso
+                                                </label>
+                                                <span className="text-[11px] text-gray-400">({editingProduct.instrucciones?.length || 0} pasos)</span>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newInstruccionInput}
+                                                    onChange={e => setNewInstruccionInput(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddInstruccion(); } }}
+                                                    placeholder="Ej: Aplique el producto puro sobre la mancha y frote suavemente..."
+                                                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-900 bg-white"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddInstruccion}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer"
+                                                >
+                                                    + Añadir Paso
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-2 pt-2">
+                                                {editingProduct.instrucciones?.map((inst, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+                                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 font-black text-xs flex items-center justify-center flex-shrink-0">
+                                                            {idx + 1}
+                                                        </span>
+                                                        <input
+                                                            type="text"
+                                                            value={inst}
+                                                            onChange={e => handleUpdateInstruccion(idx, e.target.value)}
+                                                            className="flex-1 bg-white border rounded-lg px-2.5 py-1 text-xs font-medium text-gray-800"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveInstruccion(idx)}
+                                                            className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                                                            title="Eliminar Paso"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 📊 TAB 5: DOSIFICACIÓN & RENDIMIENTO (MANUAL ML-01) */}
+                                {modalTab === 'dosificacion' && (
+                                    <div className="space-y-6">
+                                        <div className="bg-indigo-50/70 p-4 rounded-2xl border border-indigo-100 text-xs text-indigo-950 flex items-start gap-2.5">
+                                            <ClipboardList className="text-indigo-600 flex-shrink-0 mt-0.5" size={18} />
+                                            <div>
+                                                <strong className="block font-black text-sm">Tabla Técnica Oficial de Rendimiento & Dosificación (Manual ML-01)</strong>
+                                                Define las diluciones exactas, tiempos de contacto y rendimientos por litro que se mostrarán en la ficha técnica del producto.
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Introducción / Enfoque de Rendimiento</label>
+                                            <textarea
+                                                rows={2}
+                                                value={editingProduct.manualContent?.enrichedIntroduction || ''}
+                                                onChange={e => handleManualIntroChange(e.target.value)}
+                                                placeholder="Ej: Guía de dosificación recomendada para maximizar el rendimiento por litro en diversas aplicaciones..."
+                                                className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 bg-white"
+                                            />
+                                        </div>
+
+                                        {/* Table of Usage Rows */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                                                    Filas de Dosificación por Superficie / Aplicación
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddUsageRow}
+                                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1"
+                                                >
+                                                    <Plus size={14} /> Añadir Fila de Dosificación
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                {(editingProduct.manualContent?.usageRows || []).map((row, idx) => (
+                                                    <div key={idx} className="p-4 border rounded-2xl bg-gray-50/80 space-y-3">
+                                                        <div className="flex items-center justify-between border-b pb-2">
+                                                            <span className="font-black text-xs text-indigo-900">Aplicación #{idx + 1}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveUsageRow(idx)}
+                                                                className="text-xs text-red-500 hover:text-red-700 font-bold cursor-pointer"
+                                                            >
+                                                                Eliminar Fila
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Uso / Superficie</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.useOrSurface}
+                                                                    onChange={e => handleUpdateUsageRow(idx, 'useOrSurface', e.target.value)}
+                                                                    placeholder="Ej: Ropa Pesada / Pisos Grasosos"
+                                                                    className="w-full border rounded-lg p-2 text-xs font-bold text-gray-900 bg-white"
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Concentración</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.concentration}
+                                                                    onChange={e => handleUpdateUsageRow(idx, 'concentration', e.target.value)}
+                                                                    placeholder="Ej: Normal / Concentrado / Pesado"
+                                                                    className="w-full border rounded-lg p-2 text-xs text-gray-900 bg-white"
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Dilución</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.dilution}
+                                                                    onChange={e => handleUpdateUsageRow(idx, 'dilution', e.target.value)}
+                                                                    placeholder="Ej: 1:10 a 1:20 o Puro"
+                                                                    className="w-full border rounded-lg p-2 text-xs text-gray-900 bg-white"
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Cantidad Recomendada</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.amount}
+                                                                    onChange={e => handleUpdateUsageRow(idx, 'amount', e.target.value)}
+                                                                    placeholder="Ej: 50-80 ml / carga"
+                                                                    className="w-full border rounded-lg p-2 text-xs text-blue-700 font-bold bg-white"
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Tiempo de Contacto</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.contactTime}
+                                                                    onChange={e => handleUpdateUsageRow(idx, 'contactTime', e.target.value)}
+                                                                    placeholder="Ej: 3 a 5 minutos"
+                                                                    className="w-full border rounded-lg p-2 text-xs text-gray-900 bg-white"
+                                                                />
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Rendimiento Aproximado</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.approximateYield}
+                                                                    onChange={e => handleUpdateUsageRow(idx, 'approximateYield', e.target.value)}
+                                                                    placeholder="Ej: 12-15 lavadas / L"
+                                                                    className="w-full border rounded-lg p-2 text-xs text-emerald-700 font-black bg-white"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Recomendaciones y Precauciones */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
+                                            {/* Recomendaciones */}
+                                            <div className="space-y-3">
+                                                <label className="text-xs font-black text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <Lightbulb size={16} className="text-emerald-600" />
+                                                    Recomendaciones de Aplicación
+                                                </label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={newRecommendationInput}
+                                                        onChange={e => setNewRecommendationInput(e.target.value)}
+                                                        placeholder="Ej: Aplicar sobre superficie fría..."
+                                                        className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-900 bg-white"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddRecommendation}
+                                                        className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer"
+                                                    >
+                                                        + Añadir
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    {(editingProduct.manualContent?.recommendations || []).map((rec, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between gap-2 bg-emerald-50/60 p-2 rounded-lg border border-emerald-100 text-xs text-emerald-900">
+                                                            <span>• {rec}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveRecommendation(idx)}
+                                                                className="text-red-500 font-bold hover:text-red-700 cursor-pointer"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Precauciones */}
+                                            <div className="space-y-3">
+                                                <label className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <AlertTriangle size={16} className="text-amber-600" />
+                                                    Precauciones de Bioseguridad
+                                                </label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={newWarningInput}
+                                                        onChange={e => setNewWarningInput(e.target.value)}
+                                                        placeholder="Ej: Mantener fuera del alcance de niños..."
+                                                        className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-900 bg-white"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddWarning}
+                                                        className="bg-amber-700 hover:bg-amber-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer"
+                                                    >
+                                                        + Añadir
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    {(editingProduct.manualContent?.warnings || []).map((warn, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between gap-2 bg-amber-50/60 p-2 rounded-lg border border-amber-100 text-xs text-amber-900">
+                                                            <span>⚠️ {warn}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveWarning(idx)}
+                                                                className="text-red-500 font-bold hover:text-red-700 cursor-pointer"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ❓ TAB 6: PREGUNTAS FRECUENTES (FAQS) */}
+                                {modalTab === 'faqs' && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <label className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <HelpCircle size={16} className="text-amber-500" />
+                                                    Preguntas Frecuentes (FAQs para Google Rich Snippets)
+                                                </label>
+                                                <p className="text-xs text-gray-500">Estas preguntas y respuestas se indexan automáticamente en Google para mostrar fragmentos enriquecidos.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleAddFAQ}
+                                                className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1"
+                                            >
+                                                <Plus size={14} /> Añadir Pregunta
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {editingProduct.faqs?.map((faq, idx) => (
+                                                <div key={idx} className="p-4 border rounded-2xl bg-gray-50/80 space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-black text-xs text-gray-700">Pregunta #{idx + 1}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveFAQ(idx)}
+                                                            className="text-xs text-red-500 hover:text-red-700 font-bold cursor-pointer"
+                                                        >
+                                                            Eliminar Pregunta
+                                                        </button>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={faq.q}
+                                                        onChange={e => handleUpdateFAQ(idx, 'q', e.target.value)}
+                                                        placeholder="¿Pregunta frecuente?"
+                                                        className="w-full border rounded-xl p-2 text-xs font-bold text-gray-900 bg-white"
+                                                    />
+                                                    <textarea
+                                                        rows={2}
+                                                        value={faq.a}
+                                                        onChange={e => handleUpdateFAQ(idx, 'a', e.target.value)}
+                                                        placeholder="Respuesta explicativa para el cliente..."
+                                                        className="w-full border rounded-xl p-2 text-xs text-gray-700 bg-white"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 📷 TAB 7: IMÁGENES & MULTIMEDIA */}
+                                {modalTab === 'imagenes' && (
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Imagen Principal del Producto</label>
+                                            <input 
+                                                type="text" 
+                                                value={editingProduct.imgFile || ''} 
+                                                onChange={e => handleEditChange('imgFile', e.target.value)}
+                                                placeholder="nombre-de-imagen.webp"
+                                                className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 bg-white font-mono mb-3"
+                                            />
+                                        </div>
+
+                                        {/* Subida & AI Background Removal */}
+                                        <div className="border border-dashed border-gray-300 rounded-2xl p-4 bg-gray-50 text-center space-y-2">
+                                            <Upload className="mx-auto text-gray-400" size={24} />
+                                            <div>
+                                                <label className="text-xs font-black text-blue-600 hover:underline cursor-pointer">
+                                                    <span>Haz clic para subir una foto de producto</span>
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*" 
+                                                        onChange={e => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) processAndUploadImage(file, 'imgFile');
+                                                        }} 
+                                                        className="hidden" 
+                                                        disabled={isUploading}
+                                                    />
+                                                </label>
+                                                <p className="text-[11px] text-gray-400 mt-0.5">Se optimizará a WebP y se procesará el fondo blanco con IA.</p>
+                                            </div>
+                                            {isUploading && (
+                                                <div className="text-xs text-blue-700 font-bold flex items-center justify-center gap-2">
+                                                    <Loader2 className="animate-spin" size={14} />
+                                                    {uploadProgress}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Available Images Gallery */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-2">Galería de Imágenes Disponibles en el Servidor</label>
+                                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 max-h-52 overflow-y-auto p-2 border rounded-2xl bg-gray-50">
+                                                {availableImages.map(img => (
+                                                    <button
+                                                        key={img}
+                                                        type="button"
+                                                        onClick={() => handleEditChange('imgFile', img)}
+                                                        className={`relative aspect-square rounded-xl border overflow-hidden p-1 bg-white cursor-pointer transition-all ${
+                                                            editingProduct.imgFile === img 
+                                                                ? 'ring-2 ring-red-600 border-red-600' 
+                                                                : 'hover:border-gray-400'
+                                                        }`}
+                                                    >
+                                                        <Image
+                                                            src={`/images/${img}`}
+                                                            alt={img}
+                                                            fill
+                                                            unoptimized
+                                                            className="object-contain p-1"
+                                                        />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="p-4 border-t bg-gray-50 flex items-center justify-between sticky bottom-0 z-20 bg-white/95 backdrop-blur-md">
+                            <div className="p-4 sm:p-5 border-t bg-gray-50 flex items-center justify-between sticky bottom-0 z-20 bg-white/95 backdrop-blur-md">
                                 <button
                                     type="button"
                                     onClick={() => setEditingProduct(null)}
-                                    className="px-4 py-2.5 border border-gray-300 hover:bg-gray-100 rounded-xl font-bold text-sm text-gray-700 transition-colors cursor-pointer"
+                                    className="px-5 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
                                 >
                                     Cancelar
                                 </button>
 
-                                <button
-                                    type="submit"
-                                    disabled={isSaving}
-                                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer"
-                                >
-                                    {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                                    Guardar Cambios en Firestore
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="submit"
+                                        disabled={isSaving}
+                                        className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black px-6 py-2.5 rounded-xl shadow-lg shadow-red-600/20 transition-all cursor-pointer disabled:opacity-50"
+                                    >
+                                        {isSaving ? (
+                                            <>
+                                                <Loader2 size={15} className="animate-spin" /> Guardando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save size={15} /> Guardar Todos los Cambios
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </motion.form>
                     </div>

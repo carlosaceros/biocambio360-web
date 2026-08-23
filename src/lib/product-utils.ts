@@ -566,9 +566,29 @@ export function getRichProductDetails(product: Product): RichDetails {
         }
     }
 
+    // Override with custom fields explicitly set on product
+    if (product.diferenciadores && product.diferenciadores.length > 0) {
+        diferenciadores = product.diferenciadores;
+    }
+    if (product.instrucciones && product.instrucciones.length > 0) {
+        instrucciones = product.instrucciones;
+    }
+    if (product.ph) {
+        ph = product.ph;
+    }
+    if (product.dilucion) {
+        dilucion = product.dilucion;
+    }
+    if (product.biodegradabilidad) {
+        biodegradabilidad = product.biodegradabilidad;
+    }
+    if (product.usoRecomendado) {
+        usoRecomendado = product.usoRecomendado;
+    }
+
     // Merge with any faqs already present in product
     if (product.faqs && product.faqs.length > 0) {
-        faqs = [...product.faqs, ...faqs.filter(f => !product.faqs.some(pf => pf.q === f.q))];
+        faqs = product.faqs;
     }
 
     return {
@@ -1139,6 +1159,15 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         producto = `El ${name} de Biocambio360 limpia profundamente las prendas textiles, cuidando los colores y dejando un aroma fresco sin residuos de polvo.`;
         transaccion = `Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá y toda la Sabana.`;
         citableQuote = `El ${name} de Biocambio360 es un detergente líquido biodegradable fabricado en Colombia para el cuidado y lavado eficiente de ropa.`;
+    }
+
+    // Override with custom Schwartz marketing copy explicitly configured on product
+    if (product.schwartzCopy) {
+        if (product.schwartzCopy.problema) problema = product.schwartzCopy.problema;
+        if (product.schwartzCopy.solucion) solucion = product.schwartzCopy.solucion;
+        if (product.schwartzCopy.producto) producto = product.schwartzCopy.producto;
+        if (product.schwartzCopy.transaccion) transaccion = product.schwartzCopy.transaccion;
+        if (product.schwartzCopy.citableQuote) citableQuote = product.schwartzCopy.citableQuote;
     }
 
     return { problema, solucion, producto, transaccion, citableQuote };

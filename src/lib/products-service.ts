@@ -82,7 +82,15 @@ export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
                 beneficios: dbP.beneficios && dbP.beneficios.length > 0 ? dbP.beneficios : p.beneficios,
                 faqs: dbP.faqs && dbP.faqs.length > 0 ? dbP.faqs : p.faqs,
                 sku: dbP.sku || p.sku,
-                status: dbP.status || 'active'
+                status: dbP.status || 'active',
+                diferenciadores: dbP.diferenciadores || p.diferenciadores,
+                instrucciones: dbP.instrucciones || p.instrucciones,
+                ph: dbP.ph !== undefined ? dbP.ph : p.ph,
+                dilucion: dbP.dilucion !== undefined ? dbP.dilucion : p.dilucion,
+                biodegradabilidad: dbP.biodegradabilidad !== undefined ? dbP.biodegradabilidad : p.biodegradabilidad,
+                usoRecomendado: dbP.usoRecomendado !== undefined ? dbP.usoRecomendado : p.usoRecomendado,
+                schwartzCopy: dbP.schwartzCopy || p.schwartzCopy,
+                manualContent: dbP.manualContent || p.manualContent
             });
         } else {
             allProductsMap.set(p.id, p);

@@ -437,8 +437,28 @@ export const TABLA_MEZCLAS_OFICIAL: MezclaEntry[] = [
     }
 ];
 
-export function getManualContentForProduct(productId: string): ProductManualContent | null {
+export function getManualContentForProduct(productOrId: { id: string; manualContent?: any } | string): ProductManualContent | null {
+    const productId = typeof productOrId === 'string' ? productOrId : productOrId.id;
+    const customManual = typeof productOrId === 'object' && productOrId.manualContent ? productOrId.manualContent : null;
+
     const familyKey = PRODUCT_MANUAL_KEY_MAP[productId];
-    if (!familyKey) return null;
-    return MANUAL_ML01_FAMILIES[familyKey] || null;
+    const defaultManual = familyKey ? MANUAL_ML01_FAMILIES[familyKey] : null;
+
+    if (!defaultManual && !customManual) return null;
+
+    if (customManual) {
+        return {
+            source: defaultManual?.source || { documentCode: 'ML-01', issuedAt: '2026-06-15', page: 1 },
+            familyKey: defaultManual?.familyKey || (familyKey || 'detergente' as ManualFamilyKey),
+            familyName: defaultManual?.familyName || 'Guía Técnica de Aplicación',
+            shortDescription: defaultManual?.shortDescription || '',
+            examples: defaultManual?.examples || [],
+            enrichedIntroduction: customManual.enrichedIntroduction || defaultManual?.enrichedIntroduction || '',
+            usageRows: customManual.usageRows && customManual.usageRows.length > 0 ? customManual.usageRows : (defaultManual?.usageRows || []),
+            recommendations: customManual.recommendations && customManual.recommendations.length > 0 ? customManual.recommendations : (defaultManual?.recommendations || []),
+            warnings: customManual.warnings && customManual.warnings.length > 0 ? customManual.warnings : (defaultManual?.warnings || [])
+        };
+    }
+
+    return defaultManual;
 }

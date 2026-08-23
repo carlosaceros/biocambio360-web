@@ -7,6 +7,30 @@ export interface FAQ {
     a: string;
 }
 
+export interface UsageRow {
+    useOrSurface: string;
+    concentration: string;
+    dilution: string;
+    amount: string;
+    contactTime: string;
+    approximateYield: string;
+}
+
+export interface ManualContentData {
+    enrichedIntroduction?: string;
+    usageRows?: UsageRow[];
+    recommendations?: string[];
+    warnings?: string[];
+}
+
+export interface SchwartzCopyData {
+    problema?: string;
+    solucion?: string;
+    producto?: string;
+    transaccion?: string;
+    citableQuote?: string;
+}
+
 export interface Product {
     id: string;
     nombre: string;
@@ -33,6 +57,16 @@ export interface Product {
     isDeleted?: boolean;
     createdAt?: string;
     updatedAt?: string;
+
+    // Campos enriquecidos de Ficha Técnica, Schwartz Copy, Rendimiento y Dosificación
+    diferenciadores?: string[];
+    instrucciones?: string[];
+    ph?: string;
+    dilucion?: string;
+    biodegradabilidad?: string;
+    usoRecomendado?: string;
+    schwartzCopy?: SchwartzCopyData;
+    manualContent?: ManualContentData;
 }
 
 import { PRODUCTOS } from './products-data';

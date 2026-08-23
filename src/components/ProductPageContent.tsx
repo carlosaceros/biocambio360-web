@@ -68,7 +68,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     const [imageError, setImageError] = useState(false);
     const richDetails = getRichProductDetails(product);
     const schwartzCopy = getSchwartzCopy(product);
-    const manualContent = getManualContentForProduct(product.id);
+    const manualContent = getManualContentForProduct(product);
     const [expandedSection, setExpandedSection] = useState<string | null>('dosificacion');
 
     // Reset image error state when size or product changes
