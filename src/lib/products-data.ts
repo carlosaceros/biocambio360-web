@@ -19,7 +19,7 @@ export const PRODUCTOS: Product[] = [
       "Desengrasante Textil Concentrado",
       "Envío Gratis"
     ],
-    "badge": "🔥 OFERTA .000",
+    "badge": "🔥 OFERTA",
     "color": "bg-blue-600",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
@@ -109,7 +109,7 @@ export const PRODUCTOS: Product[] = [
       "Lavaloza 1/2 Galón",
       "Quitamanchas Color 1L"
     ],
-    "badge": "💥 AHORRO EXTRA .500",
+    "badge": "💥 AHORRO EXTRA",
     "color": "bg-emerald-600",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
@@ -161,7 +161,7 @@ export const PRODUCTOS: Product[] = [
       "Fórmula con Bicarbonato",
       "Envío Gratis"
     ],
-    "badge": "🔥 OFERTA .000",
+    "badge": "🔥 OFERTA",
     "color": "bg-blue-600",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
@@ -236,7 +236,7 @@ export const PRODUCTOS: Product[] = [
       "Dispensador Gratis",
       "Envío Gratis"
     ],
-    "badge": "🔥 OFERTA .000",
+    "badge": "🔥 OFERTA",
     "color": "bg-violet-600",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
@@ -261,7 +261,7 @@ export const PRODUCTOS: Product[] = [
       "Dispensador Gratis",
       "Envío Gratis"
     ],
-    "badge": "🛡️ DESINFECCIÓN TOTAL .000",
+    "badge": "🛡️ DESINFECCIÓN TOTAL",
     "color": "bg-blue-700",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
@@ -286,7 +286,7 @@ export const PRODUCTOS: Product[] = [
       "Dispensador Gratis",
       "Envío Gratis"
     ],
-    "badge": "🌿 ECO VINAGRE .000",
+    "badge": "🌿 ECO VINAGRE",
     "color": "bg-green-700",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
@@ -311,7 +311,7 @@ export const PRODUCTOS: Product[] = [
       "Remueve Grasa Pesada",
       "Envío Gratis"
     ],
-    "badge": "🔥 OFERTA .000",
+    "badge": "🔥 OFERTA",
     "color": "bg-orange-700",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",
@@ -336,7 +336,7 @@ export const PRODUCTOS: Product[] = [
       "Limpieza de Tapizados",
       "Envío Gratis"
     ],
-    "badge": "✨ ESPECIAL TAPICERÍA .000",
+    "badge": "✨ ESPECIAL TAPICERÍA",
     "color": "bg-indigo-700",
     "categoria": "Kits & Combos",
     "subcategoria": "Combos Especiales",

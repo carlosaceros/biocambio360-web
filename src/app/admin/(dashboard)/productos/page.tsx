@@ -981,7 +981,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                                             <h4 className="font-bold text-gray-900 text-sm leading-tight">{product.nombre}</h4>
                                                             {product.badge && (
                                                                 <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
-                                                                    {product.badge}
+                                                                    {product.badge.replace(/\s*\.\d{3,}$/g, '').trim()}
                                                                 </span>
                                                             )}
                                                             {isArchived && (

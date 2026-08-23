@@ -134,6 +134,11 @@ export async function getProductById(id: string): Promise<Product | null> {
     return res ? ensureStockDefaults(res) : null;
 }
 
+function cleanBadge(badge?: string): string {
+    if (!badge) return '';
+    return badge.replace(/\s*\.\d{3,}$/g, '').trim();
+}
+
 /**
  * Helper to ensure a product has valid stock data per size
  */
@@ -154,6 +159,7 @@ function ensureStockDefaults(product: Product): Product {
 
     return {
         ...product,
+        badge: cleanBadge(product.badge),
         stock,
         minStockThreshold: defaultThreshold,
         sku,
@@ -171,6 +177,7 @@ export async function saveProduct(product: Product): Promise<void> {
 
     const payload = {
         ...data,
+        badge: cleanBadge(data.badge),
         isDeleted: false,
         status: product.status || 'active',
         updatedAt: now,
