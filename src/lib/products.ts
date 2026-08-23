@@ -29,6 +29,10 @@ export interface Product {
     minStockThreshold?: number; // Umbral de alerta para stock bajo (default: 5)
     sku?: string; // Código de referencia único de inventario
     isFeatured?: boolean; // Destacado en vitrina o catálogo principal
+    status?: 'active' | 'draft' | 'archived'; // Estado de publicación
+    isDeleted?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 import { PRODUCTOS } from './products-data';

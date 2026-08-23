@@ -68,7 +68,7 @@ export async function adminDeleteProduct(id: string): Promise<void> {
 }
 
 /**
- * Full sync: upserts all canonical products and deletes stale ones from Firestore
+ * Full sync: upserts all canonical products into Firestore with default active status
  */
 export async function adminSeedProducts(): Promise<{ upserted: number; deleted: number }> {
     const adminDb = getFirestore();
@@ -76,25 +76,31 @@ export async function adminSeedProducts(): Promise<{ upserted: number; deleted: 
 
     // 1. Fetch existing IDs from Firestore
     const snapshot = await productsCollection.get();
-    const firestoreIds = new Set(snapshot.docs.map(d => d.id));
+    const firestoreMap = new Map(snapshot.docs.map(d => [d.id, d.data()]));
 
     // 2. Canonical IDs from static catalog
     const canonicalIds = new Set(PRODUCTOS.map(p => p.id));
 
-    // 3. Delete stale documents
+    // 3. Clean up only truly corrupted or explicitly deleted documents if needed
     let deleted = 0;
-    for (const fsId of firestoreIds) {
-        if (!canonicalIds.has(fsId)) {
+    for (const [fsId, data] of firestoreMap.entries()) {
+        if (!canonicalIds.has(fsId) && (data as any).isDeleted) {
             await productsCollection.doc(fsId).delete();
-            console.log(`🗑️  Deleted stale product: ${fsId}`);
+            console.log(`🗑️  Deleted pruned product: ${fsId}`);
             deleted++;
         }
     }
 
-    // 4. Upsert all canonical products
+    // 4. Upsert all canonical products from code
+    const now = new Date().toISOString();
     for (const prod of PRODUCTOS) {
         const { id, ...data } = prod;
-        await productsCollection.doc(id).set(data);
+        await productsCollection.doc(id).set({
+            ...data,
+            isDeleted: false,
+            status: 'active',
+            updatedAt: now
+        }, { merge: true });
     }
 
     console.log(`✅ Admin seed complete: ${PRODUCTOS.length} upserted, ${deleted} deleted.`);

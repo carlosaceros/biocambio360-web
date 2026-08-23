@@ -35,38 +35,66 @@ function isSupplyItem(p: Product): boolean {
 }
 
 /**
- * Gets all products from Firestore.
- * Caches the result in memory for a few minutes to reduce reads.
+ * Gets all products from Firestore with fallback to static catalog.
+ * Live edits/creations/deletions from Admin Firestore take precedence.
  */
 export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
     if (!forceRefresh && cachedProducts && Date.now() - lastFetchTime < CACHE_TIME) {
         return cachedProducts;
     }
 
-    const products: Product[] = [];
+    const dbProductsMap = new Map<string, Product>();
     try {
         const q = query(productsCollection, orderBy('nombre', 'asc'));
         const snapshot = await getDocs(q);
         snapshot.forEach((docSnap) => {
-            products.push({ id: docSnap.id, ...docSnap.data() } as Product);
+            dbProductsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Product);
         });
     } catch (e) {
-        console.warn('Warning: Could not fetch products from Firestore during build, using static fallback:', e);
+        console.warn('Warning: Could not fetch products from Firestore, using static fallback:', e);
     }
 
-    // Merge hardcoded with DB (Static code definitions win for catalog metadata and prices)
     const allProductsMap = new Map<string, Product>();
-    PRODUCTOS.forEach(p => allProductsMap.set(p.id, p));
-    products.forEach(p => {
-        const staticP = PRODUCTOS.find(sp => sp.id === p.id);
-        if (staticP) {
+
+    // 1. Load static catalog as base template
+    PRODUCTOS.forEach(p => {
+        const dbP = dbProductsMap.get(p.id);
+        if (dbP) {
+            // Check if product was deleted or archived
+            if (dbP.status === 'archived' || (dbP as any).isDeleted) {
+                return;
+            }
             allProductsMap.set(p.id, {
                 ...p,
-                ...staticP,
-                precios: staticP.precios
+                ...dbP,
+                precios: dbP.precios && Object.keys(dbP.precios).length > 0 ? dbP.precios : p.precios,
+                competidorPromedio: dbP.competidorPromedio || p.competidorPromedio,
+                stock: dbP.stock || p.stock,
+                nombre: dbP.nombre || p.nombre,
+                slogan: dbP.slogan || p.slogan,
+                descripcion: dbP.descripcion || p.descripcion,
+                shortDescription: dbP.shortDescription || p.shortDescription,
+                categoria: dbP.categoria || p.categoria,
+                subcategoria: dbP.subcategoria !== undefined ? dbP.subcategoria : p.subcategoria,
+                imgFile: dbP.imgFile || p.imgFile,
+                imgFiles: dbP.imgFiles || p.imgFiles,
+                badge: dbP.badge !== undefined ? dbP.badge : p.badge,
+                beneficios: dbP.beneficios && dbP.beneficios.length > 0 ? dbP.beneficios : p.beneficios,
+                faqs: dbP.faqs && dbP.faqs.length > 0 ? dbP.faqs : p.faqs,
+                sku: dbP.sku || p.sku,
+                status: dbP.status || 'active'
             });
+        } else {
+            allProductsMap.set(p.id, p);
         }
-        // Obsolete/deleted DB documents NOT present in static PRODUCTOS are excluded
+    });
+
+    // 2. Include any NEW custom products created by the admin in Firestore that are not in the static file
+    dbProductsMap.forEach((dbP, id) => {
+        if (!allProductsMap.has(id)) {
+            if (dbP.status === 'archived' || (dbP as any).isDeleted) return;
+            allProductsMap.set(id, dbP);
+        }
     });
 
     cachedProducts = Array.from(allProductsMap.values())
@@ -87,11 +115,14 @@ export async function getProductById(id: string): Promise<Product | null> {
     let res: Product | null = null;
     if (docSnap.exists()) {
         const dbData = { id: docSnap.id, ...docSnap.data() } as Product;
+        if ((dbData as any).isDeleted || dbData.status === 'archived') {
+            return null;
+        }
         if (fallback) {
             res = {
-                ...dbData,
                 ...fallback,
-                precios: fallback.precios
+                ...dbData,
+                precios: dbData.precios && Object.keys(dbData.precios).length > 0 ? dbData.precios : fallback.precios,
             };
         } else {
             res = dbData;
@@ -125,22 +156,33 @@ function ensureStockDefaults(product: Product): Product {
         ...product,
         stock,
         minStockThreshold: defaultThreshold,
-        sku
+        sku,
+        status: product.status || 'active'
     };
 }
 
 /**
- * Creates or overwrites a product
+ * Creates or overwrites a product in Firestore
  */
 export async function saveProduct(product: Product): Promise<void> {
     const docRef = doc(db, 'products', product.id);
-    const { id, ...data } = product; // Avoid saving ID twice
+    const now = new Date().toISOString();
+    const { id, ...data } = product;
+
+    const payload = {
+        ...data,
+        isDeleted: false,
+        status: product.status || 'active',
+        updatedAt: now,
+        createdAt: product.createdAt || now
+    };
     
     // Using setDoc to allow custom IDs (slugs)
-    await setDoc(docRef, data);
+    await setDoc(docRef, payload, { merge: true });
     
-    // Invalidate cache
+    // Invalidate cache immediately
     cachedProducts = null;
+    lastFetchTime = 0;
 }
 
 /**
@@ -152,20 +194,28 @@ export async function updateProductStock(id: string, size: string, newStockQuant
 
     const updatedStock = { ...(product.stock || {}), [size]: Math.max(0, newStockQuantity) };
     const docRef = doc(db, 'products', id);
-    await updateDoc(docRef, { stock: updatedStock });
+    await setDoc(docRef, { stock: updatedStock, updatedAt: new Date().toISOString() }, { merge: true });
 
     cachedProducts = null;
+    lastFetchTime = 0;
 }
 
 /**
- * Deletes a product
+ * Deletes a product (soft delete + purge)
  */
 export async function deleteProduct(id: string): Promise<void> {
     const docRef = doc(db, 'products', id);
-    await deleteDoc(docRef);
+    // Mark as archived / isDeleted to prevent fallback recovery
+    await setDoc(docRef, { isDeleted: true, status: 'archived', updatedAt: new Date().toISOString() }, { merge: true });
+    try {
+        await deleteDoc(docRef);
+    } catch (e) {
+        console.warn('Warning: Soft-delete fallback applied for product:', id);
+    }
     
-    // Invalidate cache
+    // Invalidate cache immediately
     cachedProducts = null;
+    lastFetchTime = 0;
 }
 
 /**
