@@ -862,9 +862,21 @@ function HomeContent() {
             </div>
           </div>
 
-          <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-black text-white/20 uppercase tracking-widest">
-            <p>© 2026 BIOCAMBIO360 S.A.S. - TODOS LOS DERECHOS RESERVADOS</p>
-            <p>DISEÑADO POR THINK TIC S.A.S.</p>
+          <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-white/50">
+            <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">© 2026 BIOCAMBIO360 S.A.S. - TODOS LOS DERECHOS RESERVADOS</p>
+            <p className="flex items-center gap-1.5 flex-wrap justify-center font-medium">
+              <span>Diseñado y desarrollado con amor por</span>
+              <a 
+                href="https://thinktic.co" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="font-bold text-white hover:text-orange-400 underline decoration-orange-500/60 hover:decoration-orange-500 transition-colors"
+              >
+                THINK TIC
+              </a>
+              <span className="text-orange-500">🧡</span>
+              <span>🇨🇴</span>
+            </p>
           </div>
         </div>
       </footer>

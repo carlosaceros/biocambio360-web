@@ -52,7 +52,19 @@ export default function Footer() {
 
                 <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] text-gray-500">
                     <p>© 2026 BIOCAMBIO360 S.A.S. — Todos los derechos reservados.</p>
-                    <p>Fábrica Directa en Soacha y Cundinamarca</p>
+                    <p className="flex items-center gap-1.5 flex-wrap justify-center text-gray-400">
+                        <span>Diseñado y desarrollado con amor por</span>
+                        <a 
+                            href="https://thinktic.co" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="font-bold text-white hover:text-orange-400 underline decoration-orange-500/60 hover:decoration-orange-500 transition-colors"
+                        >
+                            THINK TIC
+                        </a>
+                        <span className="text-orange-500">🧡</span>
+                        <span>🇨🇴</span>
+                    </p>
                 </div>
             </div>
         </footer>

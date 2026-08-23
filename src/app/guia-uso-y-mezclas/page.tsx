@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { TABLA_MEZCLAS_OFICIAL, RICH_PRODUCT_SPECS, MezclaEntry } from '@/lib/products-rich-data';
+import Footer from '@/components/Footer';
 
 export default function GuiaUsoYMezclasPage() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -265,6 +266,7 @@ export default function GuiaUsoYMezclasPage() {
                     </div>
                 </section>
             </main>
+            <Footer />
         </div>
     );
 }

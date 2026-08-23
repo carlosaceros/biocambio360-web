@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { BookOpen, Search, ArrowLeft, Calendar, ArrowRight, Sparkles } from 'lucide-react';
 import { BLOG_POSTS, BlogPost } from '@/lib/blog-data';
+import Footer from '@/components/Footer';
 
 export default function BlogIndexPage() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -143,6 +144,7 @@ export default function BlogIndexPage() {
                     </div>
                 )}
             </div>
+            <Footer />
         </div>
     );
 }

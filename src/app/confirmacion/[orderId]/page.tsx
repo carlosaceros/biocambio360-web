@@ -241,6 +241,24 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                         VOLVER AL INICIO
                     </motion.a>
                 </div>
+
+                {/* Confirmation Mini Footer */}
+                <div className="mt-12 text-center text-xs text-gray-400 space-y-1.5 pb-6">
+                    <p>© 2026 Biocambio360 S.A.S. Todos los derechos reservados.</p>
+                    <p className="flex items-center justify-center gap-1.5 flex-wrap text-xs text-gray-500 font-medium">
+                        <span>Diseñado y desarrollado con amor por</span>
+                        <a 
+                            href="https://thinktic.co" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="font-bold text-gray-700 hover:text-orange-600 underline decoration-orange-500/60 hover:decoration-orange-500 transition-colors"
+                        >
+                            THINK TIC
+                        </a>
+                        <span className="text-orange-500">🧡</span>
+                        <span>🇨🇴</span>
+                    </p>
+                </div>
             </div>
         </div>
     );

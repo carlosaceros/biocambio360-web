@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, User, Tag, ShoppingBag, ArrowRight } from 'lucide-
 import { BLOG_POSTS, BlogPost } from '@/lib/blog-data';
 import { PRODUCTOS } from '@/lib/products-data';
 import { generateProductSlug } from '@/lib/product-utils';
+import Footer from '@/components/Footer';
 
 interface BlogPostPageProps {
     params: Promise<{ slug: string }>;
@@ -154,6 +155,7 @@ export default async function BlogPostDetailPage({ params }: BlogPostPageProps) 
                     )}
                 </div>
             </div>
+            <Footer />
         </>
     );
 }

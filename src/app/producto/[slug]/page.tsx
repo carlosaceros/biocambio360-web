@@ -10,6 +10,7 @@ import {
     getRelatedProducts
 } from '@/lib/product-utils';
 import ProductPageContent from '@/components/ProductPageContent';
+import Footer from '@/components/Footer';
 
 // ISR: Revalidate the page every 60 seconds to pull new products
 export const revalidate = 60;
@@ -73,6 +74,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             )}
 
             <ProductPageContent product={product} relatedProducts={relatedProducts} />
+            <Footer />
         </>
     );
 }
