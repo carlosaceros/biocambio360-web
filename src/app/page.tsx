@@ -24,7 +24,7 @@ import {
   Package,
   Building2
 } from 'lucide-react';
-import { useState, useEffect, useMemo, useCallback, useDeferredValue, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useDeferredValue, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import ProductCard from '@/components/ProductCard';
@@ -43,6 +43,25 @@ import { PRODUCTOS } from '@/lib/products-data';
 import { useCart } from '@/lib/cart-context';
 import { getProductAffinities } from '@/lib/product-utils';
 import { getAllProducts } from '@/lib/products-service';
+
+// Helper to determine if a product is a bundle/combo/kit
+const isComboOrKit = (p: Product) => {
+  const cat = (p.categoria || '').toLowerCase();
+  const sub = (p.subcategoria || '').toLowerCase();
+  const id = (p.id || '').toLowerCase();
+  const nombre = (p.nombre || '').toLowerCase();
+  return (
+    cat.includes('kit') ||
+    cat.includes('combo') ||
+    sub.includes('kit') ||
+    sub.includes('combo') ||
+    id.startsWith('kit-') ||
+    id.startsWith('combo-') ||
+    nombre.startsWith('kit ') ||
+    nombre.startsWith('combo ') ||
+    nombre.includes('pack ')
+  );
+};
 
 function HomeContent() {
   const { addToCart, setIsCartOpen, getTotalItems } = useCart();
@@ -72,6 +91,7 @@ function HomeContent() {
   // Local state for search input (SEARCH-01: immediate responsive typing without re-mounting input)
   const [inputValue, setInputValue] = useState(searchQuery);
   const deferredQuery = useDeferredValue(inputValue);
+  const hasScrolledForQueryRef = useRef(false);
 
   // Sync local input value when URL changes from external navigation
   useEffect(() => {
@@ -92,6 +112,24 @@ function HomeContent() {
     return () => window.clearTimeout(timeoutId);
   }, [inputValue]);
 
+  // Auto-scroll to catalog when user begins typing or searching
+  useEffect(() => {
+    if (deferredQuery.trim().length >= 2) {
+      if (!hasScrolledForQueryRef.current) {
+        hasScrolledForQueryRef.current = true;
+        const el = document.getElementById('catalogo');
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top > 250 || rect.top < -100) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      }
+    } else {
+      hasScrolledForQueryRef.current = false;
+    }
+  }, [deferredQuery]);
+
   /**
    * applyFilter — construye una URL limpia con un único filtro activo.
    * Al aplicar un filtro se limpian todos los demás para evitar acumulación.
@@ -102,6 +140,11 @@ function HomeContent() {
     const query = params.toString();
     if (type === 'q') {
       setInputValue(value || '');
+      if (value && value.trim()) {
+        setTimeout(() => {
+          document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+      }
     } else {
       setInputValue('');
       router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
@@ -181,7 +224,21 @@ function HomeContent() {
     });
   }, [dbProducts, selectedCategory, selectedSubcategory, selectedSegment, selectedSolution, deferredQuery]);
 
-  // Products to render in the current batch
+  // Is searching state
+  const isSearching = Boolean(deferredQuery.trim());
+
+  // Split search results: individual products first, kits & combos below
+  const searchIndividualProducts = useMemo(() => {
+    if (!isSearching) return [];
+    return filteredProducts.filter(p => !isComboOrKit(p));
+  }, [filteredProducts, isSearching]);
+
+  const searchComboProducts = useMemo(() => {
+    if (!isSearching) return [];
+    return filteredProducts.filter(p => isComboOrKit(p));
+  }, [filteredProducts, isSearching]);
+
+  // Products to render in the current batch for non-search browsing
   const visibleProducts = useMemo(() => {
     return filteredProducts.slice(0, visibleCount);
   }, [filteredProducts, visibleCount]);
@@ -272,6 +329,12 @@ function HomeContent() {
                 placeholder="Buscar productos (ej. desengrasante)..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
                 inputMode="search"
                 enterKeyHint="search"
                 autoComplete="off"
@@ -286,7 +349,7 @@ function HomeContent() {
                     url.searchParams.delete('q');
                     window.history.replaceState(window.history.state, '', url.toString());
                   }}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
                   aria-label="Limpiar búsqueda"
                 >
                   <X size={14} />
@@ -353,7 +416,7 @@ function HomeContent() {
             
             <button
               onClick={() => document.getElementById('combos')?.scrollIntoView({ behavior: 'smooth' })}
-              className="hover:text-[var(--brand-blue)] transition-colors"
+              className="hover:text-[var(--brand-blue)] transition-colors cursor-pointer"
             >
               Combos
             </button>
@@ -376,7 +439,7 @@ function HomeContent() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsCartOpen(true)}
-              className="relative p-3 text-[var(--brand-gray)] hover:text-[var(--brand-blue)] transition-all bg-white border border-[var(--brand-border)] rounded-2xl shadow-sm"
+              className="relative p-3 text-[var(--brand-gray)] hover:text-[var(--brand-blue)] transition-all bg-white border border-[var(--brand-border)] rounded-2xl shadow-sm cursor-pointer"
             >
               <ShoppingCart size={22} />
               <AnimatePresence>
@@ -458,7 +521,7 @@ function HomeContent() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="bg-white text-[var(--brand-dark)] font-black px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-sm tracking-tight"
+                    className="bg-white text-[var(--brand-dark)] font-black px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-sm tracking-tight cursor-pointer"
                   >
                     VER PRODUCTOS
                     <ArrowDown size={18} strokeWidth={3} />
@@ -467,7 +530,7 @@ function HomeContent() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => document.getElementById('combos')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="bg-white/5 backdrop-blur-md border border-white/10 text-white font-black px-8 py-4 rounded-2xl hover:bg-white/10 transition-all text-sm tracking-tight"
+                    className="bg-white/5 backdrop-blur-md border border-white/10 text-white font-black px-8 py-4 rounded-2xl hover:bg-white/10 transition-all text-sm tracking-tight cursor-pointer"
                   >
                     🔥 ARMAR COMBO
                   </motion.button>
@@ -476,28 +539,32 @@ function HomeContent() {
             </div>
           </div>
 
-          {/* Kits & Combos Section */}
-          <KitsSection 
-            onAddToCart={handleAddToCart} 
-            onViewDetails={openQuickView}
-            onVerTodosKits={() => {
-              applyFilter('cat', 'Kits & Combos');
-            }}
-          />
+          {/* Kits & Combos Section (Hidden when searching so user sees search results immediately) */}
+          {!isSearching && (
+            <KitsSection 
+              onAddToCart={handleAddToCart} 
+              onViewDetails={openQuickView}
+              onVerTodosKits={() => {
+                applyFilter('cat', 'Kits & Combos');
+              }}
+            />
+          )}
 
           {/* ─── PRODUCT CATALOG ────────────────────────────────── */}
-          <div id="catalogo" className="px-6 py-12">
+          <div id="catalogo" className="px-6 py-12 scroll-mt-20">
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4 border-b border-gray-100 pb-6">
               <div>
                 <span className="text-[var(--brand-blue)] font-black uppercase text-[10px] tracking-[0.3em] mb-2 block">
-                  {selectedCategory || selectedSegment || selectedSolution ? 'Filtrado por' : 'Nuestro Catálogo'}
+                  {isSearching ? 'Búsqueda en Catálogo' : (selectedCategory || selectedSegment || selectedSolution ? 'Filtrado por' : 'Nuestro Catálogo')}
                 </span>
-                <h2 className="text-4xl font-black text-[var(--brand-dark)] tracking-tighter uppercase">
-                  {selectedSubcategory || 
-                   selectedCategory || 
-                   (selectedSegment ? `Perfil: ${selectedSegment}` : null) || 
-                   (selectedSolution ? `Solución: ${selectedSolution}` : null) || 
-                   'Colección Completa'}
+                <h2 className="text-3xl md:text-4xl font-black text-[var(--brand-dark)] tracking-tighter uppercase">
+                  {isSearching ? `Resultados para "${deferredQuery}"` : (
+                    selectedSubcategory || 
+                    selectedCategory || 
+                    (selectedSegment ? `Perfil: ${selectedSegment}` : null) || 
+                    (selectedSolution ? `Solución: ${selectedSolution}` : null) || 
+                    'Colección Completa'
+                  )}
                 </h2>
               </div>
               
@@ -507,15 +574,18 @@ function HomeContent() {
                   <input
                     type="text"
                     placeholder="Filtrar catálogo..."
-                    value={searchQuery}
-                    onChange={(e) => applyFilter('q', e.target.value || null)}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
                     className="w-full bg-white border border-gray-200 rounded-2xl py-2 pl-9 pr-8 text-base md:text-xs focus:outline-none focus:border-[var(--brand-blue)] focus:ring-1 focus:ring-[var(--brand-blue)] text-gray-900 transition-all shadow-sm"
                   />
                   <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
-                  {searchQuery && (
+                  {inputValue && (
                     <button 
-                      onClick={() => applyFilter(null, null)}
-                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                      onClick={() => {
+                        setInputValue('');
+                        applyFilter(null, null);
+                      }}
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
                     >
                       <X size={14} />
                     </button>
@@ -523,11 +593,14 @@ function HomeContent() {
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-3 text-xs font-bold text-gray-500">
-                  <span>{filteredProducts.length} productos</span>
-                  {(selectedCategory || selectedSubcategory || selectedSegment || selectedSolution || searchQuery) && (
+                  <span>{filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''}</span>
+                  {(selectedCategory || selectedSubcategory || selectedSegment || selectedSolution || inputValue) && (
                     <button 
-                      onClick={() => applyFilter(null, null)}
-                      className="text-xs font-black text-[var(--brand-pink)] hover:underline flex items-center gap-1 bg-[var(--brand-pink-50)] px-3 py-1.5 rounded-full transition-colors"
+                      onClick={() => {
+                        setInputValue('');
+                        applyFilter(null, null);
+                      }}
+                      className="text-xs font-black text-[var(--brand-pink)] hover:underline flex items-center gap-1 bg-[var(--brand-pink-50)] px-3 py-1.5 rounded-full transition-colors cursor-pointer"
                     >
                       Limpiar <X size={12} strokeWidth={3} />
                     </button>
@@ -537,7 +610,7 @@ function HomeContent() {
             </div>
 
             {/* Profile Selector (Segment Filter) — Hidden during active search */}
-            {!searchQuery && (
+            {!isSearching && (
               <div className="mb-10 bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm">
                 <p className="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">
                   Selecciona tu perfil para ver soluciones a tu medida
@@ -561,7 +634,7 @@ function HomeContent() {
                           document.getElementById('grid-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }, 50);
                       }}
-                      className={`p-5 rounded-3xl border-2 text-left transition-all ${
+                      className={`p-5 rounded-3xl border-2 text-left transition-all cursor-pointer ${
                         isActive 
                           ? 'border-[var(--brand-blue)] bg-[var(--brand-blue)]/5 shadow-md font-bold' 
                           : `border-gray-100 bg-white ${profile.color}`
@@ -579,33 +652,122 @@ function HomeContent() {
             </div>
             )}
 
-            <div id="grid-productos" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8 scroll-mt-28">
-              {visibleProducts.map((producto) => (
-                <ProductCard
-                  key={producto.id}
-                  product={producto}
-                  onAddToCart={handleAddToCart}
-                  onViewDetails={openQuickView}
-                />
-              ))}
-            </div>
+            {/* ─── RENDERING LOGIC: SEARCH VS NORMAL BROWSING ─── */}
+            {isSearching ? (
+              <div className="space-y-12">
+                {/* 1. Individual Products Section */}
+                {searchIndividualProducts.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-6 pb-3 border-b border-gray-100">
+                      <h3 className="text-xl md:text-2xl font-black text-[var(--brand-dark)] flex items-center gap-2">
+                        <Package className="text-[var(--brand-blue)]" size={24} />
+                        Productos Individuales
+                      </h3>
+                      <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3.5 py-1 rounded-full">
+                        {searchIndividualProducts.length} {searchIndividualProducts.length === 1 ? 'producto' : 'productos'}
+                      </span>
+                    </div>
+                    <div id="grid-productos" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8 scroll-mt-28">
+                      {searchIndividualProducts.map((producto) => (
+                        <ProductCard
+                          key={producto.id}
+                          product={producto}
+                          onAddToCart={handleAddToCart}
+                          onViewDetails={openQuickView}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Load More Products Button & Count */}
-            {visibleCount < filteredProducts.length && (
-              <div className="mt-12 flex flex-col items-center justify-center gap-3">
-                <p className="text-xs font-bold text-gray-400">
-                  Mostrando {visibleProducts.length} de {filteredProducts.length} productos
-                </p>
-                <motion.button
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => setVisibleCount((prev) => prev + 12)}
-                  className="bg-[var(--brand-blue)] hover:bg-blue-700 text-white font-black px-8 py-3.5 rounded-2xl shadow-lg shadow-[var(--brand-blue)]/20 text-xs tracking-widest flex items-center gap-2 transition-all cursor-pointer uppercase"
-                >
-                  CARGAR MÁS PRODUCTOS
-                  <ChevronDown size={16} strokeWidth={3} />
-                </motion.button>
+                {/* 2. Kits & Combos Section (Shown underneath individual products) */}
+                {searchComboProducts.length > 0 && (
+                  <div className="p-6 md:p-8 bg-gradient-to-br from-pink-50/50 via-amber-50/30 to-purple-50/40 rounded-[2.5rem] border-2 border-pink-200/60 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-pink-200/50">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-pink-600 bg-pink-100 px-3 py-1 rounded-full inline-block mb-1">
+                          🔥 Ahorro en Combo & Kits
+                        </span>
+                        <h3 className="text-xl md:text-2xl font-black text-[var(--brand-dark)] flex items-center gap-2">
+                          <Sparkles className="text-pink-600" size={24} />
+                          Kits y Combos con este producto
+                        </h3>
+                        <p className="text-xs text-gray-600 mt-0.5 font-medium">
+                          Lleva más cantidad o combina con otros productos con descuento directo de fábrica
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-pink-800 bg-pink-100 px-3.5 py-1.5 rounded-full self-start sm:self-auto shadow-xs">
+                        {searchComboProducts.length} {searchComboProducts.length === 1 ? 'combo disponible' : 'combos disponibles'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
+                      {searchComboProducts.map((producto) => (
+                        <ProductCard
+                          key={producto.id}
+                          product={producto}
+                          onAddToCart={handleAddToCart}
+                          onViewDetails={openQuickView}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Empty State if no products match */}
+                {filteredProducts.length === 0 && (
+                  <div className="py-16 text-center bg-white rounded-3xl border border-gray-200 p-8 shadow-sm my-6">
+                    <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Search size={28} />
+                    </div>
+                    <h3 className="text-xl font-black text-gray-900 mb-2">
+                      No encontramos resultados para &quot;{deferredQuery}&quot;
+                    </h3>
+                    <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
+                      Prueba buscando con palabras como <em>detergente</em>, <em>desengrasante</em>, <em>lavaloza</em>, <em>suavizante</em> o <em>limpiapisos</em>.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setInputValue('');
+                        applyFilter(null, null);
+                      }}
+                      className="bg-[var(--brand-blue)] text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-wider hover:bg-blue-700 transition-colors cursor-pointer"
+                    >
+                      Ver Todos los Productos
+                    </button>
+                  </div>
+                )}
               </div>
+            ) : (
+              <>
+                <div id="grid-productos" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8 scroll-mt-28">
+                  {visibleProducts.map((producto) => (
+                    <ProductCard
+                      key={producto.id}
+                      product={producto}
+                      onAddToCart={handleAddToCart}
+                      onViewDetails={openQuickView}
+                    />
+                  ))}
+                </div>
+
+                {/* Load More Products Button & Count */}
+                {visibleCount < filteredProducts.length && (
+                  <div className="mt-12 flex flex-col items-center justify-center gap-3">
+                    <p className="text-xs font-bold text-gray-400">
+                      Mostrando {visibleProducts.length} de {filteredProducts.length} productos
+                    </p>
+                    <motion.button
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => setVisibleCount((prev) => prev + 12)}
+                      className="bg-[var(--brand-blue)] hover:bg-blue-700 text-white font-black px-8 py-3.5 rounded-2xl shadow-lg shadow-[var(--brand-blue)]/20 text-xs tracking-widest flex items-center gap-2 transition-all cursor-pointer uppercase"
+                    >
+                      CARGAR MÁS PRODUCTOS
+                      <ChevronDown size={16} strokeWidth={3} />
+                    </motion.button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

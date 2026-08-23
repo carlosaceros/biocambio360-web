@@ -269,12 +269,8 @@ export default function CheckoutPage() {
             newErrors.email = 'Email inválido';
         }
 
-        if (!formData.departamento) {
-            newErrors.departamento = 'Departamento es requerido';
-        }
-
-        if (!formData.ciudad) {
-            newErrors.ciudad = 'Ciudad es requerida';
+        if (!formData.departamento || !formData.ciudad || !destinoCodigo) {
+            newErrors.ciudad = 'Debes buscar y seleccionar tu ciudad de la lista';
         }
 
         if (!formData.direccion.trim() || formData.direccion.length < 10) {
@@ -282,7 +278,27 @@ export default function CheckoutPage() {
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+
+        const errorKeys = Object.keys(newErrors);
+        if (errorKeys.length > 0) {
+            // Orden lógico de los campos en el formulario
+            const fieldOrder = ['nombre', 'cedula', 'celular', 'email', 'ciudad', 'direccion'];
+            const firstError = fieldOrder.find(k => newErrors[k]);
+
+            if (firstError) {
+                setTimeout(() => {
+                    const el = document.getElementById(`field-${firstError}`) ||
+                               document.querySelector(`[name="${firstError}"]`) as HTMLElement;
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.focus();
+                    }
+                }, 100);
+            }
+            return false;
+        }
+
+        return true;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -502,14 +518,15 @@ export default function CheckoutPage() {
                                             Nombre Completo *
                                         </label>
                                         <input
+                                            id="field-nombre"
                                             type="text"
                                             name="nombre"
                                             value={formData.nombre}
                                             onChange={handleInputChange}
-                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.nombre ? 'border-red-500' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
+                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.nombre ? 'border-red-500 bg-red-50/20 ring-2 ring-red-200' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
                                             placeholder="Juan Pérez"
                                         />
-                                        {errors.nombre && <p className="text-red-600 text-xs mt-1">{errors.nombre}</p>}
+                                        {errors.nombre && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.nombre}</p>}
                                     </div>
 
                                     <div>
@@ -517,15 +534,16 @@ export default function CheckoutPage() {
                                             Cédula *
                                         </label>
                                         <input
+                                            id="field-cedula"
                                             type="text"
                                             name="cedula"
                                             value={formData.cedula}
                                             onChange={handleInputChange}
-                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.cedula ? 'border-red-500' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
+                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.cedula ? 'border-red-500 bg-red-50/20 ring-2 ring-red-200' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
                                             placeholder="1234567890"
                                             maxLength={10}
                                         />
-                                        {errors.cedula && <p className="text-red-600 text-xs mt-1">{errors.cedula}</p>}
+                                        {errors.cedula && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.cedula}</p>}
                                     </div>
 
                                     <div>
@@ -533,15 +551,16 @@ export default function CheckoutPage() {
                                             Celular *
                                         </label>
                                         <input
+                                            id="field-celular"
                                             type="tel"
                                             name="celular"
                                             value={formData.celular}
                                             onChange={handleInputChange}
-                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.celular ? 'border-red-500' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
+                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.celular ? 'border-red-500 bg-red-50/20 ring-2 ring-red-200' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
                                             placeholder="3001234567"
                                             maxLength={10}
                                         />
-                                        {errors.celular && <p className="text-red-600 text-xs mt-1">{errors.celular}</p>}
+                                        {errors.celular && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.celular}</p>}
                                     </div>
 
                                     <div className="md:col-span-2">
@@ -549,14 +568,15 @@ export default function CheckoutPage() {
                                             Email (Opcional)
                                         </label>
                                         <input
+                                            id="field-email"
                                             type="email"
                                             name="email"
                                             value={formData.email}
                                             onChange={handleInputChange}
-                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.email ? 'border-red-500' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
+                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.email ? 'border-red-500 bg-red-50/20 ring-2 ring-red-200' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
                                             placeholder="correo@ejemplo.com"
                                         />
-                                        {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email}</p>}
+                                        {errors.email && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.email}</p>}
                                     </div>
                                 </div>
                             </div>
@@ -574,6 +594,7 @@ export default function CheckoutPage() {
                                         </label>
                                         <div className="relative">
                                             <input
+                                                id="field-ciudad"
                                                 type="text"
                                                 value={citySearch || (formData.ciudad ? `${formData.ciudad}${formData.departamento ? ' / ' + formData.departamento : ''}` : '')}
                                                 onChange={e => {
@@ -588,7 +609,7 @@ export default function CheckoutPage() {
                                                 }}
                                                 onFocus={() => setCitySearchOpen(true)}
                                                 onBlur={() => setTimeout(() => setCitySearchOpen(false), 200)}
-                                                className={`w-full px-4 py-3 rounded-lg border-2 ${errors.ciudad ? 'border-red-500' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
+                                                className={`w-full px-4 py-3 rounded-lg border-2 ${errors.ciudad ? 'border-red-500 bg-red-50/20 ring-2 ring-red-200' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
                                                 placeholder="Busca tu ciudad (ej: Bogotá, Medellín, Cali...)"
                                                 autoComplete="off"
                                             />
@@ -637,7 +658,7 @@ export default function CheckoutPage() {
                                                 {destinoCodigo && <span className="font-mono text-gray-400">· código {destinoCodigo}</span>}
                                             </p>
                                         )}
-                                        {errors.ciudad && <p className="text-red-600 text-xs mt-1">{errors.ciudad}</p>}
+                                        {errors.ciudad && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.ciudad}</p>}
                                         {/* Shipping info badge */}
                                         {formData.ciudad && (
                                             <div className={`mt-2 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${
@@ -686,14 +707,15 @@ export default function CheckoutPage() {
                                             Dirección Completa *
                                         </label>
                                         <input
+                                            id="field-direccion"
                                             type="text"
                                             name="direccion"
                                             value={formData.direccion}
                                             onChange={handleInputChange}
-                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.direccion ? 'border-red-500' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
+                                            className={`w-full px-4 py-3 rounded-lg border-2 ${errors.direccion ? 'border-red-500 bg-red-50/20 ring-2 ring-red-200' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}
                                             placeholder="Calle 123 #45-67, Apto 301"
                                         />
-                                        {errors.direccion && <p className="text-red-600 text-xs mt-1">{errors.direccion}</p>}
+                                        {errors.direccion && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.direccion}</p>}
                                     </div>
 
                                     <div className="md:col-span-2">
@@ -804,13 +826,21 @@ export default function CheckoutPage() {
                                 </div>
                             )}
 
+                            {/* Mensaje de validación si faltan campos */}
+                            {Object.keys(errors).length > 0 && (
+                                <div className="bg-red-50 border-2 border-red-300 text-red-700 px-4 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-xs">
+                                    <span className="text-base">⚠️</span>
+                                    <span>Por favor completa o corrige los campos marcados en rojo arriba para continuar.</span>
+                                </div>
+                            )}
+
                             {/* Submit Button */}
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 type="submit"
                                 disabled={isSubmitting || !!shippingInfo.loading || !!shippingInfo.sinCobertura}
-                                className={`w-full text-white font-black py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${paymentMethod === 'wompi'
+                                className={`w-full text-white font-black py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer ${paymentMethod === 'wompi'
                                         ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                         : 'bg-red-600 hover:bg-red-700 shadow-red-200'
                                     }`}
