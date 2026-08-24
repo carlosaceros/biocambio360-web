@@ -23,6 +23,12 @@ const SIZE_LABELS: Record<string, string> = {
     '3.8L':  '1 Gal',
     '10L':   '10 L',
     '20L':   '20 L 🔥',
+    '1KG':   '1 Kg',
+    '4KG':   '4 Kg',
+    '10KG':  '10 Kg',
+    '20KG':  '20 Kg',
+    'COMBO': 'Combo Completo',
+    'DEFAULT': 'Estándar'
 };
 
 export default function ProductQuickView({ product, isOpen, onClose, onAddToCart }: ProductQuickViewProps) {
@@ -31,21 +37,24 @@ export default function ProductQuickView({ product, isOpen, onClose, onAddToCart
 
     useEffect(() => {
         if (product) {
-            const sizes = Object.keys(product.precios).sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
-            setSelectedSize(sizes[0]);
+            const sizes = Object.keys(product.precios || {}).sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+            setSelectedSize(sizes[0] || '3.8L');
             setQuantity(1);
         }
     }, [product]);
 
     if (!product) return null;
 
-    const availableSizes = Object.keys(product.precios).sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
-    const price = product.precios[selectedSize];
-    const savingsData = calcularAhorro(price, selectedSize, product.competidorPromedio[selectedSize]);
+    const availableSizes = Object.keys(product.precios || {}).sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+    const effectiveSize = (product.precios && product.precios[selectedSize] !== undefined)
+        ? selectedSize
+        : (availableSizes[0] || selectedSize);
+    const price = product.precios?.[effectiveSize] || Object.values(product.precios || {})[0] || 0;
+    const savingsData = calcularAhorro(price, effectiveSize, product.competidorPromedio?.[effectiveSize]);
     const productSlug = generateProductSlug(product.id, product.nombre);
 
     const handleAdd = () => {
-        onAddToCart(product, selectedSize, price, quantity);
+        onAddToCart(product, effectiveSize, price, quantity);
         onClose();
     };
 

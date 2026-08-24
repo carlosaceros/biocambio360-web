@@ -55,7 +55,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const savedCart = localStorage.getItem('biocambio360_cart');
         if (savedCart) {
             try {
-                setCart(JSON.parse(savedCart));
+                const parsed: CartItem[] = JSON.parse(savedCart);
+                // Sanitize any corrupt prices or invalid sizes
+                const sanitized = parsed.map(item => {
+                    const availableSizes = Object.keys(item.product?.precios || {});
+                    const validSize = (item.product?.precios && item.product.precios[item.size] !== undefined)
+                        ? item.size
+                        : (availableSizes[0] || item.size);
+                    
+                    const resolvedPrice = (item.price && item.price > 0)
+                        ? item.price
+                        : (item.product?.precios?.[validSize] || Object.values(item.product?.precios || {})[0] || 0);
+
+                    return {
+                        ...item,
+                        size: validSize as ProductSize,
+                        price: resolvedPrice
+                    };
+                });
+                setCart(sanitized);
             } catch (e) {
                 console.error('Error loading cart:', e);
             }
@@ -90,20 +108,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }, [appliedCoupon]);
 
     const addToCart = (product: Product, size: ProductSize, price: number, cantidad: number = 1) => {
+        const availableSizes = Object.keys(product.precios || {});
+        const effectiveSize = (product.precios && product.precios[size] !== undefined)
+            ? size
+            : (availableSizes[0] || size);
+
+        const resolvedPrice = (price && price > 0)
+            ? price
+            : (product.precios?.[effectiveSize] || Object.values(product.precios || {})[0] || 0);
+
         setCart(prevCart => {
             const existingItem = prevCart.find(
-                item => item.product.id === product.id && item.size === size
+                item => item.product.id === product.id && item.size === effectiveSize
             );
 
             if (existingItem) {
                 return prevCart.map(item =>
-                    item.product.id === product.id && item.size === size
-                        ? { ...item, cantidad: item.cantidad + cantidad }
+                    item.product.id === product.id && item.size === effectiveSize
+                        ? { ...item, price: resolvedPrice, cantidad: item.cantidad + cantidad }
                         : item
                 );
             }
 
-            return [...prevCart, { product, size, price, cantidad }];
+            return [...prevCart, { product, size: effectiveSize as ProductSize, price: resolvedPrice, cantidad }];
         });
     };
 

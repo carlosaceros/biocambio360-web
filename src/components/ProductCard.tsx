@@ -13,6 +13,8 @@ interface ProductCardProps {
     onViewDetails?: (product: Product) => void;
 }
 
+import { useEffect } from 'react';
+
 // Top 5 most purchased sizes displayed in the initial catalog grid
 const TOP_SIZES: ProductSize[] = ['1L', '1/2G', '3.8L', '10L', '20L'];
 
@@ -29,6 +31,12 @@ const SIZE_LABELS: Record<string, string> = {
     '500ML': '500 ml',
     '60ML': '60 ml',
     '15L': '15 L',
+    '1KG': '1 Kg',
+    '4KG': '4 Kg',
+    '10KG': '10 Kg',
+    '20KG': '20 Kg',
+    'COMBO': 'Combo Completo',
+    'DEFAULT': 'Estándar'
 };
 
 // Placeholder SVG rendered inline
@@ -43,7 +51,7 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     const [imgError, setImgError] = useState(false);
 
     // Get all sizes sorted by size order
-    const allSizes = Object.keys(product.precios).sort(
+    const allSizes = Object.keys(product.precios || {}).sort(
         (a, b) => (SIZE_ORDER.indexOf(a as ProductSize) !== -1 ? SIZE_ORDER.indexOf(a as ProductSize) : 99) - 
                   (SIZE_ORDER.indexOf(b as ProductSize) !== -1 ? SIZE_ORDER.indexOf(b as ProductSize) : 99)
     );
@@ -52,8 +60,28 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     const mainSizes = allSizes.filter(s => TOP_SIZES.includes(s as ProductSize));
     const displaySizes = mainSizes.length > 0 ? mainSizes : allSizes;
 
-    const [selectedSize, setSelectedSize] = useState<string>(displaySizes[0] || '3.8L');
-    const currentPrice = product.precios[selectedSize] || product.precios[displaySizes[0]] || 0;
+    const initialSize = (product.precios && product.precios[displaySizes[0]] !== undefined) 
+        ? displaySizes[0] 
+        : (Object.keys(product.precios || {})[0] || '3.8L');
+
+    const [selectedSize, setSelectedSize] = useState<string>(initialSize);
+
+    // Keep selectedSize synchronized with valid keys of current product
+    useEffect(() => {
+        if (!product.precios || product.precios[selectedSize] === undefined) {
+            const fallback = displaySizes[0] || Object.keys(product.precios || {})[0] || '3.8L';
+            setSelectedSize(fallback);
+        }
+    }, [product, displaySizes, selectedSize]);
+
+    const effectiveSize = (product.precios && product.precios[selectedSize] !== undefined)
+        ? selectedSize
+        : (displaySizes[0] || Object.keys(product.precios || {})[0] || selectedSize);
+
+    const currentPrice = product.precios?.[effectiveSize] 
+        || product.precios?.[displaySizes[0]] 
+        || Object.values(product.precios || {})[0] 
+        || 0;
 
     // Dynamically resolve image for selected size on-demand
     const imgSrc = `/images/${getProductImage(product, selectedSize)}`;
@@ -150,12 +178,12 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
                 <div className="mt-auto pt-3 flex items-end justify-between border-t border-gray-50">
                     <div>
                         <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">
-                            Precio ({SIZE_LABELS[selectedSize] || selectedSize})
+                            Precio ({SIZE_LABELS[effectiveSize] || effectiveSize})
                         </p>
                         <div className="flex items-baseline gap-1.5">
-                            {product.competidorPromedio && product.competidorPromedio[selectedSize] && product.competidorPromedio[selectedSize] > currentPrice && (
+                            {product.competidorPromedio && product.competidorPromedio[effectiveSize] && product.competidorPromedio[effectiveSize] > currentPrice && (
                                 <span className="text-xs text-gray-400 line-through font-bold">
-                                    {formatCurrency(product.competidorPromedio[selectedSize])}
+                                    {formatCurrency(product.competidorPromedio[effectiveSize])}
                                 </span>
                             )}
                             <span className="text-xl font-black text-[var(--brand-dark)] tracking-tight">
@@ -168,7 +196,7 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            onAddToCart?.(product, selectedSize, currentPrice, 1);
+                            onAddToCart?.(product, effectiveSize, currentPrice, 1);
                         }}
                         className="w-10 h-10 rounded-2xl bg-[var(--brand-blue-50)] text-[var(--brand-blue)] flex items-center justify-center hover:bg-[var(--brand-blue)] hover:text-white transition-all duration-300 shadow-sm hover:shadow-[var(--brand-blue)]/20 cursor-pointer"
                         title="Agregar al carrito"
