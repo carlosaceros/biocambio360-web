@@ -3,16 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Product, ProductSize } from './products';
 import { calcularAhorro } from './products';
-
-// Weight in kg per product size (1L ≈ 1kg for liquid cleaning products)
-const PESOS_POR_TALLA: Record<ProductSize, number> = {
-    '1L': 1.0,
-    '1/2G': 1.9,
-    '3.8L': 3.8,
-    '10L': 10.0,
-    '20L': 20.0,
-};
-
+import { getCartPackagingAnalysis, PackagingAnalysis } from './shipping-zones';
 import { AppliedCoupon } from './coupon-types';
 
 export interface CartItem {
@@ -33,6 +24,7 @@ interface CartContextType {
     getTotalPrice: () => number;
     getTotalSavings: () => number;
     getTotalWeightKg: () => number;
+    getPackagingAnalysis: () => PackagingAnalysis;
     isCartOpen: boolean;
     setIsCartOpen: (open: boolean) => void;
     appliedCoupon: AppliedCoupon | null;
@@ -221,11 +213,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }, 0);
     };
 
+    const getPackagingAnalysis = (): PackagingAnalysis => {
+        const quoteItems = cart.map(item => ({
+            productId: item.product.id,
+            nombre: item.product.nombre,
+            size: item.size,
+            cantidad: item.cantidad,
+        }));
+        return getCartPackagingAnalysis(quoteItems);
+    };
+
     const getTotalWeightKg = () => {
-        return cart.reduce((total, item) => {
-            const pesoUnitario = PESOS_POR_TALLA[item.size] ?? 1;
-            return total + (pesoUnitario * item.cantidad);
-        }, 0);
+        return getPackagingAnalysis().totalWeightKg;
     };
 
     return (
@@ -241,6 +240,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 getTotalPrice,
                 getTotalSavings,
                 getTotalWeightKg,
+                getPackagingAnalysis,
                 isCartOpen,
                 setIsCartOpen,
                 appliedCoupon,

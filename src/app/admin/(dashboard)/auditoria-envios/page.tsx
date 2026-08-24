@@ -44,11 +44,19 @@ interface AuditLog {
     fallbackZona?: string;
     errorMessage?: string;
     durationMs?: number;
-    // Campos nuevos (a partir de 2026-08-15)
+    // Campos de auditoria detallada de paquetes y subsidios
     subsidioBruto?: number;
     subsidioEfectivo?: number;
     subsidioFabricaBruto?: number;
     subsidioMaxNacional?: number;
+    desgloseSubsidio?: Array<{
+        nombre: string;
+        size: string;
+        cantidad: number;
+        pesoTotal: number;
+        subsidioUnitario: number;
+        subsidioTotal: number;
+    }>;
 }
 
 const SOURCE_CONFIG = {
@@ -331,6 +339,28 @@ export default function ShippingAuditPage() {
                                                         </div>
                                                     ))}
                                                 </div>
+
+                                                {/* Detalle de items y subsidios */}
+                                                {log.desgloseSubsidio && log.desgloseSubsidio.length > 0 && (
+                                                    <div className="mt-3 bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
+                                                        <div className="text-xs font-bold text-indigo-900 mb-1.5 flex items-center gap-1.5">
+                                                            <Package size={13} className="text-indigo-600" />
+                                                            Composición del Pedido & Subsidios Aplicados:
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            {log.desgloseSubsidio.map((item, idx) => (
+                                                                <div key={idx} className="flex items-center justify-between text-xs text-gray-700 bg-white/80 px-2.5 py-1 rounded-lg border border-indigo-50">
+                                                                    <span>
+                                                                        <strong className="text-gray-900">{item.cantidad}x</strong> {item.nombre} ({item.size}) · <span className="text-gray-500">{item.pesoTotal} kg</span>
+                                                                    </span>
+                                                                    <span className="font-semibold text-indigo-700">
+                                                                        Subsidio: {fmt(item.subsidioTotal)} ({fmt(item.subsidioUnitario)} c/u)
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* 99envios response breakdown */}

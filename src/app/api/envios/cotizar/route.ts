@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { cotizarEnvio } from '@/lib/99envios-service';
 import { getAdminDB } from '@/lib/firebase-admin';
 import {
-    calcularSubsidioReal,
+    getCartPackagingAnalysis,
     isZonaLocal,
-    SUBSIDIO_MAX_NACIONAL_COP,
+    CartItemQuote,
 } from '@/lib/shipping-zones';
 
 const LOGS_COLLECTION = 'shipping_audit_logs';
@@ -31,14 +31,19 @@ export async function POST(request: Request) {
             destinoNombre = 'BOGOTA D.C.',
             subtotal = 0,
             aplicaContrapago = true,
-            totalWeightKg = 5,
+            totalWeightKg: weightParam,
+            items = [],
             itemsSizes = [],
         } = body;
 
         const esLocal = isZonaLocal(destinoCodigo);
 
-        // Subsidio bruto (suma por item, refleja el costo real de la fábrica)
-        const subsidioBruto = calcularSubsidioReal(itemsSizes, totalWeightKg);
+        // Analizar empaque, bultos, pesos reales y subsidio de fábrica
+        const rawItems: CartItemQuote[] = (items && items.length > 0) ? items : itemsSizes;
+        const analysis = getCartPackagingAnalysis(rawItems);
+        const totalWeightKg = analysis.totalWeightKg || weightParam || 5;
+        const bultos = analysis.bultos;
+        const subsidioBruto = analysis.subsidioBruto;
 
         // ── ZONA LOCAL → Flota propia Biocambio360, GRATIS ──────────────────────
         if (esLocal) {
@@ -47,14 +52,16 @@ export async function POST(request: Request) {
                 destinoNombre,
                 subtotal,
                 totalWeightKg,
+                bultos,
                 subsidioBruto,
-                subsidioEfectivo: subsidioBruto,   // absorbe todo el flete
+                subsidioEfectivo: subsidioBruto,
                 cotizacionBruta99: 0,
                 fleteCliente: 0,
                 esGratis: true,
                 esLocal: true,
                 transportadora: 'Flota Propia Biocambio360',
                 dias: '1-2',
+                desgloseSubsidio: analysis.desgloseSubsidio,
                 durationMs: Date.now() - startTime,
             };
 
@@ -66,6 +73,8 @@ export async function POST(request: Request) {
                 cotizacionBruta99: 0,
                 subsidioBruto,
                 subsidioEfectivo: subsidioBruto,
+                totalWeightKg,
+                bultos,
                 transportadora: 'Flota Propia Biocambio360',
                 dias: '1-2',
                 esLocal,
@@ -77,14 +86,21 @@ export async function POST(request: Request) {
         // ── ZONA NACIONAL → 99 Envíos API ────────────────────────────────────────
         let quote99;
         try {
-            quote99 = await cotizarEnvio(destinoCodigo, destinoNombre, subtotal, aplicaContrapago, totalWeightKg);
+            quote99 = await cotizarEnvio(
+                destinoCodigo,
+                destinoNombre,
+                subtotal,
+                aplicaContrapago,
+                totalWeightKg,
+                analysis.dimensions
+            );
         } catch (err: any) {
             console.warn('[Cotizar] Fallback 99 Envíos API:', err.message);
             quote99 = {
                 cheapest: {
-                    transportadora: 'interrapidisimo',
-                    valor: 25000,
-                    valor_contrapago: 0,
+                    transportadora: 'coordinadora',
+                    valor: 35000,
+                    valor_contrapago: 3500,
                     dias: 3,
                 },
                 all: {},
@@ -96,12 +112,9 @@ export async function POST(request: Request) {
         const costoBrutoTotal = cotizacionBruta99 + valorContrapago;
 
         // ── SUBSIDIO NACIONAL ────────────────────────────────────────────────────
-        // Regla: el subsidio de fábrica para rutas nacionales tiene un TOPE FIJO
-        // de SUBSIDIO_MAX_NACIONAL_COP ($15.000) sin importar el tamaño del pedido.
-        // Esto evita que pedidos grandes (17 garrafas = $204.000 subsidio bruto)
-        // terminen con flete $0 en ciudades como Bucaramanga o Medellín.
-        // La zona local (Bogotá/Soacha) ya queda cubierta con flota propia arriba.
-        const subsidioEfectivo = Math.min(subsidioBruto, SUBSIDIO_MAX_NACIONAL_COP);
+        // El subsidio de fábrica cubre según los productos adquiridos ($12k 20L/10L, $6k 3.8L, $3k 1/2G, $1k 1L).
+        // Para rutas nacionales se aplica hasta cubrir el flete bruto total.
+        const subsidioEfectivo = Math.min(subsidioBruto, costoBrutoTotal);
         const fleteCliente = Math.max(0, costoBrutoTotal - subsidioEfectivo);
         const esGratis = fleteCliente === 0;
 
@@ -111,9 +124,9 @@ export async function POST(request: Request) {
             destinoNombre,
             subtotal,
             totalWeightKg,
+            bultos,
             subsidioBruto,
             subsidioEfectivo,
-            subsidioMaxNacional: SUBSIDIO_MAX_NACIONAL_COP,
             cotizacionBruta99,
             valorContrapago,
             costoBrutoTotal,
@@ -125,6 +138,7 @@ export async function POST(request: Request) {
             transportadora: quote99.cheapest.transportadora || 'coordinadora',
             dias: quote99.cheapest.dias,
             api99Cotizaciones: quote99.all,
+            desgloseSubsidio: analysis.desgloseSubsidio,
             durationMs: Date.now() - startTime,
         };
 
@@ -138,13 +152,15 @@ export async function POST(request: Request) {
             costoBrutoTotal,
             subsidioBruto,
             subsidioEfectivo,
+            totalWeightKg,
+            bultos,
             transportadora: quote99.cheapest.transportadora,
             dias: quote99.cheapest.dias,
             esLocal,
             source: '99envios',
             mensaje: esGratis
                 ? '¡Envío GRATIS asumido por Biocambio360!'
-                : `Flete $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora?.toUpperCase()}). Biocambio360 subsidia $${subsidioEfectivo.toLocaleString('es-CO')}.`,
+                : `Flete $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora?.toUpperCase()} · ${bultos} bulto${bultos > 1 ? 's' : ''}). Biocambio360 subsidia $${subsidioEfectivo.toLocaleString('es-CO')}.`,
         });
     } catch (e: any) {
         console.error('[Cotizar API] Error:', e);

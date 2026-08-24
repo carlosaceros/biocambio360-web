@@ -107,9 +107,9 @@ export default function CheckoutPage() {
     const effectiveShippingCost = appliedCoupon?.type === 'free_shipping' ? 0 : shippingCost;
     const total = Math.max(0, subtotal - discountAmount) + effectiveShippingCost;
 
-    // Cotizar envío con 99 Envíos cuando cambia la ciudad destino
+    // Cotizar envío con 99 Envíos cuando cambia la ciudad destino, método de pago o carrito
     useEffect(() => {
-        if (!destinoCodigo || !formData.ciudad) return;
+        if (!destinoCodigo || !formData.ciudad || cart.length === 0) return;
         let cancelled = false;
         setShippingInfo({ loading: true });
         setShippingCost(0);
@@ -123,6 +123,12 @@ export default function CheckoutPage() {
                 subtotal,
                 aplicaContrapago: paymentMethod === 'contraentrega',
                 totalWeightKg: totalKg,
+                items: cart.map(item => ({
+                    productId: item.product.id,
+                    nombre: item.product.nombre,
+                    size: item.size,
+                    cantidad: item.cantidad,
+                })),
                 itemsSizes: cart.map(item => ({ size: item.size, cantidad: item.cantidad })),
             }),
         })
@@ -153,7 +159,7 @@ export default function CheckoutPage() {
             });
 
         return () => { cancelled = true; };
-    }, [destinoCodigo, formData.ciudad, paymentMethod]);
+    }, [destinoCodigo, formData.ciudad, paymentMethod, subtotal, totalKg]);
 
     // Scroll to top on mount
     useEffect(() => {

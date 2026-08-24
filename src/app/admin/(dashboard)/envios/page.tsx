@@ -216,7 +216,7 @@ export default function AdminEnviosPage() {
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xs text-blue-600 font-bold uppercase">Subsidio</p>
-                                        <p className="text-sm font-black text-blue-700">{formatCurrency(tarifa)}</p>
+                                        <p className="text-sm font-black text-blue-700">{formatCurrency(Number(tarifa))}</p>
                                     </div>
                                 </div>
                             ))}

@@ -73,7 +73,8 @@ export async function cotizarEnvio(
     destinoNombre: string,
     valorDeclarado: number,
     aplicaContrapago: boolean = true,
-    pesoKg: number = 5
+    pesoKg: number = 5,
+    dimensions?: { alto: number; largo: number; ancho: number }
 ): Promise<QuoteResult> {
     const token = await getAuthToken();
 
@@ -84,6 +85,10 @@ export async function cotizarEnvio(
     const yyyy = tomorrow.getFullYear();
     const fecha = `${dd}-${mm}-${yyyy}`;
 
+    const alto = dimensions?.alto || (pesoKg >= 20 ? 38 : (pesoKg >= 10 ? 32 : 25));
+    const largo = dimensions?.largo || (pesoKg >= 20 ? 38 : (pesoKg >= 10 ? 30 : 25));
+    const ancho = dimensions?.ancho || (pesoKg >= 20 ? 42 : (pesoKg >= 10 ? 30 : 25));
+
     const payload = {
         destino: { codigo: destinoCodigo, nombre: destinoNombre },
         origen: ORIGEN,
@@ -91,10 +96,10 @@ export async function cotizarEnvio(
         IdServicio: 1,
         fecha,
         valorDeclarado: Math.max(75000, valorDeclarado),
-        peso: Math.min(30, pesoKg),
-        alto: 20,
-        largo: 20,
-        ancho: 20,
+        peso: Math.max(1, Math.round(pesoKg * 10) / 10),
+        alto,
+        largo,
+        ancho,
         seguro99: false,
         seguro99plus: aplicaContrapago ? 1 : 0,
         AplicaContrapago: aplicaContrapago,
