@@ -27,15 +27,19 @@ import {
     CreditCard,
     User,
     Calendar,
-    X
+    X,
+    Key,
+    Shield
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import { subscribeToOrders, updateOrderStatus } from '@/lib/orders-service';
 import { Order, OrderStatus, ORDER_STATUS_CONFIG, TimelineEvent } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Image from 'next/image';
+import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
 
 /**
  * Safely convert a Firestore Timestamp (or serialized version) to a JS Date.
@@ -216,10 +220,12 @@ function KanbanColumn({ status, orders, onOrderClick }: KanbanColumnProps) {
 
 export default function PedidosPage() {
     const router = useRouter();
+    const { user, role } = useAuth();
     const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeOrder, setActiveOrder] = useState<(Order & { id: string }) | null>(null);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -326,11 +332,31 @@ export default function PedidosPage() {
                                 <ArrowLeft size={20} className="text-gray-600" />
                             </motion.button>
                             <div>
-                                <h1 className="text-2xl font-black text-gray-900" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
-                                    GESTIÓN DE PEDIDOS
-                                </h1>
+                                <div className="flex items-center gap-2">
+                                    <h1 className="text-xl md:text-2xl font-black text-gray-900" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
+                                        GESTIÓN DE PEDIDOS
+                                    </h1>
+                                    {role === 'gestor_pedidos' && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <Shield size={11} className="text-emerald-600" />
+                                            GESTOR
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-sm text-gray-500">{orders.length} pedidos totales</p>
                             </div>
+                        </div>
+
+                        {/* Botón Cambiar Contraseña */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setIsPasswordModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors"
+                                title="Cambiar mi contraseña"
+                            >
+                                <Key size={14} className="text-indigo-600" />
+                                <span className="hidden sm:inline">Cambiar Clave</span>
+                            </button>
                         </div>
                     </div>
 
@@ -610,6 +636,12 @@ export default function PedidosPage() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Modal Cambiar Contraseña */}
+            <ChangePasswordModal
+                isOpen={isPasswordModalOpen}
+                onClose={() => setIsPasswordModalOpen(false)}
+            />
         </div>
     );
 }

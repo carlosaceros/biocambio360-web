@@ -7,21 +7,38 @@ import {
     signOut as firebaseSignOut,
     onAuthStateChanged,
     setPersistence,
-    browserLocalPersistence
+    browserLocalPersistence,
+    updatePassword as firebaseUpdatePassword,
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
+
+export type UserRole = 'superadmin' | 'gestor_pedidos' | 'user';
+
+export interface AdminUserProfile {
+    email: string;
+    nombre: string;
+    role: UserRole;
+    permissions: Record<string, string>;
+}
 
 interface AuthContextType {
     user: User | null;
+    userProfile: AdminUserProfile | null;
+    role: UserRole;
     loading: boolean;
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
+    changePassword: (newPassword: string) => Promise<void>;
+    canAccess: (module: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [userProfile, setUserProfile] = useState<AdminUserProfile | null>(null);
+    const [role, setRole] = useState<UserRole>('user');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -29,8 +46,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPersistence(auth, browserLocalPersistence).catch(console.error);
 
         // Listen for auth state changes
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setUser(user);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
+            if (currentUser && currentUser.email) {
+                const email = currentUser.email.toLowerCase().trim();
+                let determinedRole: UserRole = 'gestor_pedidos';
+                let determinedName = 'Gestor de Pedidos & Logística';
+
+                if (email === 'thinktic.thinktic@gmail.com') {
+                    determinedRole = 'superadmin';
+                    determinedName = 'Super Administrador THINK TIC';
+                } else if (email === 'infobiocambio360@gmail.com') {
+                    determinedRole = 'gestor_pedidos';
+                    determinedName = 'Gestor de Pedidos & Logística';
+                }
+
+                try {
+                    const docRef = doc(db, 'admin_users', email);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        const finalRole = (data.role as UserRole) || determinedRole;
+                        const profile: AdminUserProfile = {
+                            email,
+                            nombre: data.nombre || determinedName,
+                            role: finalRole,
+                            permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', auditoria_envios: 'read', inventario: 'read' }),
+                        };
+                        setUserProfile(profile);
+                        setRole(finalRole);
+                    } else {
+                        const profile: AdminUserProfile = {
+                            email,
+                            nombre: determinedName,
+                            role: determinedRole,
+                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', auditoria_envios: 'read', inventario: 'read' },
+                        };
+                        setUserProfile(profile);
+                        setRole(determinedRole);
+                    }
+                } catch {
+                    const profile: AdminUserProfile = {
+                        email,
+                        nombre: determinedName,
+                        role: determinedRole,
+                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', auditoria_envios: 'read', inventario: 'read' },
+                    };
+                    setUserProfile(profile);
+                    setRole(determinedRole);
+                }
+            } else {
+                setUserProfile(null);
+                setRole('user');
+            }
             setLoading(false);
         });
 
@@ -48,13 +116,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signOut = async () => {
         try {
             await firebaseSignOut(auth);
+            setUser(null);
+            setUserProfile(null);
+            setRole('user');
         } catch (error: any) {
             throw new Error(error.message);
         }
     };
 
+    const changePassword = async (newPassword: string) => {
+        if (!auth.currentUser) {
+            throw new Error('No hay una sesión activa de usuario.');
+        }
+        if (!newPassword || newPassword.length < 6) {
+            throw new Error('La contraseña debe tener al menos 6 caracteres.');
+        }
+        try {
+            await firebaseUpdatePassword(auth.currentUser, newPassword);
+        } catch (error: any) {
+            if (error.code === 'auth/requires-recent-login') {
+                throw new Error('Por seguridad, debes cerrar sesión e iniciar sesión nuevamente antes de cambiar la contraseña.');
+            }
+            throw new Error(error.message || 'Error al actualizar la contraseña');
+        }
+    };
+
+    const canAccess = (module: string): boolean => {
+        if (role === 'superadmin') return true;
+        if (role === 'gestor_pedidos') {
+            return ['pedidos', 'auditoria-envios', 'inventario', 'dashboard'].includes(module);
+        }
+        return false;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+        <AuthContext.Provider value={{ user, userProfile, role, loading, signIn, signOut, changePassword, canAccess }}>
             {children}
         </AuthContext.Provider>
     );

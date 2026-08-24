@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Activity, RefreshCw, Trash2, ChevronDown, ChevronUp,
     CheckCircle, XCircle, AlertTriangle, Truck, Gift, Clock,
-    Package, DollarSign, MapPin, Wifi, WifiOff
+    Package, DollarSign, MapPin, Wifi, WifiOff, ArrowLeft, Key
 } from 'lucide-react';
+import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
 
 interface AuditLog {
     id: string;
@@ -79,11 +81,13 @@ const fmtTime = (iso: string) => {
 };
 
 export default function ShippingAuditPage() {
+    const router = useRouter();
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [filter, setFilter] = useState<string>('all');
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
     const fetchLogs = useCallback(async (showRefreshing = false) => {
         if (showRefreshing) setRefreshing(true);
@@ -135,11 +139,17 @@ export default function ShippingAuditPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Header */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => router.push('/admin')}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 mr-1"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
                         <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-xl flex items-center justify-center">
                             <Activity className="text-white" size={20} />
                         </div>
@@ -148,21 +158,29 @@ export default function ShippingAuditPage() {
                             <p className="text-sm text-gray-500">Logs en tiempo real de la API de envíos · últimas 100 cotizaciones</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <button
+                            onClick={() => setIsPasswordModalOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors"
+                            title="Cambiar mi contraseña"
+                        >
+                            <Key size={14} className="text-indigo-600" />
+                            <span className="hidden sm:inline">Cambiar Clave</span>
+                        </button>
                         <button
                             onClick={() => fetchLogs(true)}
                             disabled={refreshing}
-                            className="flex items-center gap-2 bg-white border border-gray-200 hover:border-indigo-400 hover:text-indigo-600 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm"
+                            className="flex items-center gap-2 bg-white border border-gray-200 hover:border-indigo-400 hover:text-indigo-600 text-gray-600 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-medium transition-all shadow-sm"
                         >
-                            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
-                            {refreshing ? 'Actualizando...' : 'Actualizar'}
+                            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                            <span className="hidden sm:inline">{refreshing ? 'Actualizando...' : 'Actualizar'}</span>
                         </button>
                         <button
                             onClick={clearOldLogs}
-                            className="flex items-center gap-2 bg-white border border-gray-200 hover:border-red-400 hover:text-red-600 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm"
+                            className="flex items-center gap-2 bg-white border border-gray-200 hover:border-red-400 hover:text-red-600 text-gray-600 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-medium transition-all shadow-sm"
                         >
-                            <Trash2 size={15} />
-                            Limpiar viejos
+                            <Trash2 size={14} />
+                            <span className="hidden sm:inline">Limpiar viejos</span>
                         </button>
                     </div>
                 </div>
@@ -416,6 +434,12 @@ export default function ShippingAuditPage() {
                     </div>
                 )}
             </div>
+
+            {/* Modal Cambiar Contraseña */}
+            <ChangePasswordModal
+                isOpen={isPasswordModalOpen}
+                onClose={() => setIsPasswordModalOpen(false)}
+            />
         </div>
     );
 }
