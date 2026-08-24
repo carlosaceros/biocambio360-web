@@ -146,7 +146,9 @@ export default function AdminDashboard() {
         }).format(value);
     };
 
-    const isGestor = role === 'gestor_pedidos';
+    const email = user?.email?.toLowerCase().trim();
+    const isSuperAdmin = (role === 'superadmin' || email === 'thinktic.thinktic@gmail.com') && email !== 'infobiocambio360@gmail.com';
+    const isGestor = !isSuperAdmin;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

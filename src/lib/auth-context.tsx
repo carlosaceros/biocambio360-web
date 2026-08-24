@@ -50,16 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(currentUser);
             if (currentUser && currentUser.email) {
                 const email = currentUser.email.toLowerCase().trim();
-                let determinedRole: UserRole = 'gestor_pedidos';
-                let determinedName = 'Gestor de Pedidos & Logística';
+                const isSuper = email === 'thinktic.thinktic@gmail.com';
+                const determinedRole: UserRole = isSuper ? 'superadmin' : 'gestor_pedidos';
+                const determinedName = isSuper ? 'Super Administrador THINK TIC' : 'Gestor de Pedidos & Logística';
 
-                if (email === 'thinktic.thinktic@gmail.com') {
-                    determinedRole = 'superadmin';
-                    determinedName = 'Super Administrador THINK TIC';
-                } else if (email === 'infobiocambio360@gmail.com') {
-                    determinedRole = 'gestor_pedidos';
-                    determinedName = 'Gestor de Pedidos & Logística';
-                }
+                // Asignar de inmediato de forma síncrona
+                setRole(determinedRole);
 
                 try {
                     const docRef = doc(db, 'admin_users', email);
