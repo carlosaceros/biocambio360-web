@@ -654,32 +654,62 @@ export default function PedidosPage() {
                                                         </div>
                                                     </div>
                                                     {activeOrder.metodoPago === 'wompi' && (
-                                                        <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase ${
+                                                        <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase flex items-center gap-1 ${
                                                             activeOrder.wompiTransaction?.status === 'APPROVED'
-                                                                ? 'bg-green-100 text-green-800 border border-green-200'
+                                                                ? 'bg-green-100 text-green-800 border border-green-300'
                                                                 : activeOrder.wompiTransaction?.status === 'DECLINED'
-                                                                ? 'bg-red-100 text-red-800 border border-red-200'
-                                                                : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                                                : 'bg-amber-100 text-amber-800 border border-amber-300'
                                                         }`}>
-                                                            {activeOrder.wompiTransaction?.status || (activeOrder.status === 'confirmado' ? 'APROBADO' : 'PENDIENTE')}
+                                                            {activeOrder.wompiTransaction?.status === 'APPROVED'
+                                                                ? '✅ PAGADO (WOMPI APROBADO)'
+                                                                : activeOrder.wompiTransaction?.status === 'DECLINED'
+                                                                ? '❌ PAGO RECHAZADO'
+                                                                : '⏳ SIN PAGO EN PASARELA'}
                                                         </span>
                                                     )}
                                                 </div>
 
                                                 {activeOrder.metodoPago === 'wompi' ? (
-                                                    <div className="bg-white rounded-lg p-3 border border-blue-100 space-y-2 text-xs">
+                                                    <div className="bg-white rounded-lg p-3.5 border border-blue-100 space-y-3 text-xs">
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div>
-                                                                <span className="text-gray-500 block">Referencia Wompi:</span>
+                                                                <span className="text-gray-500 block font-medium">Referencia Wompi (ID Pedido):</span>
                                                                 <span className="font-mono font-bold text-gray-900 break-all">{activeOrder.id}</span>
                                                             </div>
                                                             <div>
-                                                                <span className="text-gray-500 block">ID Transacción Wompi:</span>
-                                                                <span className="font-mono font-bold text-indigo-700 break-all">
-                                                                    {activeOrder.wompiTransaction?.id || 'No asignado aún'}
+                                                                <span className="text-gray-500 block font-medium">ID Transacción Wompi:</span>
+                                                                <span className={`font-mono font-bold break-all ${activeOrder.wompiTransaction?.id ? 'text-green-700' : 'text-amber-700'}`}>
+                                                                    {activeOrder.wompiTransaction?.id || 'No asignado aún (Sin pago)'}
                                                                 </span>
                                                             </div>
                                                         </div>
+
+                                                        {/* Status explanation for Admin / Logistics */}
+                                                        {activeOrder.wompiTransaction?.status === 'APPROVED' ? (
+                                                            <div className="p-2.5 bg-green-50 border border-green-200 rounded-lg text-green-900 flex items-start gap-2">
+                                                                <span className="text-base leading-none">✅</span>
+                                                                <div>
+                                                                    <p className="font-bold">Pago 100% verificado y aprobado por Wompi</p>
+                                                                    <p className="text-[11px] text-green-700 mt-0.5">
+                                                                        El dinero ingresó a tu cuenta de Wompi/Bancolombia. Puedes despachar este pedido con total seguridad.
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 space-y-1">
+                                                                <div className="flex items-center gap-1.5 font-bold text-[11px] text-amber-800">
+                                                                    <span>ℹ️ Guía para Admin y Logística:</span>
+                                                                </div>
+                                                                <p className="text-[11px] text-amber-800 leading-snug">
+                                                                    El cliente seleccionó Wompi en la web pero <strong>aún no registra pago completado en la pasarela</strong> (cerró la pestaña o no ingresó los datos).
+                                                                </p>
+                                                                <p className="text-[11px] text-amber-900 font-medium">
+                                                                    • Si el cliente pagó por WhatsApp (link manual / transferencia), puedes despachar según el comprobante.<br />
+                                                                    • Si tienes duda, pulsa el botón azul <strong>"Consultar en Wompi"</strong> para verificar en tiempo real.
+                                                                </p>
+                                                            </div>
+                                                        )}
 
                                                         {activeOrder.wompiTransaction && (
                                                             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
