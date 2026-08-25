@@ -73,11 +73,14 @@ export function useAdminNotifications() {
 
     // Request browser notification permission + register FCM token
     useEffect(() => {
-        if (typeof window === 'undefined' || !('Notification' in window)) return;
+        if (typeof window === 'undefined') return;
 
         const initNotifications = async () => {
             try {
-                let permission = Notification.permission;
+                const notifAPI = (window as any).Notification;
+                if (!notifAPI) return;
+
+                let permission = notifAPI.permission;
 
                 if (permission === 'granted') {
                     setPermissionGranted(true);
@@ -90,9 +93,10 @@ export function useAdminNotifications() {
                             const messaging = getMessaging(app);
                             onMessage(messaging, (payload) => {
                                 const { title, body } = payload.notification || {};
-                                if (title && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                                const curNotifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
+                                if (title && curNotifAPI && curNotifAPI.permission === 'granted') {
                                     try {
-                                        new Notification(title, {
+                                        new curNotifAPI(title, {
                                             body: body || '',
                                             icon: '/icon.png',
                                         });
@@ -150,9 +154,10 @@ export function useAdminNotifications() {
                     setNotifications((prev) => [notification, ...prev]);
 
                     // Show browser notification if permission granted (fallback for non-FCM)
-                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                        try {
-                            const browserNotif = new Notification(notification.title, {
+                    try {
+                        const notifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
+                        if (notifAPI && notifAPI.permission === 'granted') {
+                            const browserNotif = new notifAPI(notification.title, {
                                 body: notification.body,
                                 icon: '/icon.png',
                                 badge: '/icon.png',
@@ -163,9 +168,9 @@ export function useAdminNotifications() {
                                 window.location.href = '/admin/pedidos';
                                 browserNotif.close();
                             };
-                        } catch (e) {
-                            console.warn('[Notifications] No se pudo mostrar notificación del navegador', e);
                         }
+                    } catch (e) {
+                        console.warn('[Notifications] No se pudo mostrar notificación del navegador', e);
                     }
                 }
             });
@@ -185,20 +190,32 @@ export function useAdminNotifications() {
     };
 
     const requestPermission = async () => {
-        if (typeof window === 'undefined' || !('Notification' in window)) return false;
-        const permission = await Notification.requestPermission();
-        const granted = permission === 'granted';
-        if (granted) {
-            setPermissionGranted(true);
-            await registerFCMToken();
+        try {
+            if (typeof window === 'undefined') return false;
+            const notifAPI = (window as any).Notification;
+            if (!notifAPI || typeof notifAPI.requestPermission !== 'function') return false;
+            const permission = await notifAPI.requestPermission();
+            const granted = permission === 'granted';
+            if (granted) {
+                setPermissionGranted(true);
+                await registerFCMToken();
+            }
+            return granted;
+        } catch (_) {
+            return false;
         }
-        return granted;
     };
+
+    const isPermGranted = permissionGranted || Boolean(
+        typeof window !== 'undefined' &&
+        (window as any).Notification &&
+        (window as any).Notification.permission === 'granted'
+    );
 
     return {
         notifications,
         unreadCount,
-        permissionGranted: permissionGranted || (typeof window !== 'undefined' && Notification.permission === 'granted'),
+        permissionGranted: isPermGranted,
         markAllAsRead,
         markAsRead,
         requestPermission,
