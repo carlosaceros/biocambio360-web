@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import {
     getAllReplenishmentRecords,
     markReminderSent,
+    updateCustomerType,
     CustomerReplenishment
 } from '@/lib/replenishment-service';
 import { formatCurrency } from '@/lib/checkout-utils';
@@ -42,6 +43,18 @@ export default function ReabastecimientoBIAdminPage() {
         const data = await getAllReplenishmentRecords();
         setRecords(data);
         setIsLoading(false);
+    };
+
+    const handleToggleCustomerType = async (r: CustomerReplenishment) => {
+        if (!r.id) return;
+        const newType: 'b2c' | 'b2b' = r.customerType === 'b2b' ? 'b2c' : 'b2b';
+        try {
+            await updateCustomerType(r.id, newType);
+            setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, customerType: newType } : rec));
+        } catch (e) {
+            console.error(e);
+            alert('Error al actualizar tipo de cliente en Firestore.');
+        }
     };
 
     const handleSendReminder = async (r: CustomerReplenishment) => {
@@ -178,8 +191,8 @@ export default function ReabastecimientoBIAdminPage() {
                         className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold bg-white text-gray-800"
                     >
                         <option value="">Todos los Tipos de Cliente</option>
-                        <option value="b2c">🛒 B2C Hogar (3.8L / Pequeño)</option>
-                        <option value="b2b">🏢 B2B Empresa (10L / 20L Garrafas)</option>
+                        <option value="b2c">🛒 B2C Hogar (Consumidor)</option>
+                        <option value="b2b">🏢 B2B Empresa (Corporativo / Institucional)</option>
                     </select>
                 </div>
             </div>
@@ -190,7 +203,7 @@ export default function ReabastecimientoBIAdminPage() {
                     <table className="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                <th className="p-4">Cliente & Tipo</th>
+                                <th className="p-4">Cliente & Tipo (Clic para alternar)</th>
                                 <th className="p-4">Resumen Última Compra</th>
                                 <th className="p-4 text-center">Ciclo de Consumo</th>
                                 <th className="p-4 text-center">Próximo Reabastecimiento</th>
@@ -231,9 +244,13 @@ export default function ReabastecimientoBIAdminPage() {
                                         <tr key={r.id || r.customerPhone} className="hover:bg-gray-50/80 transition-colors">
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${r.customerType === 'b2b' ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-700'}`}>
-                                                        {r.customerType === 'b2b' ? '🏢 B2B Empresa' : '🛒 B2C Hogar'}
-                                                    </span>
+                                                    <button
+                                                        onClick={() => handleToggleCustomerType(r)}
+                                                        title="Clic para cambiar entre B2C Hogar y B2B Empresa"
+                                                        className={`text-[10px] font-black px-2 py-0.5 rounded-md cursor-pointer transition-all hover:scale-105 ${r.customerType === 'b2b' ? 'bg-teal-100 hover:bg-teal-200 text-teal-800' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+                                                    >
+                                                        {r.customerType === 'b2b' ? '🏢 B2B Empresa ⇄' : '🛒 B2C Hogar ⇄'}
+                                                    </button>
                                                 </div>
                                                 <div className="font-bold text-gray-900 mt-1">{r.customerName}</div>
                                                 <div className="text-xs text-gray-500">📱 {r.customerPhone} · 📍 {r.customerCity}</div>

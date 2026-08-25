@@ -22,44 +22,73 @@ const replenishmentsRef = collection(db, 'customer_replenishments');
 
 /**
  * Calculates estimated lifespan of items in an order
+ * In ecommerce retail, purchases of 10L, 20L or Combos for household/laundry use are B2C by default.
+ * B2B is reserved for business/institutional accounts or explicit corporate quote orders.
  */
-export function calculateOrderLifespanDays(orderItems: OrderItem[]): { days: number; type: 'b2c' | 'b2b' } {
-    let has20L = false;
-    let has10L = false;
-    let has3_8L = false;
+export function calculateOrderLifespanDays(
+    orderItems: OrderItem[],
+    isExplicitB2B: boolean = false
+): { days: number; type: 'b2c' | 'b2b' } {
+    let totalVolumeLitres = 0;
 
     (orderItems || []).forEach((item: OrderItem) => {
         const pres = (item.size || '').toLowerCase();
-        const nombre = (item.product?.nombre || '').toLowerCase();
-        
-        if (pres.includes('20') || pres.includes('garrafa') || nombre.includes('20l')) {
-            has20L = true;
-        } else if (pres.includes('10')) {
-            has10L = true;
-        } else if (pres.includes('3.8') || pres.includes('galon') || pres.includes('galón')) {
-            has3_8L = true;
+        const nombre = (item.product?.nombre || (item as any).nombre || '').toLowerCase();
+        const qty = item.cantidad || 1;
+
+        let itemLitres = 3.8;
+        if (pres.includes('20') || nombre.includes('20l')) {
+            itemLitres = 20;
+        } else if (pres.includes('10') || nombre.includes('10l')) {
+            itemLitres = 10;
+        } else if (pres.includes('3.8') || pres.includes('galon') || pres.includes('galón') || pres.includes('1/2g')) {
+            itemLitres = pres.includes('1/2') ? 1.9 : 3.8;
+        } else if (pres.includes('1l') || pres.includes('1 l')) {
+            itemLitres = 1;
+        } else if (pres.includes('combo') || nombre.includes('combo') || nombre.includes('kit')) {
+            itemLitres = 23.8; // Combo typical is 20L + 1 Galón
         }
+
+        totalVolumeLitres += itemLitres * qty;
     });
 
-    if (has20L) {
-        return { days: 90, type: 'b2b' }; // 90 days for 20L
-    }
-    if (has10L) {
-        return { days: 60, type: 'b2b' }; // 60 days for 10L
-    }
-    if (has3_8L) {
-        return { days: 45, type: 'b2c' }; // 45 days for 3.8L Galón
+    // Consumption cycle in days based on total volume
+    let estimatedDays = 45;
+    if (totalVolumeLitres >= 40) {
+        estimatedDays = 90;
+    } else if (totalVolumeLitres >= 20) {
+        estimatedDays = 75;
+    } else if (totalVolumeLitres >= 10) {
+        estimatedDays = 60;
+    } else if (totalVolumeLitres >= 3.8) {
+        estimatedDays = 45;
+    } else {
+        estimatedDays = 30;
     }
 
-    return { days: 60, type: 'b2c' }; // Default 60 days
+    // Default to B2C (Hogar) for all online store orders, unless explicitly flagged B2B
+    const customerType: 'b2c' | 'b2b' = isExplicitB2B ? 'b2b' : 'b2c';
+
+    return { days: estimatedDays, type: customerType };
 }
 
 /**
  * Records or updates a customer's replenishment timer upon order placement or status update
  */
-export function processOrderReplenishment(order: Order): CustomerReplenishment {
-    const orderItems = order.productos || (order as any).items || [];
-    const { days, type } = calculateOrderLifespanDays(orderItems);
+export function processOrderReplenishment(order: Order | any): CustomerReplenishment {
+    const orderItems = order.productos || order.items || [];
+    const cliente = order.cliente || order.shippingAddress || {};
+    
+    // Check if order comes from B2B quote portal or contains corporate data
+    const isExplicitB2B = Boolean(
+        order.isB2B ||
+        order.tipoCliente === 'b2b' ||
+        cliente.nit ||
+        cliente.razonSocial ||
+        cliente.empresa
+    );
+
+    const { days, type } = calculateOrderLifespanDays(orderItems, isExplicitB2B);
     
     let orderDate = new Date();
     if (order.createdAt && typeof (order.createdAt as any).toDate === 'function') {
@@ -74,14 +103,13 @@ export function processOrderReplenishment(order: Order): CustomerReplenishment {
         .map((i: any) => `${i.cantidad}x ${i.product?.nombre || i.nombre || 'Producto'} (${i.size || i.presentacionSeleccionada || '3.8L'})`)
         .join(', ');
 
-    const cliente = order.cliente || (order as any).shippingAddress || {};
-    const customerPhone = cliente.celular || (order as any).customerPhone || (order as any).telefono || '';
+    const customerPhone = cliente.celular || order.customerPhone || order.telefono || '';
     const cleanPhone = customerPhone.replace(/\D/g, '');
-    const customerEmail = cliente.email || (order as any).customerEmail || '';
+    const customerEmail = cliente.email || order.customerEmail || '';
 
     return {
         id: cleanPhone || customerEmail.toLowerCase().trim() || `cli_${Date.now()}`,
-        customerName: cliente.nombre || (order as any).customerName || 'Cliente',
+        customerName: cliente.nombre || order.customerName || 'Cliente',
         customerEmail: customerEmail ? customerEmail.toLowerCase().trim() : '',
         customerPhone,
         customerCity: cliente.ciudad || 'Soacha / Bogotá',
@@ -104,6 +132,19 @@ export async function saveReplenishmentRecord(record: CustomerReplenishment): Pr
         await setDoc(docRef, record, { merge: true });
     } catch (e) {
         console.warn('Error saving replenishment record to Firestore:', e);
+    }
+}
+
+/**
+ * Updates customer type (B2C vs B2B) directly in Firestore
+ */
+export async function updateCustomerType(id: string, newType: 'b2c' | 'b2b'): Promise<void> {
+    try {
+        const docRef = doc(db, 'customer_replenishments', id);
+        await updateDoc(docRef, { customerType: newType });
+    } catch (e) {
+        console.error('Error updating customer type in Firestore:', e);
+        throw e;
     }
 }
 
