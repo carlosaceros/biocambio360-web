@@ -89,7 +89,7 @@ interface OrderCardProps {
 }
 
 function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
-    const config = ORDER_STATUS_CONFIG[order.status];
+    const config = ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG['pendiente'];
     const timeAgo = formatDistanceToNow(safeToDate(order.createdAt), {
         addSuffix: true,
         locale: es
@@ -100,9 +100,13 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
         data: { order }
     });
 
-    const whatsappUrl = `https://wa.me/57${order.cliente.celular.replace(/\D/g, '')}?text=${encodeURIComponent(
-        `Hola ${order.cliente.nombre}, tu pedido ${order.id} está en proceso.`
-    )}`;
+    const customerPhone = (order.cliente?.celular || '').replace(/\D/g, '');
+    const customerName = order.cliente?.nombre || 'Cliente';
+    const whatsappUrl = customerPhone
+        ? `https://wa.me/57${customerPhone}?text=${encodeURIComponent(
+            `Hola ${customerName}, tu pedido ${order.id} está en proceso.`
+        )}`
+        : '#';
 
     if (isDragging && !isOverlay) {
         return (
@@ -125,7 +129,7 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
             <div className="flex items-start justify-between mb-3">
                 <div>
                     <p className="text-xs text-gray-500 mb-1">#{order.id.slice(-8)}</p>
-                    <p className="font-black text-gray-900 text-sm">{order.cliente.nombre}</p>
+                    <p className="font-black text-gray-900 text-sm">{customerName}</p>
                 </div>
                 <div className={`${config.bgColor} ${config.color} rounded-lg px-2 py-1 text-xs font-bold`}>
                     {config.icon}
@@ -134,7 +138,7 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
 
             {/* Location */}
             <p className="text-xs text-gray-600 mb-2 truncate">
-                📍 {order.cliente.ciudad}, {order.cliente.departamento}
+                📍 {order.cliente?.ciudad || 'Colombia'}{order.cliente?.departamento ? `, ${order.cliente.departamento}` : ''}
             </p>
 
             {/* Products Summary, Payment Method & Coupon Badge */}
@@ -505,18 +509,18 @@ export default function PedidosPage() {
                                                     <div key={idx} className="flex gap-4">
                                                         <div className="relative w-16 h-16 bg-white rounded-lg border border-gray-200 overflow-hidden flex-shrink-0">
                                                             <Image
-                                                                src={`/images/${item.product.imgFile}`}
-                                                                alt={item.product.nombre}
+                                                                src={`/images/${item.product?.imgFile || 'placeholder.png'}`}
+                                                                alt={item.product?.nombre || item.nombre || 'Producto'}
                                                                 fill
                                                                 className="object-contain p-1"
                                                             />
                                                         </div>
                                                         <div className="flex-1">
-                                                            <p className="font-bold text-gray-900 line-clamp-2">{item.product.nombre}</p>
-                                                            <p className="text-sm text-gray-500">{item.size}</p>
+                                                            <p className="font-bold text-gray-900 line-clamp-2">{item.product?.nombre || item.nombre || 'Producto'}</p>
+                                                            <p className="text-sm text-gray-500">{item.size || 'Estándar'}</p>
                                                             <div className="flex justify-between items-center mt-1">
-                                                                <span className="text-sm font-medium">x{item.cantidad}</span>
-                                                                <span className="font-bold">{formatCurrency(item.price * item.cantidad)}</span>
+                                                                <span className="text-sm font-medium">x{item.cantidad || 1}</span>
+                                                                <span className="font-bold">{formatCurrency((item.price || 0) * (item.cantidad || 1))}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -527,7 +531,7 @@ export default function PedidosPage() {
                                         <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Subtotal</span>
-                                                <span className="font-medium">{formatCurrency(activeOrder.subtotal)}</span>
+                                                <span className="font-medium">{formatCurrency(activeOrder.subtotal || 0)}</span>
                                             </div>
 
                                             {activeOrder.cuponAplicado && (
@@ -542,7 +546,7 @@ export default function PedidosPage() {
                                                         )}
                                                     </div>
                                                     <span className="font-black text-purple-900">
-                                                        -{formatCurrency(activeOrder.cuponAplicado.discountAmount || (activeOrder.subtotal - activeOrder.total + activeOrder.envio))}
+                                                        -{formatCurrency(activeOrder.cuponAplicado.discountAmount || ((activeOrder.subtotal || 0) - (activeOrder.total || 0) + (activeOrder.envio || 0)))}
                                                     </span>
                                                 </div>
                                             )}
@@ -550,12 +554,12 @@ export default function PedidosPage() {
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Envío</span>
                                                 <span className="font-medium text-green-600">
-                                                    {activeOrder.envio === 0 ? 'GRATIS' : formatCurrency(activeOrder.envio)}
+                                                    {activeOrder.envio === 0 ? 'GRATIS' : formatCurrency(activeOrder.envio || 0)}
                                                 </span>
                                             </div>
                                             <div className="border-t border-gray-200 pt-2 flex justify-between items-center">
                                                 <span className="font-black text-lg">Total</span>
-                                                <span className="font-black text-xl text-red-600">{formatCurrency(activeOrder.total)}</span>
+                                                <span className="font-black text-xl text-red-600">{formatCurrency(activeOrder.total || 0)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -570,19 +574,19 @@ export default function PedidosPage() {
                                             <div className="bg-white border rounded-xl p-4 space-y-3">
                                                 <div>
                                                     <p className="text-xs text-gray-500">Nombre</p>
-                                                    <p className="font-bold text-gray-900">{activeOrder.cliente.nombre}</p>
+                                                    <p className="font-bold text-gray-900">{activeOrder.cliente?.nombre || 'Sin nombre'}</p>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <p className="text-xs text-gray-500">Cédula</p>
-                                                        <p className="font-medium">{activeOrder.cliente.cedula}</p>
+                                                        <p className="font-medium">{activeOrder.cliente?.cedula || 'N/A'}</p>
                                                     </div>
                                                     <div>
                                                         <p className="text-xs text-gray-500">Celular</p>
-                                                        <p className="font-medium">{activeOrder.cliente.celular}</p>
+                                                        <p className="font-medium">{activeOrder.cliente?.celular || 'N/A'}</p>
                                                     </div>
                                                 </div>
-                                                {activeOrder.cliente.email && (
+                                                {activeOrder.cliente?.email && (
                                                     <div>
                                                         <p className="text-xs text-gray-500">Email</p>
                                                         <p className="font-medium break-all">{activeOrder.cliente.email}</p>
@@ -599,19 +603,19 @@ export default function PedidosPage() {
                                             <div className="bg-white border rounded-xl p-4 space-y-3">
                                                 <div>
                                                     <p className="text-xs text-gray-500">Dirección</p>
-                                                    <p className="font-bold text-gray-900">{activeOrder.cliente.direccion}</p>
+                                                    <p className="font-bold text-gray-900">{activeOrder.cliente?.direccion || 'N/A'}</p>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <p className="text-xs text-gray-500">Ciudad</p>
-                                                        <p className="font-medium">{activeOrder.cliente.ciudad}</p>
+                                                        <p className="font-medium">{activeOrder.cliente?.ciudad || 'N/A'}</p>
                                                     </div>
                                                     <div>
                                                         <p className="text-xs text-gray-500">Departamento</p>
-                                                        <p className="font-medium">{activeOrder.cliente.departamento}</p>
+                                                        <p className="font-medium">{activeOrder.cliente?.departamento || 'N/A'}</p>
                                                     </div>
                                                 </div>
-                                                {activeOrder.cliente.notas && (
+                                                {activeOrder.cliente?.notas && (
                                                     <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mt-2">
                                                         <p className="text-xs text-yellow-800 font-bold mb-1">Notas de entrega:</p>
                                                         <p className="text-sm text-yellow-900 italic">"{activeOrder.cliente.notas}"</p>
