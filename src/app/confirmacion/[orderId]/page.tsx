@@ -27,6 +27,12 @@ interface Order {
     metodoPago: string;
     estado: string;
     createdAt: string;
+    cuponAplicado?: {
+        code: string;
+        type: string;
+        value: number;
+        discountAmount: number;
+    };
 }
 
 export default function ConfirmacionPage({ params }: { params: Promise<{ orderId: string }> }) {
@@ -152,6 +158,17 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                             <span className="text-gray-600">Subtotal</span>
                             <span className="font-bold">{formatCurrency(order.subtotal)}</span>
                         </div>
+                        {order.cuponAplicado && (
+                            <div className="flex justify-between items-center text-sm text-purple-800 font-bold bg-purple-50 p-2.5 rounded-lg border border-purple-200">
+                                <span>
+                                    🎟️ Descuento Cupón ({order.cuponAplicado.code})
+                                    {order.cuponAplicado.type === 'percentage' && ` -${order.cuponAplicado.value}%`}
+                                </span>
+                                <span className="font-black text-purple-900">
+                                    -{formatCurrency(order.cuponAplicado.discountAmount || (order.subtotal - order.total + order.envio))}
+                                </span>
+                            </div>
+                        )}
                         <div className="flex justify-between">
                             <span className="text-gray-600">Envío</span>
                             <span className="font-bold text-green-600">

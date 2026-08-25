@@ -29,7 +29,8 @@ import {
     Calendar,
     X,
     Key,
-    Shield
+    Shield,
+    Ticket
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -133,11 +134,17 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                 📍 {order.cliente.ciudad}, {order.cliente.departamento}
             </p>
 
-            {/* Products Summary */}
-            <div className="mb-3">
+            {/* Products Summary & Coupon Badge */}
+            <div className="mb-3 flex items-center justify-between gap-1 flex-wrap">
                 <p className="text-xs text-gray-500">
                     {safeToArray(order.productos).length} producto{safeToArray(order.productos).length > 1 ? 's' : ''}
                 </p>
+                {order.cuponAplicado && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200" title={`Cupón ${order.cuponAplicado.code}`}>
+                        <Ticket size={11} className="text-purple-600" />
+                        {order.cuponAplicado.code} (-{formatCurrency(order.cuponAplicado.discountAmount || 0)})
+                    </span>
+                )}
             </div>
 
             {/* Total */}
@@ -477,11 +484,29 @@ export default function PedidosPage() {
                                             </div>
                                         </div>
 
-                                        <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                                        <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Subtotal</span>
                                                 <span className="font-medium">{formatCurrency(activeOrder.subtotal)}</span>
                                             </div>
+
+                                            {activeOrder.cuponAplicado && (
+                                                <div className="flex justify-between items-center text-sm text-purple-800 font-bold bg-purple-50 p-2.5 rounded-lg border border-purple-200">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Ticket size={15} className="text-purple-600 flex-shrink-0" />
+                                                        <span>Cupón {activeOrder.cuponAplicado.code}</span>
+                                                        {activeOrder.cuponAplicado.type === 'percentage' && (
+                                                            <span className="text-[11px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-black">
+                                                                -{activeOrder.cuponAplicado.value}%
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="font-black text-purple-900">
+                                                        -{formatCurrency(activeOrder.cuponAplicado.discountAmount || (activeOrder.subtotal - activeOrder.total + activeOrder.envio))}
+                                                    </span>
+                                                </div>
+                                            )}
+
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Envío</span>
                                                 <span className="font-medium text-green-600">
