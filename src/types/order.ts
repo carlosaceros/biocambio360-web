@@ -38,6 +38,19 @@ export interface TimelineEvent {
     note?: string;
 }
 
+export interface WompiTransactionDetails {
+    id?: string;
+    status?: string; // 'APPROVED' | 'PENDING' | 'DECLINED' | 'VOIDED' | 'ERROR'
+    reference?: string;
+    amountInCents?: number;
+    paymentMethodType?: string; // 'CARD' | 'NEQUI' | 'BANCOLOMBIA_TRANSFER' | 'PSE' | 'DAVIPLATA'
+    currency?: string;
+    customerEmail?: string;
+    statusMessage?: string;
+    updatedAt?: string;
+    raw?: any;
+}
+
 export interface Order {
     id: string;
     cliente: OrderCustomer;
@@ -53,6 +66,7 @@ export interface Order {
         value: number;
         discountAmount: number;
     };
+    wompiTransaction?: WompiTransactionDetails;
     timeline: TimelineEvent[];
     whatsappConversation?: string[];
     notas?: string[];

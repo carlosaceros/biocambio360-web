@@ -77,6 +77,27 @@ export async function POST(request: Request) {
                 await updateOrderStatus(transaction.reference, newStatus, internalNote);
                 console.log(`Successfully updated order ${transaction.reference} to ${newStatus}`);
 
+                // Guardar detalles completos de la transacción Wompi
+                try {
+                    const db = getAdminDB();
+                    await db.collection('orders').doc(transaction.reference).set({
+                        wompiTransaction: {
+                            id: transaction.id,
+                            status: transaction.status,
+                            reference: transaction.reference,
+                            amountInCents: transaction.amount_in_cents,
+                            paymentMethodType: transaction.payment_method_type,
+                            currency: transaction.currency,
+                            customerEmail: (transaction as any).customer_email || (transaction as any).customer_data?.email,
+                            statusMessage: (transaction as any).status_message,
+                            updatedAt: new Date().toISOString(),
+                            raw: transaction
+                        }
+                    }, { merge: true });
+                } catch (saveWompiErr) {
+                    console.warn('Could not attach wompiTransaction to order:', saveWompiErr);
+                }
+
                 // 4. Notify Admins (infobiocambio360@gmail.com & carlos.aceros@thinktic.co)
                 try {
                     await sendOrderStatusUpdateEmailToAdmin({

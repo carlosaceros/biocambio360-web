@@ -30,7 +30,10 @@ import {
     X,
     Key,
     Shield,
-    Ticket
+    Ticket,
+    RefreshCw,
+    ExternalLink,
+    ShieldCheck
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -134,16 +137,31 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                 📍 {order.cliente.ciudad}, {order.cliente.departamento}
             </p>
 
-            {/* Products Summary & Coupon Badge */}
-            <div className="mb-3 flex items-center justify-between gap-1 flex-wrap">
-                <p className="text-xs text-gray-500">
-                    {safeToArray(order.productos).length} producto{safeToArray(order.productos).length > 1 ? 's' : ''}
-                </p>
-                {order.cuponAplicado && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200" title={`Cupón ${order.cuponAplicado.code}`}>
-                        <Ticket size={11} className="text-purple-600" />
-                        {order.cuponAplicado.code} (-{formatCurrency(order.cuponAplicado.discountAmount || 0)})
+            {/* Products Summary, Payment Method & Coupon Badge */}
+            <div className="mb-3 space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                        {safeToArray(order.productos).length} producto{safeToArray(order.productos).length > 1 ? 's' : ''}
                     </span>
+                    {order.metodoPago === 'wompi' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
+                            <CreditCard size={11} className="text-blue-600" />
+                            {order.wompiTransaction?.status === 'APPROVED' ? 'Wompi: Pagado' : 'Wompi'}
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
+                            💵 Contraentrega
+                        </span>
+                    )}
+                </div>
+
+                {order.cuponAplicado && (
+                    <div className="flex items-center">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200" title={`Cupón ${order.cuponAplicado.code}`}>
+                            <Ticket size={11} className="text-purple-600" />
+                            {order.cuponAplicado.code} (-{formatCurrency(order.cuponAplicado.discountAmount || 0)})
+                        </span>
+                    </div>
                 )}
             </div>
 
@@ -233,6 +251,28 @@ export default function PedidosPage() {
     const [activeOrder, setActiveOrder] = useState<(Order & { id: string }) | null>(null);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [isCheckingWompi, setIsCheckingWompi] = useState(false);
+    const [wompiStatusFeedback, setWompiStatusFeedback] = useState<string | null>(null);
+
+    const handleCheckWompi = async (orderId: string) => {
+        setIsCheckingWompi(true);
+        setWompiStatusFeedback(null);
+        try {
+            const res = await fetch(`/api/admin/wompi-status?orderId=${orderId}`);
+            const data = await res.json();
+            if (data.wompiTransaction) {
+                setActiveOrder(prev => prev && prev.id === orderId ? { ...prev, wompiTransaction: data.wompiTransaction, status: data.orderStatus || prev.status } : prev);
+                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, wompiTransaction: data.wompiTransaction, status: data.orderStatus || o.status } : o));
+                setWompiStatusFeedback(`✅ ${data.message || 'Datos de Wompi actualizados'}`);
+            } else {
+                setWompiStatusFeedback(`ℹ️ ${data.message || 'Sin transacción confirmada en Wompi aún'}`);
+            }
+        } catch (e: any) {
+            setWompiStatusFeedback(`❌ Error al consultar Wompi: ${e.message}`);
+        } finally {
+            setIsCheckingWompi(false);
+        }
+    };
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -575,6 +615,115 @@ export default function PedidosPage() {
                                                     <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mt-2">
                                                         <p className="text-xs text-yellow-800 font-bold mb-1">Notas de entrega:</p>
                                                         <p className="text-sm text-yellow-900 italic">"{activeOrder.cliente.notas}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Payment Method & Wompi Technical Transaction Card */}
+                                        <div>
+                                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                <CreditCard className="text-blue-600" size={18} />
+                                                Método de Pago & Transacción
+                                            </h3>
+                                            <div className={`border rounded-xl p-4 space-y-3 ${
+                                                activeOrder.metodoPago === 'wompi'
+                                                    ? 'bg-blue-50/40 border-blue-200'
+                                                    : 'bg-amber-50/40 border-amber-200'
+                                            }`}>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xl">
+                                                            {activeOrder.metodoPago === 'wompi' ? '💳' : '💵'}
+                                                        </span>
+                                                        <div>
+                                                            <p className="font-black text-gray-900 text-sm">
+                                                                {activeOrder.metodoPago === 'wompi'
+                                                                    ? 'Pago en Línea (Wompi)'
+                                                                    : 'Pago Contraentrega (Efectivo/Nequi)'}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">
+                                                                {activeOrder.metodoPago === 'wompi'
+                                                                    ? 'Pasarela Wompi · Bancolombia'
+                                                                    : 'Cobro por repartidor / transportadora'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    {activeOrder.metodoPago === 'wompi' && (
+                                                        <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase ${
+                                                            activeOrder.wompiTransaction?.status === 'APPROVED'
+                                                                ? 'bg-green-100 text-green-800 border border-green-200'
+                                                                : activeOrder.wompiTransaction?.status === 'DECLINED'
+                                                                ? 'bg-red-100 text-red-800 border border-red-200'
+                                                                : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                        }`}>
+                                                            {activeOrder.wompiTransaction?.status || (activeOrder.status === 'confirmado' ? 'APROBADO' : 'PENDIENTE')}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {activeOrder.metodoPago === 'wompi' ? (
+                                                    <div className="bg-white rounded-lg p-3 border border-blue-100 space-y-2 text-xs">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div>
+                                                                <span className="text-gray-500 block">Referencia Wompi:</span>
+                                                                <span className="font-mono font-bold text-gray-900 break-all">{activeOrder.id}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-gray-500 block">ID Transacción Wompi:</span>
+                                                                <span className="font-mono font-bold text-indigo-700 break-all">
+                                                                    {activeOrder.wompiTransaction?.id || 'No asignado aún'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {activeOrder.wompiTransaction && (
+                                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                                                                <div>
+                                                                    <span className="text-gray-500 block">Medio de Pago:</span>
+                                                                    <span className="font-bold text-indigo-900">
+                                                                        {activeOrder.wompiTransaction.paymentMethodType || 'Nequi / Tarjeta / PSE'}
+                                                                    </span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-gray-500 block">Monto Transacción:</span>
+                                                                    <span className="font-black text-gray-900">
+                                                                        {formatCurrency(activeOrder.wompiTransaction.amountInCents ? activeOrder.wompiTransaction.amountInCents / 100 : activeOrder.total)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {activeOrder.wompiTransaction?.statusMessage && (
+                                                            <div className="p-2 bg-gray-50 rounded text-gray-600 italic border border-gray-100">
+                                                                Respuesta Wompi: {activeOrder.wompiTransaction.statusMessage}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Live check button */}
+                                                        <div className="pt-2 flex items-center justify-between gap-2 flex-wrap border-t border-gray-100">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleCheckWompi(activeOrder.id)}
+                                                                disabled={isCheckingWompi}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                            >
+                                                                <RefreshCw size={13} className={isCheckingWompi ? 'animate-spin' : ''} />
+                                                                {isCheckingWompi ? 'Consultando Wompi...' : '🔍 Consultar / Sincronizar en Wompi'}
+                                                            </button>
+                                                            {wompiStatusFeedback && (
+                                                                <span className="text-[11px] font-bold text-gray-700">{wompiStatusFeedback}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-white rounded-lg p-3 border border-amber-100 text-xs text-amber-900 space-y-1">
+                                                        <p className="font-bold flex items-center gap-1">
+                                                            ⚠️ Cobro en destino: {formatCurrency(activeOrder.total)}
+                                                        </p>
+                                                        <p className="text-gray-600 text-[11px]">
+                                                            El transportador o domiciliario recaudará este valor al entregar la mercancía al cliente.
+                                                        </p>
                                                     </div>
                                                 )}
                                             </div>
