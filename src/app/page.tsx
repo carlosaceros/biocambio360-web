@@ -184,8 +184,8 @@ function HomeContent() {
   const filteredProducts = useMemo(() => {
     let results = dbProducts.length > 0 ? dbProducts : PRODUCTOS;
 
-    const normalizeText = (val: string) =>
-      val.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+    const normalizeText = (val?: string | null) =>
+      (val || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
     // Unless selectedCategory explicitly equals 'Kits & Combos', filter OUT Kits from main catalog (unless filtering by Solution, Segment or Search)
     if (selectedCategory !== 'Kits & Combos' && !selectedSolution && !selectedSegment && !deferredQuery.trim()) {
