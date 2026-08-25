@@ -111,7 +111,7 @@ export default function CartDrawer() {
                                 </motion.div>
                             ) : (
                                 <AnimatePresence mode="popLayout">
-                                    {cart.map((item, idx) => (
+                                    {cart.filter(item => item && item.product && item.product.id).map((item, idx) => (
                                         <motion.div
                                             key={`${item.product.id}-${item.size}`}
                                             layout
@@ -128,7 +128,7 @@ export default function CartDrawer() {
                                                 >
                                                     <img
                                                         src={`/images/${getProductImage(item.product, item.size)}`}
-                                                        alt={item.product.nombre}
+                                                        alt={item.product?.nombre || 'Producto'}
                                                         className="w-full h-full object-contain p-2"
                                                         onError={(e) => {
                                                             (e.target as HTMLImageElement).src = '/images/placeholder.png';
@@ -138,7 +138,7 @@ export default function CartDrawer() {
 
                                                 <div className="flex-1 min-w-0">
                                                     <h3 className="font-extrabold text-[var(--brand-dark)] text-sm mb-1 truncate">
-                                                        {item.product.nombre}
+                                                        {item.product?.nombre || 'Producto'}
                                                     </h3>
                                                     <p className="text-xs text-gray-500 mb-3">
                                                         Presentación: <span className="font-bold text-[var(--brand-blue)]">{item.size}</span>

@@ -35,24 +35,37 @@ export default function Error({
             <h1 className="text-2xl sm:text-3xl font-black mb-3">
                 Algo no cargó como se esperaba
             </h1>
-            <p className="text-gray-400 max-w-md text-sm sm:text-base mb-8">
-                Hemos actualizado la plataforma con nuevas funciones. Por favor recarga o restablece los datos temporales de navegación.
+            <p className="text-gray-400 max-w-md text-sm sm:text-base mb-4">
+                Hemos actualizado la plataforma con nuevas funciones. Pulsa el botón para limpiar la memoria caché y recargar.
             </p>
+
+            {error && (
+                <div className="max-w-md w-full bg-black/50 border border-red-500/30 rounded-xl p-3 mb-6 text-left overflow-hidden">
+                    <p className="text-[11px] font-mono text-red-400 break-all">
+                        <strong>Error:</strong> {error.message || error.toString()}
+                    </p>
+                    {error.digest && (
+                        <p className="text-[10px] font-mono text-gray-500 mt-1">
+                            Digest: {error.digest}
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-xs sm:max-w-md">
                 <button
-                    onClick={() => reset()}
-                    className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 hover:opacity-95 transition-all"
+                    onClick={handleClearAndReload}
+                    className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 hover:opacity-95 transition-all cursor-pointer"
                 >
                     <RefreshCw size={18} />
-                    Reintentar
+                    Limpiar caché y recargar
                 </button>
 
                 <button
-                    onClick={handleClearAndReload}
-                    className="w-full py-3.5 px-6 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm border border-white/20 flex items-center justify-center gap-2 transition-all"
+                    onClick={() => reset()}
+                    className="w-full py-3.5 px-6 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm border border-white/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
-                    Limpiar caché y recargar
+                    Reintentar
                 </button>
             </div>
 
