@@ -101,13 +101,20 @@ function HomeContent() {
   // SEARCH-03: Debounced replaceState without router.push/router.replace (preserves input focus)
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      const url = new URL(window.location.href);
-      if (inputValue.trim()) {
-        url.searchParams.set('q', inputValue.trim());
-      } else {
-        url.searchParams.delete('q');
+      try {
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          if (inputValue.trim()) {
+            url.searchParams.set('q', inputValue.trim());
+          } else {
+            url.searchParams.delete('q');
+          }
+          const targetPath = url.pathname + (url.search ? url.search : '');
+          window.history.replaceState(window.history.state, '', targetPath);
+        }
+      } catch (e) {
+        // ignore Safari history replaceState security exceptions
       }
-      window.history.replaceState(window.history.state, '', url.toString());
     }, 400);
     return () => window.clearTimeout(timeoutId);
   }, [inputValue]);

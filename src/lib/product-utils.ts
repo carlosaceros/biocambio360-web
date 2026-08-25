@@ -982,7 +982,8 @@ const PRODUCT_SEGMENTS_MAP: Record<string, string[]> = {
  * Get product affinities using explicit maps — zero substring matching, zero false positives.
  */
 export function getProductAffinities(p: Product) {
-    const id = p.id;
+    if (!p) return { solutions: [], segments: ['Hogar'] };
+    const id = p.id || '';
     const cat = (p.categoria || '').toLowerCase();
 
     // Lookup in explicit solutions map
@@ -1202,7 +1203,8 @@ const SIZE_VOLUMES: Record<string, number> = {
  * If there is no specific image for the selected size, it calculates the volume
  * distance to all configured sizes and returns the image filename of the closest size.
  */
-export function getProductImage(product: Product, selectedSize: string): string {
+export function getProductImage(product: Product | null | undefined, selectedSize: string): string {
+    if (!product) return 'placeholder.png';
     const size = selectedSize || 'DEFAULT';
     
     // 1. If product has custom size images mapped

@@ -43,8 +43,12 @@ export default function FirstPurchaseModal() {
         const unsubscribe = subscribePromoConfig((cfg) => {
             setConfig(cfg);
             if (cfg?.isActive) {
-                const dismissed = sessionStorage.getItem(STORAGE_KEY);
-                if (!dismissed) {
+                try {
+                    const dismissed = typeof window !== 'undefined' ? sessionStorage.getItem(STORAGE_KEY) : null;
+                    if (!dismissed) {
+                        setTimeout(() => setIsOpen(true), 1800);
+                    }
+                } catch (_) {
                     setTimeout(() => setIsOpen(true), 1800);
                 }
             } else {
@@ -56,25 +60,31 @@ export default function FirstPurchaseModal() {
 
     const handleDismiss = useCallback(() => {
         setIsOpen(false);
-        sessionStorage.setItem(STORAGE_KEY, '1');
+        try {
+            sessionStorage.setItem(STORAGE_KEY, '1');
+        } catch (_) {}
     }, []);
 
     const handleCopy = useCallback(() => {
-        if (!config) return;
-        navigator.clipboard.writeText(config.couponCode).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2500);
-        });
+        if (!config || !config.couponCode) return;
+        try {
+            navigator.clipboard.writeText(config.couponCode).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2500);
+            }).catch(() => {});
+        } catch (_) {}
     }, [config]);
 
     const handleApply = useCallback(async () => {
-        if (!config) return;
+        if (!config || !config.couponCode) return;
         await applyCoupon(config.couponCode, '', '');
         setApplied(true);
         setTimeout(() => {
             setIsOpen(false);
             setIsCartOpen(true);
-            sessionStorage.setItem(STORAGE_KEY, '1');
+            try {
+                sessionStorage.setItem(STORAGE_KEY, '1');
+            } catch (_) {}
         }, 1000);
     }, [config, applyCoupon, setIsCartOpen]);
 

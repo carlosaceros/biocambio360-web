@@ -42,60 +42,83 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const [isHydrated, setIsHydrated] = useState(false);
     const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
 
-    // Load cart & coupon from localStorage on mount
+    // Load cart & coupon from localStorage on mount safely
     useEffect(() => {
-        const savedCart = localStorage.getItem('biocambio360_cart');
-        if (savedCart) {
-            try {
-                const parsed: CartItem[] = JSON.parse(savedCart);
-                // Sanitize any corrupt prices or invalid sizes
-                const sanitized = parsed.map(item => {
-                    const availableSizes = Object.keys(item.product?.precios || {});
-                    const validSize = (item.product?.precios && item.product.precios[item.size] !== undefined)
-                        ? item.size
-                        : (availableSizes[0] || item.size);
-                    
-                    const resolvedPrice = (item.price && item.price > 0)
-                        ? item.price
-                        : (item.product?.precios?.[validSize] || Object.values(item.product?.precios || {})[0] || 0);
+        try {
+            const savedCart = typeof window !== 'undefined' ? localStorage.getItem('biocambio360_cart') : null;
+            if (savedCart) {
+                const parsed = JSON.parse(savedCart);
+                if (Array.isArray(parsed)) {
+                    // Sanitize and filter out corrupt items
+                    const sanitized = parsed
+                        .filter(item => item && item.product && typeof item.product === 'object' && item.product.id)
+                        .map(item => {
+                            const precios = item.product.precios || {};
+                            const availableSizes = Object.keys(precios);
+                            const validSize = (precios[item.size] !== undefined)
+                                ? item.size
+                                : (availableSizes[0] || item.size || '3.8L');
+                            
+                            const resolvedPrice = (typeof item.price === 'number' && item.price > 0)
+                                ? item.price
+                                : (precios[validSize] || Object.values(precios)[0] || 0);
 
-                    return {
-                        ...item,
-                        size: validSize as ProductSize,
-                        price: resolvedPrice
-                    };
-                });
-                setCart(sanitized);
-            } catch (e) {
-                console.error('Error loading cart:', e);
+                            return {
+                                ...item,
+                                product: item.product,
+                                size: validSize as ProductSize,
+                                price: resolvedPrice,
+                                cantidad: typeof item.cantidad === 'number' && item.cantidad > 0 ? item.cantidad : 1
+                            };
+                        });
+                    setCart(sanitized);
+                }
             }
+        } catch (e) {
+            console.error('Error loading cart from localStorage:', e);
+            try { localStorage.removeItem('biocambio360_cart'); } catch (_) {}
         }
-        const savedCoupon = localStorage.getItem('biocambio360_coupon');
-        if (savedCoupon) {
-            try {
+
+        try {
+            const savedCoupon = typeof window !== 'undefined' ? localStorage.getItem('biocambio360_coupon') : null;
+            if (savedCoupon) {
                 setAppliedCoupon(JSON.parse(savedCoupon));
-            } catch (e) {
-                console.error('Error loading saved coupon:', e);
             }
+        } catch (e) {
+            console.error('Error loading saved coupon:', e);
+            try { localStorage.removeItem('biocambio360_coupon'); } catch (_) {}
         }
+
         setIsHydrated(true);
     }, []);
 
     // Save cart to localStorage whenever it changes
     useEffect(() => {
-        if (cart.length > 0) {
-            localStorage.setItem('biocambio360_cart', JSON.stringify(cart));
-        } else {
-            localStorage.removeItem('biocambio360_cart');
+        try {
+            if (typeof window !== 'undefined') {
+                if (cart.length > 0) {
+                    localStorage.setItem('biocambio360_cart', JSON.stringify(cart));
+                } else {
+                    localStorage.removeItem('biocambio360_cart');
+                }
+            }
+        } catch (e) {
+            // ignore quota/security errors
         }
     }, [cart]);
 
     // Save coupon to localStorage
     useEffect(() => {
-        if (appliedCoupon) {
-            localStorage.setItem('biocambio360_coupon', JSON.stringify(appliedCoupon));
-        } else {
-            localStorage.removeItem('biocambio360_coupon');
+        try {
+            if (typeof window !== 'undefined') {
+                if (appliedCoupon) {
+                    localStorage.setItem('biocambio360_coupon', JSON.stringify(appliedCoupon));
+                } else {
+                    localStorage.removeItem('biocambio360_coupon');
+                }
+            }
+        } catch (e) {
+            // ignore quota/security errors
         }
     }, [appliedCoupon]);
 
@@ -153,20 +176,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     };
 
     const getTotalItems = () => {
-        return cart.reduce((total, item) => total + item.cantidad, 0);
+        return cart.reduce((total, item) => total + (item?.cantidad || 0), 0);
     };
 
     const getTotalPrice = () => {
-        return cart.reduce((total, item) => total + (item.price * item.cantidad), 0);
+        return cart.reduce((total, item) => total + ((item?.price || 0) * (item?.cantidad || 0)), 0);
     };
 
     const getDiscountAmount = () => {
         if (!appliedCoupon) return 0;
         const subtotal = getTotalPrice();
         if (appliedCoupon.type === 'percentage') {
-            return Math.round((subtotal * appliedCoupon.value) / 100);
+            return Math.round((subtotal * (appliedCoupon.value || 0)) / 100);
         } else if (appliedCoupon.type === 'fixed_amount') {
-            return Math.min(subtotal, appliedCoupon.value);
+            return Math.min(subtotal, appliedCoupon.value || 0);
         } else if (appliedCoupon.type === 'buy_x_get_y') {
             return Math.round(subtotal * 0.15);
         }
@@ -204,22 +227,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const getTotalSavings = () => {
         return cart.reduce((total, item) => {
+            if (!item || !item.product) return total;
             const competidorPrecio = item.product.competidorPromedio?.[item.size] || 0;
-            const savingsData = calcularAhorro(item.price, item.size, competidorPrecio);
+            const savingsData = calcularAhorro(item.price || 0, item.size || '3.8L', competidorPrecio);
             if (savingsData && savingsData.ahorroDinero > 0) {
-                return total + (savingsData.ahorroDinero * item.cantidad);
+                return total + (savingsData.ahorroDinero * (item.cantidad || 1));
             }
             return total;
         }, 0);
     };
 
     const getPackagingAnalysis = (): PackagingAnalysis => {
-        const quoteItems = cart.map(item => ({
-            productId: item.product.id,
-            nombre: item.product.nombre,
-            size: item.size,
-            cantidad: item.cantidad,
-        }));
+        const quoteItems = cart
+            .filter(item => item && item.product && item.product.id)
+            .map(item => ({
+                productId: item.product.id,
+                nombre: item.product.nombre || 'Producto',
+                size: item.size || '3.8L',
+                cantidad: item.cantidad || 1,
+            }));
         return getCartPackagingAnalysis(quoteItems);
     };
 

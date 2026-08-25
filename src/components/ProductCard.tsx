@@ -50,6 +50,8 @@ const PLACEHOLDER_EMOJI: Record<string, string> = {
 export default function ProductCard({ product, onAddToCart, onViewDetails }: ProductCardProps) {
     const [imgError, setImgError] = useState(false);
 
+    if (!product || !product.id) return null;
+
     // Get all sizes sorted by size order
     const allSizes = Object.keys(product.precios || {}).sort(
         (a, b) => (SIZE_ORDER.indexOf(a as ProductSize) !== -1 ? SIZE_ORDER.indexOf(a as ProductSize) : 99) - 

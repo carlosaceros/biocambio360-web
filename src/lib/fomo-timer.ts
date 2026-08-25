@@ -23,24 +23,32 @@ export function useFomoTimer(): FomoTimerState {
         if (typeof window === 'undefined') return;
 
         const initOrGetTimer = (): number => {
-            const stored = localStorage.getItem(TIMER_KEY);
             const now = Date.now();
+            try {
+                const stored = localStorage.getItem(TIMER_KEY);
+                if (!stored) {
+                    localStorage.setItem(TIMER_KEY, now.toString());
+                    return now;
+                }
 
-            if (!stored) {
-                localStorage.setItem(TIMER_KEY, now.toString());
+                const startTime = parseInt(stored, 10);
+                if (isNaN(startTime)) {
+                    localStorage.setItem(TIMER_KEY, now.toString());
+                    return now;
+                }
+
+                const elapsed = now - startTime;
+
+                // If 72 hours passed since original start, reset cycle
+                if (elapsed >= SEVENTY_TWO_HOURS_MS) {
+                    localStorage.setItem(TIMER_KEY, now.toString());
+                    return now;
+                }
+
+                return startTime;
+            } catch (_) {
                 return now;
             }
-
-            const startTime = parseInt(stored, 10);
-            const elapsed = now - startTime;
-
-            // If 72 hours passed since original start, reset cycle
-            if (elapsed >= SEVENTY_TWO_HOURS_MS) {
-                localStorage.setItem(TIMER_KEY, now.toString());
-                return now;
-            }
-
-            return startTime;
         };
 
         const updateTimer = () => {

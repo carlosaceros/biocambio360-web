@@ -52,17 +52,17 @@ export default function DiscountWheelModal() {
             }
         );
 
-        // Check if user previously spun
-        const savedSpin = localStorage.getItem('biocambio360_wheel_won');
-        if (savedSpin) {
-            try {
+        // Check if user previously spun safely
+        try {
+            const savedSpin = localStorage.getItem('biocambio360_wheel_won');
+            if (savedSpin) {
                 const parsed = JSON.parse(savedSpin);
                 setWonCoupon(parsed);
                 setHasSpun(true);
                 setIsFormSubmitted(true);
-            } catch (e) {
-                // ignore
             }
+        } catch (e) {
+            // ignore storage access error
         }
 
         return () => unsubscribe();
@@ -70,7 +70,7 @@ export default function DiscountWheelModal() {
 
     // Draw canvas wheel with HD resolution and crisp legible text
     useEffect(() => {
-        if (!config || !canvasRef.current || !config.segments.length) return;
+        if (!config || !canvasRef.current || !config.segments || !Array.isArray(config.segments) || !config.segments.length) return;
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -311,6 +311,10 @@ export default function DiscountWheelModal() {
         setIsOpen(false);
         setIsCartOpen(true);
     };
+
+    if (!isLoaded || !config || !config.isActive || !config.segments || !Array.isArray(config.segments) || config.segments.length === 0) {
+        return null;
+    }
 
     return (
         <>
