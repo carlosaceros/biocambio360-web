@@ -10,11 +10,21 @@ import { Order } from '@/types/order';
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
 function safeToDate(timestamp: any): Date {
-    if (!timestamp) return new Date();
-    if (typeof timestamp.toDate === 'function') return timestamp.toDate();
-    if (timestamp.seconds) return new Date(timestamp.seconds * 1000);
-    if (typeof timestamp === 'string' || typeof timestamp === 'number') return new Date(timestamp);
-    return new Date();
+    if (!timestamp) return new Date(0);
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof timestamp.toDate === 'function') {
+        try {
+            return timestamp.toDate();
+        } catch {
+            return new Date(0);
+        }
+    }
+    if (timestamp.seconds !== undefined) return new Date(timestamp.seconds * 1000);
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        const d = new Date(timestamp);
+        if (!isNaN(d.getTime())) return d;
+    }
+    return new Date(0);
 }
 
 function formatPrice(price: number) {
@@ -176,22 +186,23 @@ export function useAdminNotifications() {
         const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            // On the very first load, record existing orders and load recent 10 into dropdown
+            // On the very first load, record existing orders and load recent 15 into dropdown
             if (isFirstLoad.current) {
                 const initialList: AdminNotification[] = [];
-                snapshot.docs.forEach((doc, idx) => {
+                snapshot.docs.forEach((doc) => {
                     const data = doc.data() as Order;
                     knownOrderIds.current.add(doc.id);
                     const statusKey = `${data.status}_${data.wompiTransaction?.status || ''}`;
                     knownOrderStatuses.current.set(doc.id, statusKey);
 
-                    if (idx < 10) {
-                        const notif = buildOrderNotification(doc.id, data);
-                        notif.read = true; // Mark historical items as already read
-                        initialList.push(notif);
-                    }
+                    const notif = buildOrderNotification(doc.id, data);
+                    notif.read = true; // Mark historical items as already read
+                    initialList.push(notif);
                 });
-                setNotifications(initialList);
+
+                // Ordenar estrictamente por fecha descendente (más reciente arriba)
+                initialList.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+                setNotifications(initialList.slice(0, 15));
                 isFirstLoad.current = false;
                 return;
             }
@@ -217,8 +228,11 @@ export function useAdminNotifications() {
                 if (shouldNotify) {
                     const notification = buildOrderNotification(docId, data);
 
-                    // Add to in-app list (avoid duplicate IDs)
-                    setNotifications((prev) => [notification, ...prev.filter(n => n.orderId !== docId)]);
+                    // Add to in-app list, merge without duplicate orderIds, and sort chronologically
+                    setNotifications((prev) => {
+                        const merged = [notification, ...prev.filter(n => n.orderId !== docId)];
+                        return merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 20);
+                    });
 
                     // Show browser notification if permission granted (fallback for non-FCM)
                     try {

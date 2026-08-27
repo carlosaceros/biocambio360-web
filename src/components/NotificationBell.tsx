@@ -16,11 +16,17 @@ interface NotificationBellProps {
 }
 
 function timeAgo(date: Date): string {
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 60) return 'Hace un momento';
-    if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
-    if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)}h`;
-    return date.toLocaleDateString('es-CO');
+    if (!date || isNaN(date.getTime()) || date.getTime() === 0) return 'Fecha no disponible';
+    const now = Date.now();
+    const diffSeconds = Math.floor((now - date.getTime()) / 1000);
+
+    if (diffSeconds < 45) return 'Hace un momento';
+    if (diffSeconds < 3600) return `Hace ${Math.floor(diffSeconds / 60)} min`;
+    if (diffSeconds < 86400) return `Hace ${Math.floor(diffSeconds / 3600)} h`;
+    if (diffSeconds < 86400 * 2) {
+        return `Ayer, ${date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 const getNotificationStyle = (type: AdminNotification['type']) => {
