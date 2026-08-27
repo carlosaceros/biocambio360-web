@@ -20,114 +20,51 @@ import {
     Calculator,
     Factory
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { useCart } from '@/lib/cart-context';
-import { createB2BProposal, updateB2BProposalStatus, B2BProposalItem } from '@/lib/b2b-proposal-service';
+import {
+    createB2BProposal,
+    updateB2BProposalStatus,
+    B2BProposalItem,
+    getB2BSectorsConfig,
+    DEFAULT_SECTORS,
+    SectorConfig
+} from '@/lib/b2b-proposal-service';
 import HeaderMessage from '@/components/HeaderMessage';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
-interface SectorConfig {
-    id: 'conjunto_residencial' | 'lavanderia' | 'restaurant' | 'school' | 'hotel' | 'clinic';
-    title: string;
-    description: string;
-    icon: any;
-    defaultUnitsLabel: string;
-    defaultUnits: number;
-    recommendedItems: { nombre: string; presentacion: string; precioMercado: number; precioBiocambio: number; factorUnidad: number }[];
-}
-
-const SECTORS: SectorConfig[] = [
-    {
-        id: 'conjunto_residencial',
-        title: 'Conjunto Residencial / Propiedad Horizontal',
-        description: 'Edificios, torres y conjuntos residenciales en Soacha, Bogotá y Cundinamarca.',
-        icon: Building2,
-        defaultUnitsLabel: 'Número de Apartamentos',
-        defaultUnits: 250,
-        recommendedItems: [
-            { nombre: 'Limpiapisos Aromático Concentrado', presentacion: '20 Litros', precioMercado: 75000, precioBiocambio: 46000, factorUnidad: 0.02 },
-            { nombre: 'Desinfectante Limpiador Multiusos', presentacion: '20 Litros', precioMercado: 82000, precioBiocambio: 51000, factorUnidad: 0.02 },
-            { nombre: 'Blanqueador Desinfectante de Hipoclorito', presentacion: '20 Litros', precioMercado: 68000, precioBiocambio: 42000, factorUnidad: 0.015 },
-            { nombre: 'Desengrasante Industrial Potente', presentacion: '20 Litros', precioMercado: 95000, precioBiocambio: 58000, factorUnidad: 0.01 }
-        ]
-    },
-    {
-        id: 'lavanderia',
-        title: 'Lavandería Industrial / Tintorería',
-        description: 'Plantas de lavado, tintorerías y lavanderías comerciales.',
-        icon: Shirt,
-        defaultUnitsLabel: 'Kilos de Ropa Procesados al Día',
-        defaultUnits: 400,
-        recommendedItems: [
-            { nombre: 'Detergente Industrial Concentrado', presentacion: '20 Litros', precioMercado: 110000, precioBiocambio: 68000, factorUnidad: 0.03 },
-            { nombre: 'Suavizante Textil de Alto Rendimiento', presentacion: '20 Litros', precioMercado: 98000, precioBiocambio: 59000, factorUnidad: 0.025 },
-            { nombre: 'Blanqueador Oxigenado Ropa Color y Blanca', presentacion: '20 Litros', precioMercado: 92000, precioBiocambio: 56000, factorUnidad: 0.02 },
-            { nombre: 'Desengrasante Removedor de Manchas', presentacion: '20 Litros', precioMercado: 105000, precioBiocambio: 64000, factorUnidad: 0.015 }
-        ]
-    },
-    {
-        id: 'restaurant',
-        title: 'Restaurante / Casino Empresarial / Catering',
-        description: 'Establecimientos gastronómicos, comedores industriales y servicios de catering.',
-        icon: Utensils,
-        defaultUnitsLabel: 'Servicios o Platos Preparados al Día',
-        defaultUnits: 350,
-        recommendedItems: [
-            { nombre: 'Detergente Lavaloza Concentrado Cocina', presentacion: '20 Litros', precioMercado: 83000, precioBiocambio: 52000, factorUnidad: 0.025 },
-            { nombre: 'Desengrasante Removedor de Grasa Pesada', presentacion: '20 Litros', precioMercado: 98000, precioBiocambio: 61000, factorUnidad: 0.02 },
-            { nombre: 'Desinfectante Grado Alimentario', presentacion: '20 Litros', precioMercado: 85000, precioBiocambio: 53000, factorUnidad: 0.015 },
-            { nombre: 'Jabón Antibacterial para Manos Cocina', presentacion: '10 Litros', precioMercado: 55000, precioBiocambio: 34000, factorUnidad: 0.01 }
-        ]
-    },
-    {
-        id: 'school',
-        title: 'Colegio / Universidad / Institución Educativa',
-        description: 'Planteles educativos, campus universitarios y jardines infantiles.',
-        icon: GraduationCap,
-        defaultUnitsLabel: 'Número de Estudiantes',
-        defaultUnits: 800,
-        recommendedItems: [
-            { nombre: 'Limpiapisos Aromático Alto Relleno', presentacion: '20 Litros', precioMercado: 75000, precioBiocambio: 46000, factorUnidad: 0.015 },
-            { nombre: 'Desinfectante Hospitalario/Escolar', presentacion: '20 Litros', precioMercado: 84000, precioBiocambio: 52000, factorUnidad: 0.015 },
-            { nombre: 'Jabón Espuma para Manos Institucional', presentacion: '20 Litros', precioMercado: 92000, precioBiocambio: 57000, factorUnidad: 0.01 },
-            { nombre: 'Blanqueador Sanitizante de Baterías Sanitarias', presentacion: '20 Litros', precioMercado: 68000, precioBiocambio: 42000, factorUnidad: 0.01 }
-        ]
-    },
-    {
-        id: 'hotel',
-        title: 'Hotel / Alojamiento / Hospedaje',
-        description: 'Hoteles, hostales, apartahoteles y centros de alojamiento.',
-        icon: Hotel,
-        defaultUnitsLabel: 'Número de Habitaciones',
-        defaultUnits: 60,
-        recommendedItems: [
-            { nombre: 'Detergente Ropa de Cama y Toallas', presentacion: '20 Litros', precioMercado: 108000, precioBiocambio: 67000, factorUnidad: 0.1 },
-            { nombre: 'Suavizante Aroma Prolongado', presentacion: '20 Litros', precioMercado: 95000, precioBiocambio: 58000, factorUnidad: 0.08 },
-            { nombre: 'Limpiador de Vidrios y Azulejos', presentacion: '20 Litros', precioMercado: 83000, precioBiocambio: 49000, factorUnidad: 0.05 },
-            { nombre: 'Desinfectante Amonio Cuaternario 5ta Gen', presentacion: '20 Litros', precioMercado: 89000, precioBiocambio: 55000, factorUnidad: 0.05 }
-        ]
-    },
-    {
-        id: 'clinic',
-        title: 'Clínica / Centro Médico / IPS / Consultorio',
-        description: 'Centros odontológicos, IPS, laboratorios y clínicas de salud.',
-        icon: Stethoscope,
-        defaultUnitsLabel: 'Número de Consultorios / Unidades',
-        defaultUnits: 15,
-        recommendedItems: [
-            { nombre: 'Desinfectante Quirúrgico Amonio 5ta Gen', presentacion: '20 Litros', precioMercado: 115000, precioBiocambio: 71000, factorUnidad: 0.3 },
-            { nombre: 'Jabón Antiséptico para Manos', presentacion: '20 Litros', precioMercado: 102000, precioBiocambio: 63000, factorUnidad: 0.25 },
-            { nombre: 'Blanqueador Desinfectante de Áreas Críticas', presentacion: '20 Litros', precioMercado: 72000, precioBiocambio: 44000, factorUnidad: 0.2 },
-            { nombre: 'Limpiador Germicida de Pisos', presentacion: '20 Litros', precioMercado: 85000, precioBiocambio: 53000, factorUnidad: 0.2 }
-        ]
+const getSectorIcon = (iconKey?: string) => {
+    switch (iconKey) {
+        case 'Shirt': return Shirt;
+        case 'Utensils': return Utensils;
+        case 'GraduationCap': return GraduationCap;
+        case 'Hotel': return Hotel;
+        case 'Stethoscope': return Stethoscope;
+        case 'Factory': return Factory;
+        case 'Sparkles': return Sparkles;
+        case 'Building2':
+        default:
+            return Building2;
     }
-];
+};
 
 export default function CotizadorB2BPage() {
     const { addToCart, setIsCartOpen } = useCart();
 
-    const [selectedSector, setSelectedSector] = useState<SectorConfig>(SECTORS[0]);
-    const [units, setUnits] = useState<number>(SECTORS[0].defaultUnits);
+    const [sectors, setSectors] = useState<SectorConfig[]>(DEFAULT_SECTORS);
+    const [selectedSector, setSelectedSector] = useState<SectorConfig>(DEFAULT_SECTORS[0]);
+    const [units, setUnits] = useState<number>(DEFAULT_SECTORS[0].defaultUnits);
+
+    useEffect(() => {
+        getB2BSectorsConfig().then((data) => {
+            if (data && data.length > 0) {
+                setSectors(data);
+                setSelectedSector(data[0]);
+                setUnits(data[0].defaultUnits);
+            }
+        });
+    }, []);
 
     // Lead Form inputs
     const [nombreEncargado, setNombreEncargado] = useState('');
@@ -146,10 +83,10 @@ export default function CotizadorB2BPage() {
     };
 
     // Calculate items and savings dynamically
-    const calculatedItems: B2BProposalItem[] = selectedSector.recommendedItems.map(item => {
-        const cantidad = Math.max(1, Math.round(units * item.factorUnidad));
-        const subtotalMercado = cantidad * item.precioMercado;
-        const subtotalBiocambio = cantidad * item.precioBiocambio;
+    const calculatedItems: B2BProposalItem[] = (selectedSector.recommendedItems || []).map(item => {
+        const cantidad = Math.max(1, Math.round(units * (item.factorUnidad || 0.01)));
+        const subtotalMercado = cantidad * (item.precioMercado || 0);
+        const subtotalBiocambio = cantidad * (item.precioBiocambio || 0);
         const ahorroItem = subtotalMercado - subtotalBiocambio;
 
         return {
@@ -292,8 +229,8 @@ export default function CotizadorB2BPage() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
-                            {SECTORS.map((sec) => {
-                                const IconComponent = sec.icon;
+                            {sectors.map((sec) => {
+                                const IconComponent = getSectorIcon(sec.iconKey);
                                 const isSelected = selectedSector.id === sec.id;
 
                                 return (

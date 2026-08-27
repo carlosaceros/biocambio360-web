@@ -293,22 +293,40 @@ export default function AdminDashboard() {
                         {/* Gestor Quick Actions */}
                         <div>
                             <h2 className="text-lg font-black text-gray-900 mb-4">MÓDULOS HABILITADOS</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => router.push('/admin/pedidos')}
-                                    className="bg-white rounded-2xl p-6 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
                                 >
-                                    <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                        <Package size={26} />
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                        <Package size={22} />
                                     </div>
-                                    <h3 className="text-lg font-black text-gray-900 mb-1">Gestionar Pedidos & Guías</h3>
-                                    <p className="text-xs text-gray-500 mb-3">
-                                        Tablero Kanban de órdenes, cambio de estados, notas y emisión de guías PDF 99 Envíos.
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Pedidos & Guías</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Kanban de órdenes y emisión de guías 99 Envíos.
                                     </p>
                                     <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                                        Acceso Total Pedidos <ArrowUpRight size={14} />
+                                        Acceso Total <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/cotizaciones-b2b')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-teal-200 text-left hover:border-teal-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                                        <Building2 size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Cotizador & Tarifas B2B</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Gestión de cotizaciones, tarifas de sectores y edición.
+                                    </p>
+                                    <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
+                                        Editar Tarifas & CRM <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
 
@@ -316,14 +334,14 @@ export default function AdminDashboard() {
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => router.push('/admin/auditoria-envios')}
-                                    className="bg-white rounded-2xl p-6 shadow-sm border-2 border-indigo-200 text-left hover:border-indigo-500 hover:shadow-md transition-all group"
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-indigo-200 text-left hover:border-indigo-500 hover:shadow-md transition-all group"
                                 >
-                                    <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                        <Activity size={26} />
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        <Activity size={22} />
                                     </div>
-                                    <h3 className="text-lg font-black text-gray-900 mb-1">Auditoría de Envíos & Fletes</h3>
-                                    <p className="text-xs text-gray-500 mb-3">
-                                        Trazabilidad de cotizaciones, tarifas de transportadoras, bultos y subsidios de fábrica.
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Auditoría Envíos</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Trazabilidad de cotizaciones y tarifas de fletes.
                                     </p>
                                     <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
                                         Solo Consulta <ArrowUpRight size={14} />
@@ -334,17 +352,17 @@ export default function AdminDashboard() {
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => router.push('/admin/inventario')}
-                                    className="bg-white rounded-2xl p-6 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
                                 >
-                                    <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                                        <Eye size={26} />
+                                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                        <Eye size={22} />
                                     </div>
-                                    <h3 className="text-lg font-black text-gray-900 mb-1">Inventario de Productos</h3>
-                                    <p className="text-xs text-gray-500 mb-3">
-                                        Vista especial de catálogo, stock, presentaciones, precios oficiales y fichas técnicas.
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Inventario Stock</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Vista de catálogo, stock y precios oficiales.
                                     </p>
                                     <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
-                                        Solo Vista (Sin Edición) <ArrowUpRight size={14} />
+                                        Solo Vista <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
                             </div>

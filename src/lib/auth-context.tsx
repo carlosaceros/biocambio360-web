@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             email,
                             nombre: data.nombre || determinedName,
                             role: finalRole,
-                            permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', auditoria_envios: 'read', inventario: 'read' }),
+                            permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read' }),
                         };
                         setUserProfile(profile);
                         setRole(finalRole);
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             email,
                             nombre: determinedName,
                             role: determinedRole,
-                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', auditoria_envios: 'read', inventario: 'read' },
+                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read' },
                         };
                         setUserProfile(profile);
                         setRole(determinedRole);
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         email,
                         nombre: determinedName,
                         role: determinedRole,
-                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', auditoria_envios: 'read', inventario: 'read' },
+                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read' },
                     };
                     setUserProfile(profile);
                     setRole(determinedRole);
@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const canAccess = (module: string): boolean => {
         if (role === 'superadmin') return true;
         if (role === 'gestor_pedidos') {
-            return ['pedidos', 'auditoria-envios', 'inventario', 'dashboard'].includes(module);
+            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard'].includes(module);
         }
         return false;
     };
