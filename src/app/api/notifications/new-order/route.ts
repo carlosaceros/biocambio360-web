@@ -39,11 +39,11 @@ export async function POST(request: Request) {
 
         // 1. Push notification to admin (fire and forget)
         sendAdminPushNotification({
-            title: isOnline ? '💳 ¡Pago Online!' : '🛒 ¡Nuevo Pedido!',
+            title: isOnline ? '🟡 Pedido Wompi (Checkout Iniciado)' : '🛒 ¡Nuevo Pedido Contraentrega!',
             body: isOnline
-                ? `${customerName} · ${formattedTotal} con tarjeta`
-                : `${customerName} · ${formattedTotal} contraentrega`,
-            data: { orderId, type: 'new_order' },
+                ? `${customerName} · ${formattedTotal} (Pendiente de confirmación de pasarela)`
+                : `${customerName} · ${formattedTotal} (Pago en efectivo al entregar)`,
+            data: { orderId, type: isOnline ? 'payment_pending' : 'new_order' },
         }).catch(e => console.warn('[FCM] Push failed (non-fatal):', e));
 
         // 2. Email confirmation to customer

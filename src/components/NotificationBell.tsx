@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Bell, BellRing, ShoppingCart, CreditCard, Check, X } from 'lucide-react';
+import { Bell, BellRing, ShoppingCart, CreditCard, Clock, AlertTriangle, CheckCircle2, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AdminNotification } from '@/hooks/useAdminNotifications';
 import { useRouter } from 'next/navigation';
@@ -22,6 +22,40 @@ function timeAgo(date: Date): string {
     if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)}h`;
     return date.toLocaleDateString('es-CO');
 }
+
+const getNotificationStyle = (type: AdminNotification['type']) => {
+    switch (type) {
+        case 'payment_confirmed':
+            return {
+                icon: <CheckCircle2 size={15} />,
+                bg: 'bg-emerald-100 text-emerald-700',
+                dot: 'bg-emerald-500',
+                rowBg: 'hover:bg-emerald-50/40'
+            };
+        case 'payment_declined':
+            return {
+                icon: <AlertTriangle size={15} />,
+                bg: 'bg-red-100 text-red-700',
+                dot: 'bg-red-500',
+                rowBg: 'hover:bg-red-50/40'
+            };
+        case 'payment_pending':
+            return {
+                icon: <Clock size={15} />,
+                bg: 'bg-amber-100 text-amber-700',
+                dot: 'bg-amber-500',
+                rowBg: 'hover:bg-amber-50/40'
+            };
+        case 'new_order':
+        default:
+            return {
+                icon: <ShoppingCart size={15} />,
+                bg: 'bg-blue-100 text-blue-700',
+                dot: 'bg-blue-500',
+                rowBg: 'hover:bg-blue-50/40'
+            };
+    }
+};
 
 export default function NotificationBell({
     notifications,
@@ -157,39 +191,40 @@ export default function NotificationBell({
                                     <p className="text-xs text-gray-300 mt-1">Los nuevos pedidos aparecerán aquí</p>
                                 </div>
                             ) : (
-                                notifications.map((notif) => (
-                                    <button
-                                        key={notif.id}
-                                        onClick={() => handleNotificationClick(notif)}
-                                        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-start gap-3 ${!notif.read ? 'bg-blue-50/50' : ''}`}
-                                    >
-                                        {/* Icon */}
-                                        <div className={`mt-0.5 p-2 rounded-lg flex-shrink-0 ${notif.type === 'payment_confirmed' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                                            {notif.type === 'payment_confirmed'
-                                                ? <CreditCard size={14} />
-                                                : <ShoppingCart size={14} />
-                                            }
-                                        </div>
+                                notifications.map((notif) => {
+                                    const style = getNotificationStyle(notif.type);
 
-                                        {/* Content */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <p className="text-sm font-semibold text-gray-800 truncate">
-                                                    {notif.title}
-                                                </p>
-                                                {!notif.read && (
-                                                    <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                                                )}
+                                    return (
+                                        <button
+                                            key={notif.id}
+                                            onClick={() => handleNotificationClick(notif)}
+                                            className={`w-full text-left px-4 py-3 transition-colors flex items-start gap-3 ${style.rowBg} ${!notif.read ? 'bg-slate-50 font-medium' : ''}`}
+                                        >
+                                            {/* Icon */}
+                                            <div className={`mt-0.5 p-2 rounded-xl flex-shrink-0 ${style.bg}`}>
+                                                {style.icon}
                                             </div>
-                                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                                                {notif.body}
-                                            </p>
-                                            <p className="text-xs text-gray-400 mt-1">
-                                                {timeAgo(notif.timestamp)}
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))
+
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-xs font-black text-gray-900 truncate">
+                                                        {notif.title}
+                                                    </p>
+                                                    {!notif.read && (
+                                                        <span className={`w-2 h-2 rounded-full ${style.dot} flex-shrink-0`} />
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-600 mt-0.5 line-clamp-2 leading-relaxed">
+                                                    {notif.body}
+                                                </p>
+                                                <p className="text-[10px] font-bold text-gray-400 mt-1">
+                                                    {timeAgo(notif.timestamp)}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    );
+                                })
                             )}
                         </div>
 

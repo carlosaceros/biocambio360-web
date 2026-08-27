@@ -27,8 +27,62 @@ export interface AdminNotification {
     body: string;
     timestamp: Date;
     read: boolean;
-    type: 'new_order' | 'payment_confirmed';
+    type: 'new_order' | 'payment_confirmed' | 'payment_pending' | 'payment_declined';
     orderId: string;
+}
+
+function buildOrderNotification(docId: string, data: Order): AdminNotification {
+    const customerName = data.cliente?.nombre || 'Cliente';
+    const total = formatPrice(data.total || 0);
+    const isWompi = data.metodoPago === 'wompi';
+    const wompiStatus = (data.wompiTransaction?.status || '').toUpperCase();
+    const isWompiApproved = wompiStatus === 'APPROVED' || data.status === 'confirmado';
+    const isWompiDeclined = wompiStatus === 'DECLINED' || wompiStatus === 'ERROR' || wompiStatus === 'VOIDED' || data.status === 'cancelado';
+
+    if (isWompi) {
+        if (isWompiApproved) {
+            const wompiId = data.wompiTransaction?.id || (data as any).wompiTransactionId || '';
+            return {
+                id: `${docId}_approved_${Date.now()}`,
+                title: '🟢 ¡Pago Aprobado en Wompi!',
+                body: `${customerName} · ${total} pagado con éxito ${wompiId ? `(ID: ${wompiId.slice(-6)})` : ''}`,
+                timestamp: safeToDate(data.updatedAt || data.createdAt),
+                read: false,
+                type: 'payment_confirmed',
+                orderId: docId,
+            };
+        } else if (isWompiDeclined) {
+            return {
+                id: `${docId}_declined_${Date.now()}`,
+                title: '🔴 Pago Declinado en Wompi',
+                body: `${customerName} · ${total} fue rechazado por el banco/pasarela`,
+                timestamp: safeToDate(data.updatedAt || data.createdAt),
+                read: false,
+                type: 'payment_declined',
+                orderId: docId,
+            };
+        } else {
+            return {
+                id: `${docId}_pending_${Date.now()}`,
+                title: '🟡 Pedido Wompi (Sin Pago Aún)',
+                body: `${customerName} · ${total} (Checkout iniciado, pendiente de pago en pasarela)`,
+                timestamp: safeToDate(data.createdAt),
+                read: false,
+                type: 'payment_pending',
+                orderId: docId,
+            };
+        }
+    } else {
+        return {
+            id: `${docId}_contra_${Date.now()}`,
+            title: '🛒 ¡Nuevo Pedido Contraentrega!',
+            body: `${customerName} · ${total} (Se cobrará en efectivo al entregar)`,
+            timestamp: safeToDate(data.createdAt),
+            read: false,
+            type: 'new_order',
+            orderId: docId,
+        };
+    }
 }
 
 async function registerFCMToken() {
@@ -69,6 +123,7 @@ export function useAdminNotifications() {
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
     const [permissionGranted, setPermissionGranted] = useState(false);
     const knownOrderIds = useRef<Set<string>>(new Set());
+    const knownOrderStatuses = useRef<Map<string, string>>(new Map());
     const isFirstLoad = useRef(true);
 
     // Request browser notification permission + register FCM token
@@ -116,42 +171,54 @@ export function useAdminNotifications() {
         initNotifications();
     }, []);
 
-    // Subscribe to orders and detect new ones (for in-app notifications)
+    // Subscribe to orders and detect new ones or status updates (for in-app notifications)
     useEffect(() => {
         const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            // On the very first load, just record all existing order IDs (no notifications)
+            // On the very first load, record existing orders and load recent 10 into dropdown
             if (isFirstLoad.current) {
-                snapshot.docs.forEach((doc) => knownOrderIds.current.add(doc.id));
+                const initialList: AdminNotification[] = [];
+                snapshot.docs.forEach((doc, idx) => {
+                    const data = doc.data() as Order;
+                    knownOrderIds.current.add(doc.id);
+                    const statusKey = `${data.status}_${data.wompiTransaction?.status || ''}`;
+                    knownOrderStatuses.current.set(doc.id, statusKey);
+
+                    if (idx < 10) {
+                        const notif = buildOrderNotification(doc.id, data);
+                        notif.read = true; // Mark historical items as already read
+                        initialList.push(notif);
+                    }
+                });
+                setNotifications(initialList);
                 isFirstLoad.current = false;
                 return;
             }
 
-            // For every change, detect added documents
+            // For every change, detect added or modified documents
             snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added' && !knownOrderIds.current.has(change.doc.id)) {
-                    const data = change.doc.data() as Order;
-                    knownOrderIds.current.add(change.doc.id);
+                const data = change.doc.data() as Order;
+                const docId = change.doc.id;
+                const currentStatusKey = `${data.status}_${data.wompiTransaction?.status || ''}`;
+                const previousStatusKey = knownOrderStatuses.current.get(docId);
 
-                    const customerName = data.cliente?.nombre || 'Cliente desconocido';
-                    const total = formatPrice(data.total || 0);
-                    const isPaid = data.status === 'confirmado' || data.metodoPago === 'wompi';
+                let shouldNotify = false;
 
-                    const notification: AdminNotification = {
-                        id: change.doc.id + '_' + Date.now(),
-                        title: isPaid ? '💳 ¡Pago Confirmado!' : '🛒 ¡Nuevo Pedido!',
-                        body: isPaid
-                            ? `${customerName} pagó ${total} con tarjeta`
-                            : `${customerName} hizo un pedido de ${total} (contraentrega)`,
-                        timestamp: safeToDate(data.createdAt),
-                        read: false,
-                        type: isPaid ? 'payment_confirmed' : 'new_order',
-                        orderId: change.doc.id,
-                    };
+                if (change.type === 'added' && !knownOrderIds.current.has(docId)) {
+                    knownOrderIds.current.add(docId);
+                    knownOrderStatuses.current.set(docId, currentStatusKey);
+                    shouldNotify = true;
+                } else if (change.type === 'modified' && previousStatusKey !== currentStatusKey) {
+                    knownOrderStatuses.current.set(docId, currentStatusKey);
+                    shouldNotify = true;
+                }
 
-                    // Add to in-app list
-                    setNotifications((prev) => [notification, ...prev]);
+                if (shouldNotify) {
+                    const notification = buildOrderNotification(docId, data);
+
+                    // Add to in-app list (avoid duplicate IDs)
+                    setNotifications((prev) => [notification, ...prev.filter(n => n.orderId !== docId)]);
 
                     // Show browser notification if permission granted (fallback for non-FCM)
                     try {
@@ -161,7 +228,7 @@ export function useAdminNotifications() {
                                 body: notification.body,
                                 icon: '/icon.png',
                                 badge: '/icon.png',
-                                tag: change.doc.id,
+                                tag: docId,
                             });
                             browserNotif.onclick = () => {
                                 window.focus();
