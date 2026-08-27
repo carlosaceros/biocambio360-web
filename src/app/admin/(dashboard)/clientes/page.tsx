@@ -24,6 +24,24 @@ import { formatCurrency } from '@/lib/checkout-utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+function parseSafeDate(timestamp: any): Date {
+    if (!timestamp) return new Date();
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof timestamp.toDate === 'function') {
+        try {
+            return timestamp.toDate();
+        } catch {
+            return new Date();
+        }
+    }
+    if (timestamp.seconds !== undefined) return new Date(timestamp.seconds * 1000);
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        const d = new Date(timestamp);
+        if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+}
+
 export default function ClientesPage() {
     const router = useRouter();
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -239,8 +257,8 @@ export default function ClientesPage() {
                                     <div>
                                         <h2 className="text-2xl font-black text-gray-900">{selectedCustomer.nombre}</h2>
                                         <p className="text-gray-500 flex items-center gap-2 text-sm">
-                                            <span>Cliente desde {format(selectedCustomer.createdAt.toDate(), 'MMMM yyyy', { locale: es })}</span>
-                                            {selectedCustomer.ordersCount > 1 && (
+                                            <span>Cliente desde {format(parseSafeDate(selectedCustomer.createdAt || selectedCustomer.firstOrderDate), 'MMMM yyyy', { locale: es })}</span>
+                                            {(selectedCustomer.ordersCount || 0) > 1 && (
                                                 <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">
                                                     Recurrente
                                                 </span>
@@ -296,7 +314,7 @@ export default function ClientesPage() {
 
                                             <div className="pt-4 border-t border-gray-200">
                                                 <a
-                                                    href={`https://wa.me/57${selectedCustomer.celular.replace(/\D/g, '')}`}
+                                                    href={`https://wa.me/57${(selectedCustomer.celular || '').replace(/\D/g, '')}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
@@ -312,13 +330,13 @@ export default function ClientesPage() {
 
                                             <div className="flex justify-between items-center">
                                                 <span className="text-blue-700 text-sm">Total Gastado</span>
-                                                <span className="text-blue-900 font-black text-xl">{formatCurrency(selectedCustomer.totalSpent)}</span>
+                                                <span className="text-blue-900 font-black text-xl">{formatCurrency(selectedCustomer.totalSpent || 0)}</span>
                                             </div>
 
                                             <div className="flex justify-between items-center">
                                                 <span className="text-blue-700 text-sm">Ticket Promedio</span>
                                                 <span className="text-blue-900 font-bold">
-                                                    {formatCurrency(selectedCustomer.totalSpent / selectedCustomer.ordersCount)}
+                                                    {formatCurrency((selectedCustomer.totalSpent || 0) / Math.max(1, selectedCustomer.ordersCount || 1))}
                                                 </span>
                                             </div>
                                         </div>
@@ -353,7 +371,7 @@ export default function ClientesPage() {
                                                                     </span>
                                                                 </div>
                                                                 <p className="text-xs text-gray-500">
-                                                                    {format(order.createdAt.toDate(), "d MMM yyyy, HH:mm", { locale: es })}
+                                                                    {format(parseSafeDate(order.createdAt), "d MMM yyyy, HH:mm", { locale: es })}
                                                                 </p>
                                                             </div>
                                                         </div>
