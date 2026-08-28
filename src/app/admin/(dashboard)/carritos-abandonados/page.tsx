@@ -27,7 +27,9 @@ import {
     Package,
     ChevronRight,
     X,
-    Eye
+    Eye,
+    MousePointerClick,
+    MailOpen
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import {
@@ -103,6 +105,14 @@ export default function CarritosAbandonadosPage() {
     const totalRecoveredValue = recoveredCarts.reduce((sum, c) => sum + (c.total || 0), 0);
     const recoveryRate = totalCartsCount > 0 ? Math.round((recoveredCarts.length / totalCartsCount) * 100) : 0;
 
+    // Tracking Metrics
+    const notifiedCarts = carts.filter((c) => (c.notificationCount || 0) > 0);
+    const openedCarts = carts.filter((c) => (c.openCount || 0) > 0 || !!c.openedAt);
+    const clickedCarts = carts.filter((c) => (c.clickCount || 0) > 0 || !!c.clickedAt);
+
+    const openRate = notifiedCarts.length > 0 ? Math.round((openedCarts.length / notifiedCarts.length) * 100) : 0;
+    const clickRate = openedCarts.length > 0 ? Math.round((clickedCarts.length / openedCarts.length) * 100) : 0;
+
     const safeToDate = (timestamp: any): Date => {
         if (!timestamp) return new Date();
         if (typeof timestamp.toDate === 'function') return timestamp.toDate();
@@ -135,7 +145,7 @@ export default function CarritosAbandonadosPage() {
     };
 
     const handleCopyRecoveryUrl = (cartToken: string) => {
-        const url = `${window.location.origin}/checkout?recovery_token=${cartToken}`;
+        const url = `https://www.biocambio360.com/checkout?recovery_token=${cartToken}`;
         navigator.clipboard.writeText(url);
         setCopiedToken(cartToken);
         setTimeout(() => setCopiedToken(null), 3000);
@@ -149,7 +159,7 @@ export default function CarritosAbandonadosPage() {
 
         const phoneDigits = cart.customerPhone.replace(/\D/g, '');
         const formattedPhone = phoneDigits.length === 10 ? `57${phoneDigits}` : phoneDigits;
-        const recoveryUrl = `${window.location.origin}/checkout?recovery_token=${cart.cartToken}`;
+        const recoveryUrl = `https://www.biocambio360.com/checkout?recovery_token=${cart.cartToken}`;
         const customerName = cart.customerName || 'Hola';
         const productsList = (cart.items || []).map((i) => `• ${i.nombre} (${i.size}) × ${i.cantidad}`).join('\n');
 
@@ -220,7 +230,7 @@ export default function CarritosAbandonadosPage() {
                                 </h1>
                             </div>
                             <p className="text-xs md:text-sm text-gray-500 font-medium">
-                                Recuperación omnicanal: Correos automáticos y contacto directo por WhatsApp
+                                Recuperación omnicanal con analítica de apertura de correos y clics
                             </p>
                         </div>
                     </div>
@@ -243,16 +253,16 @@ export default function CarritosAbandonadosPage() {
                 )}
 
                 {/* Metrics Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Abandonados</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Abandonados</span>
                             <span className="p-2 bg-rose-50 text-rose-600 rounded-xl">
                                 <AlertTriangle size={18} />
                             </span>
                         </div>
-                        <p className="text-3xl font-black text-rose-600 mt-2">{abandonedCarts.length}</p>
-                        <p className="text-xs text-gray-500 font-medium mt-1">Carritos pendientes por recuperar</p>
+                        <p className="text-2xl font-black text-rose-600 mt-2">{abandonedCarts.length}</p>
+                        <p className="text-[11px] text-gray-500 font-medium mt-1">Carritos pendientes</p>
                     </div>
 
                     <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
@@ -262,30 +272,43 @@ export default function CarritosAbandonadosPage() {
                                 <DollarSign size={18} />
                             </span>
                         </div>
-                        <p className="text-3xl font-black text-amber-600 mt-2">{formatCurrency(totalLostValue)}</p>
-                        <p className="text-xs text-gray-500 font-medium mt-1">Ingresos potenciales no cerrados</p>
+                        <p className="text-2xl font-black text-amber-600 mt-2">{formatCurrency(totalLostValue)}</p>
+                        <p className="text-[11px] text-gray-500 font-medium mt-1">Ingresos potenciales</p>
                     </div>
 
                     <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Recuperados</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Recuperados</span>
                             <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
                                 <CheckCircle2 size={18} />
                             </span>
                         </div>
-                        <p className="text-3xl font-black text-emerald-600 mt-2">{recoveredCarts.length}</p>
-                        <p className="text-xs text-emerald-700 font-bold mt-1">+{formatCurrency(totalRecoveredValue)} rescatados</p>
+                        <p className="text-2xl font-black text-emerald-600 mt-2">{recoveredCarts.length}</p>
+                        <p className="text-[11px] text-emerald-700 font-bold mt-1">+{formatCurrency(totalRecoveredValue)}</p>
                     </div>
 
+                    {/* Email Open Rate */}
                     <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tasa de Rescate</span>
-                            <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                                <TrendingUp size={18} />
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tasa Apertura</span>
+                            <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                <MailOpen size={18} />
                             </span>
                         </div>
-                        <p className="text-3xl font-black text-indigo-600 mt-2">{recoveryRate}%</p>
-                        <p className="text-xs text-gray-500 font-medium mt-1">Efectividad de correos + WhatsApp</p>
+                        <p className="text-2xl font-black text-blue-600 mt-2">{openRate}%</p>
+                        <p className="text-[11px] text-gray-500 font-medium mt-1">{openedCarts.length} de {notifiedCarts.length} abiertos</p>
+                    </div>
+
+                    {/* Email Click-Through Rate (CTR) */}
+                    <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tasa de Clics</span>
+                            <span className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+                                <MousePointerClick size={18} />
+                            </span>
+                        </div>
+                        <p className="text-2xl font-black text-purple-600 mt-2">{clickRate}%</p>
+                        <p className="text-[11px] text-gray-500 font-medium mt-1">{clickedCarts.length} de {openedCarts.length} con clic</p>
                     </div>
                 </div>
 
@@ -365,8 +388,8 @@ export default function CarritosAbandonadosPage() {
                                         <th className="py-3.5 px-4">Cliente & Contacto</th>
                                         <th className="py-3.5 px-4">Productos en Carrito</th>
                                         <th className="py-3.5 px-4 text-right">Total</th>
-                                        <th className="py-3.5 px-4">Fecha / Antigüedad</th>
-                                        <th className="py-3.5 px-4">Notificaciones</th>
+                                        <th className="py-3.5 px-4">Fecha</th>
+                                        <th className="py-3.5 px-4">Trazabilidad Email</th>
                                         <th className="py-3.5 px-4 text-center">Acciones de Rescate</th>
                                     </tr>
                                 </thead>
@@ -374,6 +397,8 @@ export default function CarritosAbandonadosPage() {
                                     {filteredCarts.map((cart) => {
                                         const isRecovered = cart.status === 'recovered';
                                         const hasPhone = !!cart.customerPhone;
+                                        const isOpened = (cart.openCount || 0) > 0 || !!cart.openedAt;
+                                        const isClicked = (cart.clickCount || 0) > 0 || !!cart.clickedAt;
 
                                         return (
                                             <tr
@@ -457,10 +482,11 @@ export default function CarritosAbandonadosPage() {
                                                     </p>
                                                 </td>
 
-                                                {/* Notificaciones */}
+                                                {/* Trazabilidad Email (Enviado / Abierto / Clic) */}
                                                 <td className="py-4 px-4 align-top">
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-1">
+                                                    <div className="flex flex-col gap-1.5">
+                                                        {/* Status Envíos */}
+                                                        <div className="flex items-center gap-1.5">
                                                             <span
                                                                 className={`w-2 h-2 rounded-full ${
                                                                     cart.notificationCount > 0
@@ -470,13 +496,24 @@ export default function CarritosAbandonadosPage() {
                                                             />
                                                             <span className="text-xs font-bold text-gray-700">
                                                                 {cart.notificationCount === 0
-                                                                    ? 'Sin envíos aún'
-                                                                    : `${cart.notificationCount} de 3 correos`}
+                                                                    ? 'Sin envíos'
+                                                                    : `${cart.notificationCount}/3 correos`}
                                                             </span>
                                                         </div>
-                                                        {cart.lastNotifiedAt && (
-                                                            <span className="text-[10px] text-gray-400">
-                                                                Último: {getTimeAgo(cart.lastNotifiedAt)}
+
+                                                        {/* Badge Apertura */}
+                                                        {isOpened ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-black border border-blue-100">
+                                                                <Eye size={11} /> Abierto ({cart.openCount || 1}x)
+                                                            </span>
+                                                        ) : cart.notificationCount > 0 ? (
+                                                            <span className="text-[10px] text-gray-400">No abierto aún</span>
+                                                        ) : null}
+
+                                                        {/* Badge Clic */}
+                                                        {isClicked && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-black border border-purple-100">
+                                                                <MousePointerClick size={11} /> Clic en botón ({cart.clickCount || 1}x)
                                                             </span>
                                                         )}
                                                     </div>
@@ -599,6 +636,33 @@ export default function CarritosAbandonadosPage() {
                                     <p className="font-extrabold text-gray-900 text-sm mt-0.5">
                                         {selectedCart.ciudad ? `${selectedCart.ciudad}, ${selectedCart.direccion || ''}` : 'No ingresada'}
                                     </p>
+                                </div>
+                            </div>
+
+                            {/* Trazabilidad de Correo */}
+                            <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-2">
+                                <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider">
+                                    📊 Trazabilidad y Comportamiento del Cliente
+                                </h4>
+                                <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                                    <div className="bg-white p-2 rounded-xl border border-blue-100">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Correos Enviados</p>
+                                        <p className="text-base font-black text-gray-900">{selectedCart.notificationCount || 0}/3</p>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-xl border border-blue-100">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Aperturas</p>
+                                        <p className="text-base font-black text-blue-600">{selectedCart.openCount || 0} veces</p>
+                                        {selectedCart.openedAt && (
+                                            <p className="text-[9px] text-gray-400">{getTimeAgo(selectedCart.openedAt)}</p>
+                                        )}
+                                    </div>
+                                    <div className="bg-white p-2 rounded-xl border border-blue-100">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Clics en Botón</p>
+                                        <p className="text-base font-black text-purple-600">{selectedCart.clickCount || 0} veces</p>
+                                        {selectedCart.clickedAt && (
+                                            <p className="text-[9px] text-gray-400">{getTimeAgo(selectedCart.clickedAt)}</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 

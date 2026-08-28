@@ -43,6 +43,7 @@ export default function CheckoutPage() {
     const router = useRouter();
     const { 
         cart, 
+        restoreCart,
         getTotalPrice, 
         getTotalWeightKg, 
         isHydrated,
@@ -180,12 +181,14 @@ export default function CheckoutPage() {
         }
     }, [isHydrated]);
 
-    // Redirect if cart is empty — but only AFTER localStorage has been read (isHydrated)
+    const [isRecovering, setIsRecovering] = useState<boolean>(false);
+
+    // Redirect if cart is empty — but only AFTER localStorage has been read (isHydrated) and not in recovery mode
     useEffect(() => {
-        if (isHydrated && cart.length === 0) {
+        if (isHydrated && cart.length === 0 && !isRecovering) {
             router.push('/');
         }
-    }, [isHydrated, cart, router]);
+    }, [isHydrated, cart, isRecovering, router]);
 
     const [cartToken, setCartToken] = useState<string>('');
 
@@ -195,24 +198,51 @@ export default function CheckoutPage() {
         const recoveryToken = params.get('recovery_token');
 
         if (recoveryToken) {
+            setIsRecovering(true);
             fetch(`/api/abandoned-cart/recover?token=${recoveryToken}`)
                 .then(r => r.json())
                 .then(res => {
                     if (res.cart) {
                         setCartToken(res.cart.cartToken);
-                        if (res.cart.customerEmail) {
-                            setFormData(prev => ({
-                                ...prev,
-                                email: res.cart.customerEmail || prev.email,
-                                nombre: res.cart.customerName || prev.nombre,
-                                celular: res.cart.customerPhone || prev.celular,
-                                ciudad: res.cart.ciudad || prev.ciudad,
-                                direccion: res.cart.direccion || prev.direccion,
+                        
+                        // Prefill all captured customer data
+                        setFormData(prev => ({
+                            ...prev,
+                            nombre: res.cart.customerName || prev.nombre,
+                            email: res.cart.customerEmail || prev.email,
+                            celular: res.cart.customerPhone || prev.celular,
+                            ciudad: res.cart.ciudad || prev.ciudad,
+                            direccion: res.cart.direccion || prev.direccion,
+                        }));
+
+                        // Reconstruct and restore cart items into context
+                        if (Array.isArray(res.cart.items) && res.cart.items.length > 0) {
+                            const reconstructed = res.cart.items.map((item: any) => ({
+                                product: {
+                                    id: item.id,
+                                    nombre: item.nombre,
+                                    precios: { [item.size]: item.price },
+                                    competidorPromedio: {},
+                                    slogan: '',
+                                    descripcion: '',
+                                    imgFile: item.imgFile || 'detergente-multiusos.webp',
+                                    beneficios: [],
+                                    badge: '',
+                                    color: 'bg-blue-600',
+                                    categoria: 'Aseo Hogar',
+                                    subcategoria: '',
+                                    faqs: [],
+                                },
+                                size: item.size,
+                                price: item.price,
+                                cantidad: item.cantidad,
                             }));
+                            restoreCart(reconstructed);
                         }
                     }
                 })
-                .catch(err => console.warn('[Recovery] Error restoring cart:', err));
+                .catch(err => console.warn('[Recovery] Error restoring cart:', err))
+                .finally(() => setIsRecovering(false));
         } else {
             let tok = localStorage.getItem('biocambio_cart_token');
             if (!tok) {
@@ -221,7 +251,7 @@ export default function CheckoutPage() {
             }
             setCartToken(tok);
         }
-    }, []);
+    }, [restoreCart]);
 
     // 2. Auto-save abandoned cart session when email, phone, or cart changes
     useEffect(() => {

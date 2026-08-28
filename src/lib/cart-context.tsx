@@ -21,6 +21,7 @@ interface CartContextType {
     removeFromCart: (productId: string, size: string) => void;
     updateQuantity: (productId: string, size: string, cantidad: number) => void;
     clearCart: () => void;
+    restoreCart: (items: CartItem[]) => void;
     getTotalItems: () => number;
     getTotalPrice: () => number;
     getTotalSavings: () => number;
@@ -186,6 +187,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setAppliedCoupon(null);
     };
 
+    const restoreCart = (items: CartItem[]) => {
+        if (Array.isArray(items)) {
+            setCart(items);
+        }
+    };
+
     const getTotalItems = () => {
         return cart.reduce((total, item) => total + (item?.cantidad || 0), 0);
     };
@@ -273,6 +280,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 removeFromCart,
                 updateQuantity,
                 clearCart,
+                restoreCart,
                 getTotalItems,
                 getTotalPrice,
                 getTotalSavings,
