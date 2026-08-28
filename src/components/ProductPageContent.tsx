@@ -25,6 +25,7 @@ import ProductCard from '@/components/ProductCard';
 import Toast from '@/components/Toast';
 import { getRichProductDetails, getSchwartzCopy, getProductImage } from '@/lib/product-utils';
 import { getManualContentForProduct, MANUAL_NOTICE_TEXT } from '@/lib/products-rich-data';
+import { trackViewContent } from '@/lib/meta-pixel';
 
 // Fixed size order
 const SIZE_ORDER: string[] = ['500ML', '1L', '1/2G', '3.8L', '10L', '20L'];
@@ -77,6 +78,21 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     }, [selectedSize, product.id]);
 
     const price = product.precios[selectedSize] || 0;
+
+    // Meta Pixel: Track ViewContent when viewing product
+    useEffect(() => {
+        if (product && product.id) {
+            const currentPrice = product.precios[selectedSize] || Object.values(product.precios)[0] || 0;
+            trackViewContent({
+                content_ids: [product.sku || `${product.id}-${selectedSize}`],
+                content_name: `${product.nombre} (${selectedSize})`,
+                content_type: 'product',
+                currency: 'COP',
+                value: currentPrice,
+            });
+        }
+    }, [product, selectedSize]);
+
     const savingsData = calcularAhorro(
         price,
         selectedSize,

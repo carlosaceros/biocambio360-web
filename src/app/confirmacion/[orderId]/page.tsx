@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle, Package, MapPin, Phone, MessageCircle, Home } from 'lucide-react';
 import { formatCurrency } from '@/lib/checkout-utils';
 import { useCart } from '@/lib/cart-context';
+import { trackPurchase } from '@/lib/meta-pixel';
 import Link from 'next/link';
 
 interface Order {
@@ -54,6 +55,34 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
 
             const parsedOrder = JSON.parse(orderData);
             setOrder(parsedOrder);
+
+            // Meta Pixel: Track Purchase (Deduplicated with sessionStorage per orderId)
+            try {
+                const trackedKey = `pixel_purchased_${orderId}`;
+                if (typeof window !== 'undefined' && !sessionStorage.getItem(trackedKey)) {
+                    const rawItems = Array.isArray(parsedOrder.productos)
+                        ? parsedOrder.productos
+                        : Object.values(parsedOrder.productos || {});
+
+                    const contentIds = rawItems.map((i: any) => 
+                        i.product?.sku || `${i.product?.id || i.id || 'PROD'}-${i.size || 'STD'}`
+                    );
+                    const numItems = rawItems.reduce((sum: number, item: any) => sum + (Number(item.cantidad) || 1), 0);
+
+                    trackPurchase({
+                        content_ids: contentIds,
+                        content_type: 'product',
+                        currency: 'COP',
+                        value: parsedOrder.subtotal || (parsedOrder.total - (parsedOrder.envio || 0)) || parsedOrder.total,
+                        num_items: numItems,
+                        order_id: orderId,
+                    });
+
+                    sessionStorage.setItem(trackedKey, 'true');
+                }
+            } catch (pErr) {
+                console.warn('[Meta Pixel] Error tracking purchase:', pErr);
+            }
 
             // Clear cart after successful order
             clearCart();

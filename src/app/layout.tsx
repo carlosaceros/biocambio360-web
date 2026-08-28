@@ -105,6 +105,7 @@ const organizationSchema = {
 import CartDrawer from "@/components/CartDrawer";
 import DiscountWheelModal from "@/components/DiscountWheelModal";
 import FirstPurchaseModal from "@/components/FirstPurchaseModal";
+import MetaPixel from "@/components/MetaPixel";
 
 export default function RootLayout({
   children,
@@ -121,6 +122,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
+        <MetaPixel />
       </head>
       <body suppressHydrationWarning style={{ fontFamily: '"Barlow", sans-serif' }}>
         <AuthProvider>

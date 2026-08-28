@@ -22,6 +22,7 @@ const ALL_CITIES_99 = Object.entries(citiesData as Record<string, { codigo: stri
 import { createOrder } from '@/lib/orders-service';
 import { processOrderReplenishment, saveReplenishmentRecord } from '@/lib/replenishment-service';
 import { Order } from '@/types/order';
+import { trackInitiateCheckout, trackAddPaymentInfo } from '@/lib/meta-pixel';
 
 interface FormData {
     nombre: string;
@@ -165,6 +166,19 @@ export default function CheckoutPage() {
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'instant' });
     }, []);
+
+    // Meta Pixel: Track InitiateCheckout when cart is hydrated and has items
+    useEffect(() => {
+        if (isHydrated && cart.length > 0) {
+            trackInitiateCheckout({
+                content_ids: cart.map(item => item.product.sku || `${item.product.id}-${item.size}`),
+                content_type: 'product',
+                currency: 'COP',
+                value: subtotal,
+                num_items: cart.reduce((sum, item) => sum + item.cantidad, 0),
+            });
+        }
+    }, [isHydrated]);
 
     // Redirect if cart is empty — but only AFTER localStorage has been read (isHydrated)
     useEffect(() => {
@@ -315,6 +329,14 @@ export default function CheckoutPage() {
         }
 
         setIsSubmitting(true);
+
+        // Meta Pixel: Track AddPaymentInfo when customer submits payment/order info
+        trackAddPaymentInfo({
+            content_ids: cart.map(item => item.product.sku || `${item.product.id}-${item.size}`),
+            content_type: 'product',
+            currency: 'COP',
+            value: total,
+        });
 
         try {
             // Create order in Firestore

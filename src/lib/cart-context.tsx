@@ -5,6 +5,7 @@ import { Product, ProductSize } from './products';
 import { calcularAhorro } from './products';
 import { getCartPackagingAnalysis, PackagingAnalysis } from './shipping-zones';
 import { AppliedCoupon } from './coupon-types';
+import { trackAddToCart } from './meta-pixel';
 
 export interface CartItem {
     product: Product;
@@ -131,6 +132,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const resolvedPrice = (price && price > 0)
             ? price
             : (product.precios?.[effectiveSize] || Object.values(product.precios || {})[0] || 0);
+
+        // Meta Pixel: Track AddToCart
+        trackAddToCart({
+            content_ids: [product.sku || `${product.id}-${effectiveSize}`],
+            content_name: `${product.nombre} (${effectiveSize})`,
+            content_type: 'product',
+            currency: 'COP',
+            value: resolvedPrice,
+            num_items: cantidad,
+        });
 
         setCart(prevCart => {
             const existingItem = prevCart.find(
