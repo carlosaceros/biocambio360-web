@@ -22,6 +22,7 @@ const ALL_CITIES_99 = Object.entries(citiesData as Record<string, { codigo: stri
 import { createOrder } from '@/lib/orders-service';
 import { processOrderReplenishment, saveReplenishmentRecord } from '@/lib/replenishment-service';
 import { markCartAsRecovered } from '@/lib/abandoned-cart-service';
+import { getStoredTrafficAttribution } from '@/lib/traffic-attribution';
 import { Order } from '@/types/order';
 import { trackInitiateCheckout, trackAddPaymentInfo } from '@/lib/meta-pixel';
 
@@ -400,7 +401,8 @@ export default function CheckoutPage() {
                     type: appliedCoupon.type,
                     value: appliedCoupon.value,
                     discountAmount
-                } : undefined
+                } : undefined,
+                origen: getStoredTrafficAttribution() || undefined
             };
 
             const orderId = await createOrder(orderData as any);

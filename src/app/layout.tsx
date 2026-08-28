@@ -102,10 +102,12 @@ const organizationSchema = {
   ]
 };
 
+import { Suspense } from 'react';
 import CartDrawer from "@/components/CartDrawer";
 import DiscountWheelModal from "@/components/DiscountWheelModal";
 import FirstPurchaseModal from "@/components/FirstPurchaseModal";
 import MetaPixel from "@/components/MetaPixel";
+import TrafficTracker from "@/components/TrafficTracker";
 
 export default function RootLayout({
   children,
@@ -127,6 +129,9 @@ export default function RootLayout({
       <body suppressHydrationWarning style={{ fontFamily: '"Barlow", sans-serif' }}>
         <AuthProvider>
           <CartProvider>
+            <Suspense fallback={null}>
+              <TrafficTracker />
+            </Suspense>
             {children}
             <CartDrawer />
             <DiscountWheelModal />

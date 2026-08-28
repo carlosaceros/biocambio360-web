@@ -33,7 +33,9 @@ import {
     Ticket,
     RefreshCw,
     ExternalLink,
-    ShieldCheck
+    ShieldCheck,
+    Target,
+    Globe
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -86,6 +88,53 @@ interface OrderCardProps {
     order: Order & { id: string };
     onClick: () => void;
     isOverlay?: boolean;
+}
+
+function getOriginBadge(origen?: Order['origen']) {
+    if (!origen || !origen.etiqueta) {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-50 text-gray-500 border border-gray-200" title="Tráfico Directo">
+                Directo
+            </span>
+        );
+    }
+
+    const { tipo, etiqueta } = origen;
+    const label = etiqueta || 'Directo';
+
+    if (tipo === 'pauta_meta') {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-pink-50 text-pink-700 border border-pink-200" title="Tráfico de Pauta Meta / Instagram Ads">
+                🎯 {label}
+            </span>
+        );
+    }
+    if (tipo === 'pauta_google') {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200" title="Tráfico de Google Ads">
+                🎯 {label}
+            </span>
+        );
+    }
+    if (tipo === 'organico') {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200" title="Tráfico Orgánico">
+                🌱 {label}
+            </span>
+        );
+    }
+    if (tipo === 'referido') {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200" title="Tráfico Referido">
+                🔗 {label}
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-50 text-gray-500 border border-gray-200">
+            {label}
+        </span>
+    );
 }
 
 function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
@@ -141,7 +190,7 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                 📍 {order.cliente?.ciudad || 'Colombia'}{order.cliente?.departamento ? `, ${order.cliente.departamento}` : ''}
             </p>
 
-            {/* Products Summary, Payment Method & Coupon Badge */}
+            {/* Products Summary, Payment Method, Coupon & Origen Badge */}
             <div className="mb-3 space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>
@@ -159,14 +208,15 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                     )}
                 </div>
 
-                {order.cuponAplicado && (
-                    <div className="flex items-center">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    {getOriginBadge(order.origen)}
+                    {order.cuponAplicado && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200" title={`Cupón ${order.cuponAplicado.code}`}>
                             <Ticket size={11} className="text-purple-600" />
                             {order.cuponAplicado.code} (-{formatCurrency(order.cuponAplicado.discountAmount || 0)})
                         </span>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* Total */}
@@ -619,6 +669,58 @@ export default function PedidosPage() {
                                                     <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mt-2">
                                                         <p className="text-xs text-yellow-800 font-bold mb-1">Notas de entrega:</p>
                                                         <p className="text-sm text-yellow-900 italic">"{activeOrder.cliente.notas}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Traffic Attribution & Origin */}
+                                        <div>
+                                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                <Target className="text-pink-600" size={18} />
+                                                Origen & Trazabilidad de Marketing
+                                            </h3>
+                                            <div className="bg-white border rounded-xl p-4 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500 font-bold uppercase">Fuente Detectada</span>
+                                                    {getOriginBadge(activeOrder.origen)}
+                                                </div>
+                                                {activeOrder.origen?.campana && (
+                                                    <div>
+                                                        <p className="text-xs text-gray-500">Campaña de Pauta</p>
+                                                        <p className="font-bold text-gray-900 text-xs font-mono bg-pink-50 text-pink-800 p-2 rounded-lg border border-pink-100 mt-0.5">
+                                                            {activeOrder.origen.campana}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {activeOrder.origen?.medio && (
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <p className="text-xs text-gray-500">Medio / Formato</p>
+                                                            <p className="font-medium text-xs text-gray-800 mt-0.5">{activeOrder.origen.medio}</p>
+                                                        </div>
+                                                        {activeOrder.origen?.contenido && (
+                                                            <div>
+                                                                <p className="text-xs text-gray-500">Anuncio / Creativo</p>
+                                                                <p className="font-medium text-xs text-gray-800 mt-0.5">{activeOrder.origen.contenido}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {activeOrder.origen?.landingPage && (
+                                                    <div>
+                                                        <p className="text-xs text-gray-500">Página de Entrada (Landing)</p>
+                                                        <p className="font-mono text-xs text-blue-600 bg-blue-50/50 p-1.5 rounded-lg border border-blue-100 truncate mt-0.5">
+                                                            {activeOrder.origen.landingPage}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {activeOrder.origen?.referrer && (
+                                                    <div>
+                                                        <p className="text-xs text-gray-500">Referrer URL</p>
+                                                        <p className="font-mono text-[11px] text-gray-400 truncate mt-0.5">
+                                                            {activeOrder.origen.referrer}
+                                                        </p>
                                                     </div>
                                                 )}
                                             </div>

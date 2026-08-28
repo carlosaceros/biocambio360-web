@@ -66,6 +66,20 @@ export interface Order {
         value: number;
         discountAmount: number;
     };
+    origen?: {
+        tipo?: 'pauta_meta' | 'pauta_google' | 'pauta_tiktok' | 'organico' | 'directo' | 'referido';
+        fuente?: string;
+        etiqueta?: string;
+        medio?: string;
+        campana?: string;
+        contenido?: string;
+        termino?: string;
+        fbclid?: string;
+        gclid?: string;
+        referrer?: string;
+        landingPage?: string;
+        timestamp?: number;
+    };
     wompiTransaction?: WompiTransactionDetails;
     timeline: TimelineEvent[];
     whatsappConversation?: string[];
