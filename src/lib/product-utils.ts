@@ -9,7 +9,10 @@ const BASE_URL = 'https://www.biocambio360.com';
  * Generate SEO-friendly slug from product name
  * Example: "Detergente Ropa" -> "detergente-ropa-industrial"
  */
-export function generateProductSlug(id: string, nombre: string): string {
+export function generateProductSlug(idOrProduct: string | { id: string; nombre?: string }, optionalNombre?: string): string {
+    const id = typeof idOrProduct === 'object' ? idOrProduct.id : idOrProduct;
+    const nombre = typeof idOrProduct === 'object' ? (idOrProduct.nombre || idOrProduct.id) : (optionalNombre || id);
+
     // Mapeo de IDs a términos descriptivos adicionales para SEO
     const seoTerms: Record<string, string> = {
         'detergente': 'industrial',
@@ -657,13 +660,197 @@ export function generateBreadcrumbSchema(product: Product) {
 }
 
 /**
- * Get related products based on simple logic
+ * Get smart related and complementary products based on intent, category synergy and cross-selling
  */
 export async function getRelatedProducts(currentProductId: string, limit: number = 3): Promise<Product[]> {
     const products = await getAllProducts();
-    return products
-        .filter(p => p.id !== currentProductId)
-        .slice(0, limit);
+    const currentProduct = products.find(p => p.id === currentProductId);
+    if (!currentProduct) {
+        return products.filter(p => p.id !== currentProductId).slice(0, limit);
+    }
+
+    const curId = currentProduct.id;
+    const curCat = currentProduct.categoria || '';
+    const curSub = currentProduct.subcategoria || '';
+    const pMap = new Map(products.map(p => [p.id, p]));
+
+    // 1. Explicit complementary cross-sell clusters
+    const COMPLEMENTARY_CLUSTERS: Array<{
+        match: (p: Product) => boolean;
+        targets: string[];
+    }> = [
+        // 🧺 Laundry cluster (Detergentes, Suavizantes, Quitamanchas, Blanqueadores)
+        {
+            match: (p) => {
+                const id = p.id.toLowerCase();
+                const cat = (p.categoria || '').toLowerCase();
+                const sub = (p.subcategoria || '').toLowerCase();
+                return id.includes('detergente') || id.includes('suavizante') || id.includes('quitamanchas') || id.includes('blanqueador') || sub.includes('suavizante') || sub.includes('detergente') || cat.includes('ropa');
+            },
+            targets: [
+                'suavizante-manzan-verde',
+                'quitamanchas-ropa-color',
+                'kit-combo-detergente-20l-suavizante-galon',
+                'detergente-liquido-multiusos',
+                'blanqueador',
+                'suavizante-motas-de-algodon',
+                'kit-combo-duo-10-10-detergente-desengrasante'
+            ]
+        },
+        // 🍳 Kitchen & Grease cluster (Lavaloza, Desengrasantes, Limpiavidrios, Limpieza general)
+        {
+            match: (p) => {
+                const id = p.id.toLowerCase();
+                const sub = (p.subcategoria || '').toLowerCase();
+                return id.includes('lavaloza') || id.includes('desengrasante') || sub.includes('lavaloza') || sub.includes('desengrasante');
+            },
+            targets: [
+                'lavaloza-liquido',
+                'desengrasante',
+                'bactokill',
+                'limpiavidrios',
+                'kit-combo-lavanderia-cocina',
+                'kit-combo-detergente-20l-desengrasante-galon',
+                'desengrasante-industrial'
+            ]
+        },
+        // 🧼 Floor care & Hard surfaces (Limpiapisos, Ceras, Selladores, Limpiajuntas, Removedor)
+        {
+            match: (p) => {
+                const id = p.id.toLowerCase();
+                const sub = (p.subcategoria || '').toLowerCase();
+                return id.includes('cera') || id.includes('sellador') || id.includes('limpiapisos') || id.includes('limpiajuntas') || id.includes('removedor') || sub.includes('pisos') || sub.includes('limpiapisos') || sub.includes('selladores') || id.includes('ambientador');
+            },
+            targets: [
+                'cera-autobrillante',
+                'removedor-de-ceras',
+                'limpiapisos-lavanda',
+                'limpiajuntas',
+                'sellador-polimerico',
+                'ambientador-canela',
+                'limpiapisos-brisa-marina'
+            ]
+        },
+        // 🚗 Automotive cluster (Shampoos autos/motos, Siliconas, Lustrallantas, Perfumes)
+        {
+            match: (p) => {
+                const cat = (p.categoria || '').toLowerCase();
+                const id = p.id.toLowerCase();
+                return cat.includes('automotriz') || id.includes('autos') || id.includes('motos') || id.includes('lustrallantas');
+            },
+            targets: [
+                'shampoo-autos',
+                'silicona-autos',
+                'lustrallantas-para-autos',
+                'perfume-autos-citrufresh-110-ml',
+                'shampoo-motos',
+                'silicona-para-motos',
+                'lustrallantas-para-motos'
+            ]
+        },
+        // ✨ Personal Care & Cosmetics (Splashes, Mantequillas Corporales, Jabones de Manos, Gel)
+        {
+            match: (p) => {
+                const cat = (p.categoria || '').toLowerCase();
+                const id = p.id.toLowerCase();
+                return cat.includes('personal') || id.includes('splash') || id.includes('mantequilla') || id.includes('jabon-de-manos') || id.includes('jabon-manos');
+            },
+            targets: [
+                'mantequilla-corporal-fiesta-caribe',
+                'splash-cuerpo-fiesta-caribe',
+                'jabon-manos-antibacterial',
+                'gel-antibacterial-70',
+                'splash-cuerpo-rey-andino',
+                'mantequilla-corporal-cafettal',
+                'splash-cuerpo-aura-salvaje'
+            ]
+        },
+        // 🛡️ Disinfection & Biosecurity (Bactokill, Alcoholes, Desinfectante Bicarbonato, Cloro, Oxígeno)
+        {
+            match: (p) => {
+                const id = p.id.toLowerCase();
+                const cat = (p.categoria || '').toLowerCase();
+                return id === 'bactokill' || id.includes('alcohol') || id.includes('desinfectante') || id.includes('cloro') || id.includes('oxigeno') || cat.includes('desinfección');
+            },
+            targets: [
+                'bactokill',
+                'alcohol-glicerinado-70',
+                'oxigeno-activo-desinfectante',
+                'pastillas-de-cloro-8-unidades',
+                'desinfectante-bicarbonato',
+                'alcohol-ethanol-96'
+            ]
+        },
+        // 🎁 Kits & Combos cluster (Upsells & High-Yield Bundles)
+        {
+            match: (p) => {
+                const cat = (p.categoria || '').toLowerCase();
+                const id = p.id.toLowerCase();
+                return cat.includes('kit') || cat.includes('combo') || id.startsWith('kit-') || id.startsWith('combo-');
+            },
+            targets: [
+                'kit-limpieza-completo-1-20l',
+                'kit-combo-duo-10-10-detergente-desengrasante',
+                'kit-combo-lavanderia-cocina',
+                'kit-combo-detergente-20l-suavizante-galon',
+                'kit-limpieza-completo-3-galones',
+                'kit-combo-detergente-20l-desengrasante-galon'
+            ]
+        }
+    ];
+
+    let candidateIds: string[] = [];
+    for (const cluster of COMPLEMENTARY_CLUSTERS) {
+        if (cluster.match(currentProduct)) {
+            candidateIds.push(...cluster.targets);
+            break;
+        }
+    }
+
+    // Filter out current product and remove duplicates
+    const uniqueCandidateIds = Array.from(new Set(candidateIds)).filter(id => id !== curId);
+    const result: Product[] = [];
+
+    for (const id of uniqueCandidateIds) {
+        const prod = pMap.get(id);
+        if (prod) {
+            result.push(prod);
+            if (result.length >= limit) return result;
+        }
+    }
+
+    // Dynamic category/subcategory fallback scoring if more items are needed
+    const remaining = products.filter(p => p.id !== curId && !result.some(r => r.id === p.id));
+    const scored = remaining.map(p => {
+        let score = 0;
+        if (p.subcategoria && p.subcategoria === curSub) score += 50;
+        if (p.categoria && p.categoria === curCat) score += 30;
+        // Avoid mixing personal care with industrial chemicals in fallback
+        const isCurPersonal = curCat.toLowerCase().includes('personal');
+        const isPPersonal = (p.categoria || '').toLowerCase().includes('personal');
+        if (isCurPersonal !== isPPersonal) score -= 100;
+        return { p, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    for (const item of scored) {
+        if (item.score >= 0) {
+            result.push(item.p);
+            if (result.length >= limit) break;
+        }
+    }
+
+    // Ultimate fallback if still fewer than limit
+    if (result.length < limit) {
+        for (const p of products) {
+            if (p.id !== curId && !result.some(r => r.id === p.id)) {
+                result.push(p);
+                if (result.length >= limit) break;
+            }
+        }
+    }
+
+    return result.slice(0, limit);
 }
 
 /**

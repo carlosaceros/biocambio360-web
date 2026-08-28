@@ -23,7 +23,7 @@ import { Product, formatCurrency, calcularAhorro } from '@/lib/products';
 import { useCart } from '@/lib/cart-context';
 import ProductCard from '@/components/ProductCard';
 import Toast from '@/components/Toast';
-import { getRichProductDetails, getSchwartzCopy, getProductImage } from '@/lib/product-utils';
+import { getRichProductDetails, getSchwartzCopy, getProductImage, generateProductSlug } from '@/lib/product-utils';
 import { getManualContentForProduct, MANUAL_NOTICE_TEXT } from '@/lib/products-rich-data';
 import { trackViewContent } from '@/lib/meta-pixel';
 
@@ -65,6 +65,10 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     const [selectedSize, setSelectedSize] = useState<string>(availableSizes[0] || '10L');
     const [quantity, setQuantity] = useState(1);
     const [showToast, setShowToast] = useState(false);
+    const [toastData, setToastData] = useState<{ name: string; size: string }>({
+        name: product.nombre,
+        size: availableSizes[0] || '10L',
+    });
     const [mediaTab, setMediaTab] = useState<'image' | 'video'>('image');
     const [imageError, setImageError] = useState(false);
     const richDetails = getRichProductDetails(product);
@@ -101,6 +105,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
 
     const handleAddToCart = () => {
         addToCart(product, selectedSize as any, price, quantity);
+        setToastData({ name: product.nombre, size: selectedSize });
         setShowToast(true);
     };
 
@@ -113,8 +118,8 @@ export default function ProductPageContent({ product, relatedProducts }: Product
             <Toast
                 show={showToast}
                 message="Producto agregado"
-                productName={product.nombre}
-                size={selectedSize}
+                productName={toastData.name}
+                size={toastData.size}
                 onClose={() => setShowToast(false)}
             />
 
@@ -750,9 +755,13 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                     <ProductCard
                                         key={prod.id}
                                         product={prod}
-                                        onAddToCart={(product, size, price, cantidad) => {
-                                            addToCart(product, size as any, price, cantidad);
+                                        onAddToCart={(addedProduct, size, addedPrice, cantidad) => {
+                                            addToCart(addedProduct, size as any, addedPrice, cantidad);
+                                            setToastData({ name: addedProduct.nombre, size: size });
                                             setShowToast(true);
+                                        }}
+                                        onViewDetails={(prodDetails) => {
+                                            router.push(`/producto/${generateProductSlug(prodDetails)}`);
                                         }}
                                     />
                                 ))}

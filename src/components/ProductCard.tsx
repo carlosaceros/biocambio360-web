@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ShoppingCart, Search, Plus, Minus } from 'lucide-react';
 import { Product, ProductSize, calcularAhorro, formatCurrency } from '@/lib/products';
 import { generateProductSlug, getProductImage } from '@/lib/product-utils';
@@ -12,8 +13,6 @@ interface ProductCardProps {
     onAddToCart?: (product: Product, size: string, price: number, cantidad: number) => void;
     onViewDetails?: (product: Product) => void;
 }
-
-import { useEffect } from 'react';
 
 // Top 5 most purchased sizes displayed in the initial catalog grid
 const TOP_SIZES: ProductSize[] = ['1L', '1/2G', '3.8L', '10L', '20L'];
@@ -48,6 +47,7 @@ const PLACEHOLDER_EMOJI: Record<string, string> = {
 };
 
 export default function ProductCard({ product, onAddToCart, onViewDetails }: ProductCardProps) {
+    const router = useRouter();
     const [imgError, setImgError] = useState(false);
 
     if (!product || !product.id) return null;
@@ -88,13 +88,21 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     // Dynamically resolve image for selected size on-demand
     const imgSrc = `/images/${getProductImage(product, selectedSize)}`;
 
+    const handleCardClick = () => {
+        if (onViewDetails) {
+            onViewDetails(product);
+        } else {
+            router.push(`/producto/${generateProductSlug(product)}`);
+        }
+    };
+
     return (
         <motion.div
             layout
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             whileHover={{ y: -6 }}
-            onClick={() => onViewDetails?.(product)}
+            onClick={handleCardClick}
             className="bg-white rounded-[2rem] shadow-sm border border-gray-100 flex flex-col hover:shadow-2xl hover:shadow-[var(--brand-blue)]/10 transition-all duration-500 group overflow-hidden cursor-pointer h-full"
         >
             {/* Product image container */}
