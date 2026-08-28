@@ -76,6 +76,12 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                         value: parsedOrder.subtotal || (parsedOrder.total - (parsedOrder.envio || 0)) || parsedOrder.total,
                         num_items: numItems,
                         order_id: orderId,
+                        userData: {
+                            email: parsedOrder.cliente?.email || undefined,
+                            phone: parsedOrder.cliente?.celular || undefined,
+                            name: parsedOrder.cliente?.nombre || undefined,
+                            city: parsedOrder.cliente?.ciudad || undefined,
+                        },
                     });
 
                     sessionStorage.setItem(trackedKey, 'true');

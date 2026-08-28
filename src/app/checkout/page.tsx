@@ -330,12 +330,18 @@ export default function CheckoutPage() {
 
         setIsSubmitting(true);
 
-        // Meta Pixel: Track AddPaymentInfo when customer submits payment/order info
+        // Meta Pixel & CAPI: Track AddPaymentInfo when customer submits payment/order info
         trackAddPaymentInfo({
             content_ids: cart.map(item => item.product.sku || `${item.product.id}-${item.size}`),
             content_type: 'product',
             currency: 'COP',
             value: total,
+            userData: {
+                email: formData.email || undefined,
+                phone: formData.celular || undefined,
+                name: formData.nombre || undefined,
+                city: formData.ciudad || undefined,
+            },
         });
 
         try {

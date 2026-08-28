@@ -1,6 +1,6 @@
 'use client';
 
-export const FB_PIXEL_ID = '1261044985153442';
+export const FB_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || '1261044985153442';
 
 declare global {
     interface Window {
@@ -9,19 +9,67 @@ declare global {
     }
 }
 
+export interface MetaUserData {
+    email?: string;
+    phone?: string;
+    name?: string;
+    city?: string;
+}
+
 /**
- * Safely dispatches a Meta Pixel standard event if window.fbq is initialized.
+ * Genera un event_id único para deduplicación entre Browser Pixel y Server CAPI.
  */
-export function trackPixelEvent(eventName: string, params?: Record<string, any>) {
+export function generateEventId(prefix: string = 'evt'): string {
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Envía el evento tanto al Pixel del navegador como a la API de Conversiones (CAPI) del servidor
+ * utilizando el mismo event_id para deduplicación exacta.
+ */
+export function trackPixelAndCapi(
+    eventName: 'PageView' | 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'AddPaymentInfo' | 'Purchase',
+    params?: Record<string, any>,
+    userData?: MetaUserData,
+    eventId?: string
+) {
+    const finalEventId = eventId || (params?.order_id ? `pur_${params.order_id}` : generateEventId(eventName.toLowerCase()));
+
+    // 1. Browser Meta Pixel
     if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
         try {
             if (params) {
-                window.fbq('track', eventName, params);
+                window.fbq('track', eventName, params, { eventID: finalEventId });
             } else {
-                window.fbq('track', eventName);
+                window.fbq('track', eventName, {}, { eventID: finalEventId });
             }
         } catch (err) {
             console.warn(`[Meta Pixel] Error tracking ${eventName}:`, err);
+        }
+    }
+
+    // 2. Server-Side Meta Conversions API (CAPI)
+    if (typeof window !== 'undefined') {
+        try {
+            fetch('/api/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
+                body: JSON.stringify({
+                    event_name: eventName,
+                    custom_data: params,
+                    event_id: finalEventId,
+                    email: userData?.email,
+                    phone: userData?.phone,
+                    name: userData?.name,
+                    city: userData?.city,
+                    url: window.location.href,
+                }),
+            }).catch(e => {
+                // Silently ignore background network errors on client side
+            });
+        } catch (e) {
+            // Ignore error
         }
     }
 }
@@ -29,8 +77,8 @@ export function trackPixelEvent(eventName: string, params?: Record<string, any>)
 /**
  * Track PageView
  */
-export function trackPageView() {
-    trackPixelEvent('PageView');
+export function trackPageView(userData?: MetaUserData) {
+    trackPixelAndCapi('PageView', undefined, userData);
 }
 
 /**
@@ -42,6 +90,7 @@ export interface ViewContentParams {
     content_type?: string;
     currency?: string;
     value?: number;
+    userData?: MetaUserData;
 }
 
 export function trackViewContent({
@@ -50,14 +99,19 @@ export function trackViewContent({
     content_type = 'product',
     currency = 'COP',
     value = 0,
+    userData,
 }: ViewContentParams) {
-    trackPixelEvent('ViewContent', {
-        content_ids,
-        content_name,
-        content_type,
-        currency,
-        value: Math.round(value),
-    });
+    trackPixelAndCapi(
+        'ViewContent',
+        {
+            content_ids,
+            content_name,
+            content_type,
+            currency,
+            value: Math.round(value),
+        },
+        userData
+    );
 }
 
 /**
@@ -70,6 +124,7 @@ export interface AddToCartParams {
     currency?: string;
     value?: number;
     num_items?: number;
+    userData?: MetaUserData;
 }
 
 export function trackAddToCart({
@@ -79,15 +134,20 @@ export function trackAddToCart({
     currency = 'COP',
     value = 0,
     num_items = 1,
+    userData,
 }: AddToCartParams) {
-    trackPixelEvent('AddToCart', {
-        content_ids,
-        content_name,
-        content_type,
-        currency,
-        value: Math.round(value),
-        num_items,
-    });
+    trackPixelAndCapi(
+        'AddToCart',
+        {
+            content_ids,
+            content_name,
+            content_type,
+            currency,
+            value: Math.round(value),
+            num_items,
+        },
+        userData
+    );
 }
 
 /**
@@ -99,6 +159,7 @@ export interface InitiateCheckoutParams {
     currency?: string;
     value: number;
     num_items: number;
+    userData?: MetaUserData;
 }
 
 export function trackInitiateCheckout({
@@ -107,14 +168,19 @@ export function trackInitiateCheckout({
     currency = 'COP',
     value,
     num_items,
+    userData,
 }: InitiateCheckoutParams) {
-    trackPixelEvent('InitiateCheckout', {
-        content_ids,
-        content_type,
-        currency,
-        value: Math.round(value),
-        num_items,
-    });
+    trackPixelAndCapi(
+        'InitiateCheckout',
+        {
+            content_ids,
+            content_type,
+            currency,
+            value: Math.round(value),
+            num_items,
+        },
+        userData
+    );
 }
 
 /**
@@ -125,6 +191,7 @@ export interface AddPaymentInfoParams {
     content_type?: string;
     currency?: string;
     value: number;
+    userData?: MetaUserData;
 }
 
 export function trackAddPaymentInfo({
@@ -132,13 +199,18 @@ export function trackAddPaymentInfo({
     content_type = 'product',
     currency = 'COP',
     value,
+    userData,
 }: AddPaymentInfoParams) {
-    trackPixelEvent('AddPaymentInfo', {
-        content_ids,
-        content_type,
-        currency,
-        value: Math.round(value),
-    });
+    trackPixelAndCapi(
+        'AddPaymentInfo',
+        {
+            content_ids,
+            content_type,
+            currency,
+            value: Math.round(value),
+        },
+        userData
+    );
 }
 
 /**
@@ -151,6 +223,7 @@ export interface PurchaseParams {
     value: number;
     num_items: number;
     order_id: string;
+    userData?: MetaUserData;
 }
 
 export function trackPurchase({
@@ -160,13 +233,19 @@ export function trackPurchase({
     value,
     num_items,
     order_id,
+    userData,
 }: PurchaseParams) {
-    trackPixelEvent('Purchase', {
-        content_ids,
-        content_type,
-        currency,
-        value: Math.round(value),
-        num_items,
-        order_id,
-    });
+    trackPixelAndCapi(
+        'Purchase',
+        {
+            content_ids,
+            content_type,
+            currency,
+            value: Math.round(value),
+            num_items,
+            order_id,
+        },
+        userData,
+        `pur_${order_id}`
+    );
 }
