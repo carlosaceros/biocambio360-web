@@ -365,6 +365,24 @@ export default function AdminDashboard() {
                                         Solo Vista <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/carritos-abandonados')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-rose-200 text-left hover:border-rose-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                        <ShoppingCart size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Carritos Abandonados</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Recuperación WhatsApp 1-clic y correos SMTP.
+                                    </p>
+                                    <span className="text-xs font-bold text-rose-700 flex items-center gap-1">
+                                        Recuperar Clientes <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
                             </div>
                         </div>
                     </>
@@ -623,6 +641,17 @@ export default function AdminDashboard() {
                                     <Eye className="text-purple-600 mb-3" size={24} />
                                     <p className="font-black text-gray-900 mb-1">Inventario Solo Vista</p>
                                     <p className="text-xs text-gray-600">Vista rápida operativa de stock</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/carritos-abandonados')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-rose-200 transition-colors"
+                                >
+                                    <ShoppingCart className="text-rose-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Carritos Abandonados</p>
+                                    <p className="text-xs text-gray-600">Recuperación WhatsApp 1-clic y correos</p>
                                 </motion.button>
                             </div>
                         </div>

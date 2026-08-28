@@ -223,9 +223,10 @@ export default function CheckoutPage() {
         }
     }, []);
 
-    // 2. Auto-save abandoned cart session when email or cart changes
+    // 2. Auto-save abandoned cart session when email, phone, or cart changes
     useEffect(() => {
-        if (!cartToken || !formData.email || !formData.email.includes('@') || cart.length === 0) return;
+        const hasContact = (formData.email && formData.email.includes('@')) || (formData.celular && formData.celular.replace(/\D/g, '').length >= 7);
+        if (!cartToken || !hasContact || cart.length === 0) return;
 
         const timer = setTimeout(() => {
             fetch('/api/abandoned-cart/save', {

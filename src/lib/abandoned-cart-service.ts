@@ -55,7 +55,7 @@ function formatCOP(amount: number): string {
  */
 export async function saveAbandonedCartSession(data: {
     cartToken: string;
-    customerEmail: string;
+    customerEmail?: string;
     customerName?: string;
     customerPhone?: string;
     ciudad?: string;
@@ -65,7 +65,7 @@ export async function saveAbandonedCartSession(data: {
     shippingCost: number;
     total: number;
 }): Promise<void> {
-    if (!data.cartToken || !data.customerEmail || data.items.length === 0) return;
+    if (!data.cartToken || (!data.customerEmail && !data.customerPhone) || data.items.length === 0) return;
 
     const cartRef = doc(db, COLLECTION_NAME, data.cartToken);
     const existingSnap = await getDoc(cartRef);
