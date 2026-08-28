@@ -20,7 +20,25 @@ export interface MetaUserData {
  * Genera un event_id único para deduplicación entre Browser Pixel y Server CAPI.
  */
 export function generateEventId(prefix: string = 'evt'): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return `${prefix}_${crypto.randomUUID()}`;
+    }
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Helper universal para llamar a cualquier evento con sincronización automática Browser + CAPI.
+ */
+export async function trackEvent(
+    eventName: 'PageView' | 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'AddPaymentInfo' | 'Purchase' | string,
+    customData?: Record<string, any>,
+    emailOrUserData?: string | MetaUserData
+) {
+    const userData: MetaUserData = typeof emailOrUserData === 'string' 
+        ? { email: emailOrUserData } 
+        : (emailOrUserData || {});
+    
+    return trackPixelAndCapi(eventName as any, customData, userData);
 }
 
 /**
