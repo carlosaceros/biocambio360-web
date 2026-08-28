@@ -14,11 +14,49 @@ export async function GET(request: Request) {
         const q = query(cartsRef, where('status', '==', 'abandoned'));
         const snap = await getDocs(q);
 
+        // Fetch all non-canceled orders to cross-reference and eliminate false positives
+        const ordersRef = collection(db, 'orders');
+        const ordersSnap = await getDocs(ordersRef);
+        const activeOrders = ordersSnap.docs
+            .map(d => ({ id: d.id, ...d.data() as any }))
+            .filter(o => o.status !== 'cancelado');
+
         const now = Date.now();
         let processedCount = 0;
+        let autoRecoveredCount = 0;
 
         for (const docSnap of snap.docs) {
             const cart = docSnap.data() as AbandonedCartRecord;
+
+            // 1. Cross-reference with orders: If the customer completed an order, mark as recovered and NEVER email
+            const cartEmail = (cart.customerEmail || '').trim().toLowerCase();
+            const cartPhoneDigits = (cart.customerPhone || '').replace(/\D/g, '');
+
+            const matchingOrder = activeOrders.find(o => {
+                const orderEmail = (o.cliente?.email || '').trim().toLowerCase();
+                const orderPhoneDigits = (o.cliente?.celular || o.cliente?.telefono || '').replace(/\D/g, '');
+                const emailMatch = cartEmail && orderEmail && cartEmail === orderEmail;
+                const phoneMatch = cartPhoneDigits && orderPhoneDigits && (
+                    cartPhoneDigits === orderPhoneDigits ||
+                    cartPhoneDigits.endsWith(orderPhoneDigits) ||
+                    orderPhoneDigits.endsWith(cartPhoneDigits)
+                );
+                return emailMatch || phoneMatch;
+            });
+
+            if (matchingOrder) {
+                // Customer completed an order! Mark as recovered immediately
+                await updateDoc(doc(db, 'abandoned_carts', cart.cartToken), {
+                    status: 'recovered',
+                    recoveredOrderId: matchingOrder.id,
+                    recoveredNote: `Pedido #${matchingOrder.id} completado con éxito (${matchingOrder.status})`,
+                    updatedAt: serverTimestamp(),
+                });
+                autoRecoveredCount++;
+                continue; // Do NOT send recovery email
+            }
+
+            // 2. If truly abandoned without order, process sequence
             const createdAtMs = cart.createdAt?.toMillis ? cart.createdAt.toMillis() : now;
             const elapsedHours = (now - createdAtMs) / (1000 * 60 * 60);
 
@@ -57,6 +95,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ 
             status: 'ok', 
             processedCount, 
+            autoRecoveredCount,
             checkedCount: snap.docs.length 
         });
     } catch (err: any) {

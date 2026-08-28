@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -29,7 +29,8 @@ import {
     X,
     Eye,
     MousePointerClick,
-    MailOpen
+    MailOpen,
+    CheckCheck
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import {
@@ -47,6 +48,7 @@ import { formatCurrency } from '@/lib/checkout-utils';
 export default function CarritosAbandonadosPage() {
     const router = useRouter();
     const [carts, setCarts] = useState<AbandonedCartRecord[]>([]);
+    const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'abandoned' | 'recovered'>('all');
@@ -56,10 +58,21 @@ export default function CarritosAbandonadosPage() {
     const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     useEffect(() => {
+        // 1. Subscribe to orders to cross-reference completed checkouts
+        const ordersRef = collection(db, 'orders');
+        const unsubscribeOrders = onSnapshot(ordersRef, (snapshot) => {
+            const fetchedOrders: any[] = [];
+            snapshot.forEach((docSnap) => {
+                fetchedOrders.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            setOrders(fetchedOrders.filter(o => o.status !== 'cancelado'));
+        });
+
+        // 2. Subscribe to abandoned carts
         const cartsRef = collection(db, 'abandoned_carts');
         const q = query(cartsRef, orderBy('createdAt', 'desc'));
 
-        const unsubscribe = onSnapshot(
+        const unsubscribeCarts = onSnapshot(
             q,
             (snapshot) => {
                 const fetched: AbandonedCartRecord[] = [];
@@ -75,11 +88,42 @@ export default function CarritosAbandonadosPage() {
             }
         );
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribeOrders();
+            unsubscribeCarts();
+        };
     }, []);
 
+    // Cross-reference carts with active orders to prevent ANY false positives
+    const enrichedCarts = useMemo(() => {
+        return carts.map(cart => {
+            const cartEmail = (cart.customerEmail || '').trim().toLowerCase();
+            const cartPhone = (cart.customerPhone || '').replace(/\D/g, '');
+
+            const matchingOrder = orders.find(o => {
+                const oEmail = (o.cliente?.email || '').trim().toLowerCase();
+                const oPhone = (o.cliente?.celular || o.cliente?.telefono || '').replace(/\D/g, '');
+                const emailMatch = cartEmail && oEmail && cartEmail === oEmail;
+                const phoneMatch = cartPhone && oPhone && (
+                    cartPhone === oPhone ||
+                    cartPhone.endsWith(oPhone) ||
+                    oPhone.endsWith(cartPhone)
+                );
+                return emailMatch || phoneMatch;
+            });
+
+            const isRecovered = cart.status === 'recovered' || !!matchingOrder;
+
+            return {
+                ...cart,
+                status: (isRecovered ? 'recovered' : 'abandoned') as 'abandoned' | 'recovered' | 'expired',
+                linkedOrder: matchingOrder || null,
+            };
+        });
+    }, [carts, orders]);
+
     // Filter carts
-    const filteredCarts = carts.filter((c) => {
+    const filteredCarts = enrichedCarts.filter((c) => {
         // Status filter
         if (statusFilter === 'abandoned' && c.status !== 'abandoned') return false;
         if (statusFilter === 'recovered' && c.status !== 'recovered') return false;
@@ -97,18 +141,18 @@ export default function CarritosAbandonadosPage() {
     });
 
     // Metrics
-    const totalCartsCount = carts.length;
-    const abandonedCarts = carts.filter((c) => c.status === 'abandoned');
-    const recoveredCarts = carts.filter((c) => c.status === 'recovered');
+    const totalCartsCount = enrichedCarts.length;
+    const abandonedCarts = enrichedCarts.filter((c) => c.status === 'abandoned');
+    const recoveredCarts = enrichedCarts.filter((c) => c.status === 'recovered');
 
     const totalLostValue = abandonedCarts.reduce((sum, c) => sum + (c.total || 0), 0);
     const totalRecoveredValue = recoveredCarts.reduce((sum, c) => sum + (c.total || 0), 0);
     const recoveryRate = totalCartsCount > 0 ? Math.round((recoveredCarts.length / totalCartsCount) * 100) : 0;
 
     // Tracking Metrics
-    const notifiedCarts = carts.filter((c) => (c.notificationCount || 0) > 0);
-    const openedCarts = carts.filter((c) => (c.openCount || 0) > 0 || !!c.openedAt);
-    const clickedCarts = carts.filter((c) => (c.clickCount || 0) > 0 || !!c.clickedAt);
+    const notifiedCarts = enrichedCarts.filter((c) => (c.notificationCount || 0) > 0);
+    const openedCarts = enrichedCarts.filter((c) => (c.openCount || 0) > 0 || !!c.openedAt);
+    const clickedCarts = enrichedCarts.filter((c) => (c.clickCount || 0) > 0 || !!c.clickedAt);
 
     const openRate = notifiedCarts.length > 0 ? Math.round((openedCarts.length / notifiedCarts.length) * 100) : 0;
     const clickRate = openedCarts.length > 0 ? Math.round((clickedCarts.length / openedCarts.length) * 100) : 0;
@@ -230,7 +274,7 @@ export default function CarritosAbandonadosPage() {
                                 </h1>
                             </div>
                             <p className="text-xs md:text-sm text-gray-500 font-medium">
-                                Recuperación omnicanal con analítica de apertura de correos y clics
+                                Monitoreo y rescate de ventas sin procesar con validación cruzada de pedidos
                             </p>
                         </div>
                     </div>
@@ -256,13 +300,13 @@ export default function CarritosAbandonadosPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Abandonados</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Abandonados Reales</span>
                             <span className="p-2 bg-rose-50 text-rose-600 rounded-xl">
                                 <AlertTriangle size={18} />
                             </span>
                         </div>
                         <p className="text-2xl font-black text-rose-600 mt-2">{abandonedCarts.length}</p>
-                        <p className="text-[11px] text-gray-500 font-medium mt-1">Carritos pendientes</p>
+                        <p className="text-[11px] text-gray-500 font-medium mt-1">Carritos sin compra</p>
                     </div>
 
                     <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
@@ -273,18 +317,18 @@ export default function CarritosAbandonadosPage() {
                             </span>
                         </div>
                         <p className="text-2xl font-black text-amber-600 mt-2">{formatCurrency(totalLostValue)}</p>
-                        <p className="text-[11px] text-gray-500 font-medium mt-1">Ingresos potenciales</p>
+                        <p className="text-[11px] text-gray-500 font-medium mt-1">Ingresos pendientes</p>
                     </div>
 
                     <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Recuperados</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Recuperados / Pedidos</span>
                             <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                                <CheckCircle2 size={18} />
+                                <CheckCheck size={18} />
                             </span>
                         </div>
                         <p className="text-2xl font-black text-emerald-600 mt-2">{recoveredCarts.length}</p>
-                        <p className="text-[11px] text-emerald-700 font-bold mt-1">+{formatCurrency(totalRecoveredValue)}</p>
+                        <p className="text-[11px] text-emerald-700 font-bold mt-1">+{formatCurrency(totalRecoveredValue)} completados</p>
                     </div>
 
                     {/* Email Open Rate */}
@@ -336,7 +380,7 @@ export default function CarritosAbandonadosPage() {
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                         >
-                            Todos ({carts.length})
+                            Todos ({enrichedCarts.length})
                         </button>
                         <button
                             onClick={() => setStatusFilter('abandoned')}
@@ -356,7 +400,7 @@ export default function CarritosAbandonadosPage() {
                                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                             }`}
                         >
-                            Recuperados ({recoveredCarts.length})
+                            Recuperados / Pedidos ({recoveredCarts.length})
                         </button>
                     </div>
                 </div>
@@ -370,14 +414,14 @@ export default function CarritosAbandonadosPage() {
                         </div>
                     ) : filteredCarts.length === 0 ? (
                         <div className="p-16 text-center">
-                            <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <ShoppingBag size={28} />
+                            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <CheckCheck size={28} />
                             </div>
-                            <h3 className="text-lg font-black text-gray-900 mb-1">No se encontraron carritos</h3>
+                            <h3 className="text-lg font-black text-gray-900 mb-1">Sin carritos abandonados pendientes</h3>
                             <p className="text-sm text-gray-500 max-w-sm mx-auto">
                                 {searchTerm
                                     ? 'No hay registros que coincidan con la búsqueda ingresada.'
-                                    : 'En este momento no hay carritos registrados bajo este filtro.'}
+                                    : 'Todos los pedidos recientes han sido procesados y completados con éxito.'}
                             </p>
                         </div>
                     ) : (
@@ -389,16 +433,17 @@ export default function CarritosAbandonadosPage() {
                                         <th className="py-3.5 px-4">Productos en Carrito</th>
                                         <th className="py-3.5 px-4 text-right">Total</th>
                                         <th className="py-3.5 px-4">Fecha</th>
-                                        <th className="py-3.5 px-4">Trazabilidad Email</th>
+                                        <th className="py-3.5 px-4">Estado & Trazabilidad</th>
                                         <th className="py-3.5 px-4 text-center">Acciones de Rescate</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-sm">
-                                    {filteredCarts.map((cart) => {
+                                    {filteredCarts.map((cart: any) => {
                                         const isRecovered = cart.status === 'recovered';
                                         const hasPhone = !!cart.customerPhone;
                                         const isOpened = (cart.openCount || 0) > 0 || !!cart.openedAt;
                                         const isClicked = (cart.clickCount || 0) > 0 || !!cart.clickedAt;
+                                        const linkedOrder = cart.linkedOrder;
 
                                         return (
                                             <tr
@@ -412,7 +457,7 @@ export default function CarritosAbandonadosPage() {
                                                             {cart.customerName || 'Cliente sin nombre'}
                                                             {isRecovered && (
                                                                 <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
-                                                                    Recuperado
+                                                                    {linkedOrder ? `Pedido #${linkedOrder.id.slice(0, 6)}` : 'Recuperado'}
                                                                 </span>
                                                             )}
                                                         </span>
@@ -437,7 +482,7 @@ export default function CarritosAbandonadosPage() {
                                                 {/* Productos */}
                                                 <td className="py-4 px-4 align-top">
                                                     <div className="space-y-1.5 max-w-xs">
-                                                        {cart.items?.map((item, idx) => (
+                                                        {cart.items?.map((item: any, idx: number) => (
                                                             <div
                                                                 key={idx}
                                                                 className="flex items-center justify-between text-xs bg-gray-50 p-1.5 rounded-lg border border-gray-100"
@@ -482,39 +527,42 @@ export default function CarritosAbandonadosPage() {
                                                     </p>
                                                 </td>
 
-                                                {/* Trazabilidad Email (Enviado / Abierto / Clic) */}
+                                                {/* Estado & Trazabilidad */}
                                                 <td className="py-4 px-4 align-top">
                                                     <div className="flex flex-col gap-1.5">
-                                                        {/* Status Envíos */}
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span
-                                                                className={`w-2 h-2 rounded-full ${
-                                                                    cart.notificationCount > 0
-                                                                        ? 'bg-blue-500'
-                                                                        : 'bg-gray-300'
-                                                                }`}
-                                                            />
-                                                            <span className="text-xs font-bold text-gray-700">
-                                                                {cart.notificationCount === 0
-                                                                    ? 'Sin envíos'
-                                                                    : `${cart.notificationCount}/3 correos`}
+                                                        {isRecovered ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black border border-emerald-200">
+                                                                <CheckCircle2 size={13} /> {linkedOrder ? `Pedido #${linkedOrder.id.slice(0, 6)} (${linkedOrder.status})` : 'Pedido Procesado'}
                                                             </span>
-                                                        </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span
+                                                                        className={`w-2 h-2 rounded-full ${
+                                                                            cart.notificationCount > 0
+                                                                                ? 'bg-blue-500'
+                                                                                : 'bg-rose-400'
+                                                                        }`}
+                                                                    />
+                                                                    <span className="text-xs font-bold text-gray-700">
+                                                                        {cart.notificationCount === 0
+                                                                            ? 'Sin envíos aún'
+                                                                            : `${cart.notificationCount}/3 correos`}
+                                                                    </span>
+                                                                </div>
 
-                                                        {/* Badge Apertura */}
-                                                        {isOpened ? (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-black border border-blue-100">
-                                                                <Eye size={11} /> Abierto ({cart.openCount || 1}x)
-                                                            </span>
-                                                        ) : cart.notificationCount > 0 ? (
-                                                            <span className="text-[10px] text-gray-400">No abierto aún</span>
-                                                        ) : null}
+                                                                {isOpened && (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-black border border-blue-100">
+                                                                        <Eye size={11} /> Abierto ({cart.openCount || 1}x)
+                                                                    </span>
+                                                                )}
 
-                                                        {/* Badge Clic */}
-                                                        {isClicked && (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-black border border-purple-100">
-                                                                <MousePointerClick size={11} /> Clic en botón ({cart.clickCount || 1}x)
-                                                            </span>
+                                                                {isClicked && (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-black border border-purple-100">
+                                                                        <MousePointerClick size={11} /> Clic en botón ({cart.clickCount || 1}x)
+                                                                    </span>
+                                                                )}
+                                                            </>
                                                         )}
                                                     </div>
                                                 </td>
@@ -600,7 +648,7 @@ export default function CarritosAbandonadosPage() {
                                         Token: {selectedCart.cartToken.slice(0, 12)}...
                                     </span>
                                     <h3 className="text-xl font-black text-gray-900 mt-2">
-                                        Detalle de Carrito Abandonado
+                                        Detalle de Carrito
                                     </h3>
                                 </div>
                                 <button

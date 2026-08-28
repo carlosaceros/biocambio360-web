@@ -21,6 +21,7 @@ const ALL_CITIES_99 = Object.entries(citiesData as Record<string, { codigo: stri
     .sort((a, b) => a.ciudad.localeCompare(b.ciudad));
 import { createOrder } from '@/lib/orders-service';
 import { processOrderReplenishment, saveReplenishmentRecord } from '@/lib/replenishment-service';
+import { markCartAsRecovered } from '@/lib/abandoned-cart-service';
 import { Order } from '@/types/order';
 import { trackInitiateCheckout, trackAddPaymentInfo } from '@/lib/meta-pixel';
 
@@ -403,6 +404,16 @@ export default function CheckoutPage() {
             };
 
             const orderId = await createOrder(orderData as any);
+
+            // Mark abandoned cart session as recovered immediately to prevent false positives
+            if (cartToken) {
+                markCartAsRecovered(cartToken).catch(err =>
+                    console.warn('[Checkout] Error marking cart as recovered:', err)
+                );
+                try {
+                    localStorage.removeItem('biocambio_cart_token');
+                } catch (e) {}
+            }
 
             // Record replenishment BI timer (works for B2C & B2B)
             if (orderId) {
