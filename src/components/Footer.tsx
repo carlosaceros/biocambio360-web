@@ -33,7 +33,7 @@ export default function Footer() {
                             <li><Link href="/politica-envios" className="hover:text-white transition-colors">Política de Envíos</Link></li>
                             <li><Link href="/politica-devolucion" className="hover:text-white transition-colors">Política de Devolución</Link></li>
                             <li><Link href="/garantias" className="hover:text-white transition-colors">Garantías de Calidad</Link></li>
-                            <li><Link href="/privacidad" className="hover:text-white transition-colors">Política de Privacidad</Link></li>
+                            <li><Link href="/privacidad" className="hover:text-white transition-colors">Tratamiento de Datos & Privacidad</Link></li>
                         </ul>
                     </div>
 
@@ -45,7 +45,7 @@ export default function Footer() {
                                 📱 WhatsApp: <a href="https://wa.me/573241005353" target="_blank" rel="noopener noreferrer" className="hover:text-teal-400 font-bold transition-colors">+57 324 100 5353</a>
                             </li>
                             <li>✉️ Email: ventas@biocambio360.com</li>
-                            <li>🏢 NIT: 901.847.392-1</li>
+                            <li>🏢 NIT: 901.798.484-4</li>
                         </ul>
                     </div>
                 </div>
