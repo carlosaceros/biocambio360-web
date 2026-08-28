@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { 
-    sendContact1Email, 
-    sendContact2Email, 
-    sendContact3Email, 
     AbandonedCartRecord 
 } from '@/lib/abandoned-cart-service';
+import { 
+    sendContact1Email, 
+    sendContact2Email, 
+    sendContact3Email 
+} from '@/lib/abandoned-cart-emails';
 
 export async function POST(req: NextRequest) {
     try {
