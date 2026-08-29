@@ -109,27 +109,38 @@ export function generateProductMetadata(product: Product, size?: string): Metada
     
     const pricePerMl = (price / (liters * 1000)).toFixed(2);
 
-    // SEO-optimized title with long-tail keywords
-    const title = product.categoria === 'Kits & Combos'
-        ? `${product.nombre} - Oferta de Fábrica | Biocambio360`
-        : `${product.nombre} ${selectedSize} Industrial - $${price.toLocaleString('es-CO')} | Biocambio360`;
+    // SEO-optimized title with high-intent keywords & local geo-targeting
+    let title = '';
+    let description = '';
 
-    const description = product.categoria === 'Kits & Combos'
-        ? `${product.descripcion} Envíos prioritarios a Bogotá, Medellín, Cali, Barranquilla, Soacha y toda Colombia.`
-        : `Compra ${product.nombre} ${selectedSize} industrial a $${price.toLocaleString('es-CO')}. ${product.descripcion} Costo por ml: $${pricePerMl}/ml. ${product.slogan}. Envíos Colombia Biocambio360.`;
+    if (product.id.includes('detergente')) {
+        title = `Detergente Líquido Lavadora 20 Litros Bogotá | Biocambio360 Fábrica`;
+        description = `Detergente líquido para lavadora de 20 litros ($86.000 COP) y galón directo de fábrica en Bogotá, Soacha y Colombia. Elimina manchas en ropa blanca y color. Despacho rápido.`;
+    } else if (product.categoria === 'Kits & Combos') {
+        title = `${product.nombre} - Oferta Fábrica Bogotá y Colombia | Biocambio360`;
+        description = `${product.descripcion} Envíos prioritarios en Bogotá, Soacha, Cundinamarca y toda Colombia. Pago seguro contraentrega.`;
+    } else {
+        title = `${product.nombre} ${selectedSize} Industrial - Fábrica Bogotá | Biocambio360`;
+        description = `Compra ${product.nombre} ${selectedSize} a precio directo de fábrica ($${price.toLocaleString('es-CO')}). ${product.descripcion} Envíos a Bogotá, Cundinamarca y Colombia.`;
+    }
+
     const absoluteImageUrl = `${BASE_URL}/images/${product.imgFile.replace(/%20/g, ' ')}`;
 
     return {
         title,
         description,
         keywords: [
+            'detergente liquido bogota 20 litros',
+            'detergente liquido para lavadora bogota',
+            'detergente 20 litros bogota',
+            'detergente liquido industrial bogota',
+            'detergente ropa blanca y color 20 litros',
+            'detergente liquido precio fabrica bogota',
             product.nombre.toLowerCase(),
             `${product.nombre.toLowerCase()} industrial`,
             `${product.nombre.toLowerCase()} ${selectedSize}`,
             'kits de productos de aseo colombia',
             'combos de aseo bogota',
-            'kits de limpieza medellin',
-            'insumos de aseo cali barranquilla',
             'fabrica de productos de aseo soacha',
             'aseo granel colombia',
             'productos limpieza por mayor',

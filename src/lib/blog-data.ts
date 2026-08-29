@@ -11,6 +11,83 @@ export interface BlogPost {
 }
 
 export const BLOG_POSTS: BlogPost[] = [
+// --- ARTÍCULO PILLAR SEO: DETERGENTE LÍQUIDO BOGOTÁ 20 LITROS ---
+    {
+        slug: 'detergente-liquido-bogota-20-litros-precio-fabrica',
+        title: 'Detergente Líquido 20 Litros en Bogotá: Precios de Fábrica, Rendimiento y Dónde Comprar',
+        summary: 'Guía definitiva de compra de detergente líquido de 20 litros (pimpina) para lavadora en Bogotá y Cundinamarca. Comparativa de precios de fábrica ($86.000 COP vs $119.000 marcas comerciales), rendimiento por lavada y despacho a domicilio.',
+        category: 'Lavandería',
+        date: '2026-08-29',
+        geoTarget: 'Bogotá, Soacha, Cundinamarca, Colombia',
+        relatedProductIds: ['detergente-liquido-multiusos', 'kit-combo-duo-10-10-detergente-desengrasante'],
+        faq: [
+            {
+                q: '¿Cuánto cuesta una pimpina de detergente líquido de 20 litros en Bogotá?',
+                a: 'En Biocambio360 consigues la pimpina de 20 litros por $86.000 COP a precio directo de fábrica. En marcas comerciales intermediarias como Detercol o grandes superficies el precio oscila entre $119.000 y $145.000 COP por la misma cantidad.'
+            },
+            {
+                q: '¿Cuántas lavadas rinde una pimpina de 20 litros de detergente líquido?',
+                a: 'Con una dosificación estándar de 70 ml por carga de 10 a 12 kg en lavadora automática, una pimpina de 20 litros rinde hasta 280 lavadas completas, representando un costo de solo $307 COP por lavada.'
+            },
+            {
+                q: '¿Sirve para lavadoras automáticas de carga frontal y superior?',
+                a: 'Sí, su formulación es de baja espuma controlada y pH neutro con bicarbonato activo, ideal para proteger los rodamientos y sensores de lavadoras modernas tanto de carga frontal como superior.'
+            },
+            {
+                q: '¿Tienen cobertura de entrega en Bogotá y municipios cercanos?',
+                a: 'Sí, contamos con despacho diario en todas las localidades de Bogotá (Suba, Engativá, Kennedy, Fontibón, Usaquén, Chapinero, Bosa, Puente Aranda, Teusaquillo) y municipios de Cundinamarca (Soacha, Facatativá, Chía, Mosquera, Madrid, Funza, Zipaquirá, Cajicá, Cota).'
+            }
+        ],
+        contentHtml: `
+            <p class="mb-4 text-gray-700 leading-relaxed font-medium">Si buscas <strong>detergente líquido en Bogotá en presentación de 20 litros</strong> para tu hogar, lavandería comercial, hotel o negocio, comprar directamente a fábrica es la decisión financiera más inteligente del 2026. Mientras las marcas tradicionales y grandes superficies cobran hasta $120.000 o $140.000 por una pimpina de 20 litros, en <strong>Biocambio360</strong> fabricamos y distribuimos directamente por solo <strong>$86.000 COP</strong>.</p>
+
+            <div class="my-6 p-5 bg-blue-50/80 border border-blue-200 rounded-2xl">
+                <h4 class="text-lg font-black text-blue-950 mb-2">📊 Comparativa de Precios en Bogotá (Presentación 20 Litros):</h4>
+                <ul class="space-y-2 text-sm text-blue-900">
+                    <li class="flex items-center justify-between border-b border-blue-100 pb-1.5">
+                        <span class="font-bold">🏭 Biocambio360 (Venta Directa de Fábrica):</span>
+                        <span class="font-black text-emerald-700 text-base">$86.000 COP ($4.300 / Litro)</span>
+                    </li>
+                    <li class="flex items-center justify-between border-b border-blue-100 pb-1.5 text-gray-600">
+                        <span>🏷️ Marcas Intermediarias (Detercol y similares):</span>
+                        <span class="font-semibold line-through">$119.000 COP ($5.950 / Litro)</span>
+                    </li>
+                    <li class="flex items-center justify-between text-gray-600">
+                        <span>🏬 Grandes Superficies (Éxito, Jumbo, Homecenter):</span>
+                        <span class="font-semibold line-through">$140.000+ COP ($7.000 / Litro)</span>
+                    </li>
+                </ul>
+                <p class="text-xs text-blue-800 font-bold mt-3">🔥 Ahorro directo comprobado de más de $33.000 COP por cada pimpina de 20 litros.</p>
+            </div>
+
+            <h3 class="text-xl font-bold mt-6 mb-3 text-gray-900">1. ¿Por qué elegir la presentación de 20 Litros (Pimpina)?</h3>
+            <p class="mb-4 text-gray-600 leading-relaxed">Comprar en volumen no solo reduce el impacto ambiental al disminuir el uso de envases plásticos descartables, sino que optimiza drásticamente el costo operativo por ciclo de lavado. Con una pimpina de 20 litros obtienes:</p>
+            <ul class="list-disc list-inside mb-4 text-gray-600 space-y-1.5">
+                <li><strong>280 cargas de ropa</strong> garantizadas (a 70 ml por carga en lavadora de 12 kg).</li>
+                <li><strong>$307 COP por lavada</strong>, el costo por ciclo más competitivo del mercado colombiano.</li>
+                <li><strong>Fórmula potenciada con Bicarbonato de Sodio</strong> que neutraliza malos olores y protege tanto prendas blancas como colores vivos sin desgastar las fibras textiles.</li>
+            </ul>
+
+            <h3 class="text-xl font-bold mt-6 mb-3 text-gray-900">2. Rendimiento técnico adaptado al agua de Bogotá</h3>
+            <p class="mb-4 text-gray-600 leading-relaxed">El agua de la sabana de Bogotá suele presentar temperaturas frías que impiden la correcta disolución de los detergentes en polvo económicos, generando manchas calcáreas y residuos blancos en ropa oscura. El <strong>Detergente Líquido Concentrado Biocambio360</strong> se disuelve instantáneamente en agua fría, penetrando en los tejidos y facilitando un enjuague rápido que cuida los sellos y rodamientos de la lavadora.</p>
+
+            <h3 class="text-xl font-bold mt-6 mb-3 text-gray-900">3. Cobertura de Entrega y Envíos en Bogotá y Cundinamarca</h3>
+            <p class="mb-4 text-gray-600 leading-relaxed">Despachamos pedidos diarios de detergente líquido de 20 litros en:</p>
+            <ul class="list-disc list-inside mb-4 text-gray-600 space-y-1">
+                <li><strong>Localidades de Bogotá:</strong> Suba, Engativá, Fontibón, Kennedy, Bosa, Puente Aranda, Usaquén, Chapinero, Barrios Unidos, Teusaquillo, San Cristóbal, Tunjuelito, Rafael Uribe y Antonio Nariño.</li>
+                <li><strong>Municipios de Cundinamarca:</strong> Soacha, Facatativá, Chía, Mosquera, Madrid, Funza, Zipaquirá, Cajicá, Cota, Sibaté y alrededores.</li>
+                <li><strong>Envíos Nacionales:</strong> Cobertura a Medellín, Cali, Barranquilla, Bucaramanga, Pereira, Manizales y principales ciudades de Colombia.</li>
+            </ul>
+
+            <div class="my-8 p-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl shadow-lg text-center">
+                <h4 class="text-2xl font-black mb-2">¿Listo para pedir tu Detergente de 20 Litros a Precio de Fábrica?</h4>
+                <p class="text-blue-100 text-sm mb-5 max-w-lg mx-auto">Pide en línea en 1 minuto con pago seguro contraentrega o tarjeta y recíbelo en la puerta de tu casa o negocio.</p>
+                <a href="/producto/detergente-liquido-para-lavadora-y-ropa?tamano=20L" class="inline-block bg-white text-blue-900 hover:bg-yellow-300 hover:text-blue-950 font-black px-6 py-3.5 rounded-xl shadow-md transition-all text-sm uppercase tracking-wider">
+                    Ver Detergente 20L por $86.000 COP →
+                </a>
+            </div>
+        `
+    },
 // --- CATEGORÍA: LAVANDERÍA ---
     {
         slug: 'errores-lavar-ropa-danan-lavadora',

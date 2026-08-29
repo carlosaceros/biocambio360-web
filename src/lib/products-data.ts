@@ -927,27 +927,37 @@ export const PRODUCTOS: Product[] = [
   },
   {
     "id": "detergente-liquido-multiusos",
-    "nombre": "Detergente Líquido Multiusos",
+    "nombre": "Detergente Líquido para Lavadora y Ropa",
     "precios": {
       "20L": 86000,
       "10L": 57000,
       "3.8L": 34000,
       "1/2G": 19000
     },
-    "slogan": "Lavadera de Ropa y Limpieza General Multiusos",
-    "descripcion": "Detergente líquido concentrado con bicarbonato. Remueve manchas difíciles en prendas blancas y de color cuidando las fibras.",
+    "slogan": "Detergente Líquido para Lavadora de 20 Litros, 10L y Galón | Ropa Blanca y Color",
+    "descripcion": "Detergente líquido para lavadora de 20 litros, 10 litros y galón con bicarbonato activo. Fórmula concentrada ideal para ropa blanca y de color en Bogotá, Soacha y Colombia. Elimina suciedad pesada y grasa protegiendo las fibras textiles a precio directo de fábrica.",
     "imgFile": "label_detergente_ropa_detergente_ropa_galon.webp",
     "imgFileSmall": "PAJARITO_DETERGENTE ROPA Galón.webp",
     "beneficios": [
-      "Protección Color",
-      "pH Neutro",
-      "Baja Espuma"
+      "Protección Color y Blancos",
+      "pH Neutro Seguro",
+      "Baja Espuma para Lavadora Automática",
+      "Rinde hasta 280 Lavadas en 20L"
     ],
     "badge": "MÁS VENDIDO",
     "color": "bg-blue-600",
     "categoria": "Aseo Hogar",
     "subcategoria": "Detergentes",
-    "faqs": [],
+    "faqs": [
+      {
+        "q": "¿Cuánto cuesta el detergente líquido de 20 litros en Bogotá?",
+        "a": "En Biocambio360 consigues la pimpina de 20 litros por $86.000 COP a precio directo de fábrica, ahorrando más de $30.000 frente a marcas intermediarias."
+      },
+      {
+        "q": "¿Cuántas lavadas rinde la presentación de 20 litros?",
+        "a": "Rinde hasta 280 cargas completas de ropa utilizando la dosificación recomendada de 70 ml por tanda de 10 a 12 kg."
+      }
+    ],
     "competidorPromedio": {
       "20L": 129000,
       "10L": 85500,
@@ -961,7 +971,7 @@ export const PRODUCTOS: Product[] = [
       "1/2G": "label_detergente_ropa_detergente_ropa_medio_galon.webp"
     },
     "manualContentKey": "detergente",
-    "shortDescription": "Limpieza precisa para cada carga, desde ropa diaria hasta mantelería. Un litro rinde hasta 14 cargas ligeras con la dosificación recomendada."
+    "shortDescription": "Detergente líquido concentrado con bicarbonato para lavadora de 20 litros, 10L y galón. Limpieza profunda en ropa blanca y color a precio de fábrica en Bogotá."
   },
   {
     "id": "eliminador-de-olores",
