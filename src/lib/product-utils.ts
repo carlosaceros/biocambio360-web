@@ -191,9 +191,10 @@ export function generateProductSchema(product: Product, size: string = '10L') {
     
     const offers = actualSizes.map((s) => {
         const price = product.precios[s];
+        const variantUrl = s !== 'DEFAULT' ? `${BASE_URL}/producto/${slug}?tamano=${encodeURIComponent(s)}` : `${BASE_URL}/producto/${slug}`;
         return {
             "@type": "Offer",
-            "url": `${BASE_URL}/producto/${slug}`,
+            "url": variantUrl,
             "priceCurrency": "COP",
             "price": price,
             "priceValidUntil": "2026-12-31",

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import {
     getAllProductSlugs,
     getProductBySlug,
@@ -73,7 +74,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 />
             )}
 
-            <ProductPageContent product={product} relatedProducts={relatedProducts} />
+            <Suspense fallback={<div className="min-h-screen bg-white" />}>
+                <ProductPageContent product={product} relatedProducts={relatedProducts} />
+            </Suspense>
             <Footer />
         </>
     );

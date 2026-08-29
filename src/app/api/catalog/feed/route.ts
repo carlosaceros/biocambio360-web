@@ -67,12 +67,14 @@ export async function GET() {
                 const subcategory = product.subcategoria || 'General';
                 const productType = `Aseo & Limpieza > ${category}${subcategory ? ` > ${subcategory}` : ''}`;
 
+                const variantUrl = size !== 'DEFAULT' ? `${productUrl}?tamano=${encodeURIComponent(size)}` : productUrl;
+
                 items.push(`    <item>
       <g:id>${escapeXml(skuId)}</g:id>
       <g:item_group_id>${escapeXml(product.id)}</g:item_group_id>
       <g:title><![CDATA[${title}]]></g:title>
       <g:description><![CDATA[${description}]]></g:description>
-      <g:link>${escapeXml(productUrl)}</g:link>
+      <g:link>${escapeXml(variantUrl)}</g:link>
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>
       <g:brand>Biocambio360</g:brand>
       <g:condition>new</g:condition>

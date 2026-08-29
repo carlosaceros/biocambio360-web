@@ -16,7 +16,7 @@ import {
     CheckCircle2,
     ClipboardList 
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Product, formatCurrency, calcularAhorro } from '@/lib/products';
@@ -49,6 +49,8 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     const router = useRouter();
     const { addToCart, setIsCartOpen, getTotalItems } = useCart();
     
+    const searchParams = useSearchParams();
+
     // Sort available sizes and pick the first one, filtering out DEFAULT if other sizes exist
     const rawSizes = Object.keys(product.precios);
     const hasOtherSizes = rawSizes.some(s => s !== 'DEFAULT');
@@ -62,12 +64,44 @@ export default function ProductPageContent({ product, relatedProducts }: Product
         if (indexB === -1) return -1;
         return indexA - indexB;
     });
-    const [selectedSize, setSelectedSize] = useState<string>(availableSizes[0] || '10L');
+
+    const paramSizeRaw = (searchParams?.get('tamano') || searchParams?.get('size') || searchParams?.get('presentacion') || '').trim();
+    const findMatchingSize = (target: string): string | undefined => {
+        if (!target) return undefined;
+        const normalized = target.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return availableSizes.find(s => {
+            const sNorm = s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return sNorm === normalized || s.toLowerCase() === target.toLowerCase();
+        });
+    };
+
+    const initialSize = findMatchingSize(paramSizeRaw) || availableSizes[0] || '10L';
+    const [selectedSize, setSelectedSize] = useState<string>(initialSize);
+
+    // Sync if URL search params change
+    useEffect(() => {
+        if (paramSizeRaw) {
+            const matched = findMatchingSize(paramSizeRaw);
+            if (matched && matched !== selectedSize) {
+                setSelectedSize(matched);
+            }
+        }
+    }, [paramSizeRaw, availableSizes]);
+
+    const handleSizeSelect = (newSize: string) => {
+        setSelectedSize(newSize);
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tamano', newSize);
+            window.history.replaceState({}, '', url.toString());
+        }
+    };
+
     const [quantity, setQuantity] = useState(1);
     const [showToast, setShowToast] = useState(false);
     const [toastData, setToastData] = useState<{ name: string; size: string }>({
         name: product.nombre,
-        size: availableSizes[0] || '10L',
+        size: initialSize,
     });
     const [mediaTab, setMediaTab] = useState<'image' | 'video'>('image');
     const [imageError, setImageError] = useState(false);
@@ -335,7 +369,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                                 <motion.button
                                                     key={size}
                                                     whileTap={{ scale: 0.95 }}
-                                                    onClick={() => setSelectedSize(size)}
+                                                    onClick={() => handleSizeSelect(size)}
                                                     className={`p-4 rounded-xl border-2 transition-all ${selectedSize === size
                                                             ? 'border-[var(--brand-pink)] bg-[var(--brand-pink-50)] shadow-md'
                                                             : 'border-gray-200 hover:border-gray-300 bg-white'
@@ -711,7 +745,92 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             )}
                         </div>
 
-                        {/* 4. Preguntas Frecuentes - AEO Optimization */}
+                        {/* 4. Tabla de Presentaciones y Rendimiento Unitario - AEO / RAG / B2B */}
+                        {availableSizes.length > 1 && (
+                            <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+                                <button
+                                    onClick={() => toggleSection('presentaciones')}
+                                    className="w-full p-6 flex justify-between items-center hover:bg-gray-50 transition-colors text-left"
+                                >
+                                    <span className="flex items-center gap-3 text-lg font-black text-gray-900">
+                                        <Package className="text-blue-600 w-5 h-5" />
+                                        Presentaciones de Fábrica y Rendimiento por Litro
+                                    </span>
+                                    {expandedSection === 'presentaciones' ? <ChevronUp /> : <ChevronDown />}
+                                </button>
+                                {expandedSection === 'presentaciones' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        className="px-6 pb-6"
+                                    >
+                                        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+                                            Comparativa de costos por litro y ahorro por volumen en venta directa de fábrica Biocambio360:
+                                        </p>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-xs text-left border-collapse">
+                                                <thead>
+                                                    <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-bold uppercase tracking-wider">
+                                                        <th className="p-3">Presentación</th>
+                                                        <th className="p-3 text-right">Precio Fábrica</th>
+                                                        <th className="p-3 text-right">Costo x Litro/Unidad</th>
+                                                        <th className="p-3 text-center">Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {availableSizes.map((sizeKey) => {
+                                                        const sizePrice = product.precios[sizeKey] || 0;
+                                                        let literFactor = 1;
+                                                        if (sizeKey === '20L') literFactor = 20;
+                                                        else if (sizeKey === '10L') literFactor = 10;
+                                                        else if (sizeKey === '3.8L') literFactor = 3.8;
+                                                        else if (sizeKey === '1/2G') literFactor = 1.9;
+                                                        else if (sizeKey === '1L') literFactor = 1;
+                                                        else if (sizeKey === '500ML') literFactor = 0.5;
+
+                                                        const unitPrice = sizePrice / literFactor;
+                                                        const isCurrent = selectedSize === sizeKey;
+
+                                                        return (
+                                                            <tr key={sizeKey} className={isCurrent ? 'bg-blue-50/60 font-bold' : 'hover:bg-gray-50'}>
+                                                                <td className="p-3">
+                                                                    <span className="font-black text-gray-900 text-sm">{sizeKey}</span>
+                                                                    {sizeKey === '20L' && (
+                                                                        <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-orange-800">
+                                                                            Mayor Ahorro 🔥
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-3 text-right font-black text-gray-900 text-sm">
+                                                                    {formatCurrency(sizePrice)}
+                                                                </td>
+                                                                <td className="p-3 text-right text-gray-600 font-mono">
+                                                                    {formatCurrency(Math.round(unitPrice))} / L
+                                                                </td>
+                                                                <td className="p-3 text-center">
+                                                                    <button
+                                                                        onClick={() => handleSizeSelect(sizeKey)}
+                                                                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                                                            isCurrent
+                                                                                ? 'bg-blue-600 text-white shadow-sm'
+                                                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                                        }`}
+                                                                    >
+                                                                        {isCurrent ? 'Seleccionado ✓' : 'Elegir'}
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 5. Preguntas Frecuentes - AEO Optimization */}
                         <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
                             <button
                                 onClick={() => toggleSection('faqs')}
