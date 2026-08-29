@@ -56,14 +56,12 @@ export const PRODUCTOS: Product[] = [
     "id": "lavaloza-liquido",
     "nombre": "Lavaloza Líquido Concentrado",
     "precios": {
-      "1L": 12500,
       "1/2G": 19000,
       "3.8L": 35000,
       "10L": 57000,
       "20L": 86000
     },
     "competidorPromedio": {
-      "1L": 19000,
       "1/2G": 28500,
       "3.8L": 52500,
       "10L": 85500,
@@ -374,7 +372,6 @@ export const PRODUCTOS: Product[] = [
     "id": "alcohol-glicerinado-70",
     "nombre": "Alcohol Glicerinado 70%",
     "precios": {
-      "1L": 16000,
       "1/2G": 27000,
       "3.8L": 49000,
       "10L": 97000,
@@ -394,7 +391,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Alcohol",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 24000,
       "1/2G": 40500,
       "3.8L": 73500,
       "10L": 145500,
@@ -412,7 +408,6 @@ export const PRODUCTOS: Product[] = [
     "id": "alcohol-perfumistico",
     "nombre": "Alcohol Perfumístico 96%",
     "precios": {
-      "1L": 16000,
       "1/2G": 27000,
       "3.8L": 49000,
       "10L": 97000,
@@ -431,7 +426,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Alcohol",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 24000,
       "1/2G": 40500,
       "3.8L": 73500,
       "10L": 145500,
@@ -443,7 +437,6 @@ export const PRODUCTOS: Product[] = [
     "id": "ambientador",
     "nombre": "Ambientador",
     "precios": {
-      "1L": 29000,
       "1/2G": 33000,
       "3.8L": 64000,
       "10L": 110000,
@@ -462,7 +455,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Ambientadores",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 43500,
       "1/2G": 49500,
       "3.8L": 96000,
       "10L": 165000,
@@ -475,7 +467,6 @@ export const PRODUCTOS: Product[] = [
     "id": "ambientador-canela",
     "nombre": "Ambientador Canela",
     "precios": {
-      "1L": 29000,
       "1/2G": 33000,
       "3.8L": 64000,
       "10L": 110000,
@@ -494,7 +485,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Ambientadores",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 43500,
       "1/2G": 49500,
       "3.8L": 96000,
       "10L": 165000,
@@ -507,7 +497,6 @@ export const PRODUCTOS: Product[] = [
     "id": "ambientador-chicle",
     "nombre": "Ambientador chicle",
     "precios": {
-      "1L": 29000,
       "1/2G": 33000,
       "3.8L": 64000,
       "10L": 110000,
@@ -526,7 +515,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Ambientadores",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 43500,
       "1/2G": 49500,
       "3.8L": 96000,
       "10L": 165000,
@@ -539,7 +527,6 @@ export const PRODUCTOS: Product[] = [
     "id": "ambientador-kiwi",
     "nombre": "Ambientador kiwi",
     "precios": {
-      "1L": 29000,
       "1/2G": 33000,
       "3.8L": 64000,
       "10L": 110000,
@@ -558,7 +545,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Ambientadores",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 43500,
       "1/2G": 49500,
       "3.8L": 96000,
       "10L": 165000,
@@ -571,7 +557,6 @@ export const PRODUCTOS: Product[] = [
     "id": "ambientador-talco",
     "nombre": "Ambientador talco",
     "precios": {
-      "1L": 29000,
       "1/2G": 33000,
       "3.8L": 64000,
       "10L": 110000,
@@ -590,7 +575,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Ambientadores",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 43500,
       "1/2G": 49500,
       "3.8L": 96000,
       "10L": 165000,
@@ -603,7 +587,6 @@ export const PRODUCTOS: Product[] = [
     "id": "ambientador-tutti-frutti",
     "nombre": "Ambientador Tutti Frutti",
     "precios": {
-      "1L": 29000,
       "1/2G": 33000,
       "3.8L": 64000,
       "10L": 110000,
@@ -622,7 +605,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Ambientadores",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 43500,
       "1/2G": 49500,
       "3.8L": 96000,
       "10L": 165000,
@@ -635,7 +617,6 @@ export const PRODUCTOS: Product[] = [
     "id": "bactokill",
     "nombre": "Bactokill - Desinfectante Multisuperficies (Hogar e Industria)",
     "precios": {
-      "1L": 9500,
       "1/2G": 16500,
       "3.8L": 32000,
       "10L": 69000,
@@ -655,7 +636,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Bactokill Desinfectante",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 14500,
       "1/2G": 25000,
       "3.8L": 48000,
       "10L": 103500,
@@ -663,7 +643,6 @@ export const PRODUCTOS: Product[] = [
     },
     "imgFiles": {
       "10L": "label_bactokill_bactokill_10_litros.webp",
-      "1L": "label_bactokill_bactokill_1_litro.webp",
       "20L": "label_bactokill_bactokill_20_litros.webp",
       "3.8L": "label_bactokill_bactokill_galon.webp",
       "1/2G": "label_bactokill_bactokill_medio_galon.webp"
@@ -712,7 +691,6 @@ export const PRODUCTOS: Product[] = [
     "id": "cera-autobrillante",
     "nombre": "Cera Autobrillante",
     "precios": {
-      "1L": 20500,
       "1/2G": 34000,
       "3.8L": 64000,
       "10L": 106000,
@@ -732,7 +710,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Pisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 31000,
       "1/2G": 51000,
       "3.8L": 96000,
       "10L": 159000,
@@ -751,7 +728,6 @@ export const PRODUCTOS: Product[] = [
     "nombre": "Cera Autobrillante Roja",
     "precios": {
       "1/2G": 35000,
-      "1L": 21000,
       "20L": 171000,
       "3.8L": 66000
     },
@@ -770,7 +746,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "1/2G": 52500,
-      "1L": 31500,
       "20L": 256500,
       "3.8L": 99000
     },
@@ -780,7 +755,6 @@ export const PRODUCTOS: Product[] = [
     "id": "desengrasante",
     "nombre": "Desengrasante Multiusos Cortagrasa (Hogar, Negocios e Industria)",
     "precios": {
-      "1L": 12500,
       "1/2G": 19000,
       "3.8L": 35000,
       "10L": 55000,
@@ -801,7 +775,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Desengrasantes",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19000,
       "1/2G": 28500,
       "3.8L": 52500,
       "10L": 82500,
@@ -809,7 +782,6 @@ export const PRODUCTOS: Product[] = [
     },
     "imgFiles": {
       "1/2G": "label_desengrasante_desengrasante_hogar_medio_galon.webp",
-      "1L": "label_desengrasante_desengrasante_hogar_1_litro.webp",
       "10L": "label_desengrasante_desengrasante_hogar_10_litros.webp",
       "20L": "label_desengrasante_desengrasante_hogar_20_litros.webp",
       "3.8L": "label_desengrasante_desengrasante_hogar_galon.webp"
@@ -821,7 +793,6 @@ export const PRODUCTOS: Product[] = [
     "id": "desengrasante-industrial",
     "nombre": "Desengrasante Industrial",
     "precios": {
-      "1L": 13500,
       "1/2G": 20000,
       "3.8L": 37000,
       "10L": 62000,
@@ -841,7 +812,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Desengrasantes",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 20500,
       "1/2G": 30000,
       "3.8L": 55500,
       "10L": 93000,
@@ -886,7 +856,6 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "1/2G": 19000,
       "10L": 62000,
-      "1L": 14000,
       "20L": 92000,
       "3.8L": 34000
     },
@@ -905,7 +874,6 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "1/2G": 28500,
       "10L": 93000,
-      "1L": 21000,
       "20L": 138000,
       "3.8L": 51000
     },
@@ -990,8 +958,7 @@ export const PRODUCTOS: Product[] = [
       "10L": "label_detergente_ropa_detergente_ropa_10_litros.webp",
       "20L": "label_detergente_ropa_detergente_ropa_20_litros.webp",
       "3.8L": "label_detergente_ropa_detergente_ropa_galon.webp",
-      "1/2G": "label_detergente_ropa_detergente_ropa_medio_galon.webp",
-      "1L": "label_detergente_ropa_detergente_ropa_1_litro.webp"
+      "1/2G": "label_detergente_ropa_detergente_ropa_medio_galon.webp"
     },
     "manualContentKey": "detergente",
     "shortDescription": "Limpieza precisa para cada carga, desde ropa diaria hasta mantelería. Un litro rinde hasta 14 cargas ligeras con la dosificación recomendada."
@@ -1002,7 +969,6 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "1/2G": 41000,
       "10L": 124000,
-      "1L": 32000,
       "20L": 203000,
       "3.8L": 78000
     },
@@ -1021,7 +987,6 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "1/2G": 61500,
       "10L": 186000,
-      "1L": 48000,
       "20L": 304500,
       "3.8L": 117000
     },
@@ -1032,7 +997,6 @@ export const PRODUCTOS: Product[] = [
     "nombre": "Eliminador de Olores Limon",
     "precios": {
       "10L": 124000,
-      "1L": 32000,
       "20L": 203000,
       "3.8L": 78000
     },
@@ -1050,7 +1014,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "10L": 186000,
-      "1L": 48000,
       "20L": 304500,
       "3.8L": 117000
     },
@@ -1084,7 +1047,6 @@ export const PRODUCTOS: Product[] = [
     "nombre": "Gel antibacterial 70%",
     "precios": {
       "1/2G": 33000,
-      "1L": 18000,
       "20L": 155000,
       "3.8L": 54000
     },
@@ -1102,7 +1064,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "1/2G": 49500,
-      "1L": 27000,
       "20L": 232500,
       "3.8L": 81000
     },
@@ -1153,52 +1114,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "DEFAULT": 156000
-    },
-    "shortDescription": "Jabón líquido de manos con glicerina USP y pH balanceado 5.5. Limpieza suave e hidratante para uso diario continuo."
-  },
-  {
-    "id": "jabon-de-manos-300ml",
-    "nombre": "Jabón de Manos 300Ml",
-    "precios": {
-      "DEFAULT": 6500
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Especialidades",
-    "subcategoria": null,
-    "faqs": [],
-    "competidorPromedio": {
-      "DEFAULT": 9750
-    },
-    "shortDescription": "Jabón líquido de manos con glicerina USP y pH balanceado 5.5. Limpieza suave e hidratante para uso diario continuo."
-  },
-  {
-    "id": "jabon-de-manos-500ml",
-    "nombre": "Jabón de Manos 500Ml",
-    "precios": {
-      "DEFAULT": 10000
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Especialidades",
-    "subcategoria": null,
-    "faqs": [],
-    "competidorPromedio": {
-      "DEFAULT": 15000
     },
     "shortDescription": "Jabón líquido de manos con glicerina USP y pH balanceado 5.5. Limpieza suave e hidratante para uso diario continuo."
   },
@@ -1351,7 +1266,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiajuntas",
     "nombre": "Limpiajuntas",
     "precios": {
-      "1L": 18000,
       "1/2G": 27000,
       "3.8L": 50000,
       "10L": 79000,
@@ -1370,7 +1284,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": null,
     "faqs": [],
     "competidorPromedio": {
-      "1L": 27000,
       "1/2G": 40500,
       "3.8L": 75000,
       "10L": 118500,
@@ -1382,7 +1295,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos",
     "nombre": "Limpiapisos",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1401,7 +1313,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1413,7 +1324,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-brisa-marina",
     "nombre": "Limpiapisos Brisa Marina",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1433,7 +1343,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1451,7 +1360,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-canela",
     "nombre": "Limpiapisos canela",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1470,7 +1378,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1488,7 +1395,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-citronela",
     "nombre": "Limpiapisos citronela",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1507,7 +1413,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1525,7 +1430,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-citronella",
     "nombre": "Limpiapisos Citronella",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1544,7 +1448,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1556,7 +1459,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-frutos-rojos",
     "nombre": "Limpiapisos frutos rojos",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1575,7 +1477,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1593,7 +1494,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-lavanda",
     "nombre": "Limpiapisos lavanda",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1612,7 +1512,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1630,7 +1529,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-pino",
     "nombre": "Limpiapisos pino",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1649,7 +1547,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1667,7 +1564,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-talco",
     "nombre": "Limpiapisos talco",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1686,7 +1582,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1704,7 +1599,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiapisos-vainilla",
     "nombre": "Limpiapisos vainilla",
     "precios": {
-      "1L": 13000,
       "1/2G": 17000,
       "3.8L": 31000,
       "10L": 55000,
@@ -1723,7 +1617,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Limpiapisos",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 25500,
       "3.8L": 46500,
       "10L": 82500,
@@ -1741,7 +1634,6 @@ export const PRODUCTOS: Product[] = [
     "id": "limpiavidrios",
     "nombre": "Limpiavidrios",
     "precios": {
-      "1L": 13000,
       "1/2G": 20000,
       "3.8L": 34000,
       "10L": 55000,
@@ -1760,7 +1652,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": null,
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 30000,
       "3.8L": 51000,
       "10L": 82500,
@@ -1773,7 +1664,6 @@ export const PRODUCTOS: Product[] = [
     "nombre": "Lustrallantas para autos",
     "precios": {
       "1/2G": 27000,
-      "1L": 17000,
       "20L": 125000,
       "3.8L": 47000
     },
@@ -1791,7 +1681,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "1/2G": 40500,
-      "1L": 25500,
       "20L": 187500,
       "3.8L": 70500
     },
@@ -1802,7 +1691,6 @@ export const PRODUCTOS: Product[] = [
     "nombre": "Lustrallantas para motos",
     "precios": {
       "1/2G": 27000,
-      "1L": 17000,
       "20L": 125000,
       "3.8L": 47000
     },
@@ -1820,7 +1708,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "1/2G": 40500,
-      "1L": 25500,
       "20L": 187500,
       "3.8L": 70500
     },
@@ -2118,7 +2005,6 @@ export const PRODUCTOS: Product[] = [
     "id": "quita-oxido",
     "nombre": "Quita óxido",
     "precios": {
-      "1L": 21500,
       "1/2G": 38000,
       "3.8L": 72000,
       "10L": 139000,
@@ -2137,7 +2023,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": null,
     "faqs": [],
     "competidorPromedio": {
-      "1L": 32500,
       "1/2G": 57000,
       "3.8L": 108000,
       "10L": 208500,
@@ -2197,7 +2082,6 @@ export const PRODUCTOS: Product[] = [
     "precios": {
       "1/2G": 14500,
       "10L": 57000,
-      "1L": 9000,
       "20L": 84000,
       "3.8L": 27000
     },
@@ -2216,7 +2100,6 @@ export const PRODUCTOS: Product[] = [
     "competidorPromedio": {
       "1/2G": 22000,
       "10L": 85500,
-      "1L": 13500,
       "20L": 126000,
       "3.8L": 40500
     },
@@ -2225,30 +2108,6 @@ export const PRODUCTOS: Product[] = [
       "20L": "label_quitamanchas_ropa_color_quitamanchas_ropa_color_20_litros.webp",
       "3.8L": "label_quitamanchas_ropa_color_quitamanchas_ropa_color_galon.webp",
       "1/2G": "label_quitamanchas_ropa_color_quitamanchas_ropa_color_medio_galon.webp"
-    },
-    "manualContentKey": "quitamanchas-ropa-color",
-    "shortDescription": "Combate manchas difíciles sin renunciar a la apariencia de tus prendas de color. Úsalo en agua fría o tibia y trata hasta 50 prendas por cada 5 L de solución."
-  },
-  {
-    "id": "quitamanchas-ropa-color-500ml",
-    "nombre": "Quitamanchas ropa color 500Ml",
-    "precios": {
-      "DEFAULT": 5500
-    },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para especialidades.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Especialidades",
-    "subcategoria": null,
-    "faqs": [],
-    "competidorPromedio": {
-      "DEFAULT": 8250
     },
     "manualContentKey": "quitamanchas-ropa-color",
     "shortDescription": "Combate manchas difíciles sin renunciar a la apariencia de tus prendas de color. Úsalo en agua fría o tibia y trata hasta 50 prendas por cada 5 L de solución."
@@ -2284,7 +2143,6 @@ export const PRODUCTOS: Product[] = [
     "id": "sellador-polimerico",
     "nombre": "Sellador Polimérico",
     "precios": {
-      "1L": 25500,
       "1/2G": 44000,
       "3.8L": 84000,
       "10L": 177000,
@@ -2304,7 +2162,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Selladores",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 38500,
       "1/2G": 66000,
       "3.8L": 126000,
       "10L": 265500,
@@ -2346,7 +2203,6 @@ export const PRODUCTOS: Product[] = [
     "nombre": "Sellador Polimérico rojo",
     "precios": {
       "1/2G": 45000,
-      "1L": 26000,
       "20L": 276000,
       "3.8L": 86000
     },
@@ -2365,7 +2221,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "1/2G": 67500,
-      "1L": 39000,
       "20L": 414000,
       "3.8L": 129000
     },
@@ -2375,7 +2230,6 @@ export const PRODUCTOS: Product[] = [
     "id": "shampoo-autos",
     "nombre": "Shampoo Autos",
     "precios": {
-      "1L": 13000,
       "1/2G": 20000,
       "3.8L": 36000,
       "10L": 60000,
@@ -2394,7 +2248,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Shampoo",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 30000,
       "3.8L": 54000,
       "10L": 90000,
@@ -2406,7 +2259,6 @@ export const PRODUCTOS: Product[] = [
     "id": "shampoo-motos",
     "nombre": "Shampoo Motos",
     "precios": {
-      "1L": 13000,
       "1/2G": 20000,
       "3.8L": 36000,
       "10L": 60000,
@@ -2425,7 +2277,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Shampoo",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 30000,
       "3.8L": 54000,
       "10L": 90000,
@@ -2437,7 +2288,6 @@ export const PRODUCTOS: Product[] = [
     "id": "shampoo-muebles",
     "nombre": "Shampoo Muebles",
     "precios": {
-      "1L": 12000,
       "1/2G": 18000,
       "3.8L": 33000,
       "10L": 57000,
@@ -2456,7 +2306,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Muebles y Tapicería",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 18000,
       "1/2G": 27000,
       "3.8L": 49500,
       "10L": 85500,
@@ -2468,7 +2317,6 @@ export const PRODUCTOS: Product[] = [
     "id": "silicona-autos",
     "nombre": "Silicona Autos",
     "precios": {
-      "1L": 23000,
       "1/2G": 38000,
       "3.8L": 72000,
       "10L": 180000,
@@ -2487,7 +2335,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Siliconas",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 34500,
       "1/2G": 57000,
       "3.8L": 108000,
       "10L": 270000,
@@ -2499,7 +2346,6 @@ export const PRODUCTOS: Product[] = [
     "id": "silicona-lustramuebles",
     "nombre": "Silicona Lustramuebles",
     "precios": {
-      "1L": 23000,
       "1/2G": 38000,
       "3.8L": 72000,
       "10L": 180000,
@@ -2518,7 +2364,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Muebles y Tapicería",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 18000,
       "1/2G": 27000,
       "3.8L": 49500,
       "10L": 85500,
@@ -2527,34 +2372,10 @@ export const PRODUCTOS: Product[] = [
     "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
   },
   {
-    "id": "silicona-lustramuebles-500ml",
-    "nombre": "Silicona Lustramuebles 500Ml",
-    "precios": {
-      "DEFAULT": 16000
-    },
-    "slogan": "Brillo Natural y Protección Antiestática para Muebles",
-    "descripcion": "Silicona lustramuebles formulada para nutrir, proteger y dar brillo a muebles de madera, cuero, vinilo y cuerotex.",
-    "imgFile": "placeholder.png",
-    "beneficios": [
-      "Calidad Industrial",
-      "Rendimiento Superior"
-    ],
-    "badge": "",
-    "color": "bg-gray-600",
-    "categoria": "Aseo Hogar",
-    "subcategoria": "Muebles y Tapicería",
-    "faqs": [],
-    "competidorPromedio": {
-      "DEFAULT": 24000
-    },
-    "shortDescription": "Nutre y protege muebles de madera, cuero y vinilo. Devuelve el brillo natural y crea una barrera contra el polvo."
-  },
-  {
     "id": "silicona-para-motos",
     "nombre": "Silicona para Motos",
     "precios": {
       "1/2G": 52000,
-      "1L": 47000,
       "20L": 327000,
       "3.8L": 90000
     },
@@ -2572,7 +2393,6 @@ export const PRODUCTOS: Product[] = [
     "faqs": [],
     "competidorPromedio": {
       "1/2G": 78000,
-      "1L": 70500,
       "20L": 490500,
       "3.8L": 135000
     },
@@ -2872,7 +2692,6 @@ export const PRODUCTOS: Product[] = [
     "id": "suavizante",
     "nombre": "Suavizante Floral",
     "precios": {
-      "1L": 13000,
       "1/2G": 19000,
       "3.8L": 34000,
       "10L": 66000,
@@ -2893,7 +2712,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Suavizantes",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 28500,
       "3.8L": 51000,
       "10L": 99000,
@@ -2901,7 +2719,6 @@ export const PRODUCTOS: Product[] = [
     },
     "imgFiles": {
       "10L": "label_suavizante_suavizante_floral_10_litros.webp",
-      "1L": "label_suavizante_suavizante_floral_1_litro.webp",
       "20L": "label_suavizante_suavizante_floral_20_litros.webp",
       "3.8L": "label_suavizante_suavizante_floral_galon.webp",
       "1/2G": "label_suavizante_suavizante_floral_medio_galon.webp"
@@ -2913,7 +2730,6 @@ export const PRODUCTOS: Product[] = [
     "id": "suavizante-manzan-verde",
     "nombre": "Suavizante Manzan Verde",
     "precios": {
-      "1L": 13000,
       "1/2G": 19000,
       "3.8L": 34000,
       "10L": 66000,
@@ -2932,7 +2748,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Suavizantes",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 28500,
       "3.8L": 51000,
       "10L": 99000,
@@ -2951,7 +2766,6 @@ export const PRODUCTOS: Product[] = [
     "id": "suavizante-motas-de-algodon",
     "nombre": "Suavizante Motas de Algodon",
     "precios": {
-      "1L": 13000,
       "1/2G": 19000,
       "3.8L": 34000,
       "10L": 66000,
@@ -2970,7 +2784,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Suavizantes",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 28500,
       "3.8L": 51000,
       "10L": 99000,
@@ -2983,7 +2796,6 @@ export const PRODUCTOS: Product[] = [
     "id": "suavizante-sueno-lavanda",
     "nombre": "Suavizante Sueño Lavanda",
     "precios": {
-      "1L": 13000,
       "1/2G": 19000,
       "3.8L": 34000,
       "10L": 66000,
@@ -3002,7 +2814,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Suavizantes",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 19500,
       "1/2G": 28500,
       "3.8L": 51000,
       "10L": 99000,
@@ -3021,7 +2832,6 @@ export const PRODUCTOS: Product[] = [
     "id": "vinagre-industrial",
     "nombre": "Vinagre Industrial",
     "precios": {
-      "1L": 8900,
       "1/2G": 16000,
       "3.8L": 29000,
       "10L": 65000,
@@ -3040,7 +2850,6 @@ export const PRODUCTOS: Product[] = [
     "subcategoria": "Vinagre",
     "faqs": [],
     "competidorPromedio": {
-      "1L": 13500,
       "1/2G": 24000,
       "3.8L": 43500,
       "10L": 97500,
@@ -3058,14 +2867,12 @@ export const PRODUCTOS: Product[] = [
     "id": "detergente-ropa-negra-oscura",
     "nombre": "Detergente Ropa Negra y Oscura",
     "precios": {
-      "1L": 12500,
       "1/2G": 19000,
       "3.8L": 35000,
       "10L": 57000,
       "20L": 88000
     },
     "competidorPromedio": {
-      "1L": 19000,
       "1/2G": 28500,
       "3.8L": 52500,
       "10L": 85500,
@@ -3091,14 +2898,12 @@ export const PRODUCTOS: Product[] = [
     "id": "jabon-manos-antibacterial",
     "nombre": "Jabón para Manos Antibacterial",
     "precios": {
-      "1L": 19000,
       "1/2G": 22000,
       "3.8L": 41000,
       "10L": 67000,
       "20L": 104000
     },
     "competidorPromedio": {
-      "1L": 28500,
       "1/2G": 33000,
       "3.8L": 61500,
       "10L": 100500,

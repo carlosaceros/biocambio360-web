@@ -28,14 +28,12 @@ import { getManualContentForProduct, MANUAL_NOTICE_TEXT } from '@/lib/products-r
 import { trackViewContent } from '@/lib/meta-pixel';
 
 // Fixed size order
-const SIZE_ORDER: string[] = ['500ML', '1L', '1/2G', '3.8L', '10L', '20L'];
+const SIZE_ORDER: string[] = ['1/2G', '3.8L', '10L', '20L'];
 
 // Badge on product image per size
 const SIZE_PHOTO_BADGE: Record<string, { label: string; bg: string } | null> = {
-    '500ML': null,
-    '1L':    null,
-    '1/2G':  null,
-    '3.8L':  null,
+    '1/2G': null,
+    '3.8L': null,
     '10L': { label: '10 Litros', bg: 'bg-blue-600' },
     '20L': { label: '20 Litros 🔥', bg: 'bg-orange-600' },
 };
@@ -785,8 +783,6 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                                         else if (sizeKey === '10L') literFactor = 10;
                                                         else if (sizeKey === '3.8L') literFactor = 3.8;
                                                         else if (sizeKey === '1/2G') literFactor = 1.9;
-                                                        else if (sizeKey === '1L') literFactor = 1;
-                                                        else if (sizeKey === '500ML') literFactor = 0.5;
 
                                                         const unitPrice = sizePrice / literFactor;
                                                         const isCurrent = selectedSize === sizeKey;

@@ -186,7 +186,7 @@ export function generateProductSchema(product: Product, size: string = '10L') {
 
     // Build one Offer per size variant (better for Google Shopping)
     // Filter to only include sizes that actually have a price for this specific product
-    const possibleSizes = ['3.8L', '10L', '20L', '1L', '1/2G', 'DEFAULT'];
+    const possibleSizes = ['1/2G', '3.8L', '10L', '20L', 'DEFAULT'];
     const actualSizes = Object.keys(product.precios).filter(s => possibleSizes.includes(s));
     
     const offers = actualSizes.map((s) => {
