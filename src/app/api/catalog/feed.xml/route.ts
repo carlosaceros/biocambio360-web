@@ -15,21 +15,37 @@ function escapeXml(unsafe: string): string {
 }
 
 const SIZE_LABELS: Record<string, string> = {
-    '1L': '1 Litro',
     '1/2G': 'Medio Galón (1.9L)',
     '3.8L': '1 Galón (3.8L)',
-    '10L': '10 Litros',
-    '20L': '20 Litros',
-    '500ML': '500 ml',
-    '60ML': '60 ml',
-    '15L': '15 Litros',
-    '1KG': '1 Kg',
-    '4KG': '4 Kg',
-    '10KG': '10 Kg',
-    '20KG': '20 Kg',
-    'COMBO': 'Combo Completo',
-    'DEFAULT': 'Estándar',
+    '10L': 'Garrafa 10 Litros',
+    '20L': 'Pimpina 20 Litros',
+    '15L': 'Bidón 15 Litros',
+    '1KG': 'Pote 1 Kg',
+    '4KG': 'Galón 4 Kg',
+    '10KG': 'Balde 10 Kg',
+    '20KG': 'Caneca 20 Kg',
+    '60ML': 'Frasco 60 ml',
+    'COMBO': 'Combo Ahorro Fábrica',
+    'DEFAULT': 'Presentación Estándar',
 };
+
+function getGoogleTaxonomyCategory(product: Product): number {
+    const cat = (product.categoria || '').toLowerCase();
+    const sub = (product.subcategoria || '').toLowerCase();
+    const id = (product.id || '').toLowerCase();
+    const name = (product.nombre || '').toLowerCase();
+
+    if (id.includes('suavizante') || name.includes('suavizante')) return 633; // Fabric Softeners
+    if (id.includes('detergente') || sub.includes('lavanderia') || sub.includes('ropa') || id.includes('quitamanchas')) return 631; // Laundry Detergents
+    if (id.includes('lavaloza') || name.includes('lavaloza')) return 634; // Dish Detergents
+    if (cat.includes('automotriz') || id.includes('auto') || id.includes('carro')) return 2678; // Vehicle Cleaning & Care
+    if (cat.includes('cuidado personal') || id.includes('mantequilla') || id.includes('splash') || id.includes('jabon-de-manos')) {
+        if (id.includes('splash')) return 506; // Fragrances
+        if (id.includes('mantequilla')) return 502; // Skin Care
+        return 486; // Hand Washes & Sanitizers
+    }
+    return 632; // Household Cleaners
+}
 
 export async function GET() {
     try {
@@ -52,12 +68,20 @@ export async function GET() {
                 if (!priceValue || priceValue <= 0) continue;
 
                 const sizeClean = size.replace(/\./g, '_').toUpperCase();
-                const skuId = `${product.id}-${sizeClean}`;
+                const skuId = `BIO-${product.id.toUpperCase()}-${sizeClean}`;
                 const sizeLabel = SIZE_LABELS[size] || size;
-                const title = `${product.nombre} (${sizeLabel}) | Biocambio360`;
-                const description = product.descripcion 
-                    ? `${product.descripcion} Presentación: ${sizeLabel}. Fabricado directamente por Biocambio360 S.A.S.`
-                    : `${product.nombre} de alta concentración para el aseo y limpieza profesional e industrial. Presentación: ${sizeLabel}.`;
+                
+                // Titulo optimizado para Google Shopping & Search
+                const title = `${product.nombre} ${sizeLabel} | Venta Directa Fábrica Bogotá y Colombia`;
+                
+                // Descripcion con enriquecimiento GEO y de producto
+                const baseDesc = product.descripcion 
+                    ? product.descripcion.trim()
+                    : `${product.nombre} de alta concentración para el aseo, desinfección y limpieza profesional e industrial.`;
+                
+                const geoCoverage = `Venta directa de fábrica Biocambio360 con despacho rápido en Bogotá (Suba, Engativá, Kennedy, Fontibón, Usaquén, Chapinero, Bosa, Teusaquillo), municipios de Cundinamarca (Soacha, Facatativá, Chía, Mosquera, Madrid, Funza, Zipaquirá, Cajicá, Cota, Sibaté) y envíos a toda Colombia (Medellín, Cali, Barranquilla, Bucaramanga, Pereira, Manizales, Cartagena). Pago seguro y contraentrega disponible.`;
+                
+                const description = `${baseDesc} Presentación: ${sizeLabel}. ${geoCoverage}`;
 
                 const imgFileName = getProductImage(product, size);
                 const imageUrl = `${BASE_URL}/images/${encodeURIComponent(imgFileName).replace(/%2F/g, '/')}`;
@@ -66,6 +90,7 @@ export async function GET() {
                 const category = product.categoria || 'Aseo y Limpieza';
                 const subcategory = product.subcategoria || 'General';
                 const productType = `Aseo & Limpieza > ${category}${subcategory ? ` > ${subcategory}` : ''}`;
+                const googleCatId = getGoogleTaxonomyCategory(product);
 
                 const variantUrl = size !== 'DEFAULT' ? `${productUrl}?tamano=${encodeURIComponent(size)}` : productUrl;
 
@@ -78,17 +103,20 @@ export async function GET() {
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>
       <g:brand>Biocambio360</g:brand>
       <g:condition>new</g:condition>
-      <g:availability>in stock</g:availability>
+      <g:availability>in_stock</g:availability>
       <g:price>${priceFormatted}</g:price>
-      <g:google_product_category>632</g:google_product_category>
+      <g:google_product_category>${googleCatId}</g:google_product_category>
       <g:product_type><![CDATA[${productType}]]></g:product_type>
       <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>${escapeXml(skuId)}</g:mpn>
       <g:custom_label_0>${escapeXml(category)}</g:custom_label_0>
       <g:custom_label_1>${escapeXml(sizeLabel)}</g:custom_label_1>
-      <g:custom_label_2>Venta Directa de Fabrica</g:custom_label_2>
+      <g:custom_label_2>Bogota Cundinamarca y Colombia</g:custom_label_2>
+      <g:custom_label_3>Venta Directa de Fabrica</g:custom_label_3>
+      <g:custom_label_4>${size === '20L' ? 'Mayor Ahorro 20L' : 'Presentacion Estandar'}</g:custom_label_4>
       <g:shipping>
         <g:country>CO</g:country>
-        <g:service>Envío Nacional con Cobertura 99 Envíos</g:service>
+        <g:service>Envío Rápido Bogotá, Soacha, Facatativá, Chía y Nacional</g:service>
         <g:price>0 COP</g:price>
       </g:shipping>
     </item>`);
@@ -98,9 +126,9 @@ export async function GET() {
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
-    <title>Biocambio360 - Catálogo Oficial de Productos de Fábrica</title>
+    <title>Biocambio360 - Catálogo Oficial de Fábrica (Google Merchant &amp; Meta Ads)</title>
     <link>${BASE_URL}</link>
-    <description>Catálogo sincronizado en tiempo real de productos de aseo, limpieza industrial y combos Biocambio360 para Meta Commerce Manager y Google Merchant.</description>
+    <description>Catálogo oficial de productos de aseo, limpieza industrial y combos Biocambio360 para Google Merchant Center, Google Shopping y Meta Commerce Manager con cobertura en Bogotá, Cundinamarca y toda Colombia.</description>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
 ${items.join('\n')}
   </channel>
