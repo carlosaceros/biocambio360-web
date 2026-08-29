@@ -19,7 +19,9 @@ export async function POST(request: Request) {
             currency
         });
 
-        return NextResponse.json({ signature });
+        const publicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY || process.env.WOMPI_PUBLIC_KEY || 'pub_prod_e54xGzLAvAXkwfSIZvTUBbX8BaH1or7m';
+
+        return NextResponse.json({ signature, publicKey });
     } catch (error) {
         console.error('Error generating Wompi signature:', error);
         return NextResponse.json(

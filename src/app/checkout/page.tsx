@@ -491,7 +491,7 @@ export default function CheckoutPage() {
 
                 if (!sigRes.ok) throw new Error('Failed to get signature');
 
-                const { signature } = await sigRes.json();
+                const { signature, publicKey } = await sigRes.json();
                 
                 // Get the domain for correct redirect (works dev and prod)
                 const baseUrl = window.location.origin;
@@ -501,7 +501,7 @@ export default function CheckoutPage() {
                     currency: 'COP',
                     amountInCents: amountInCents,
                     reference: orderId,
-                    publicKey: process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY,
+                    publicKey: publicKey || process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY || 'pub_prod_e54xGzLAvAXkwfSIZvTUBbX8BaH1or7m',
                     signature: { integrity: signature },
                     redirectUrl: `${baseUrl}/confirmacion/${orderId}`, // Where wompi returns after payment
                     taxInCents: { // Required structure for some bin cards or configurations if any tax applies
