@@ -41,6 +41,7 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
     const { clearCart } = useCart();
     const [order, setOrder] = useState<Order | null>(null);
     const [orderId, setOrderId] = useState<string>('');
+    const [wompiStatus, setWompiStatus] = useState<string | null>(null);
 
     useEffect(() => {
         params.then(({ orderId }) => {
@@ -55,6 +56,21 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
 
             const parsedOrder = JSON.parse(orderData);
             setOrder(parsedOrder);
+
+            // If Wompi was used, check/reconcile status with Wompi API
+            if (parsedOrder.metodoPago === 'wompi' && typeof window !== 'undefined') {
+                const searchParams = new URLSearchParams(window.location.search);
+                const txId = searchParams.get('id');
+                
+                fetch(`/api/admin/wompi-status?orderId=${orderId}${txId ? `&transactionId=${txId}` : ''}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data?.wompiTransaction?.status) {
+                            setWompiStatus(data.wompiTransaction.status);
+                        }
+                    })
+                    .catch(err => console.warn('[Confirmacion] Wompi status check error:', err));
+            }
 
             // Meta Pixel: Track Purchase (Deduplicated with sessionStorage per orderId)
             try {
@@ -109,6 +125,9 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
     const whatsappMessage = `Hola! Acabo de hacer un pedido (${orderId}) por ${formatCurrency(order.total)} y quiero confirmar los detalles.`;
     const whatsappUrl = `https://wa.me/573241005353?text=${encodeURIComponent(whatsappMessage)}`;
 
+    const isWompiApproved = wompiStatus === 'APPROVED';
+    const isWompiDeclined = wompiStatus === 'DECLINED' || wompiStatus === 'ERROR' || wompiStatus === 'VOIDED';
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-gray-50 py-12">
             <div className="max-w-3xl mx-auto px-4">
@@ -119,15 +138,25 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                     transition={{ type: "spring", stiffness: 200, damping: 15 }}
                     className="text-center mb-8"
                 >
-                    <div className="inline-flex items-center justify-center w-24 h-24 bg-green-500 rounded-full mb-4">
+                    <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full mb-4 ${
+                        isWompiDeclined ? 'bg-red-500' : 'bg-green-500'
+                    }`}>
                         <CheckCircle className="text-white" size={56} />
                     </div>
                     <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
-                        ¡PEDIDO RECIBIDO!
+                        {isWompiApproved 
+                            ? '¡PAGO CONFIRMADO CON ÉXITO!' 
+                            : isWompiDeclined 
+                                ? 'PAGO NO COMPLETADO' 
+                                : '¡PEDIDO RECIBIDO!'}
                     </h1>
                     <p className="text-gray-600 text-lg">
                         {order.metodoPago === 'wompi'
-                            ? 'Estamos confirmando tu pago. Pronto recibirás noticias.'
+                            ? isWompiApproved
+                                ? 'Tu pago ha sido acreditado correctamente en Wompi. Ya estamos preparando tu despacho.'
+                                : isWompiDeclined
+                                    ? 'La entidad financiera rechazó la transacción. Puedes intentar nuevamente o pagar contraentrega.'
+                                    : 'Estamos confirmando tu pago en línea. Pronto recibirás noticias.'
                             : 'Tu pedido ha sido recibido exitosamente'}
                     </p>
                 </motion.div>
