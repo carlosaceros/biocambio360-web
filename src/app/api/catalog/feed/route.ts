@@ -15,18 +15,18 @@ function escapeXml(unsafe: string): string {
 }
 
 const SIZE_LABELS: Record<string, string> = {
-    '1/2G': 'Medio Galón (1.9L)',
-    '3.8L': '1 Galón (3.8L)',
-    '10L': 'Garrafa 10 Litros',
-    '20L': 'Pimpina 20 Litros',
-    '15L': 'Bidón 15 Litros',
-    '1KG': 'Pote 1 Kg',
-    '4KG': 'Galón 4 Kg',
-    '10KG': 'Balde 10 Kg',
-    '20KG': 'Caneca 20 Kg',
-    '60ML': 'Frasco 60 ml',
+    '1/2G': '1/2 Gal',
+    '3.8L': '1 Gal',
+    '10L': '10L',
+    '20L': '20L',
+    '15L': '15L',
+    '1KG': '1 Kg',
+    '4KG': '4 Kg',
+    '10KG': '10 Kg',
+    '20KG': '20 Kg',
+    '60ML': '60 ml',
     'COMBO': 'Combo Ahorro Fábrica',
-    'DEFAULT': 'Presentación Estándar',
+    'DEFAULT': 'Combo Ahorro Fábrica',
 };
 
 function getGoogleTaxonomyCategory(product: Product): number {
@@ -67,25 +67,32 @@ export async function GET() {
                 const priceValue = prices[size] || Object.values(prices)[0] || 0;
                 if (!priceValue || priceValue <= 0) continue;
 
+                // Precio de referencia / competidor tachado
+                const competitorPrice = (product.competidorPromedio && (product.competidorPromedio[size] || Object.values(product.competidorPromedio)[0])) || Math.round(priceValue * 1.35);
+                const regularPrice = competitorPrice > priceValue ? competitorPrice : Math.round(priceValue * 1.35);
+
                 const sizeClean = size.replace(/\./g, '_').toUpperCase();
                 const skuId = `BIO-${product.id.toUpperCase()}-${sizeClean}`;
                 const sizeLabel = SIZE_LABELS[size] || size;
                 
-                // Titulo optimizado para Google Shopping & Search
-                const title = `${product.nombre} ${sizeLabel} | Venta Directa Fábrica Bogotá y Colombia`;
+                // Titulo optimizado para Meta Shopping & Google Shopping
+                const title = `${product.nombre} ${sizeLabel} | Venta Directa Fábrica Biocambio360`;
                 
-                // Descripcion con enriquecimiento GEO y de producto
+                // Descripcion enriquecida
                 const baseDesc = product.descripcion 
                     ? product.descripcion.trim()
                     : `${product.nombre} de alta concentración para el aseo, desinfección y limpieza profesional e industrial.`;
                 
-                const geoCoverage = `Venta directa de fábrica Biocambio360 con despacho rápido en Bogotá (Suba, Engativá, Kennedy, Fontibón, Usaquén, Chapinero, Bosa, Teusaquillo), municipios de Cundinamarca (Soacha, Facatativá, Chía, Mosquera, Madrid, Funza, Zipaquirá, Cajicá, Cota, Sibaté) y envíos a toda Colombia (Medellín, Cali, Barranquilla, Bucaramanga, Pereira, Manizales, Cartagena). Pago seguro y contraentrega disponible.`;
+                const geoCoverage = `Venta directa de fábrica Biocambio360 con despacho rápido en Bogotá, Cundinamarca y toda Colombia. Pago contraentrega y seguro disponible.`;
                 
                 const description = `${baseDesc} Presentación: ${sizeLabel}. ${geoCoverage}`;
 
                 const imgFileName = getProductImage(product, size);
                 const imageUrl = `${BASE_URL}/images/${encodeURIComponent(imgFileName).replace(/%2F/g, '/')}`;
-                const priceFormatted = `${Math.round(priceValue)} COP`;
+                
+                // Formato exacto requerido para precios en Meta Ads (con .00 COP)
+                const priceFormatted = `${regularPrice.toFixed(2)} COP`;
+                const salePriceFormatted = `${priceValue.toFixed(2)} COP`;
 
                 const category = product.categoria || 'Aseo y Limpieza';
                 const subcategory = product.subcategoria || 'General';
@@ -105,6 +112,8 @@ export async function GET() {
       <g:condition>new</g:condition>
       <g:availability>in_stock</g:availability>
       <g:price>${priceFormatted}</g:price>
+      <g:sale_price>${salePriceFormatted}</g:sale_price>
+      <g:size>${escapeXml(sizeLabel)}</g:size>
       <g:google_product_category>${googleCatId}</g:google_product_category>
       <g:product_type><![CDATA[${productType}]]></g:product_type>
       <g:identifier_exists>no</g:identifier_exists>
@@ -116,8 +125,8 @@ export async function GET() {
       <g:custom_label_4>${size === '20L' ? 'Mayor Ahorro 20L' : 'Presentacion Estandar'}</g:custom_label_4>
       <g:shipping>
         <g:country>CO</g:country>
-        <g:service>Envío Rápido Bogotá, Soacha, Facatativá, Chía y Nacional</g:service>
-        <g:price>0 COP</g:price>
+        <g:service>Envío Rápido Bogotá, Cundinamarca y Nacional</g:service>
+        <g:price>0.00 COP</g:price>
       </g:shipping>
     </item>`);
             }
@@ -126,9 +135,9 @@ export async function GET() {
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
-    <title>Biocambio360 - Catálogo Oficial de Fábrica (Google Merchant &amp; Meta Ads)</title>
+    <title>Biocambio360 - Catálogo Oficial de Fábrica (Meta Shopping &amp; Google Merchant)</title>
     <link>${BASE_URL}</link>
-    <description>Catálogo oficial de productos de aseo, limpieza industrial y combos Biocambio360 para Google Merchant Center, Google Shopping y Meta Commerce Manager con cobertura en Bogotá, Cundinamarca y toda Colombia.</description>
+    <description>Catálogo oficial de productos Biocambio360 optimizado para Meta Shopping, Dynamic Product Ads y Google Shopping con precio tachado y presentación.</description>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
 ${items.join('\n')}
   </channel>
