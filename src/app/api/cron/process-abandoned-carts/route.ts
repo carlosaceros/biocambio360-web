@@ -16,12 +16,10 @@ export async function GET(request: Request) {
         const q = query(cartsRef, where('status', '==', 'abandoned'));
         const snap = await getDocs(q);
 
-        // Fetch all non-canceled orders to cross-reference and eliminate false positives
+        // Fetch all orders to cross-reference and eliminate false positives (including completed & canceled orders)
         const ordersRef = collection(db, 'orders');
         const ordersSnap = await getDocs(ordersRef);
-        const activeOrders = ordersSnap.docs
-            .map(d => ({ id: d.id, ...d.data() as any }))
-            .filter(o => o.status !== 'cancelado');
+        const allOrders = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
 
         const now = Date.now();
         let processedCount = 0;
@@ -34,7 +32,8 @@ export async function GET(request: Request) {
             const cartEmail = (cart.customerEmail || '').trim().toLowerCase();
             const cartPhoneDigits = (cart.customerPhone || '').replace(/\D/g, '');
 
-            const matchingOrder = activeOrders.find(o => {
+            const matchingOrder = allOrders.find(o => {
+                if (cart.recoveredOrderId && o.id === cart.recoveredOrderId) return true;
                 const orderEmail = (o.cliente?.email || '').trim().toLowerCase();
                 const orderPhoneDigits = (o.cliente?.celular || o.cliente?.telefono || '').replace(/\D/g, '');
                 const emailMatch = cartEmail && orderEmail && cartEmail === orderEmail;

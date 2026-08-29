@@ -58,14 +58,14 @@ export default function CarritosAbandonadosPage() {
     const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     useEffect(() => {
-        // 1. Subscribe to orders to cross-reference completed checkouts
+        // 1. Subscribe to orders to cross-reference completed/processed checkouts (including canceled)
         const ordersRef = collection(db, 'orders');
         const unsubscribeOrders = onSnapshot(ordersRef, (snapshot) => {
             const fetchedOrders: any[] = [];
             snapshot.forEach((docSnap) => {
                 fetchedOrders.push({ id: docSnap.id, ...docSnap.data() });
             });
-            setOrders(fetchedOrders.filter(o => o.status !== 'cancelado'));
+            setOrders(fetchedOrders);
         });
 
         // 2. Subscribe to abandoned carts
@@ -94,13 +94,14 @@ export default function CarritosAbandonadosPage() {
         };
     }, []);
 
-    // Cross-reference carts with active orders to prevent ANY false positives
+    // Cross-reference carts with all orders to prevent ANY false positives (even if order was canceled)
     const enrichedCarts = useMemo(() => {
         return carts.map(cart => {
             const cartEmail = (cart.customerEmail || '').trim().toLowerCase();
             const cartPhone = (cart.customerPhone || '').replace(/\D/g, '');
 
             const matchingOrder = orders.find(o => {
+                if (cart.recoveredOrderId && o.id === cart.recoveredOrderId) return true;
                 const oEmail = (o.cliente?.email || '').trim().toLowerCase();
                 const oPhone = (o.cliente?.celular || o.cliente?.telefono || '').replace(/\D/g, '');
                 const emailMatch = cartEmail && oEmail && cartEmail === oEmail;
@@ -114,10 +115,20 @@ export default function CarritosAbandonadosPage() {
 
             const isRecovered = cart.status === 'recovered' || !!matchingOrder;
 
+            // Auto-heal Firestore document in background if not yet marked as recovered
+            if (isRecovered && cart.status !== 'recovered' && matchingOrder) {
+                updateDoc(doc(db, 'abandoned_carts', cart.cartToken), {
+                    status: 'recovered',
+                    recoveredOrderId: matchingOrder.id,
+                    recoveredStatus: matchingOrder.status || 'procesado',
+                    updatedAt: serverTimestamp(),
+                }).catch(() => {});
+            }
+
             return {
                 ...cart,
                 status: (isRecovered ? 'recovered' : 'abandoned') as 'abandoned' | 'recovered' | 'expired',
-                linkedOrder: matchingOrder || null,
+                linkedOrder: matchingOrder || (cart.recoveredOrderId ? { id: cart.recoveredOrderId, status: (cart as any).recoveredStatus || 'procesado' } : null),
             };
         });
     }, [carts, orders]);
@@ -456,8 +467,14 @@ export default function CarritosAbandonadosPage() {
                                                         <span className="font-extrabold text-gray-900 flex items-center gap-1.5">
                                                             {cart.customerName || 'Cliente sin nombre'}
                                                             {isRecovered && (
-                                                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
-                                                                    {linkedOrder ? `Pedido #${linkedOrder.id.slice(0, 6)}` : 'Recuperado'}
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                                    linkedOrder?.status === 'cancelado'
+                                                                        ? 'bg-slate-100 text-slate-700'
+                                                                        : 'bg-emerald-100 text-emerald-800'
+                                                                }`}>
+                                                                    {linkedOrder?.status === 'cancelado'
+                                                                        ? `Pedido Cancelado #${linkedOrder.id.slice(0, 6)}`
+                                                                        : (linkedOrder ? `Pedido #${linkedOrder.id.slice(0, 6)}` : 'Recuperado')}
                                                                 </span>
                                                             )}
                                                         </span>
@@ -531,8 +548,20 @@ export default function CarritosAbandonadosPage() {
                                                 <td className="py-4 px-4 align-top">
                                                     <div className="flex flex-col gap-1.5">
                                                         {isRecovered ? (
-                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black border border-emerald-200">
-                                                                <CheckCircle2 size={13} /> {linkedOrder ? `Pedido #${linkedOrder.id.slice(0, 6)} (${linkedOrder.status})` : 'Pedido Procesado'}
+                                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black border ${
+                                                                linkedOrder?.status === 'cancelado'
+                                                                    ? 'bg-slate-50 text-slate-700 border-slate-200'
+                                                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                            }`}>
+                                                                {linkedOrder?.status === 'cancelado' ? (
+                                                                    <>
+                                                                        <X size={13} className="text-slate-500" /> Pedido Cancelado #{linkedOrder.id.slice(0, 6)}
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <CheckCircle2 size={13} /> {linkedOrder ? `Pedido #${linkedOrder.id.slice(0, 6)} (${linkedOrder.status})` : 'Pedido Procesado'}
+                                                                    </>
+                                                                )}
                                                             </span>
                                                         ) : (
                                                             <>
