@@ -351,18 +351,18 @@ export default function AdminDashboard() {
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/inventario')}
+                                    onClick={() => router.push('/admin/productos')}
                                     className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
                                 >
                                     <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                                        <Eye size={22} />
+                                        <Layers size={22} />
                                     </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Inventario Stock</h3>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Productos & Precios</h3>
                                     <p className="text-xs text-gray-500 mb-2">
-                                        Vista de catálogo, stock y precios oficiales.
+                                        Gestión de catálogo, stock y edición de precios auditada.
                                     </p>
                                     <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
-                                        Solo Vista <ArrowUpRight size={14} />
+                                        Editar Precios & Auditoría <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
 

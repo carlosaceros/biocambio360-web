@@ -175,10 +175,123 @@ function ensureStockDefaults(product: Product): Product {
     };
 }
 
+export interface PriceAuditLog {
+    id?: string;
+    timestamp: string;
+    userEmail: string;
+    userName: string;
+    userRole: string;
+    productId: string;
+    productName: string;
+    size: string;
+    oldPrice: number;
+    newPrice: number;
+    oldCompetitorPrice?: number;
+    newCompetitorPrice?: number;
+    difference: number;
+    percentageChange: number;
+    source?: string;
+}
+
+const priceAuditCollection = collection(db, 'price_audit_logs');
+
 /**
- * Creates or overwrites a product in Firestore
+ * Records price changes in the audit log
  */
-export async function saveProduct(product: Product): Promise<void> {
+export async function recordPriceAuditLogs(logs: Omit<PriceAuditLog, 'id'>[]): Promise<void> {
+    if (!logs || logs.length === 0) return;
+    try {
+        for (const logItem of logs) {
+            const logDocRef = doc(priceAuditCollection);
+            await setDoc(logDocRef, {
+                ...logItem,
+                createdAt: new Date().toISOString()
+            });
+        }
+    } catch (err) {
+        console.error('[PriceAudit] Error saving price audit logs:', err);
+    }
+}
+
+/**
+ * Fetches recent price audit logs for traceability
+ */
+export async function getPriceAuditLogs(limitCount = 100): Promise<PriceAuditLog[]> {
+    try {
+        const q = query(priceAuditCollection, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        const logs: PriceAuditLog[] = [];
+        snapshot.forEach((docSnap) => {
+            if (logs.length < limitCount) {
+                logs.push({ id: docSnap.id, ...docSnap.data() } as PriceAuditLog);
+            }
+        });
+        return logs;
+    } catch (err) {
+        console.warn('[PriceAudit] Could not fetch price audit logs from Firestore:', err);
+        return [];
+    }
+}
+
+/**
+ * Creates or overwrites a product in Firestore and audits price changes
+ */
+export async function saveProduct(
+    product: Product,
+    userContext?: { email?: string; nombre?: string; role?: string }
+): Promise<void> {
+    // 1. Audit price changes if previous product exists
+    try {
+        const previousProduct = await getProductById(product.id);
+        if (previousProduct && userContext) {
+            const oldPrices = previousProduct.precios || {};
+            const newPrices = product.precios || {};
+            const oldCompetitors = previousProduct.competidorPromedio || {};
+            const newCompetitors = product.competidorPromedio || {};
+            
+            const auditLogsToRecord: Omit<PriceAuditLog, 'id'>[] = [];
+            const allSizes = Array.from(new Set([...Object.keys(oldPrices), ...Object.keys(newPrices)]));
+            const now = new Date().toISOString();
+
+            for (const size of allSizes) {
+                const oldP = oldPrices[size] || 0;
+                const newP = newPrices[size] || 0;
+                const oldComp = oldCompetitors[size] || 0;
+                const newComp = newCompetitors[size] || 0;
+
+                const priceChanged = oldP !== newP && (oldP > 0 || newP > 0);
+                const competitorChanged = oldComp !== newComp && (oldComp > 0 || newComp > 0);
+
+                if (priceChanged || competitorChanged) {
+                    const diff = newP - oldP;
+                    const pct = oldP > 0 ? Number(((diff / oldP) * 100).toFixed(1)) : 100;
+                    auditLogsToRecord.push({
+                        timestamp: now,
+                        userEmail: userContext.email || 'desconocido@biocambio360.com',
+                        userName: userContext.nombre || 'Gestor / Logística',
+                        userRole: userContext.role || 'logistico',
+                        productId: product.id,
+                        productName: product.nombre,
+                        size,
+                        oldPrice: oldP,
+                        newPrice: newP,
+                        oldCompetitorPrice: oldComp,
+                        newCompetitorPrice: newComp,
+                        difference: diff,
+                        percentageChange: pct,
+                        source: 'admin_panel'
+                    });
+                }
+            }
+
+            if (auditLogsToRecord.length > 0) {
+                await recordPriceAuditLogs(auditLogsToRecord);
+            }
+        }
+    } catch (auditErr) {
+        console.warn('[PriceAudit] Warning while auditing prices:', auditErr);
+    }
+
     const docRef = doc(db, 'products', product.id);
     const now = new Date().toISOString();
     const { id, ...data } = product;

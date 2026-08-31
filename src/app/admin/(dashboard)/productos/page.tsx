@@ -11,13 +11,14 @@ import {
     ClipboardList, FlaskConical, Lightbulb, BookOpen, Shield
 } from 'lucide-react';
 import { Product, UsageRow, SchwartzCopyData, ManualContentData } from '@/lib/products';
-import { getAllProducts, saveProduct, deleteProduct, updateProductStock } from '@/lib/products-service';
+import { getAllProducts, saveProduct, deleteProduct, updateProductStock, getPriceAuditLogs, PriceAuditLog } from '@/lib/products-service';
 import { getRichProductDetails, getSchwartzCopy } from '@/lib/product-utils';
 import { getManualContentForProduct } from '@/lib/products-rich-data';
+import { useAuth } from '@/lib/auth-context';
 import Image from 'next/image';
 import Link from 'next/link';
 
-type ViewTab = 'inventory' | 'catalog' | 'ai-assistant' | 'margins';
+type ViewTab = 'inventory' | 'catalog' | 'ai-assistant' | 'margins' | 'price-history';
 type StockFilter = 'all' | 'in-stock' | 'low-stock' | 'out-of-stock' | 'archived';
 type ModalTab = 'general' | 'schwartz' | 'beneficios' | 'tecnica' | 'dosificacion' | 'faqs' | 'imagenes';
 
@@ -57,6 +58,7 @@ const COLOR_PRESETS = [
 ];
 
 export default function InventoryAdminPage() {
+    const { user, userProfile, role } = useAuth();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -68,6 +70,11 @@ export default function InventoryAdminPage() {
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [isSeeding, setIsSeeding] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+    // Audit logs state
+    const [priceAuditLogs, setPriceAuditLogs] = useState<PriceAuditLog[]>([]);
+    const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(false);
+    const [auditSearchQuery, setAuditSearchQuery] = useState('');
 
     // Filter & Search states
     const [activeTab, setActiveTab] = useState<ViewTab>('inventory');
@@ -101,6 +108,18 @@ export default function InventoryAdminPage() {
 
     // Market Price Scanner state
     const [scanningProductId, setScanningProductId] = useState<string | null>(null);
+
+    const loadPriceAuditLogs = async () => {
+        setIsLoadingAuditLogs(true);
+        try {
+            const logs = await getPriceAuditLogs(200);
+            setPriceAuditLogs(logs);
+        } catch (err) {
+            console.error('Error cargando historial de precios:', err);
+        } finally {
+            setIsLoadingAuditLogs(false);
+        }
+    };
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -322,10 +341,17 @@ export default function InventoryAdminPage() {
         
         setIsSaving(true);
         try {
-            await saveProduct(editingProduct);
-            showToast(`✅ Producto "${editingProduct.nombre}" guardado con éxito.`);
+            await saveProduct(editingProduct, {
+                email: user?.email || 'desconocido@biocambio360.com',
+                nombre: userProfile?.nombre || (role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
+                role: role || 'logistico'
+            });
+            showToast(`✅ Producto "${editingProduct.nombre}" guardado y registrado en auditoría.`);
             await loadProducts();
             setEditingProduct(null);
+            if (activeTab === 'price-history') {
+                await loadPriceAuditLogs();
+            }
         } catch (error) {
             console.error('Error guardando producto:', error);
             alert('Hubo un error al guardar el producto en Firestore.');
@@ -1105,6 +1131,21 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                         <Sparkles size={17} />
                         Asistente de Marketing & IA
                     </button>
+
+                    <button
+                        onClick={() => {
+                            setActiveTab('price-history');
+                            loadPriceAuditLogs();
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer ${
+                            activeTab === 'price-history' 
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs' 
+                                : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                    >
+                        <ShieldCheck size={17} />
+                        Historial & Auditoría de Precios
+                    </button>
                 </div>
 
                 {/* Filters Row */}
@@ -1517,6 +1558,178 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                             );
                         })}
                     </div>
+                </div>
+            )}
+
+            {/* 📜 VIEW 5: PRICE AUDIT HISTORY & TRACEABILITY */}
+            {activeTab === 'price-history' && (
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-4 gap-3">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase flex items-center gap-1">
+                                    <ShieldCheck size={12} /> Trazabilidad & Auditoría
+                                </span>
+                                <span className="text-xs text-gray-400">| Registro inmutable en Firestore</span>
+                            </div>
+                            <h3 className="text-lg font-black text-gray-900">HISTORIAL DE MODIFICACIONES DE PRECIOS</h3>
+                            <p className="text-xs text-gray-500">
+                                Monitorea cada cambio de precio o precio de competidor realizado por el Rol Logístico y Administradores.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 text-gray-400" size={15} />
+                                <input
+                                    type="text"
+                                    placeholder="Filtrar por producto, usuario o correo..."
+                                    value={auditSearchQuery}
+                                    onChange={e => setAuditSearchQuery(e.target.value)}
+                                    className="pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-indigo-500 focus:bg-white text-gray-900 transition-all w-64"
+                                />
+                            </div>
+
+                            <button
+                                onClick={loadPriceAuditLogs}
+                                disabled={isLoadingAuditLogs}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                                <RefreshCw size={14} className={isLoadingAuditLogs ? 'animate-spin' : ''} />
+                                <span>{isLoadingAuditLogs ? 'Actualizando...' : 'Recargar'}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {isLoadingAuditLogs ? (
+                        <div className="p-12 text-center text-gray-400 flex flex-col items-center justify-center gap-3">
+                            <Loader2 size={32} className="animate-spin text-indigo-600" />
+                            <p className="text-sm font-medium">Cargando bitácora de auditoría de precios...</p>
+                        </div>
+                    ) : priceAuditLogs.length === 0 ? (
+                        <div className="p-12 text-center text-gray-400 flex flex-col items-center justify-center gap-2">
+                            <ClipboardList size={40} className="text-gray-300 mb-2" />
+                            <p className="text-sm font-bold text-gray-700">Aún no se registran cambios de precio auditados</p>
+                            <p className="text-xs text-gray-400 max-w-md">
+                                Cada vez que un usuario con Rol Logístico o Super Admin edite los precios de un producto, el sistema registrará automáticamente la fecha, hora, responsable y variación.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                                        <th className="py-3 px-4">Fecha & Hora</th>
+                                        <th className="py-3 px-4">Responsable</th>
+                                        <th className="py-3 px-4">Producto & Tamaño</th>
+                                        <th className="py-3 px-4">Precio Biocambio360</th>
+                                        <th className="py-3 px-4">Precio Competidor</th>
+                                        <th className="py-3 px-4">Variación</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-xs">
+                                    {priceAuditLogs
+                                        .filter(log => {
+                                            if (!auditSearchQuery) return true;
+                                            const q = auditSearchQuery.toLowerCase();
+                                            return (
+                                                log.productName.toLowerCase().includes(q) ||
+                                                log.productId.toLowerCase().includes(q) ||
+                                                log.userEmail.toLowerCase().includes(q) ||
+                                                log.userName.toLowerCase().includes(q) ||
+                                                log.size.toLowerCase().includes(q)
+                                            );
+                                        })
+                                        .map((log, idx) => {
+                                            const isIncrease = log.difference > 0;
+                                            const isDecrease = log.difference < 0;
+                                            const logDate = new Date(log.timestamp);
+                                            const formattedDate = isNaN(logDate.getTime()) 
+                                                ? log.timestamp 
+                                                : logDate.toLocaleString('es-CO', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                });
+
+                                            return (
+                                                <tr key={log.id || idx} className="hover:bg-gray-50/80 transition-colors">
+                                                    <td className="py-3 px-4 font-mono text-[11px] text-gray-600 whitespace-nowrap">
+                                                        {formattedDate}
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-gray-900">{log.userName}</span>
+                                                            <span className="text-[11px] text-gray-400 font-mono">{log.userEmail}</span>
+                                                            <span className={`mt-0.5 inline-flex items-center gap-1 w-fit px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                                                log.userRole === 'superadmin' 
+                                                                    ? 'bg-indigo-100 text-indigo-700' 
+                                                                    : 'bg-emerald-100 text-emerald-700'
+                                                            }`}>
+                                                                <Shield size={9} />
+                                                                {log.userRole === 'superadmin' ? 'Super Admin' : 'Rol Logístico'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-gray-900">{log.productName}</span>
+                                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                                <span className="text-[10px] font-mono text-gray-400">{log.productId}</span>
+                                                                <span className="bg-gray-100 text-gray-700 font-bold px-1.5 py-0.5 rounded text-[10px]">
+                                                                    {log.size}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="line-through text-gray-400 font-mono text-xs">
+                                                                ${log.oldPrice.toLocaleString('es-CO')}
+                                                            </span>
+                                                            <span className="text-gray-400">➔</span>
+                                                            <span className="font-bold font-mono text-xs text-gray-900">
+                                                                ${log.newPrice.toLocaleString('es-CO')}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        {log.oldCompetitorPrice || log.newCompetitorPrice ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="line-through text-gray-400 font-mono text-xs">
+                                                                    ${(log.oldCompetitorPrice || 0).toLocaleString('es-CO')}
+                                                                </span>
+                                                                <span className="text-gray-400">➔</span>
+                                                                <span className="font-bold font-mono text-xs text-purple-700">
+                                                                    ${(log.newCompetitorPrice || 0).toLocaleString('es-CO')}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 px-4 whitespace-nowrap">
+                                                        {log.difference !== 0 ? (
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-mono text-[11px] font-black ${
+                                                                isIncrease 
+                                                                    ? 'bg-amber-100 text-amber-800' 
+                                                                    : 'bg-emerald-100 text-emerald-800'
+                                                            }`}>
+                                                                {isIncrease ? '+' : ''}${log.difference.toLocaleString('es-CO')} ({isIncrease ? '+' : ''}{log.percentageChange}%)
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs">Sin cambio en precio venta</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             )}
 

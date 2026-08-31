@@ -16,6 +16,7 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const ADMIN_RECIPIENTS = [
     { email: 'infobiocambio360@gmail.com', name: 'Biocambio360 Info' },
     { email: 'carlos.aceros@thinktic.co', name: 'Carlos Aceros' },
+    { email: 'tiendavirtual@biocambio360.com', name: 'Tienda Virtual Biocambio360' },
 ];
 
 interface EmailPayload {

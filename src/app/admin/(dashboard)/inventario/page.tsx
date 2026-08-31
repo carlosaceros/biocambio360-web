@@ -90,8 +90,16 @@ export default function InventarioViewPage() {
 
                     <div className="flex items-center gap-2">
                         <button
+                            onClick={() => router.push('/admin/productos')}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+                            title="Gestionar productos, stock y editar precios con auditoría"
+                        >
+                            <Sparkles size={14} />
+                            <span>Editar Precios & Stock</span>
+                        </button>
+                        <button
                             onClick={() => setIsPasswordModalOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors cursor-pointer"
                             title="Cambiar mi contraseña"
                         >
                             <Key size={14} className="text-indigo-600" />

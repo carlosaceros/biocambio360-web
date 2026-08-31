@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 
 const GESTOR_ALLOWED_PREFIXES = [
     '/admin/pedidos',
+    '/admin/productos',
     '/admin/cotizaciones-b2b',
     '/admin/auditoria-envios',
     '/admin/inventario',
