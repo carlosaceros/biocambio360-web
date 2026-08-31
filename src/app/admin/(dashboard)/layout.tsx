@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 
 const GESTOR_ALLOWED_PREFIXES = [
     '/admin/pedidos',
+    '/admin/cotizaciones-b2b',
     '/admin/auditoria-envios',
     '/admin/inventario',
     '/admin/carritos-abandonados',
@@ -22,7 +23,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             return;
         }
 
-        if (!loading && user && role === 'gestor_pedidos') {
+        const isLogisticoOrGestor = role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica';
+
+        if (!loading && user && isLogisticoOrGestor) {
             // Check if current path is allowed
             const isRootAdmin = pathname === '/admin' || pathname === '/admin/';
             const isAllowed = isRootAdmin || GESTOR_ALLOWED_PREFIXES.some(prefix => pathname.startsWith(prefix));

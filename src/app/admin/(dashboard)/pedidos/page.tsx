@@ -437,10 +437,10 @@ export default function PedidosPage() {
                                     <h1 className="text-xl md:text-2xl font-black text-gray-900" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
                                         GESTIÓN DE PEDIDOS
                                     </h1>
-                                    {role === 'gestor_pedidos' && (
+                                    {(role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
                                             <Shield size={11} className="text-emerald-600" />
-                                            GESTOR
+                                            {role === 'logistico' || role === 'logistica' ? 'LOGÍSTICA' : 'GESTOR'}
                                         </span>
                                     )}
                                 </div>

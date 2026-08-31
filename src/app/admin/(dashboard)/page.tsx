@@ -162,7 +162,7 @@ export default function AdminDashboard() {
                         {isGestor ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <Shield size={12} className="text-emerald-600" />
-                                GESTOR DE PEDIDOS
+                                {role === 'logistico' || role === 'logistica' ? 'ROL LOGÍSTICO' : 'GESTOR & LOGÍSTICA'}
                             </span>
                         ) : (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-indigo-50 text-indigo-700 border border-indigo-200">

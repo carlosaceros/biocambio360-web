@@ -13,7 +13,7 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
-export type UserRole = 'superadmin' | 'gestor_pedidos' | 'user';
+export type UserRole = 'superadmin' | 'gestor_pedidos' | 'logistico' | 'logistica' | 'user';
 
 export interface AdminUserProfile {
     email: string;
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (currentUser && currentUser.email) {
                 const email = currentUser.email.toLowerCase().trim();
                 const isSuper = email === 'thinktic.thinktic@gmail.com';
-                const determinedRole: UserRole = isSuper ? 'superadmin' : 'gestor_pedidos';
+                const determinedRole: UserRole = isSuper ? 'superadmin' : 'logistico';
                 const determinedName = isSuper ? 'Super Administrador THINK TIC' : 'Gestor de Pedidos & Logística';
 
                 // Asignar de inmediato de forma síncrona
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             email,
                             nombre: data.nombre || determinedName,
                             role: finalRole,
-                            permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read' }),
+                            permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read', carritos_abandonados: 'full' }),
                         };
                         setUserProfile(profile);
                         setRole(finalRole);
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             email,
                             nombre: determinedName,
                             role: determinedRole,
-                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read' },
+                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read', carritos_abandonados: 'full' },
                         };
                         setUserProfile(profile);
                         setRole(determinedRole);
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         email,
                         nombre: determinedName,
                         role: determinedRole,
-                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read' },
+                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read', carritos_abandonados: 'full' },
                     };
                     setUserProfile(profile);
                     setRole(determinedRole);
@@ -139,8 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const canAccess = (module: string): boolean => {
         if (role === 'superadmin') return true;
-        if (role === 'gestor_pedidos') {
-            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard'].includes(module);
+        if (role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
+            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard', 'carritos-abandonados'].includes(module);
         }
         return false;
     };
