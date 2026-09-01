@@ -33,6 +33,41 @@ function removeUndefined<T>(obj: T): T {
 }
 
 /**
+ * Automatically marks any abandoned cart with matching phone or email as recovered upon order creation.
+ */
+async function autoRecoverMatchingAbandonedCarts(cliente: any, orderId: string): Promise<void> {
+    try {
+        const phone = (cliente?.celular || cliente?.telefono || '').replace(/\D/g, '');
+        const email = (cliente?.email || '').trim().toLowerCase();
+        if (!phone && !email) return;
+
+        const cartsRef = collection(db, 'abandoned_carts');
+        const q = query(cartsRef, where('status', '==', 'abandoned'));
+        const snap = await getDocs(q);
+
+        for (const docSnap of snap.docs) {
+            const cart = docSnap.data();
+            const cartEmail = (cart.customerEmail || '').trim().toLowerCase();
+            const cartPhone = (cart.customerPhone || '').replace(/\D/g, '');
+
+            const matchEmail = email && cartEmail && email === cartEmail;
+            const matchPhone = phone && cartPhone && (phone === cartPhone || phone.endsWith(cartPhone) || cartPhone.endsWith(phone));
+
+            if (matchEmail || matchPhone) {
+                await updateDoc(docSnap.ref, {
+                    status: 'recovered',
+                    recoveredOrderId: orderId,
+                    recoveredNote: `Pedido #${orderId} completado en checkout`,
+                    updatedAt: Timestamp.now()
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('[OrdersService] Error auto-recovering abandoned carts:', e);
+    }
+}
+
+/**
  * Create a new order in Firestore
  */
 export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'timeline'>): Promise<string> {
@@ -54,6 +89,11 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
     // Async update customer data (fire and forget to not block order flow)
     upsertCustomerFromOrder(orderData.cliente, orderData.total).catch(err =>
         console.error('Error updating customer data:', err)
+    );
+
+    // Auto-mark any matching abandoned cart as recovered
+    autoRecoverMatchingAbandonedCarts(orderData.cliente, docRef.id).catch(err =>
+        console.warn('Error auto-recovering abandoned cart on order creation:', err)
     );
 
     return docRef.id;

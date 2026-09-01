@@ -149,17 +149,75 @@ export async function updateCustomerType(id: string, newType: 'b2c' | 'b2b'): Pr
 }
 
 /**
- * Gets all customer replenishment records for Admin BI Dashboard
+ * Gets all customer replenishment records for Admin BI Dashboard.
+ * ONLY includes customers with CONFIRMED or COMPLETED orders (confirmado, preparacion, enviado, en_camino, entregado).
+ * Excludes cancelled and unconfirmed/abandoned pending orders to ensure total BI accuracy.
  */
 export async function getAllReplenishmentRecords(): Promise<CustomerReplenishment[]> {
     try {
-        const snap = await getDocs(replenishmentsRef);
+        // 1. Fetch all orders from Firestore
+        const ordersRef = collection(db, 'orders');
+        const ordersSnap = await getDocs(ordersRef);
+
+        const VALID_STATUSES: string[] = ['confirmado', 'preparacion', 'enviado', 'en_camino', 'entregado'];
+        const customerOrdersMap = new Map<string, any>();
+
+        ordersSnap.forEach((docSnap) => {
+            const orderData = { id: docSnap.id, ...docSnap.data() } as any;
+            const status = orderData.status || 'pendiente';
+
+            // Only consider confirmed or processed orders
+            if (!VALID_STATUSES.includes(status)) {
+                return;
+            }
+
+            const phone = (orderData.cliente?.celular || orderData.cliente?.telefono || '').replace(/\D/g, '');
+            const email = (orderData.cliente?.email || '').toLowerCase().trim();
+            const customerKey = phone || email;
+
+            if (!customerKey) return;
+
+            // Pick the latest order for each customer
+            const existing = customerOrdersMap.get(customerKey);
+            let orderDateMs = Date.now();
+            if (orderData.createdAt && typeof orderData.createdAt.toMillis === 'function') {
+                orderDateMs = orderData.createdAt.toMillis();
+            } else if (orderData.createdAt) {
+                orderDateMs = new Date(orderData.createdAt).getTime();
+            }
+
+            if (!existing || orderDateMs > existing._orderDateMs) {
+                customerOrdersMap.set(customerKey, {
+                    ...orderData,
+                    _orderDateMs: orderDateMs
+                });
+            }
+        });
+
+        // 2. Fetch any existing overrides from customer_replenishments (e.g. manual B2B toggle, lastReminderSentAt)
+        const customSnap = await getDocs(replenishmentsRef);
+        const customMap = new Map<string, any>();
+        customSnap.forEach((docSnap) => {
+            customMap.set(docSnap.id, docSnap.data());
+        });
+
+        // 3. Generate replenishment records
         const list: CustomerReplenishment[] = [];
         const now = Date.now();
 
-        snap.forEach(doc => {
-            const data = doc.data() as CustomerReplenishment;
-            const dueDate = new Date(data.nextOrderDueDate).getTime();
+        customerOrdersMap.forEach((order) => {
+            const repl = processOrderReplenishment(order);
+            const customData = customMap.get(repl.id || '') || {};
+
+            // Merge custom fields (e.g. manual customerType override, lastReminderSentAt)
+            if (customData.customerType) {
+                repl.customerType = customData.customerType;
+            }
+            if (customData.lastReminderSentAt) {
+                repl.lastReminderSentAt = customData.lastReminderSentAt;
+            }
+
+            const dueDate = new Date(repl.nextOrderDueDate).getTime();
             const daysLeft = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
 
             let status: CustomerReplenishment['status'] = 'surtido';
@@ -171,11 +229,8 @@ export async function getAllReplenishmentRecords(): Promise<CustomerReplenishmen
                 status = 'alerta_temprana';
             }
 
-            list.push({
-                ...data,
-                id: doc.id,
-                status
-            });
+            repl.status = status;
+            list.push(repl);
         });
 
         // Sort by nextOrderDueDate ascending (most urgent first)
