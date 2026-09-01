@@ -11,6 +11,7 @@ const GESTOR_ALLOWED_PREFIXES = [
     '/admin/auditoria-envios',
     '/admin/inventario',
     '/admin/carritos-abandonados',
+    '/admin/finanzas',
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

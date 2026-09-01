@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const canAccess = (module: string): boolean => {
         if (role === 'superadmin') return true;
         if (role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
-            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard', 'carritos-abandonados'].includes(module);
+            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard', 'carritos-abandonados', 'finanzas', 'productos'].includes(module);
         }
         return false;
     };

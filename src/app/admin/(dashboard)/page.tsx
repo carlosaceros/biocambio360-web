@@ -383,6 +383,24 @@ export default function AdminDashboard() {
                                         Recuperar Clientes <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/finanzas')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                        <TrendingUp size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Análisis Financiero</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Histórico por meses, ticket promedio y exportación CSV.
+                                    </p>
+                                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                        Ver Finanzas & Balance <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
                             </div>
                         </div>
                     </>
@@ -652,6 +670,17 @@ export default function AdminDashboard() {
                                     <ShoppingCart className="text-rose-600 mb-3" size={24} />
                                     <p className="font-black text-gray-900 mb-1">Carritos Abandonados</p>
                                     <p className="text-xs text-gray-600">Recuperación WhatsApp 1-clic y correos</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/finanzas')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-emerald-200 transition-colors"
+                                >
+                                    <TrendingUp className="text-emerald-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Histórico & Análisis Financiero</p>
+                                    <p className="text-xs text-gray-600">Histórico de meses, AOV, fletes y CSV</p>
                                 </motion.button>
                             </div>
                         </div>

@@ -31,10 +31,25 @@ export interface OrderItem {
     price: number;
 }
 
+export interface OrderInternalNote {
+    id: string;
+    text: string;
+    authorEmail: string;
+    authorName: string;
+    authorRole: string;
+    createdAt: string; // ISO string
+    stageAtCreation?: OrderStatus;
+    isStatusChangeNote?: boolean;
+    previousStatus?: OrderStatus;
+    newStatus?: OrderStatus;
+}
+
 export interface TimelineEvent {
     status: OrderStatus;
-    timestamp: Timestamp;
+    timestamp: Timestamp | any;
     user?: string;
+    userEmail?: string;
+    userRole?: string;
     note?: string;
 }
 
@@ -82,6 +97,7 @@ export interface Order {
     };
     wompiTransaction?: WompiTransactionDetails;
     timeline: TimelineEvent[];
+    notasInternas?: OrderInternalNote[];
     whatsappConversation?: string[];
     notas?: string[];
     createdAt: Timestamp;

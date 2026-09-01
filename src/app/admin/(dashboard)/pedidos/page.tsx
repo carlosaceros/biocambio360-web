@@ -35,12 +35,15 @@ import {
     ExternalLink,
     ShieldCheck,
     Target,
-    Globe
+    Globe,
+    Send,
+    FileText,
+    ArrowRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { subscribeToOrders, updateOrderStatus } from '@/lib/orders-service';
-import { Order, OrderStatus, ORDER_STATUS_CONFIG, TimelineEvent } from '@/types/order';
+import { subscribeToOrders, updateOrderStatus, addOrderInternalNote } from '@/lib/orders-service';
+import { Order, OrderStatus, ORDER_STATUS_CONFIG, TimelineEvent, OrderInternalNote } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -299,7 +302,7 @@ function KanbanColumn({ status, orders, onOrderClick }: KanbanColumnProps) {
 
 export default function PedidosPage() {
     const router = useRouter();
-    const { user, role } = useAuth();
+    const { user, userProfile, role } = useAuth();
     const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeOrder, setActiveOrder] = useState<(Order & { id: string }) | null>(null);
@@ -307,6 +310,21 @@ export default function PedidosPage() {
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [isCheckingWompi, setIsCheckingWompi] = useState(false);
     const [wompiStatusFeedback, setWompiStatusFeedback] = useState<string | null>(null);
+
+    // Modal de Cambio de Etapa con Comentario Logístico
+    const [stageChangePrompt, setStageChangePrompt] = useState<{
+        isOpen: boolean;
+        orderId: string;
+        orderTitle: string;
+        prevStatus: OrderStatus;
+        targetStatus: OrderStatus;
+    } | null>(null);
+    const [stageNoteText, setStageNoteText] = useState('');
+    const [isSubmittingStageChange, setIsSubmittingStageChange] = useState(false);
+
+    // Estado para nueva nota interna en modal de detalle
+    const [newInternalNoteText, setNewInternalNoteText] = useState('');
+    const [isAddingInternalNote, setIsAddingInternalNote] = useState(false);
 
     const handleCheckWompi = async (orderId: string) => {
         setIsCheckingWompi(true);
@@ -348,7 +366,7 @@ export default function PedidosPage() {
         setActiveDragId(event.active.id as string);
     };
 
-    const handleDragEnd = async (event: DragEndEvent) => {
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         setActiveDragId(null);
 
@@ -359,22 +377,90 @@ export default function PedidosPage() {
         const order = orders.find(o => o.id === orderId);
         const previousStatus = order?.status;
 
-        if (order && previousStatus !== newStatus) {
-            // Optimistic update
-            setOrders(prev => prev.map(o =>
-                o.id === orderId ? { ...o, status: newStatus } : o
-            ));
+        if (order && previousStatus && previousStatus !== newStatus) {
+            setStageNoteText('');
+            setStageChangePrompt({
+                isOpen: true,
+                orderId,
+                orderTitle: `Pedido #${order.id.slice(-8)} · ${order.cliente.nombre}`,
+                prevStatus: previousStatus,
+                targetStatus: newStatus
+            });
+        }
+    };
 
-            try {
-                await updateOrderStatus(orderId, newStatus, `Estado actualizado a ${ORDER_STATUS_CONFIG[newStatus].label}`);
-            } catch (error: any) {
-                console.error('[Kanban] Error updating order status:', error?.message || error);
-                // Revert optimistic update
-                setOrders(prev => prev.map(o =>
-                    o.id === orderId ? { ...o, status: previousStatus! } : o
-                ));
-                alert(`No se pudo actualizar el estado del pedido. ${error?.message || 'Verifica tu conexión o los permisos de Firestore.'}`);
+    const handleConfirmStageChange = async (withNote = true) => {
+        if (!stageChangePrompt) return;
+        const { orderId, prevStatus, targetStatus } = stageChangePrompt;
+        const noteToSend = withNote && stageNoteText.trim() 
+            ? stageNoteText.trim() 
+            : `Estado actualizado a ${ORDER_STATUS_CONFIG[targetStatus].label}`;
+
+        setIsSubmittingStageChange(true);
+        // Optimistic update
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: targetStatus } : o));
+        if (activeOrder && activeOrder.id === orderId) {
+            setActiveOrder(prev => prev ? { ...prev, status: targetStatus } : null);
+        }
+
+        try {
+            await updateOrderStatus(
+                orderId,
+                targetStatus,
+                noteToSend,
+                {
+                    email: user?.email || '',
+                    nombre: userProfile?.nombre || (role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
+                    role: role || 'logistico'
+                }
+            );
+            setStageChangePrompt(null);
+            setStageNoteText('');
+        } catch (error: any) {
+            console.error('[Kanban] Error updating order status:', error?.message || error);
+            // Revert
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: prevStatus } : o));
+            if (activeOrder && activeOrder.id === orderId) {
+                setActiveOrder(prev => prev ? { ...prev, status: prevStatus } : null);
             }
+            alert(`No se pudo actualizar el estado del pedido: ${error?.message || 'Error de conexión'}`);
+        } finally {
+            setIsSubmittingStageChange(false);
+        }
+    };
+
+    const handleAddDirectNote = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeOrder || !newInternalNoteText.trim()) return;
+
+        setIsAddingInternalNote(true);
+        try {
+            const addedNote = await addOrderInternalNote(
+                activeOrder.id,
+                newInternalNoteText.trim(),
+                {
+                    email: user?.email || '',
+                    nombre: userProfile?.nombre || (role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
+                    role: role || 'logistico'
+                },
+                activeOrder.status
+            );
+
+            setActiveOrder(prev => prev ? {
+                ...prev,
+                notasInternas: [...(prev.notasInternas || []), addedNote]
+            } : null);
+
+            setOrders(prev => prev.map(o => o.id === activeOrder.id ? {
+                ...o,
+                notasInternas: [...(o.notasInternas || []), addedNote]
+            } : o));
+
+            setNewInternalNoteText('');
+        } catch (err: any) {
+            alert(`Error al guardar la nota: ${err.message}`);
+        } finally {
+            setIsAddingInternalNote(false);
         }
     };
 
@@ -865,6 +951,96 @@ export default function PedidosPage() {
                                             </div>
                                         </div>
 
+                                        {/* 📝 Bitácora & Notas Internas de Logística */}
+                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                                    <FileText className="text-emerald-600" size={18} />
+                                                    Notas Internas de Logística
+                                                </h3>
+                                                <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                                                    {safeToArray<OrderInternalNote>(activeOrder.notasInternas).length} nota{safeToArray<OrderInternalNote>(activeOrder.notasInternas).length !== 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+
+                                            {/* Form to add note */}
+                                            <form onSubmit={handleAddDirectNote} className="space-y-2">
+                                                <div className="relative">
+                                                    <textarea
+                                                        rows={2}
+                                                        value={newInternalNoteText}
+                                                        onChange={(e) => setNewInternalNoteText(e.target.value)}
+                                                        placeholder="Escribe una observación interna (Ej: Cliente confirmó entrega por la tarde, número de guía alterno, etc.)..."
+                                                        className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all resize-none text-slate-900"
+                                                    />
+                                                </div>
+                                                <div className="flex justify-end">
+                                                    <button
+                                                        type="submit"
+                                                        disabled={isAddingInternalNote || !newInternalNoteText.trim()}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                    >
+                                                        <Send size={12} />
+                                                        <span>{isAddingInternalNote ? 'Guardando...' : 'Agregar Nota'}</span>
+                                                    </button>
+                                                </div>
+                                            </form>
+
+                                            {/* Notes history list */}
+                                            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                                                {safeToArray<OrderInternalNote>(activeOrder.notasInternas).length === 0 ? (
+                                                    <p className="text-xs text-slate-400 italic text-center py-2">
+                                                        No hay notas internas registradas en este pedido aún.
+                                                    </p>
+                                                ) : (
+                                                    safeToArray<OrderInternalNote>(activeOrder.notasInternas)
+                                                        .slice()
+                                                        .reverse()
+                                                        .map((n: OrderInternalNote, nIdx: number) => {
+                                                            const noteDate = new Date(n.createdAt);
+                                                            const formattedNoteDate = isNaN(noteDate.getTime())
+                                                                ? n.createdAt
+                                                                : noteDate.toLocaleString('es-CO', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                });
+
+                                                            return (
+                                                                <div key={n.id || nIdx} className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-xs space-y-1.5">
+                                                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="font-bold text-xs text-slate-900">{n.authorName}</span>
+                                                                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${
+                                                                                n.authorRole === 'superadmin'
+                                                                                    ? 'bg-indigo-100 text-indigo-700'
+                                                                                    : 'bg-emerald-100 text-emerald-700'
+                                                                            }`}>
+                                                                                {n.authorRole === 'superadmin' ? 'Admin' : 'Logística'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <span className="text-[10px] font-mono text-slate-400">{formattedNoteDate}</span>
+                                                                    </div>
+
+                                                                    {n.isStatusChangeNote && n.previousStatus && n.newStatus && (
+                                                                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded w-fit">
+                                                                            <span>{ORDER_STATUS_CONFIG[n.previousStatus]?.label || n.previousStatus}</span>
+                                                                            <ArrowRight size={10} />
+                                                                            <span className="text-slate-900">{ORDER_STATUS_CONFIG[n.newStatus]?.label || n.newStatus}</span>
+                                                                        </div>
+                                                                    )}
+
+                                                                    <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                                                        {n.text}
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        })
+                                                )}
+                                            </div>
+                                        </div>
+
                                         <div>
                                             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                                                 <Clock className="text-purple-600" size={18} />
@@ -876,7 +1052,14 @@ export default function PedidosPage() {
                                                     return (
                                                         <div key={idx} className="relative">
                                                             <div className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full ${ORDER_STATUS_CONFIG[statusKey].bgColor} border-2 border-white ring-1 ring-gray-200`} />
-                                                            <p className="text-sm font-bold text-gray-900">{ORDER_STATUS_CONFIG[statusKey].label}</p>
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <p className="text-sm font-bold text-gray-900">{ORDER_STATUS_CONFIG[statusKey].label}</p>
+                                                                {event.user && (
+                                                                    <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-medium">
+                                                                        {event.user}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <p className="text-xs text-gray-500">
                                                                 {format(safeToDate(event.timestamp), "d MMM, HH:mm", { locale: es })}
                                                             </p>
@@ -941,6 +1124,82 @@ export default function PedidosPage() {
                                     <MessageCircle size={20} />
                                     Contactar por WhatsApp
                                 </a>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal de Confirmación de Cambio de Etapa con Comentario */}
+            <AnimatePresence>
+                {stageChangePrompt && (
+                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-gray-100"
+                        >
+                            <div className="flex items-center justify-between pb-3 border-b">
+                                <h3 className="text-base font-black text-gray-900">
+                                    Cambiar Estado de Pedido
+                                </h3>
+                                <button
+                                    onClick={() => setStageChangePrompt(null)}
+                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <p className="text-xs font-bold text-gray-500">
+                                {stageChangePrompt.orderTitle}
+                            </p>
+
+                            {/* State transition badges */}
+                            <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                <span className={`${ORDER_STATUS_CONFIG[stageChangePrompt.prevStatus].bgColor} ${ORDER_STATUS_CONFIG[stageChangePrompt.prevStatus].color} px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1`}>
+                                    {ORDER_STATUS_CONFIG[stageChangePrompt.prevStatus].icon} {ORDER_STATUS_CONFIG[stageChangePrompt.prevStatus].label}
+                                </span>
+                                <ArrowRight size={16} className="text-gray-400" />
+                                <span className={`${ORDER_STATUS_CONFIG[stageChangePrompt.targetStatus].bgColor} ${ORDER_STATUS_CONFIG[stageChangePrompt.targetStatus].color} px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1`}>
+                                    {ORDER_STATUS_CONFIG[stageChangePrompt.targetStatus].icon} {ORDER_STATUS_CONFIG[stageChangePrompt.targetStatus].label}
+                                </span>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-gray-700">
+                                    Nota o Comentario Logístico (Opcional):
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    value={stageNoteText}
+                                    onChange={(e) => setStageNoteText(e.target.value)}
+                                    placeholder="Ej: Empacado con 2 galones adicionales, cliente confirmó recepción para mañana, despachado con mensajero Juan..."
+                                    className="w-full text-xs p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 text-gray-900 resize-none"
+                                />
+                                <p className="text-[11px] text-gray-400">
+                                    Esta nota se guardará en la bitácora del pedido con tu nombre y rol.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                                <button
+                                    type="button"
+                                    onClick={() => setStageChangePrompt(null)}
+                                    disabled={isSubmittingStageChange}
+                                    className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleConfirmStageChange(true)}
+                                    disabled={isSubmittingStageChange}
+                                    className="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSubmittingStageChange ? 'Guardando...' : 'Confirmar Cambio'}
+                                </button>
                             </div>
                         </motion.div>
                     </div>

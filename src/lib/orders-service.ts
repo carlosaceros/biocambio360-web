@@ -15,7 +15,7 @@ import {
 import { db } from './firebase';
 import { upsertCustomerFromOrder } from './customers-service';
 
-import { Order, OrderStatus, TimelineEvent } from '@/types/order';
+import { Order, OrderStatus, TimelineEvent, OrderInternalNote } from '@/types/order';
 
 // Collection reference
 const ordersCollection = collection(db, 'orders');
@@ -60,12 +60,13 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
 }
 
 /**
- * Update order status
+ * Update order status with optional note and user attribution
  */
 export async function updateOrderStatus(
     orderId: string,
     newStatus: OrderStatus,
-    note?: string
+    note?: string,
+    userContext?: { email?: string; nombre?: string; role?: string }
 ): Promise<void> {
     const orderRef = doc(db, 'orders', orderId);
     const orderSnap = await getDoc(orderRef);
@@ -75,19 +76,78 @@ export async function updateOrderStatus(
     }
 
     const order = orderSnap.data() as Order;
+    const previousStatus = order.status;
     const now = Timestamp.now();
+    const nowIso = new Date().toISOString();
 
     const newTimelineEvent = removeUndefined({
         status: newStatus,
         timestamp: now,
+        user: userContext?.nombre || userContext?.email || 'Sistema / Gestor',
+        userEmail: userContext?.email,
+        userRole: userContext?.role,
         note
     } as TimelineEvent);
 
-    await updateDoc(orderRef, {
+    const updatePayload: Record<string, any> = {
         status: newStatus,
         timeline: arrayUnion(newTimelineEvent),
         updatedAt: now
+    };
+
+    if (note && note.trim()) {
+        const internalNote: OrderInternalNote = {
+            id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            text: note.trim(),
+            authorEmail: userContext?.email || 'logistica@biocambio360.com',
+            authorName: userContext?.nombre || (userContext?.role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
+            authorRole: userContext?.role || 'logistico',
+            createdAt: nowIso,
+            stageAtCreation: newStatus,
+            isStatusChangeNote: true,
+            previousStatus,
+            newStatus
+        };
+        updatePayload.notasInternas = arrayUnion(removeUndefined(internalNote));
+    }
+
+    await updateDoc(orderRef, updatePayload);
+}
+
+/**
+ * Add an independent internal note to an order
+ */
+export async function addOrderInternalNote(
+    orderId: string,
+    noteText: string,
+    userContext?: { email?: string; nombre?: string; role?: string },
+    currentStage?: OrderStatus
+): Promise<OrderInternalNote> {
+    if (!noteText || !noteText.trim()) {
+        throw new Error('El texto de la nota no puede estar vacío');
+    }
+
+    const orderRef = doc(db, 'orders', orderId);
+    const nowIso = new Date().toISOString();
+    const now = Timestamp.now();
+
+    const internalNote: OrderInternalNote = {
+        id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        text: noteText.trim(),
+        authorEmail: userContext?.email || 'logistica@biocambio360.com',
+        authorName: userContext?.nombre || (userContext?.role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
+        authorRole: userContext?.role || 'logistico',
+        createdAt: nowIso,
+        stageAtCreation: currentStage || 'pendiente',
+        isStatusChangeNote: false
+    };
+
+    await updateDoc(orderRef, {
+        notasInternas: arrayUnion(removeUndefined(internalNote)),
+        updatedAt: now
     });
+
+    return internalNote;
 }
 
 /**
