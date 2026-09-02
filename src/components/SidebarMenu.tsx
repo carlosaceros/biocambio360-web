@@ -234,6 +234,24 @@ export default function SidebarMenu({
                     </nav>
 
                     <div className="p-4 bg-gray-50 border-t border-[var(--brand-border)] space-y-2.5">
+                        {/* CTA Comunidad & Referidos */}
+                        <Link
+                            href="/comunidad"
+                            onClick={onClose}
+                            className="w-full bg-gradient-to-r from-purple-900 via-indigo-950 to-purple-900 hover:opacity-95 text-white p-3 rounded-2xl shadow-md border border-purple-500/30 flex items-center justify-between transition-all group cursor-pointer"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-purple-500/20 text-purple-300 rounded-xl text-base">
+                                    🎁
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-xs font-black text-white tracking-wide">GANA $10.000 POR REFERIDO</p>
+                                    <p className="text-[10px] text-purple-200 font-medium">Únete al Club de Embajadores</p>
+                                </div>
+                            </div>
+                            <ArrowRight size={16} className="text-purple-300 group-hover:translate-x-1 transition-transform" />
+                        </Link>
+
                         {/* CTA B2B Cotizador */}
                         <Link
                             href="/cotizador-b2b"

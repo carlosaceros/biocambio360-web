@@ -301,8 +301,16 @@ function HomeContent() {
               <img src="/images/logo-biocambio360.png" alt="Biocambio360" className="h-9 md:h-12 object-contain" />
             </div>
 
-            {/* Mobile Cart Button */}
+            {/* Mobile Actions Button */}
             <div className="flex items-center gap-2 md:hidden">
+              <Link
+                href="/comunidad"
+                className="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1 shadow-2xs"
+                title="Gana $10.000 recomendando"
+              >
+                🎁 $10.000
+              </Link>
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -439,6 +447,12 @@ function HomeContent() {
             >
               <ShieldCheck size={14} /> Guía & Mezclas
             </Link>
+            <Link
+              href="/comunidad"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-full transition-all text-xs font-black flex items-center gap-1 shadow-md shadow-purple-600/20 hover:scale-105"
+            >
+              🎁 Gana $10.000
+            </Link>
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
@@ -541,6 +555,13 @@ function HomeContent() {
                   >
                     🔥 ARMAR COMBO
                   </motion.button>
+                  <Link
+                    href="/comunidad"
+                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black px-7 py-4 rounded-2xl shadow-xl flex items-center gap-2 text-sm tracking-tight transition-all hover:scale-105 border border-purple-400/30 cursor-pointer"
+                  >
+                    <span>🎁 GANA $10.000</span>
+                    <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full uppercase">Referidos</span>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -850,6 +871,7 @@ function HomeContent() {
                 <li><a href="/privacidad" className="hover:text-white transition-colors">Privacidad y Tratamiento de Datos</a></li>
                 <li><a href="/politica-tratamiento-datos-biocambio360-2026.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-1">📄 Política Tratamiento de Datos (PDF)</a></li>
                 <li><a href="/terminos" className="hover:text-white transition-colors">Términos y Condiciones</a></li>
+                <li><Link href="/comunidad" className="text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 font-bold">🎁 Programa de Referidos (Gana $10.000)</Link></li>
                 <li><Link href="/blog" className="hover:text-white transition-colors">Blog & Academia</Link></li>
                 <li><Link href="/guia-uso-y-mezclas" className="hover:text-white transition-colors text-blue-400 flex items-center gap-1 font-black">🧪 Guía de Mezclas & Bioseguridad</Link></li>
               </ul>
