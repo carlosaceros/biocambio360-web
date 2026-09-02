@@ -80,3 +80,21 @@ export interface ReferralTransaction {
     updatedAt: Timestamp;
     approvedAt?: Timestamp;
 }
+
+export interface ReferralBalanceAuditLog {
+    id?: string;
+    timestamp: string; // ISO string
+    userEmail: string;
+    userName: string;
+    userRole: string;
+    profileId: string;
+    profileName: string;
+    profilePhone: string;
+    referralCode: string;
+    previousBalance: number;
+    newBalance: number;
+    difference: number;
+    reason?: string;
+    source: 'admin_modal' | 'blacklist_penalty' | 'manual_adjustment';
+    createdAt: string;
+}

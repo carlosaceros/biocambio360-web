@@ -27,4 +27,16 @@ vi.mock('firebase/firestore', () => ({
     query: vi.fn(),
     orderBy: vi.fn(),
     where: vi.fn(),
+    limit: vi.fn(),
+    increment: vi.fn((val: number) => val),
+    runTransaction: vi.fn(),
+    Timestamp: {
+        now: () => ({
+            toDate: () => new Date(),
+            toMillis: () => Date.now(),
+            seconds: Math.floor(Date.now() / 1000),
+            nanoseconds: 0
+        }),
+    },
 }));
+

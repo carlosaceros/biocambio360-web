@@ -18,7 +18,8 @@ import {
     ReferralProfile, 
     ReferralTransaction, 
     ReferralConfig, 
-    ReferralTier 
+    ReferralTier,
+    ReferralBalanceAuditLog
 } from '@/types/referral';
 import { Coupon } from './coupon-types';
 
@@ -41,6 +42,7 @@ export const DEFAULT_REFERRAL_CONFIG: ReferralConfig = {
 
 const profilesCollection = collection(db, 'referral_profiles');
 const transactionsCollection = collection(db, 'referral_transactions');
+const balanceAuditCollection = collection(db, 'referral_balance_audit_logs');
 const configDocRef = doc(db, 'referral_config', 'main');
 
 /**
@@ -402,32 +404,39 @@ export async function recordReferralTransaction(params: {
     await setDoc(txRef, removeUndefined(newTx));
 
     // Incrementar balance pendiente en el perfil del embajador
-    await updateDoc(profileRef, {
+    const profileUpdates: Record<string, any> = {
         totalReferredOrders: increment(1),
         totalSalesGenerated: increment(params.orderTotal),
         balancePending: increment(config.rewardAmount),
-        fraudAlert: isDuplicateAddressAlert ? true : undefined,
         updatedAt: now
-    });
+    };
+    if (isDuplicateAddressAlert) {
+        profileUpdates.fraudAlert = true;
+    }
+    await updateDoc(profileRef, profileUpdates);
 
     // Notificación por Email al Embajador (Presión Social de Entrega)
+    // Se invoca a través de API Route para no incluir nodemailer en el bundle de cliente
     try {
         const profSnap = await getDoc(profileRef);
         if (profSnap.exists()) {
             const prof = profSnap.data() as ReferralProfile;
             if (prof.email) {
-                const { sendReferralRewardPendingEmail } = await import('./email-service');
-                await sendReferralRewardPendingEmail({
-                    referrerEmail: prof.email,
-                    referrerName: prof.nombre,
-                    friendName: params.customer.nombre.trim().split(' ')[0],
-                    rewardAmount: config.rewardAmount,
-                    orderId: params.orderId
-                });
+                fetch('/api/notifications/referral-reward', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        referrerEmail: prof.email,
+                        referrerName: prof.nombre,
+                        friendName: params.customer.nombre.trim().split(' ')[0],
+                        rewardAmount: config.rewardAmount,
+                        orderId: params.orderId
+                    })
+                }).catch(e => console.warn('[Referrals] Error enviando email de recompensa pendiente:', e));
             }
         }
     } catch (mailErr) {
-        console.warn('[Referrals] Error enviando email de recompensa pendiente al embajador:', mailErr);
+        console.warn('[Referrals] Error preparando notificación de recompensa al embajador:', mailErr);
     }
 }
 
@@ -602,17 +611,104 @@ export async function getAllReferralTransactions(): Promise<ReferralTransaction[
 }
 
 /**
+ * Registra un evento en la bitácora de auditoría de saldos de embajadores
+ */
+export async function recordReferralBalanceAuditLog(
+    log: Omit<ReferralBalanceAuditLog, 'id'>
+): Promise<void> {
+    try {
+        const auditDocRef = doc(balanceAuditCollection);
+        await setDoc(auditDocRef, removeUndefined({
+            ...log,
+            createdAt: new Date().toISOString()
+        }));
+    } catch (err) {
+        console.warn('[ReferralAudit] Error guardando log de auditoría de saldo:', err);
+    }
+}
+
+/**
+ * Obtiene el historial de auditoría de saldos (global o filtrado por perfil)
+ */
+export async function getReferralBalanceAuditLogs(
+    profileId?: string,
+    limitCount = 100
+): Promise<ReferralBalanceAuditLog[]> {
+    try {
+        let q;
+        if (profileId) {
+            q = query(
+                balanceAuditCollection,
+                where('profileId', '==', profileId),
+                orderBy('timestamp', 'desc'),
+                limit(limitCount)
+            );
+        } else {
+            q = query(
+                balanceAuditCollection,
+                orderBy('timestamp', 'desc'),
+                limit(limitCount)
+            );
+        }
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as ReferralBalanceAuditLog));
+    } catch (err) {
+        console.warn('[ReferralAudit] Error consultando bitácora de saldos:', err);
+        return [];
+    }
+}
+
+/**
  * Actualizar manualmente el estado de un perfil de embajador (activar/suspender/ajuste de saldo)
+ * Garantiza trazabilidad y auditoría si se modifica el saldo disponible.
  */
 export async function updateReferralProfileAdmin(
     profileId: string,
-    updates: Partial<ReferralProfile>
+    updates: Partial<ReferralProfile>,
+    auditContext?: {
+        userContext?: { email?: string; nombre?: string; role?: string };
+        reason?: string;
+    }
 ): Promise<void> {
     const profileRef = doc(profilesCollection, profileId);
-    await updateDoc(profileRef, {
+
+    // Si se modifica el saldo disponible, registrar trazabilidad obligatoria
+    if (updates.balanceAvailable !== undefined) {
+        try {
+            const currentSnap = await getDoc(profileRef);
+            if (currentSnap.exists()) {
+                const currentData = currentSnap.data() as ReferralProfile;
+                const oldBal = currentData.balanceAvailable || 0;
+                const newBal = Number(updates.balanceAvailable);
+
+                if (oldBal !== newBal) {
+                    await recordReferralBalanceAuditLog({
+                        timestamp: new Date().toISOString(),
+                        userEmail: auditContext?.userContext?.email || 'admin@biocambio360.com',
+                        userName: auditContext?.userContext?.nombre || 'Administrador',
+                        userRole: auditContext?.userContext?.role || 'admin',
+                        profileId,
+                        profileName: currentData.nombre || 'Embajador',
+                        profilePhone: currentData.celular || profileId,
+                        referralCode: currentData.code || '',
+                        previousBalance: oldBal,
+                        newBalance: newBal,
+                        difference: newBal - oldBal,
+                        reason: auditContext?.reason || 'Ajuste manual de saldo desde panel administrativo',
+                        source: 'admin_modal',
+                        createdAt: new Date().toISOString()
+                    });
+                }
+            }
+        } catch (auditErr) {
+            console.warn('[ReferralAudit] Error al auditar cambio de saldo:', auditErr);
+        }
+    }
+
+    await updateDoc(profileRef, removeUndefined({
         ...updates,
         updatedAt: Timestamp.now()
-    });
+    }));
 }
 
 /**
@@ -623,10 +719,44 @@ export async function toggleBlacklistReferralProfile(
     profileId: string,
     isBlacklisted: boolean,
     reason?: string,
-    penalizeBalances = false
+    penalizeBalances = false,
+    auditContext?: {
+        userContext?: { email?: string; nombre?: string; role?: string };
+    }
 ): Promise<void> {
     const profileRef = doc(profilesCollection, profileId);
     const now = Timestamp.now();
+
+    // Si se penalizan saldos dejándolos en 0, registrar en auditoría
+    if (isBlacklisted && penalizeBalances) {
+        try {
+            const currentSnap = await getDoc(profileRef);
+            if (currentSnap.exists()) {
+                const currentData = currentSnap.data() as ReferralProfile;
+                const oldBal = currentData.balanceAvailable || 0;
+                if (oldBal > 0) {
+                    await recordReferralBalanceAuditLog({
+                        timestamp: new Date().toISOString(),
+                        userEmail: auditContext?.userContext?.email || 'admin@biocambio360.com',
+                        userName: auditContext?.userContext?.nombre || 'Administrador',
+                        userRole: auditContext?.userContext?.role || 'admin',
+                        profileId,
+                        profileName: currentData.nombre || 'Embajador',
+                        profilePhone: currentData.celular || profileId,
+                        referralCode: currentData.code || '',
+                        previousBalance: oldBal,
+                        newBalance: 0,
+                        difference: -oldBal,
+                        reason: `Anulación por lista negra: ${reason || 'Sanción administrativa'}`,
+                        source: 'blacklist_penalty',
+                        createdAt: new Date().toISOString()
+                    });
+                }
+            }
+        } catch (auditErr) {
+            console.warn('[ReferralAudit] Error al auditar anulación de saldo por lista negra:', auditErr);
+        }
+    }
 
     const updates: Record<string, any> = {
         isBlacklisted,
@@ -647,3 +777,4 @@ export async function toggleBlacklistReferralProfile(
 
     await updateDoc(profileRef, updates);
 }
+

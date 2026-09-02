@@ -22,14 +22,17 @@ import {
     FileSpreadsheet,
     Wallet,
     ShieldAlert,
-    Ban
+    Ban,
+    History
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import { 
     ReferralProfile, 
     ReferralTransaction, 
     ReferralConfig, 
-    ReferralTier 
+    ReferralTier,
+    ReferralBalanceAuditLog
 } from '@/types/referral';
 import { 
     getAllReferralProfiles, 
@@ -37,27 +40,35 @@ import {
     getReferralConfig, 
     saveReferralConfig, 
     updateReferralProfileAdmin,
-    toggleBlacklistReferralProfile
+    toggleBlacklistReferralProfile,
+    getReferralBalanceAuditLogs
 } from '@/lib/referrals-service';
 import { formatCurrency } from '@/lib/checkout-utils';
 
 export default function AdminReferidosPage() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'embajadores' | 'transacciones' | 'configuracion'>('dashboard');
+    const { user, userProfile, role } = useAuth();
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'embajadores' | 'transacciones' | 'configuracion' | 'auditoria'>('dashboard');
     const [profiles, setProfiles] = useState<ReferralProfile[]>([]);
     const [transactions, setTransactions] = useState<ReferralTransaction[]>([]);
+    const [balanceAuditLogs, setBalanceAuditLogs] = useState<ReferralBalanceAuditLog[]>([]);
     const [config, setConfig] = useState<ReferralConfig | null>(null);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [auditSearchQuery, setAuditSearchQuery] = useState('');
 
     // Modal de edición manual de embajador
     const [selectedProfile, setSelectedProfile] = useState<ReferralProfile | null>(null);
     const [editBalance, setEditBalance] = useState(0);
+    const [editBalanceReason, setEditBalanceReason] = useState('');
     const [editTier, setEditTier] = useState<ReferralTier>('referidor');
     const [editIsActive, setEditIsActive] = useState(true);
     const [editIsBlacklisted, setEditIsBlacklisted] = useState(false);
     const [editBlacklistReason, setEditBlacklistReason] = useState('');
     const [savingProfile, setSavingProfile] = useState(false);
+    const [profileAuditHistory, setProfileAuditHistory] = useState<ReferralBalanceAuditLog[]>([]);
+    const [loadingProfileHistory, setLoadingProfileHistory] = useState(false);
+    const [showHistoryInModal, setShowHistoryInModal] = useState(false);
 
     // Guardado de configuración
     const [savingConfig, setSavingConfig] = useState(false);
@@ -66,14 +77,16 @@ export default function AdminReferidosPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [profs, txs, cfg] = await Promise.all([
+            const [profs, txs, cfg, audits] = await Promise.all([
                 getAllReferralProfiles(),
                 getAllReferralTransactions(),
-                getReferralConfig()
+                getReferralConfig(),
+                getReferralBalanceAuditLogs(undefined, 150)
             ]);
             setProfiles(profs);
             setTransactions(txs);
             setConfig(cfg);
+            setBalanceAuditLogs(audits);
         } catch (e) {
             console.error('Error cargando datos de referidos:', e);
         } finally {
@@ -118,31 +131,54 @@ export default function AdminReferidosPage() {
     const handleOpenProfileModal = (p: ReferralProfile) => {
         setSelectedProfile(p);
         setEditBalance(p.balanceAvailable || 0);
+        setEditBalanceReason('');
         setEditTier(p.tier || 'referidor');
         setEditIsActive(p.isActive !== false);
         setEditIsBlacklisted(!!p.isBlacklisted);
         setEditBlacklistReason(p.blacklistReason || '');
+        setShowHistoryInModal(false);
+
+        // Cargar bitácora de auditoría histórica para este embajador
+        setLoadingProfileHistory(true);
+        getReferralBalanceAuditLogs(p.id, 20)
+            .then(logs => setProfileAuditHistory(logs))
+            .catch(err => console.warn('Error cargando historial de perfil:', err))
+            .finally(() => setLoadingProfileHistory(false));
     };
 
     const handleSaveProfileUpdates = async () => {
         if (!selectedProfile) return;
         setSavingProfile(true);
         try {
+            const userCtx = {
+                email: user?.email || undefined,
+                nombre: userProfile?.nombre || user?.displayName || 'Administrador',
+                role: role || 'admin'
+            };
+
             if (editIsBlacklisted !== !!selectedProfile.isBlacklisted) {
                 // Cambio en lista negra
                 await toggleBlacklistReferralProfile(
                     selectedProfile.id,
                     editIsBlacklisted,
                     editBlacklistReason,
-                    editIsBlacklisted // Anula saldo si entra a lista negra
+                    editIsBlacklisted, // Anula saldo si entra a lista negra
+                    { userContext: userCtx }
                 );
             } else {
-                await updateReferralProfileAdmin(selectedProfile.id, {
-                    balanceAvailable: Number(editBalance),
-                    tier: editTier,
-                    isActive: editIsActive,
-                    blacklistReason: editBlacklistReason
-                });
+                await updateReferralProfileAdmin(
+                    selectedProfile.id, 
+                    {
+                        balanceAvailable: Number(editBalance),
+                        tier: editTier,
+                        isActive: editIsActive,
+                        blacklistReason: editBlacklistReason
+                    },
+                    {
+                        userContext: userCtx,
+                        reason: editBalanceReason || 'Ajuste manual de saldo en monedero'
+                    }
+                );
             }
 
             // Refrescar local
@@ -155,6 +191,10 @@ export default function AdminReferidosPage() {
                 isBlacklisted: editIsBlacklisted,
                 blacklistReason: editBlacklistReason
             } : p));
+
+            // Actualizar bitácora de auditoría global
+            getReferralBalanceAuditLogs(undefined, 150).then(logs => setBalanceAuditLogs(logs));
+
             setSelectedProfile(null);
         } catch (err) {
             alert('Error al actualizar el perfil.');
@@ -162,6 +202,16 @@ export default function AdminReferidosPage() {
             setSavingProfile(false);
         }
     };
+
+    const filteredAuditLogs = balanceAuditLogs.filter(log => {
+        const q = auditSearchQuery.toLowerCase();
+        return (log.profileName && log.profileName.toLowerCase().includes(q)) ||
+               (log.profilePhone && log.profilePhone.includes(q)) ||
+               (log.referralCode && log.referralCode.toLowerCase().includes(q)) ||
+               (log.userName && log.userName.toLowerCase().includes(q)) ||
+               (log.userEmail && log.userEmail.toLowerCase().includes(q)) ||
+               (log.reason && log.reason.toLowerCase().includes(q));
+    });
 
     const filteredProfiles = profiles.filter(p => {
         const q = searchQuery.toLowerCase();
@@ -287,6 +337,17 @@ export default function AdminReferidosPage() {
                     >
                         <Sliders size={16} />
                         Reglas & Configuración
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('auditoria')}
+                        className={`py-3 text-xs sm:text-sm font-black border-b-2 flex items-center gap-2 transition-colors cursor-pointer shrink-0 ${
+                            activeTab === 'auditoria'
+                                ? 'border-purple-600 text-purple-700'
+                                : 'border-transparent text-gray-500 hover:text-gray-900'
+                        }`}
+                    >
+                        <History size={16} />
+                        Bitácora de Saldos ({balanceAuditLogs.length})
                     </button>
                 </div>
             </header>
@@ -806,6 +867,133 @@ export default function AdminReferidosPage() {
                         </form>
                     </div>
                 )}
+
+                {/* 5. TAB: BITÁCORA DE AUDITORÍA Y TRAZABILIDAD DE SALDOS */}
+                {activeTab === 'auditoria' && (
+                    <div className="space-y-6">
+                        {/* Header & Search */}
+                        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xs border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                                    <History className="text-purple-600" size={24} />
+                                    Bitácora de Auditoría y Trazabilidad de Saldos
+                                </h2>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Registro de modificaciones manuales, variaciones de saldo y sanciones administrativas con control de autoría.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 w-full md:w-auto">
+                                <div className="relative w-full md:w-72">
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por embajador, autor o motivo..."
+                                        value={auditSearchQuery}
+                                        onChange={(e) => setAuditSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Summary KPI Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
+                                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Ajustes Registrados</p>
+                                <p className="text-2xl font-black text-gray-900 mt-1">{filteredAuditLogs.length}</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
+                                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Incrementos de Saldo (+)</p>
+                                <p className="text-2xl font-black text-emerald-600 mt-1">
+                                    +{formatCurrency(filteredAuditLogs.filter(l => l.difference > 0).reduce((sum, l) => sum + l.difference, 0))}
+                                </p>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
+                                <p className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Deducciones / Anulaciones (-)</p>
+                                <p className="text-2xl font-black text-rose-600 mt-1">
+                                    -{formatCurrency(Math.abs(filteredAuditLogs.filter(l => l.difference < 0).reduce((sum, l) => sum + l.difference, 0)))}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Audit Log Table */}
+                        <div className="bg-white rounded-3xl shadow-xs border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase font-bold tracking-wider">
+                                        <tr>
+                                            <th className="py-3.5 px-4">Fecha y Hora</th>
+                                            <th className="py-3.5 px-4">Embajador</th>
+                                            <th className="py-3.5 px-4">Modificado Por</th>
+                                            <th className="py-3.5 px-4 text-right">Saldo Anterior</th>
+                                            <th className="py-3.5 px-4 text-right">Nuevo Saldo</th>
+                                            <th className="py-3.5 px-4 text-center">Variación</th>
+                                            <th className="py-3.5 px-4">Motivo / Justificación</th>
+                                            <th className="py-3.5 px-4 text-center">Tipo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+                                        {filteredAuditLogs.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="py-10 text-center text-gray-400 text-xs">
+                                                    No se han registrado modificaciones manuales de saldo aún.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredAuditLogs.map((log, idx) => (
+                                                <tr key={log.id || idx} className="hover:bg-gray-50/80 transition-colors">
+                                                    <td className="py-3 px-4 whitespace-nowrap text-gray-500 font-mono text-[11px]">
+                                                        {new Date(log.timestamp).toLocaleString('es-CO', {
+                                                            day: '2-digit', month: 'short', year: 'numeric',
+                                                            hour: '2-digit', minute: '2-digit'
+                                                        })}
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="font-bold text-gray-900">{log.profileName}</div>
+                                                        <div className="text-[10px] text-gray-400 font-mono">{log.profilePhone} • {log.referralCode}</div>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="font-bold text-gray-800">{log.userName}</div>
+                                                        <div className="text-[10px] text-gray-400">{log.userEmail} ({log.userRole})</div>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right font-mono font-bold text-gray-500">
+                                                        {formatCurrency(log.previousBalance)}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right font-mono font-black text-gray-900">
+                                                        {formatCurrency(log.newBalance)}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black ${
+                                                            log.difference > 0
+                                                                ? 'bg-emerald-100 text-emerald-800'
+                                                                : log.difference < 0
+                                                                ? 'bg-rose-100 text-rose-800'
+                                                                : 'bg-gray-100 text-gray-600'
+                                                        }`}>
+                                                            {log.difference > 0 ? `+${formatCurrency(log.difference)}` : formatCurrency(log.difference)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-gray-600 text-[11px] max-w-xs truncate" title={log.reason}>
+                                                        {log.reason || 'Ajuste manual'}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                            log.source === 'blacklist_penalty'
+                                                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                                : 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                        }`}>
+                                                            {log.source === 'blacklist_penalty' ? 'Sanción' : 'Manual'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
 
             {/* Modal Editar Embajador */}
@@ -838,6 +1026,69 @@ export default function AdminReferidosPage() {
                                         step={1000}
                                     />
                                     <p className="text-[10px] text-gray-400 mt-1">Ajuste manual de saldo en monedero.</p>
+
+                                    {/* Indicador de Variación y Campo de Justificación si cambia el saldo */}
+                                    {editBalance !== (selectedProfile.balanceAvailable || 0) && (
+                                        <div className="mt-2.5 p-3 rounded-xl bg-purple-50/80 border border-purple-200 space-y-2">
+                                            <div className="flex items-center justify-between text-xs font-bold">
+                                                <span className="text-purple-900">Variación de saldo:</span>
+                                                <span className={editBalance > (selectedProfile.balanceAvailable || 0) ? 'text-emerald-700 font-black' : 'text-rose-700 font-black'}>
+                                                    {editBalance > (selectedProfile.balanceAvailable || 0)
+                                                        ? `+${formatCurrency(editBalance - (selectedProfile.balanceAvailable || 0))} (Adición)`
+                                                        : `-${formatCurrency((selectedProfile.balanceAvailable || 0) - editBalance)} (Deducción)`}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-purple-950 mb-1">
+                                                    Motivo o Justificación del Ajuste *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={editBalanceReason}
+                                                    onChange={(e) => setEditBalanceReason(e.target.value)}
+                                                    placeholder="Ej: Regularización contable, compensación autorizada..."
+                                                    className="w-full px-3 py-1.5 text-xs border border-purple-300 rounded-lg bg-white font-medium focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Historial de ajustes de este embajador */}
+                                    <div className="mt-2.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowHistoryInModal(!showHistoryInModal)}
+                                            className="text-[11px] font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <History size={13} />
+                                            {showHistoryInModal ? 'Ocultar historial de ajustes' : `Ver historial de ajustes (${profileAuditHistory.length})`}
+                                        </button>
+
+                                        {showHistoryInModal && (
+                                            <div className="mt-2 max-h-36 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-gray-50 border text-[11px]">
+                                                {loadingProfileHistory ? (
+                                                    <p className="text-gray-400 text-center py-2 text-[10px]">Cargando bitácora...</p>
+                                                ) : profileAuditHistory.length === 0 ? (
+                                                    <p className="text-gray-400 text-center py-2 text-[10px]">Sin modificaciones manuales registradas.</p>
+                                                ) : (
+                                                    profileAuditHistory.map((hist, i) => (
+                                                        <div key={hist.id || i} className="p-2 rounded-lg bg-white border border-gray-100 flex flex-col gap-0.5">
+                                                            <div className="flex items-center justify-between font-bold">
+                                                                <span className="text-gray-700">{hist.userName} ({hist.userRole})</span>
+                                                                <span className={hist.difference >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                                                                    {hist.difference >= 0 ? `+${formatCurrency(hist.difference)}` : formatCurrency(hist.difference)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500 flex items-center justify-between gap-2">
+                                                                <span className="shrink-0">{new Date(hist.timestamp).toLocaleDateString('es-CO')} {new Date(hist.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                <span className="truncate text-gray-600 text-right" title={hist.reason}>{hist.reason}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div>
