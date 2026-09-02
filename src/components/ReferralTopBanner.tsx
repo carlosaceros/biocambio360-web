@@ -18,12 +18,11 @@ export default function ReferralTopBanner() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
+        // Solo activar si el usuario trajo explícitamente el parámetro de referido en la URL para pruebas
         const urlRef = searchParams.get('ref') || searchParams.get('referral');
-        const storedRef = urlRef || localStorage.getItem('biocambio_referral_code');
+        if (!urlRef) return;
 
-        if (!storedRef) return;
-
-        const cleanCode = storedRef.trim().toUpperCase();
+        const cleanCode = urlRef.trim().toUpperCase();
 
         fetch(`/api/referrals/lookup?code=${cleanCode}`)
             .then(res => res.json())
