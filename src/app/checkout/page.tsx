@@ -464,7 +464,8 @@ export default function CheckoutPage() {
                                     nombre: formData.nombre,
                                     cedula: formData.cedula,
                                     celular: formData.celular,
-                                    ciudad: formData.ciudad
+                                    ciudad: formData.ciudad,
+                                    direccion: formData.direccion
                                 },
                                 orderSubtotal: subtotal,
                                 orderTotal: total,

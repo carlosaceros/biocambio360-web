@@ -29,6 +29,8 @@ export const DEFAULT_REFERRAL_CONFIG: ReferralConfig = {
     friendDiscountType: 'fixed',
     minOrderSubtotal: 50000,
     minReferrerSpend: 50000, // Pedido mínimo que debe haber hecho el embajador para que su código funcione
+    maxReferralsCap: 15, // Límite de seguridad de amigos referidos
+    maxRedemptionPercentage: 50, // El saldo acumulado solo puede pagar hasta el 50% del valor del pedido propio
     validityDays: 60,
     tierThresholds: {
         aliadoMinOrders: 3,
@@ -339,7 +341,7 @@ export async function recordReferralTransaction(params: {
     orderId: string;
     profileId: string;
     referralCode: string;
-    customer: { nombre: string; cedula?: string; celular: string; ciudad: string };
+    customer: { nombre: string; cedula?: string; celular: string; ciudad: string; direccion?: string };
     orderSubtotal: number;
     orderTotal: number;
     discountAmount: number;
@@ -350,6 +352,37 @@ export async function recordReferralTransaction(params: {
     const profileRef = doc(profilesCollection, params.profileId);
 
     const now = Timestamp.now();
+
+    // Detección Antifraude: Concentración de Dirección de Entrega
+    let isDuplicateAddressAlert = false;
+    if (params.customer.direccion && params.customer.direccion.trim().length > 6) {
+        try {
+            const cleanAddr = params.customer.direccion.trim().toLowerCase().replace(/[#.,-]/g, ' ');
+            // Buscar en las últimas 50 transacciones del mismo embajador
+            const qSameRef = query(
+                transactionsCollection,
+                where('referralProfileId', '==', params.profileId),
+                limit(50)
+            );
+            const prevTxs = await getDocs(qSameRef);
+            let addressMatches = 0;
+            prevTxs.forEach(d => {
+                const data = d.data() as ReferralTransaction;
+                const prevAddr = data.referredCustomer?.direccion?.trim().toLowerCase().replace(/[#.,-]/g, ' ');
+                if (prevAddr && (prevAddr.includes(cleanAddr) || cleanAddr.includes(prevAddr))) {
+                    addressMatches++;
+                }
+            });
+
+            // Si ya hay 2 o más pedidos anteriores con la misma dirección
+            if (addressMatches >= 2) {
+                isDuplicateAddressAlert = true;
+            }
+        } catch (addrErr) {
+            console.warn('[Referrals] Error al auditar dirección duplicada:', addrErr);
+        }
+    }
+
     const newTx: ReferralTransaction = {
         id: txId,
         referralProfileId: params.profileId,
@@ -361,6 +394,7 @@ export async function recordReferralTransaction(params: {
         rewardAmount: config.rewardAmount,
         friendDiscountAmount: params.discountAmount,
         status: 'pending',
+        isDuplicateAddressAlert,
         createdAt: now,
         updatedAt: now
     };
@@ -372,8 +406,29 @@ export async function recordReferralTransaction(params: {
         totalReferredOrders: increment(1),
         totalSalesGenerated: increment(params.orderTotal),
         balancePending: increment(config.rewardAmount),
+        fraudAlert: isDuplicateAddressAlert ? true : undefined,
         updatedAt: now
     });
+
+    // Notificación por Email al Embajador (Presión Social de Entrega)
+    try {
+        const profSnap = await getDoc(profileRef);
+        if (profSnap.exists()) {
+            const prof = profSnap.data() as ReferralProfile;
+            if (prof.email) {
+                const { sendReferralRewardPendingEmail } = await import('./email-service');
+                await sendReferralRewardPendingEmail({
+                    referrerEmail: prof.email,
+                    referrerName: prof.nombre,
+                    friendName: params.customer.nombre.trim().split(' ')[0],
+                    rewardAmount: config.rewardAmount,
+                    orderId: params.orderId
+                });
+            }
+        }
+    } catch (mailErr) {
+        console.warn('[Referrals] Error enviando email de recompensa pendiente al embajador:', mailErr);
+    }
 }
 
 /**
@@ -470,6 +525,14 @@ export async function redeemReferralBalanceToCoupon(
 
             codeGenerated = `REDIM-${cleanPhone.slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+            const config = await getReferralConfig();
+            // Si el saldo solo puede cubrir hasta el 50% de la compra, el subtotal debe ser el doble del cupón
+            const maxPercent = config.maxRedemptionPercentage || 50;
+            const requiredSubtotal = Math.max(
+                amountToRedeem,
+                Math.round(amountToRedeem / (maxPercent / 100))
+            );
+
             // Crear el cupón en la colección coupons
             const couponRef = doc(collection(db, 'coupons'), codeGenerated.toLowerCase());
             const couponData: Coupon = {
@@ -477,7 +540,7 @@ export async function redeemReferralBalanceToCoupon(
                 code: codeGenerated,
                 type: 'fixed_amount',
                 value: amountToRedeem,
-                minSubtotal: amountToRedeem,
+                minSubtotal: requiredSubtotal,
                 validFrom: new Date().toISOString(),
                 validUntil: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
                 maxRedemptionsTotal: 1,

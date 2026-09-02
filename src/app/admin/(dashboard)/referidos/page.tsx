@@ -567,8 +567,20 @@ export default function AdminReferidosPage() {
                                                 </span>
                                             </td>
                                             <td className="py-3 px-4">
-                                                <p className="font-bold text-gray-900">{tx.referredCustomer.nombre}</p>
+                                                <div className="flex items-center gap-1.5">
+                                                    <p className="font-bold text-gray-900">{tx.referredCustomer.nombre}</p>
+                                                    {tx.isDuplicateAddressAlert && (
+                                                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-sm flex items-center gap-0.5" title="Alerta: Misma dirección de entrega detectada en varios pedidos de este embajador">
+                                                            ⚠️ Misma Dirección
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-[11px] text-gray-500">{tx.referredCustomer.celular} • {tx.referredCustomer.ciudad}</p>
+                                                {tx.referredCustomer.direccion && (
+                                                    <p className="text-[10px] text-gray-400 truncate max-w-[200px]" title={tx.referredCustomer.direccion}>
+                                                        📍 {tx.referredCustomer.direccion}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="py-3 px-4 font-bold text-gray-900">
                                                 {formatCurrency(tx.orderTotal)}
@@ -711,6 +723,34 @@ export default function AdminReferidosPage() {
                                     <p className="text-[11px] text-gray-400 mt-1">
                                         Tope antifraude de amigos que pueden usar su código antes de requerir revisión gerencial.
                                     </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        % Máximo de Redención con Saldo por Pedido (%) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={config.maxRedemptionPercentage || 50}
+                                        onChange={(e) => setConfig({ ...config, maxRedemptionPercentage: Number(e.target.value) })}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                                        min={10}
+                                        max={100}
+                                        step={5}
+                                        required
+                                    />
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        El saldo acumulado solo puede cubrir hasta este % de la compra propia (ej: 50% obliga a comprar el doble).
+                                    </p>
+                                </div>
+
+                                <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-xs text-purple-900 font-medium self-center">
+                                    <CheckCircle2 size={18} className="text-purple-600 shrink-0" />
+                                    <span>
+                                        Garantiza que por cada $10.000 COP que redima un embajador, ingrese un pedido mínimo de $20.000 COP en fábrica.
+                                    </span>
                                 </div>
                             </div>
 

@@ -10,6 +10,7 @@ export interface ReferralConfig {
     minOrderSubtotal: number; // Subtotal mínimo de compra para aplicar beneficio (ej: 50000)
     minReferrerSpend: number; // Compra mínima previa requerida por el referidor para que su código esté activo (ej: 50000)
     maxReferralsCap?: number; // Límite máximo de referidos permitidos por embajador antes de requerir auditoría manual (ej: 10)
+    maxRedemptionPercentage?: number; // % Máximo del subtotal del carrito que se puede pagar con saldo de referidos (ej: 50%)
     validityDays: number; // Días de validez de la recompensa
     tierThresholds: {
         aliadoMinOrders: number; // ej: 3
@@ -66,6 +67,7 @@ export interface ReferralTransaction {
         cedula?: string;
         celular: string;
         ciudad: string;
+        direccion?: string;
     };
     orderSubtotal: number;
     orderTotal: number;
@@ -73,6 +75,7 @@ export interface ReferralTransaction {
     friendDiscountAmount: number; // Lo que se ahorró el amigo
     status: ReferralTransactionStatus;
     rejectionReason?: string;
+    isDuplicateAddressAlert?: boolean; // Alerta antifraude si la dirección coincide con otros pedidos
     createdAt: Timestamp;
     updatedAt: Timestamp;
     approvedAt?: Timestamp;

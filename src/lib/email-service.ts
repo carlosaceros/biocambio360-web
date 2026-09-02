@@ -352,3 +352,52 @@ export async function sendOrderConfirmationEmail(data: {
         htmlContent: baseTemplate(content),
     });
 }
+
+// ─────────────────────────────────────────────────────────────
+// Email: Notificación al Referidor (Presión Social de Entrega)
+// ─────────────────────────────────────────────────────────────
+export async function sendReferralRewardPendingEmail(data: {
+    referrerEmail: string;
+    referrerName: string;
+    friendName: string;
+    rewardAmount: number;
+    orderId: string;
+}): Promise<void> {
+    if (!data.referrerEmail) return;
+
+    const content = `
+        <h1 style="margin:0 0 8px;color:#111827;font-size:24px;font-weight:800;">¡Tu amigo acaba de comprar! 🎁</h1>
+        <p style="margin:0 0 20px;color:#4b5563;font-size:15px;">
+            Hola <strong>${data.referrerName}</strong>, tenemos una excelente noticia: tu amigo(a) <strong>${data.friendName}</strong> acaba de realizar un pedido utilizando tu código de embajador.
+        </p>
+
+        <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:16px;padding:24px;text-align:center;margin-bottom:24px;">
+          <p style="margin:0;font-size:12px;color:#6d28d9;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Recompensa Pendiente</p>
+          <p style="margin:8px 0 0;font-size:36px;font-weight:900;color:#7c3aed;">+${formatCOP(data.rewardAmount)} COP</p>
+          <p style="margin:8px 0 0;font-size:13px;color:#5b21b6;font-weight:600;">
+            ⏳ Saldo en proceso de canje (Pedido #${data.orderId.slice(-8).toUpperCase()})
+          </p>
+        </div>
+
+        <div style="background:#fefce8;border:1px solid #fef08a;border-radius:12px;padding:16px;margin-bottom:24px;">
+          <p style="margin:0;font-size:13px;color:#854d0e;line-height:1.5;">
+            <strong>¿Cuándo se libera tu saldo?</strong><br/>
+            Este dinero pasará automáticamente a tu <strong>Saldo Disponible</strong> tan pronto como la transportadora entregue el pedido a tu amigo. 
+            ¡Asegúrate de animarlo a recibirlo en su domicilio para que ambos disfruten de los beneficios!
+          </p>
+        </div>
+
+        <div style="text-align:center;">
+          <a href="https://biocambio360.com/comunidad" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;text-decoration:none;padding:14px 32px;border-radius:100px;font-weight:800;font-size:14px;box-shadow:0 4px 12px rgba(124,58,237,0.3);">
+            Consultar mi Monedero de Embajador
+          </a>
+        </div>
+    `;
+
+    await sendEmail({
+        sender: { name: 'Comunidad Biocambio360', email: FROM_EMAIL },
+        to: [{ email: data.referrerEmail, name: data.referrerName }],
+        subject: `🎉 ¡Tu amigo ${data.friendName} usó tu código! Tienes ${formatCOP(data.rewardAmount)} pendientes`,
+        htmlContent: baseTemplate(content),
+    });
+}

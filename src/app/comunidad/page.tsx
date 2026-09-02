@@ -314,7 +314,7 @@ export default function ComunidadPage() {
                                 <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
                                     <div>
                                         <h4 className="font-black text-base">¡Tienes saldo disponible para usar!</h4>
-                                        <p className="text-xs text-emerald-100">Convierte tu saldo en un cupón de descuento para aplicar en tu próximo pedido.</p>
+                                        <p className="text-xs text-emerald-100">Convierte tu saldo en un cupón de descuento (aplica hasta el 50% del valor de tu próximo pedido de fábrica).</p>
                                     </div>
                                     <button
                                         onClick={handleRedeemBalance}
