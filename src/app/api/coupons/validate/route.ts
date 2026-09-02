@@ -28,6 +28,14 @@ export async function POST(request: Request) {
         );
 
         if (refResult.valid && refResult.profile) {
+            const appliedCoupon = {
+                code: refResult.profile.code,
+                type: 'fixed_amount' as const,
+                value: refResult.discountAmount,
+                discountAmount: refResult.discountAmount,
+                message: refResult.message
+            };
+
             return NextResponse.json({
                 valid: true,
                 coupon: {
@@ -39,6 +47,7 @@ export async function POST(request: Request) {
                     isActive: true
                 },
                 discountAmount: refResult.discountAmount,
+                appliedCoupon,
                 message: refResult.message,
                 isReferral: true,
                 referrerPhone: refResult.profile.celular

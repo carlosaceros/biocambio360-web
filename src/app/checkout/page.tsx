@@ -1009,14 +1009,22 @@ export default function CheckoutPage() {
                                     ¿Tienes un cupón de descuento?
                                 </label>
                                 {appliedCoupon ? (
-                                    <div className="flex items-center justify-between bg-green-50 border border-green-200 px-3 py-2 rounded-xl">
-                                        <div className="flex items-center gap-2 text-xs font-bold text-green-700">
-                                            <span>Cupón <strong>{appliedCoupon.code}</strong> (-{appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}%` : formatCurrency(discountAmount)})</span>
+                                    <div className="flex items-center justify-between bg-emerald-50 border-2 border-emerald-200 px-3.5 py-2.5 rounded-2xl shadow-xs">
+                                        <div className="space-y-0.5">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                                                    {appliedCoupon.code.startsWith('BIO') || appliedCoupon.code.includes('360') || appliedCoupon.code.startsWith('CARLOS') ? 'Descuento Referido' : 'Cupón Activo'}
+                                                </span>
+                                                <span className="font-mono font-black text-xs text-emerald-900">{appliedCoupon.code}</span>
+                                            </div>
+                                            <p className="text-xs font-bold text-emerald-700">
+                                                Ahorras {appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}%` : formatCurrency(discountAmount || appliedCoupon.discountAmount || 10000)} en este pedido
+                                            </p>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={removeCoupon}
-                                            className="text-xs text-red-500 hover:text-red-700 font-bold underline"
+                                            className="text-xs text-red-500 hover:text-red-700 font-bold underline cursor-pointer p-1"
                                         >
                                             Quitar
                                         </button>

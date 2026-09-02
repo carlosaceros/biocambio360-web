@@ -109,6 +109,8 @@ import FirstPurchaseModal from "@/components/FirstPurchaseModal";
 import MetaPixel from "@/components/MetaPixel";
 import TrafficTracker from "@/components/TrafficTracker";
 
+import ReferralTopBanner from "@/components/ReferralTopBanner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -131,6 +133,9 @@ export default function RootLayout({
           <CartProvider>
             <Suspense fallback={null}>
               <TrafficTracker />
+            </Suspense>
+            <Suspense fallback={null}>
+              <ReferralTopBanner />
             </Suspense>
             {children}
             <CartDrawer />

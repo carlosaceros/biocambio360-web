@@ -229,11 +229,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
             const data = await res.json();
             if (!res.ok || !data.valid) {
-                return { success: false, message: data.reason || 'Cupón no válido' };
+                return { success: false, message: data.reason || data.message || 'Cupón no válido' };
             }
 
-            setAppliedCoupon(data.appliedCoupon);
-            return { success: true, message: data.appliedCoupon.message };
+            const couponToSet = data.appliedCoupon || {
+                code: data.coupon?.code || code,
+                type: data.coupon?.type || 'fixed_amount',
+                value: data.coupon?.value || data.discountAmount || 0,
+                discountAmount: data.discountAmount || 0,
+                message: data.message || '¡Cupón aplicado exitosamente!'
+            };
+
+            setAppliedCoupon(couponToSet);
+            return { success: true, message: couponToSet.message || '¡Cupón aplicado!' };
         } catch (e: any) {
             return { success: false, message: e.message || 'Error al validar cupón' };
         }
