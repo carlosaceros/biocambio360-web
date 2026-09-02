@@ -22,8 +22,7 @@ import {
     FileSpreadsheet,
     Wallet,
     ShieldAlert,
-    Ban,
-    CheckCircle2
+    Ban
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { 
