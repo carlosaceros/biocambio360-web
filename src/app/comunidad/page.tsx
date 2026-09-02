@@ -254,6 +254,34 @@ export default function ComunidadPage() {
                                 </div>
                             </div>
 
+                            {/* Alerta de Activación de Código: Compra Calificada Mínima */}
+                            {profile.hasQualifiedPurchase ? (
+                                <div className="mt-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-800 font-bold">
+                                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                                    <span>
+                                        ¡Tu código está <strong>100% activo y verificado</strong>! Ya cuentas con compras previas en Biocambio360 y puedes ganar saldo de inmediato.
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="mt-4 p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-900">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="text-lg">⚠️</span>
+                                        <div>
+                                            <p className="font-black">Código pendiente de activación por compra</p>
+                                            <p className="text-[11px] text-amber-700 font-medium">
+                                                Para que tu código funcione y tus referidos reciban su descuento, debes realizar tu primera compra mínima de <strong>$50.000 COP</strong> en la tienda.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Link
+                                        href="/#catalogo"
+                                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs transition-colors shrink-0 shadow-xs"
+                                    >
+                                        Hacer mi compra
+                                    </Link>
+                                </div>
+                            )}
+
                             {/* Tarjetas de Saldos */}
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
                                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">

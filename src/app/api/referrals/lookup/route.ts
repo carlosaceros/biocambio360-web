@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getReferralProfileByPhone, getReferralProfileByCode } from '@/lib/referrals-service';
+import { 
+    getReferralProfileByPhone, 
+    getReferralProfileByCode, 
+    checkReferrerQualifiedPurchase,
+    getReferralConfig 
+} from '@/lib/referrals-service';
 
 export async function GET(request: Request) {
     try {
@@ -22,7 +27,23 @@ export async function GET(request: Request) {
             return NextResponse.json({ exists: false, message: 'No encontrado' });
         }
 
-        return NextResponse.json({ exists: true, profile });
+        const config = await getReferralConfig();
+        const minSpend = config.minReferrerSpend || 50000;
+        const qualification = await checkReferrerQualifiedPurchase(profile.celular, minSpend);
+
+        const enrichedProfile = {
+            ...profile,
+            hasQualifiedPurchase: qualification.qualified || profile.hasQualifiedPurchase,
+            totalPersonalSpent: qualification.totalSpent,
+            minReferrerSpend: minSpend
+        };
+
+        return NextResponse.json({ 
+            exists: true, 
+            profile: enrichedProfile,
+            isQualified: enrichedProfile.hasQualifiedPurchase,
+            minReferrerSpend: minSpend
+        });
     } catch (error: any) {
         return NextResponse.json({ exists: false, message: error.message }, { status: 500 });
     }

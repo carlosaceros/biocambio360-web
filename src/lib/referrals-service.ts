@@ -28,6 +28,7 @@ export const DEFAULT_REFERRAL_CONFIG: ReferralConfig = {
     friendDiscountAmount: 10000,
     friendDiscountType: 'fixed',
     minOrderSubtotal: 50000,
+    minReferrerSpend: 50000, // Pedido mínimo que debe haber hecho el embajador para que su código funcione
     validityDays: 60,
     tierThresholds: {
         aliadoMinOrders: 3,
@@ -166,11 +167,72 @@ export async function getReferralProfileByPhone(phone: string): Promise<Referral
 }
 
 /**
+ * Verifica si el embajador tiene al menos una compra calificada (>= minReferrerSpend, ej. $50.000 COP)
+ * Revisa el documento del cliente en 'customers' o directamente en la colección 'orders'.
+ */
+export async function checkReferrerQualifiedPurchase(phone: string, minSpend = 50000): Promise<{
+    qualified: boolean;
+    totalSpent: number;
+    ordersCount: number;
+    highestOrder: number;
+}> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) return { qualified: false, totalSpent: 0, ordersCount: 0, highestOrder: 0 };
+
+    try {
+        // 1. Revisar colección customers
+        const customerSnap = await getDoc(doc(db, 'customers', cleanPhone));
+        if (customerSnap.exists()) {
+            const cData = customerSnap.data();
+            const spent = cData.totalSpent || 0;
+            const count = cData.ordersCount || 0;
+            if (spent >= minSpend && count > 0) {
+                return { qualified: true, totalSpent: spent, ordersCount: count, highestOrder: spent };
+            }
+        }
+
+        // 2. Revisar colección orders por si las compras aún no consolidaron en customers
+        const ordersRef = collection(db, 'orders');
+        const q = query(ordersRef, where('cliente.celular', '==', cleanPhone));
+        const ordersSnap = await getDocs(q);
+
+        let total = 0;
+        let count = 0;
+        let maxOrder = 0;
+
+        ordersSnap.forEach(d => {
+            const data = d.data();
+            // Descartar pedidos cancelados
+            if (data.status !== 'cancelado') {
+                const val = data.subtotal || data.total || 0;
+                total += val;
+                count++;
+                if (val > maxOrder) maxOrder = val;
+            }
+        });
+
+        // Cumple si su mayor pedido o su gasto total supera el mínimo
+        const isQualified = maxOrder >= minSpend || total >= minSpend;
+        return {
+            qualified: isQualified,
+            totalSpent: total,
+            ordersCount: count,
+            highestOrder: maxOrder
+        };
+    } catch (err) {
+        console.warn('[Referrals] Error verificando compra previa del embajador:', err);
+        return { qualified: false, totalSpent: 0, ordersCount: 0, highestOrder: 0 };
+    }
+}
+
+/**
  * Validar si un código de referido puede ser utilizado por un cliente en el checkout
  * Reglas de validación:
- * 1. El código debe existir y estar activo.
- * 2. Antifraude: El cliente comprador no puede ser el mismo embajador (mismo celular o cédula).
- * 3. Subtotal mínimo requerido.
+ * 1. El programa debe estar activo.
+ * 2. El código debe existir y estar activo.
+ * 3. REGLA ESTRICTA: El embajador DEBE tener al menos 1 pedido previo calificado (>= minReferrerSpend, ej: $50.000 COP).
+ * 4. Antifraude: El cliente comprador no puede ser el mismo embajador (mismo celular o cédula).
+ * 5. Subtotal mínimo requerido para la compra del nuevo cliente.
  */
 export async function validateReferralCodeForOrder(
     code: string,
@@ -194,6 +256,18 @@ export async function validateReferralCodeForOrder(
 
     if (!profile.isActive) {
         return { valid: false, discountAmount: 0, message: 'Este código de referido ya no se encuentra activo.' };
+    }
+
+    // Validación de Compra Mínima Previa del Referidor (Mín. $50.000 COP)
+    const minRequiredSpend = config.minReferrerSpend || 50000;
+    const qualification = await checkReferrerQualifiedPurchase(profile.celular, minRequiredSpend);
+
+    if (!qualification.qualified && !profile.hasQualifiedPurchase) {
+        return {
+            valid: false,
+            discountAmount: 0,
+            message: `El código ${profile.code} aún no está activo. El embajador debe contar con al menos una compra previa mínima de $${minRequiredSpend.toLocaleString('es-CO')} COP en Biocambio360.`
+        };
     }
 
     // Validación Antifraude de Autorreferido
@@ -230,7 +304,11 @@ export async function validateReferralCodeForOrder(
     return {
         valid: true,
         discountAmount,
-        profile,
+        profile: {
+            ...profile,
+            hasQualifiedPurchase: true,
+            totalPersonalSpent: qualification.totalSpent
+        },
         message: `¡Código de embajador aplicado! Descuento de $${discountAmount.toLocaleString('es-CO')} COP concedido.`
     };
 }

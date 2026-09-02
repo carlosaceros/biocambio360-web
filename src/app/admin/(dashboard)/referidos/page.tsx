@@ -383,6 +383,10 @@ export default function AdminReferidosPage() {
                                             <strong>{formatCurrency(config?.minOrderSubtotal || 50000)}</strong>
                                         </p>
                                         <p className="flex justify-between">
+                                            <span>Compra previa referidor:</span>
+                                            <strong>{formatCurrency(config?.minReferrerSpend || 50000)}</strong>
+                                        </p>
+                                        <p className="flex justify-between">
                                             <span>Antifraude Autorreferidos:</span>
                                             <strong className="text-emerald-400">Activo</strong>
                                         </p>
@@ -620,21 +624,40 @@ export default function AdminReferidosPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-1">
-                                    Subtotal Mínimo de Pedido para Aplicar Descuento (COP) *
-                                </label>
-                                <input
-                                    type="number"
-                                    value={config.minOrderSubtotal}
-                                    onChange={(e) => setConfig({ ...config, minOrderSubtotal: Number(e.target.value) })}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
-                                    step={5000}
-                                    required
-                                />
-                                <p className="text-[11px] text-gray-400 mt-1">
-                                    Protección de margen: evita que se use el cupón en tickets inferiores que no cubran los costos logísticos.
-                                </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Subtotal Mínimo de Pedido para el Amigo (COP) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={config.minOrderSubtotal}
+                                        onChange={(e) => setConfig({ ...config, minOrderSubtotal: Number(e.target.value) })}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                                        step={5000}
+                                        required
+                                    />
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        Mínimo que debe comprar el referido para recibir los $10.000 de descuento.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Compra Previa Mínima del Embajador (COP) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={config.minReferrerSpend || 50000}
+                                        onChange={(e) => setConfig({ ...config, minReferrerSpend: Number(e.target.value) })}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                                        step={5000}
+                                        required
+                                    />
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        El referidor debe tener al menos 1 compra de este valor para que su código funcione.
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -8,6 +8,7 @@ export interface ReferralConfig {
     friendDiscountAmount: number; // Descuento en COP para el amigo (ej: 10000)
     friendDiscountType: 'fixed' | 'percentage'; // 'fixed' o 'percentage'
     minOrderSubtotal: number; // Subtotal mínimo de compra para aplicar beneficio (ej: 50000)
+    minReferrerSpend: number; // Compra mínima previa requerida por el referidor para que su código esté activo (ej: 50000)
     validityDays: number; // Días de validez de la recompensa
     tierThresholds: {
         aliadoMinOrders: number; // ej: 3
@@ -31,6 +32,10 @@ export interface ReferralProfile {
     totalReferredOrders: number;
     totalDeliveredOrders: number;
     totalSalesGenerated: number;
+
+    // Métricas de compra personal del embajador
+    totalPersonalSpent?: number; // Total acumulado en compras propias
+    hasQualifiedPurchase?: boolean; // Verdadero si tiene al menos 1 pedido >= minReferrerSpend
 
     // Balances financieros (en COP)
     balancePending: number; // Por pedidos aún en preparación/camino
