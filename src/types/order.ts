@@ -95,6 +95,12 @@ export interface Order {
         landingPage?: string;
         timestamp?: number;
     };
+    referralInfo?: {
+        code: string;
+        referrerPhone: string;
+        rewardAmount: number;
+        discountAmount: number;
+    };
     wompiTransaction?: WompiTransactionDetails;
     timeline: TimelineEvent[];
     notasInternas?: OrderInternalNote[];

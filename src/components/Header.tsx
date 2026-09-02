@@ -34,8 +34,8 @@ export default function Header() {
                     <Link href="/como-comprar" className="hover:text-red-600 transition-colors">
                         Cómo Comprar
                     </Link>
-                    <Link href="/guia-uso-y-mezclas" className="hover:text-red-600 transition-colors">
-                        Guía de Uso & Mezclas
+                    <Link href="/comunidad" className="text-purple-700 hover:text-purple-900 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200 transition-colors flex items-center gap-1 text-xs">
+                        🎁 Gana $10.000
                     </Link>
                 </nav>
 

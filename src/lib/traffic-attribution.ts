@@ -37,6 +37,13 @@ export function captureTrafficAttribution(): TrafficAttribution | null {
         const fbclid = params.get('fbclid');
         const gclid = params.get('gclid');
         const ttclid = params.get('ttclid');
+        const refCode = params.get('ref') || params.get('referral');
+
+        if (refCode) {
+            try {
+                localStorage.setItem('biocambio_referral_code', refCode.trim().toUpperCase());
+            } catch (e) {}
+        }
 
         const rawReferrer = document.referrer || '';
         let referrerHost = '';

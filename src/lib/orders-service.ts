@@ -152,6 +152,14 @@ export async function updateOrderStatus(
     }
 
     await updateDoc(orderRef, updatePayload);
+
+    // Actualizar estado de fidelización / referido si esta orden tenía transacción vinculada
+    try {
+        const { updateReferralTransactionOnOrderStatusChange } = await import('./referrals-service');
+        await updateReferralTransactionOnOrderStatusChange(orderId, newStatus);
+    } catch (refErr) {
+        console.warn('[Orders] Error al sincronizar recompensa de referido:', refErr);
+    }
 }
 
 /**

@@ -4,7 +4,6 @@ import path from 'path';
 
 export async function GET() {
     try {
-        const imagesDirectory = path.join(process.cwd(), 'images' /* Process fallback if public isn't root, but process.cwd()/public/images is standard */);
         const publicImagesDirectory = path.join(process.cwd(), 'public', 'images');
         
         const files = fs.readdirSync(publicImagesDirectory);
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
         }
         
         // Clean filename (lowercase, remove accents, replace spaces/special chars)
-        let originalName = file.name || 'uploaded_image.webp';
+        const originalName = file.name || 'uploaded_image.webp';
         
         // Strip original extension and append .webp if not present
         const ext = path.extname(originalName);
@@ -79,4 +78,39 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
     }
 }
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const filename = searchParams.get('filename');
+
+        if (!filename) {
+            return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
+        }
+
+        // Prevent path traversal and protect system placeholders
+        const sanitizedFilename = path.basename(filename);
+        if (sanitizedFilename === 'placeholder.png' || sanitizedFilename.startsWith('.')) {
+            return NextResponse.json({ error: 'No se puede eliminar este archivo protegido del sistema' }, { status: 403 });
+        }
+
+        const publicImagesDirectory = path.join(process.cwd(), 'public', 'images');
+        const filePath = path.join(publicImagesDirectory, sanitizedFilename);
+
+        if (!fs.existsSync(filePath)) {
+            return NextResponse.json({ error: 'El archivo no existe' }, { status: 404 });
+        }
+
+        await fs.promises.unlink(filePath);
+
+        return NextResponse.json({
+            success: true,
+            message: `Imagen ${sanitizedFilename} eliminada exitosamente`
+        });
+    } catch (error) {
+        console.error('Error deleting image:', error);
+        return NextResponse.json({ error: 'Error al eliminar imagen del servidor' }, { status: 500 });
+    }
+}
+
 

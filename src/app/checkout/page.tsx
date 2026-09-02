@@ -252,8 +252,15 @@ export default function CheckoutPage() {
                 localStorage.setItem('biocambio_cart_token', tok);
             }
             setCartToken(tok);
+
+            // Auto-detectar código de referido si vino por enlace ?ref=... o guardado previo
+            const urlRef = params.get('ref') || params.get('referral');
+            const storedRef = typeof window !== 'undefined' ? (urlRef || localStorage.getItem('biocambio_referral_code')) : null;
+            if (storedRef && !appliedCoupon) {
+                setCouponCodeInput(storedRef.toUpperCase());
+            }
         }
-    }, [restoreCart]);
+    }, [restoreCart, appliedCoupon]);
 
     // 2. Auto-save abandoned cart session when email, phone, or cart changes
     useEffect(() => {
@@ -440,6 +447,48 @@ export default function CheckoutPage() {
                 } catch (cErr) {
                     console.warn('Error al registrar redención de cupón:', cErr);
                 }
+
+                // Si fue un cupón de embajador/referido, registrar la transacción de referido
+                try {
+                    const storedRef = typeof window !== 'undefined' ? localStorage.getItem('biocambio_referral_code') : null;
+                    const effectiveRefCode = (appliedCoupon as any)?.code || storedRef;
+                    if (effectiveRefCode) {
+                        const { getReferralProfileByCode, recordReferralTransaction } = await import('@/lib/referrals-service');
+                        const refProfile = await getReferralProfileByCode(effectiveRefCode);
+                        if (refProfile) {
+                            await recordReferralTransaction({
+                                orderId,
+                                profileId: refProfile.id,
+                                referralCode: refProfile.code,
+                                customer: {
+                                    nombre: formData.nombre,
+                                    cedula: formData.cedula,
+                                    celular: formData.celular,
+                                    ciudad: formData.ciudad
+                                },
+                                orderSubtotal: subtotal,
+                                orderTotal: total,
+                                discountAmount
+                            });
+                        }
+                    }
+                } catch (refRecordErr) {
+                    console.warn('[Checkout] Error registrando transacción de referido:', refRecordErr);
+                }
+            }
+
+            // Crear o asegurar el perfil de embajador para este comprador para que pueda referir en la página de confirmación
+            try {
+                const { getOrCreateReferralProfile } = await import('@/lib/referrals-service');
+                await getOrCreateReferralProfile({
+                    nombre: formData.nombre,
+                    cedula: formData.cedula,
+                    celular: formData.celular,
+                    email: formData.email,
+                    ciudad: formData.ciudad
+                });
+            } catch (profErr) {
+                console.warn('[Checkout] Error al inicializar perfil de embajador del cliente:', profErr);
             }
 
             // Send push + email notifications — await to ensure request reaches server before navigation

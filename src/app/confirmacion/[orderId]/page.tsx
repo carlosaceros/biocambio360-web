@@ -299,6 +299,66 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                     </div>
                 </motion.div>
 
+                {/* Referral & Ambassador Share Card */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35 }}
+                    className="bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 rounded-2xl shadow-xl p-6 md:p-8 mb-6 text-white relative overflow-hidden border border-indigo-700/50"
+                >
+                    <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    <div className="relative z-10">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/20 border border-pink-400/30 text-pink-300 text-xs font-black uppercase tracking-wider mb-3">
+                            🎁 Comunidad BioCambio360
+                        </div>
+                        <h2 className="text-xl md:text-2xl font-black mb-2">
+                            ¡Regala $10.000 COP y Gana $10.000 COP para tu próximo pedido!
+                        </h2>
+                        <p className="text-sm text-gray-300 mb-5 leading-relaxed">
+                            Comparte tu enlace exclusivo con amigos o familiares. Ellos obtienen <strong className="text-white">$10.000 COP de descuento</strong> en su primera compra y tú acumulas <strong className="text-emerald-400">$10.000 COP en saldo monedero</strong> apenas su pedido sea entregado.
+                        </p>
+
+                        <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 mb-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="text-left w-full sm:w-auto">
+                                <p className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Tu Enlace de Embajador:</p>
+                                <p className="text-sm font-mono font-bold text-amber-300 truncate max-w-xs sm:max-w-md">
+                                    {typeof window !== 'undefined' ? `${window.location.origin}/?ref=${order.cliente?.nombre?.split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO'}${order.cliente?.celular?.replace(/\D/g, '').slice(-3) || '360'}` : 'biocambio360.com'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const shareLink = `${window.location.origin}/?ref=${order.cliente?.nombre?.split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO'}${order.cliente?.celular?.replace(/\D/g, '').slice(-3) || '360'}`;
+                                    navigator.clipboard.writeText(shareLink);
+                                    alert('¡Enlace de referido copiado al portapapeles!');
+                                }}
+                                className="w-full sm:w-auto px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-black transition-colors shrink-0"
+                            >
+                                📋 Copiar Enlace
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <a
+                                href={`https://wa.me/?text=${encodeURIComponent(
+                                    `¡Hola! Te recomiendo Biocambio360, compran directo a fábrica productos de aseo concentrados biodegradables. Entra con mi enlace y te dan $10.000 COP de descuento en tu primera compra: ${typeof window !== 'undefined' ? `${window.location.origin}/?ref=${order.cliente?.nombre?.split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO'}${order.cliente?.celular?.replace(/\D/g, '').slice(-3) || '360'}` : 'https://biocambio360-web.vercel.app'}`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm"
+                            >
+                                <MessageCircle size={18} />
+                                Compartir en WhatsApp con 1 Clic
+                            </a>
+                            <Link
+                                href="/comunidad"
+                                className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs flex items-center justify-center transition-colors"
+                            >
+                                Ver Mi Saldo & Aliados →
+                            </Link>
+                        </div>
+                    </div>
+                </motion.div>
+
                 {/* Action Buttons */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <motion.a

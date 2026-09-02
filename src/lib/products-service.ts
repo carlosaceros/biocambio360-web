@@ -234,7 +234,23 @@ export async function getPriceAuditLogs(limitCount = 100): Promise<PriceAuditLog
 }
 
 /**
- * Creates or overwrites a product in Firestore and audits price changes
+ * Recursively removes undefined values from an object so Firestore doesn't reject the write.
+ */
+function removeUndefined<T>(obj: T): T {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+        return obj.map(item => removeUndefined(item)) as unknown as T;
+    }
+    return Object.fromEntries(
+        Object.entries(obj as Record<string, unknown>)
+            .filter(([, v]) => v !== undefined)
+            .map(([k, v]) => [k, typeof v === 'object' && v !== null ? removeUndefined(v) : v])
+    ) as T;
+}
+
+/**
+ * Saves or updates a product in Firestore (Admin CMS).
+ * Validates and strips undefined fields to prevent Firestore setDoc exceptions.
  */
 export async function saveProduct(
     product: Product,
@@ -296,18 +312,48 @@ export async function saveProduct(
     const now = new Date().toISOString();
     const { id, ...data } = product;
 
-    const payload = {
+    const rawPayload = {
         ...data,
         badge: cleanBadge(data.badge),
-        isDeleted: false,
+        isDeleted: product.status === 'archived' ? true : (product.isDeleted === true),
         status: product.status || 'active',
         updatedAt: now,
         createdAt: product.createdAt || now
     };
     
-    // Using setDoc to allow custom IDs (slugs)
-    await setDoc(docRef, payload, { merge: true });
+    const payload = removeUndefined(rawPayload);
+
+    try {
+        // Using setDoc to allow custom IDs (slugs)
+        await setDoc(docRef, payload, { merge: true });
+    } catch (error) {
+        console.error('[saveProduct] Error guardando producto en Firestore:', error);
+        throw error;
+    }
     
+    // Invalidate cache immediately
+    cachedProducts = null;
+    lastFetchTime = 0;
+}
+
+/**
+ * Updates publication visibility status for a product (active, draft, archived)
+ */
+export async function updateProductVisibility(
+    id: string, 
+    status: 'active' | 'draft' | 'archived'
+): Promise<void> {
+    const docRef = doc(db, 'products', id);
+    const updatedAt = new Date().toISOString();
+    const isDeleted = status === 'archived';
+
+    try {
+        await setDoc(docRef, { status, isDeleted, updatedAt }, { merge: true });
+    } catch (error) {
+        console.error(`[updateProductVisibility] Error actualizando visibilidad de ${id}:`, error);
+        throw error;
+    }
+
     // Invalidate cache immediately
     cachedProducts = null;
     lastFetchTime = 0;

@@ -23,6 +23,7 @@ export default function Footer() {
                             <li><Link href="/" className="hover:text-white transition-colors">Catálogo de Productos</Link></li>
                             <li><Link href="/cotizador-b2b" className="hover:text-white transition-colors">Cotizador B2B / Empresas</Link></li>
                             <li><Link href="/como-comprar" className="hover:text-white transition-colors">Cómo Comprar Paso a Paso</Link></li>
+                            <li><Link href="/comunidad" className="hover:text-amber-400 font-bold transition-colors">🎁 Comunidad & Gana $10.000</Link></li>
                             <li><Link href="/guia-uso-y-mezclas" className="hover:text-white transition-colors">Guía de Uso & Mezclas</Link></li>
                         </ul>
                     </div>

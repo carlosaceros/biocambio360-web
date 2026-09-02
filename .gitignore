@@ -44,3 +44,7 @@ next-env.d.ts
 Fotos_productos/
 *.cdr
 
+# local strategy docs & drafts
+resumen_estrategia_y_tienda.html
+fidelizacion/
+

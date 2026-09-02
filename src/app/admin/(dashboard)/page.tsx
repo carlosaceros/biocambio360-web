@@ -401,6 +401,24 @@ export default function AdminDashboard() {
                                         Ver Finanzas & Balance <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/referidos')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                        <Users size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Comunidad & Referidos</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Red de embajadores, ventas recomendadas y auditoría de saldos.
+                                    </p>
+                                    <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
+                                        Gestionar Referidos <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
                             </div>
                         </div>
                     </>
@@ -681,6 +699,17 @@ export default function AdminDashboard() {
                                     <TrendingUp className="text-emerald-600 mb-3" size={24} />
                                     <p className="font-black text-gray-900 mb-1">Histórico & Análisis Financiero</p>
                                     <p className="text-xs text-gray-600">Histórico de meses, AOV, fletes y CSV</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/referidos')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-purple-200 transition-colors"
+                                >
+                                    <Users className="text-purple-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Comunidad & Referidos</p>
+                                    <p className="text-xs text-gray-600">Embajadores, métricas CAC y saldos</p>
                                 </motion.button>
                             </div>
                         </div>

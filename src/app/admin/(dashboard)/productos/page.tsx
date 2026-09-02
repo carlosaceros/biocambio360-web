@@ -6,12 +6,12 @@ import {
     Plus, Edit, Trash2, Save, X, Package, Upload, Loader2, Sparkles, 
     Search, Filter, Download, ArrowUpDown, AlertTriangle, CheckCircle2, 
     XCircle, RefreshCw, MessageSquare, TrendingUp, DollarSign, Layers,
-    Copy, ExternalLink, ShieldCheck, Zap, Eye, Check, Tag, HelpCircle,
+    Copy, ExternalLink, ShieldCheck, Zap, Eye, EyeOff, Check, Tag, HelpCircle,
     Boxes, Smartphone, Image as ImageIcon, SlidersHorizontal, FileText,
     ClipboardList, FlaskConical, Lightbulb, BookOpen, Shield
 } from 'lucide-react';
 import { Product, UsageRow, SchwartzCopyData, ManualContentData } from '@/lib/products';
-import { getAllProducts, saveProduct, deleteProduct, updateProductStock, getPriceAuditLogs, PriceAuditLog } from '@/lib/products-service';
+import { getAllProducts, saveProduct, deleteProduct, updateProductStock, updateProductVisibility, getPriceAuditLogs, PriceAuditLog } from '@/lib/products-service';
 import { getRichProductDetails, getSchwartzCopy } from '@/lib/product-utils';
 import { getManualContentForProduct } from '@/lib/products-rich-data';
 import { useAuth } from '@/lib/auth-context';
@@ -68,6 +68,9 @@ export default function InventoryAdminPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [selectedImageSizeTarget, setSelectedImageSizeTarget] = useState<string | null>(null); // null = imagen principal, '1L', '20L', etc.
+    const [imageGallerySearchQuery, setImageGallerySearchQuery] = useState('');
+    const [isDeletingImage, setIsDeletingImage] = useState<string | null>(null);
     const [isSeeding, setIsSeeding] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -148,6 +151,27 @@ export default function InventoryAdminPage() {
             }
         } catch (error) {
             console.error('Error cargando imágenes:', error);
+        }
+    };
+
+    const handleDeleteImageFromServer = async (filename: string) => {
+        if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente la imagen "${filename}" del servidor?`)) return;
+        setIsDeletingImage(filename);
+        try {
+            const res = await fetch(`/api/admin/images?filename=${encodeURIComponent(filename)}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Error al eliminar la imagen');
+            }
+            showToast(`🗑️ Imagen "${filename}" eliminada.`);
+            await loadImages();
+        } catch (err: any) {
+            console.error('Error al eliminar imagen:', err);
+            alert(err?.message || 'No se pudo eliminar la imagen.');
+        } finally {
+            setIsDeletingImage(null);
         }
     };
 
@@ -346,17 +370,46 @@ export default function InventoryAdminPage() {
                 nombre: userProfile?.nombre || (role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
                 role: role || 'logistico'
             });
-            showToast(`✅ Producto "${editingProduct.nombre}" guardado y registrado en auditoría.`);
+            showToast(`✅ Producto "${editingProduct.nombre}" guardado y sincronizado.`);
             await loadProducts();
             setEditingProduct(null);
             if (activeTab === 'price-history') {
                 await loadPriceAuditLogs();
             }
-        } catch (error) {
-            console.error('Error guardando producto:', error);
-            alert('Hubo un error al guardar el producto en Firestore.');
+        } catch (error: any) {
+            console.error('Error guardando producto en Firestore:', error);
+            const errMsg = error?.message || 'Error desconocido';
+            alert(`Hubo un error al guardar el producto en Firestore: ${errMsg}`);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    // Quick change publication status without opening full modal
+    const handleQuickVisibilityChange = async (productId: string, newStatus: 'active' | 'draft' | 'archived') => {
+        const prod = products.find(p => p.id === productId);
+        if (!prod) return;
+
+        // Optimistic update
+        setProducts(prev => prev.map(p => {
+            if (p.id === productId) {
+                return {
+                    ...p,
+                    status: newStatus,
+                    isDeleted: newStatus === 'archived'
+                };
+            }
+            return p;
+        }));
+
+        try {
+            await updateProductVisibility(productId, newStatus);
+            const statusLabel = newStatus === 'active' ? '🟢 Activo (Visible en tienda)' : newStatus === 'draft' ? '🟡 Borrador (Solo admin)' : '📦 Archivado (Oculto)';
+            showToast(`Visibilidad actualizada: "${prod.nombre}" ahora está ${statusLabel}.`);
+        } catch (error: any) {
+            console.error('Error al cambiar visibilidad rápida:', error);
+            alert(`Error al actualizar estado en Firestore: ${error?.message || 'Reintentando recarga...'}`);
+            await loadProducts();
         }
     };
 
@@ -868,71 +921,110 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
         return `https://wa.me/573241005353?text=${encodeURIComponent(msg)}`;
     };
 
-    const processAndUploadImage = async (file: File, fieldName: 'imgFile' | 'imgFileSmall') => {
+    /**
+     * Optimizes, resizes (max 1600x1600) and converts image to pure WebP client-side
+     * without any heavy AI models or external dependencies.
+     * Supports targeting either the main product image or a specific size presentation.
+     */
+    const processAndUploadImage = async (file: File, targetSize?: string | null) => {
         setIsUploading(true);
-        setUploadProgress('Inicializando...');
+        setUploadProgress('Optimizando y convirtiendo a WebP...');
         setUploadError(null);
 
         try {
-            setUploadProgress('Cargando motor de IA para eliminar fondo...');
-            const { removeBackground } = await import('@imgly/background-removal');
-            
-            const transparentBlob = await removeBackground(file, {
-                progress: (key, current, total) => {
-                    const pct = Math.round((current / total) * 100);
-                    setUploadProgress(key.includes('fetch') ? `Descargando IA: ${pct}%` : `Procesando IA: ${pct}%`);
-                }
-            });
-
-            setUploadProgress('Mejorando saturación, luz y contraste...');
-            const imageUrl = URL.createObjectURL(transparentBlob);
+            // 1. Read file as Image
+            const imageUrl = URL.createObjectURL(file);
             const img = new window.Image();
-            
+
             await new Promise((resolve, reject) => {
                 img.onload = resolve;
-                img.onerror = reject;
+                img.onerror = () => reject(new Error('No se pudo cargar el archivo de imagen seleccionado'));
                 img.src = imageUrl;
             });
 
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('No canvas context');
+            // 2. Calculate proportional bounding box (max 1600x1600 for crisp web display)
+            const MAX_DIM = 1600;
+            let width = img.width;
+            let height = img.height;
 
-            ctx.filter = 'brightness(1.05) contrast(1.15) saturate(1.25)';
-            ctx.drawImage(img, 0, 0, img.width, img.height);
+            if (width > MAX_DIM || height > MAX_DIM) {
+                if (width > height) {
+                    height = Math.round((height * MAX_DIM) / width);
+                    width = MAX_DIM;
+                } else {
+                    width = Math.round((width * MAX_DIM) / height);
+                    height = MAX_DIM;
+                }
+            }
+
+            // 3. Draw on Canvas and export as WebP (quality 0.85)
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('No se pudo inicializar el lienzo de procesamiento');
+
+            // Draw image smoothly
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
             URL.revokeObjectURL(imageUrl);
 
-            setUploadProgress('Comprimiendo WebP ultra-ligero...');
+            setUploadProgress('Comprimiendo imagen...');
             const webpBlob = await new Promise<Blob>((resolve, reject) => {
                 canvas.toBlob((blob) => {
                     if (blob) resolve(blob);
-                    else reject(new Error('Fallo al exportar WebP'));
+                    else reject(new Error('Fallo al exportar formato WebP'));
                 }, 'image/webp', 0.85);
             });
 
-            setUploadProgress('Guardando imagen...');
+            // 4. Prepare sanitized filename
+            setUploadProgress('Subiendo al servidor...');
             const uploadFormData = new FormData();
-            const originalName = file.name;
+            const originalName = file.name || 'producto';
             const baseName = originalName.replace(/\.[^.]+$/, '').toLowerCase()
                 .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
-                
-            const finalFilename = `${baseName || 'producto'}_${Date.now()}.webp`;
+            
+            const sizeSuffix = targetSize ? `_${targetSize.toLowerCase().replace(/[^a-z0-9]/g, '')}` : '';
+            const finalFilename = `${baseName || 'producto'}${sizeSuffix}_${Date.now().toString().slice(-6)}.webp`;
             uploadFormData.append('file', webpBlob, finalFilename);
 
+            // 5. Send to API
             const res = await fetch('/api/admin/images', {
                 method: 'POST',
                 body: uploadFormData
             });
 
-            if (!res.ok) throw new Error('Error al subir la imagen');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'Error al guardar la imagen en el servidor');
+            }
 
             const data = await res.json();
+            const savedFilename = data.filename;
+
+            // 6. Update local editing state immediately
+            if (targetSize) {
+                // Set for specific size
+                setEditingProduct(prev => {
+                    if (!prev) return null;
+                    const nextImgFiles = { ...(prev.imgFiles || {}) };
+                    nextImgFiles[targetSize] = savedFilename;
+                    return {
+                        ...prev,
+                        imgFiles: nextImgFiles
+                    };
+                });
+                showToast(`✅ Imagen para tamaño ${targetSize} actualizada a "${savedFilename}".`);
+            } else {
+                // Set as main product image
+                handleEditChange('imgFile', savedFilename);
+                showToast(`✅ Imagen principal actualizada a "${savedFilename}".`);
+            }
+
             await loadImages();
-            handleEditChange(fieldName, data.filename);
-            setUploadProgress('¡Imagen procesada con éxito!');
-            setTimeout(() => { setIsUploading(false); setUploadProgress(''); }, 1500);
+            setUploadProgress('¡Imagen optimizada y guardada!');
+            setTimeout(() => { setIsUploading(false); setUploadProgress(''); }, 1200);
 
         } catch (error: any) {
             console.error('Error processing/uploading image:', error);
@@ -1231,6 +1323,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                 <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-500 uppercase text-[11px] font-black tracking-wider">
                                     <th className="py-3.5 px-4">Producto & SKU</th>
                                     <th className="py-3.5 px-4">Categoría</th>
+                                    <th className="py-3.5 px-4 text-center">Visibilidad</th>
                                     <th className="py-3.5 px-4 text-center">Existencias en Bodega (+/-)</th>
                                     <th className="py-3.5 px-4 text-right">Rango de Precios</th>
                                     <th className="py-3.5 px-4 text-center">Acciones CRUD</th>
@@ -1248,7 +1341,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                     return (
                                         <tr 
                                             key={product.id} 
-                                            className={`hover:bg-gray-50/80 transition-colors ${isArchived ? 'opacity-50 bg-gray-50' : ''}`}
+                                            className={`hover:bg-gray-50/80 transition-colors ${isArchived ? 'opacity-60 bg-gray-50' : ''}`}
                                         >
                                             {/* Product Info */}
                                             <td className="py-3.5 px-4">
@@ -1299,6 +1392,26 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                                         {product.subcategoria}
                                                     </span>
                                                 )}
+                                            </td>
+
+                                            {/* Quick Publication Status Selector */}
+                                            <td className="py-3.5 px-4 text-center">
+                                                <select
+                                                    value={product.status || 'active'}
+                                                    onChange={(e) => handleQuickVisibilityChange(product.id, e.target.value as 'active' | 'draft' | 'archived')}
+                                                    className={`text-xs font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none ${
+                                                        (product.status || 'active') === 'active'
+                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                                            : product.status === 'draft'
+                                                            ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                                                    }`}
+                                                    title="Cambiar visibilidad en catálogo"
+                                                >
+                                                    <option value="active">🟢 Activo (Tienda)</option>
+                                                    <option value="draft">🟡 Borrador (Admin)</option>
+                                                    <option value="archived">📦 Archivado (Oculto)</option>
+                                                </select>
                                             </td>
 
                                             {/* Stock Interactive Controls per Size */}
@@ -1396,11 +1509,24 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                                         <MessageSquare size={17} />
                                                     </button>
 
+                                                    {/* Quick Toggle Visibility (Active / Archived) */}
+                                                    <button
+                                                        onClick={() => handleQuickVisibilityChange(product.id, isArchived ? 'active' : 'archived')}
+                                                        className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                                                            isArchived
+                                                                ? 'text-emerald-600 hover:bg-emerald-50'
+                                                                : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+                                                        }`}
+                                                        title={isArchived ? 'Activar y mostrar en tienda pública' : 'Ocultar / Archivar de la tienda'}
+                                                    >
+                                                        {isArchived ? <Eye size={17} /> : <EyeOff size={17} />}
+                                                    </button>
+
                                                     {/* Delete */}
                                                     <button
                                                         onClick={() => setProductToDelete(product)}
                                                         className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                                        title="Eliminar o archivar producto"
+                                                        title="Eliminar permanentemente de la base de datos"
                                                     >
                                                         <Trash2 size={17} />
                                                     </button>
@@ -1412,7 +1538,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
 
                                 {filteredProducts.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="py-12 text-center text-gray-400">
+                                        <td colSpan={6} className="py-12 text-center text-gray-400">
                                             <Package size={36} className="mx-auto mb-2 opacity-50" />
                                             <p className="font-bold text-gray-600">No se encontraron productos</p>
                                             <p className="text-xs">Prueba cambiando los filtros de búsqueda o categoría</p>
@@ -1452,9 +1578,20 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                             unoptimized
                                             className="object-contain p-3"
                                         />
-                                        <span className={`absolute top-2 right-2 text-[10px] font-black px-2 py-0.5 rounded-full ${badgeColor}`}>
-                                            {statusText}
-                                        </span>
+                                        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${badgeColor}`}>
+                                                {statusText}
+                                            </span>
+                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-xs ${
+                                                (product.status || 'active') === 'active'
+                                                    ? 'bg-emerald-500 text-white'
+                                                    : product.status === 'draft'
+                                                    ? 'bg-amber-500 text-white'
+                                                    : 'bg-gray-600 text-white'
+                                            }`}>
+                                                {product.status === 'archived' ? '📦 Archivado' : product.status === 'draft' ? '🟡 Borrador' : '🟢 Activo'}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <h3 className="font-bold text-gray-900 text-sm line-clamp-2 leading-tight mb-1">{product.nombre}</h3>
@@ -1462,12 +1599,22 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                     <p className="text-xs text-gray-600 line-clamp-2 mb-3">{product.shortDescription || product.descripcion}</p>
                                 </div>
 
-                                <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
+                                <div className="border-t border-gray-100 pt-3 flex items-center justify-between gap-2">
                                     <span className="font-black text-gray-900 text-sm">
                                         ${(Object.values(product.precios)[0] || 0).toLocaleString('es-CO')}
                                     </span>
 
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <select
+                                            value={product.status || 'active'}
+                                            onChange={(e) => handleQuickVisibilityChange(product.id, e.target.value as 'active' | 'draft' | 'archived')}
+                                            className="text-[11px] font-bold border rounded-lg px-1.5 py-1 bg-gray-50 text-gray-700 cursor-pointer focus:outline-none"
+                                            title="Cambiar estado de publicación"
+                                        >
+                                            <option value="active">🟢 Activo</option>
+                                            <option value="draft">🟡 Borrador</option>
+                                            <option value="archived">📦 Archivar</option>
+                                        </select>
                                         <Link
                                             href={`/producto/${product.id}`}
                                             target="_blank"
@@ -1478,7 +1625,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                         </Link>
                                         <button
                                             onClick={() => handleOpenEdit(product)}
-                                            className="bg-gray-100 hover:bg-red-600 hover:text-white text-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                            className="bg-gray-100 hover:bg-red-600 hover:text-white text-gray-700 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                                         >
                                             Editar
                                         </button>
@@ -2077,6 +2224,86 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                                                         className="w-full border rounded-lg p-1.5 text-xs font-bold text-emerald-800 bg-white"
                                                                     />
                                                                 </div>
+
+                                                                {/* Size-specific custom image selector */}
+                                                                <div className="col-span-2 pt-2 border-t border-gray-200/80">
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <label className="text-[10px] font-bold text-gray-600 flex items-center gap-1">
+                                                                            <ImageIcon size={12} className="text-blue-600" />
+                                                                            Foto Presentación ({size})
+                                                                        </label>
+                                                                        {editingProduct.imgFiles?.[size] && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const updated = { ...(editingProduct.imgFiles || {}) };
+                                                                                    delete updated[size];
+                                                                                    setEditingProduct({
+                                                                                        ...editingProduct,
+                                                                                        imgFiles: Object.keys(updated).length > 0 ? updated : undefined
+                                                                                    });
+                                                                                    showToast(`Imagen personalizada de ${size} eliminada. Usará la principal.`);
+                                                                                }}
+                                                                                className="text-[9px] text-red-500 hover:text-red-700 font-bold"
+                                                                                title="Restablecer a imagen principal"
+                                                                            >
+                                                                                Restablecer
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="relative w-10 h-10 rounded-lg bg-white border border-gray-200 overflow-hidden flex-shrink-0">
+                                                                            <Image
+                                                                                src={`/images/${editingProduct.imgFiles?.[size] || editingProduct.imgFile || 'placeholder.png'}`}
+                                                                                alt={size}
+                                                                                fill
+                                                                                unoptimized
+                                                                                className="object-contain p-0.5"
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <select
+                                                                                value={editingProduct.imgFiles?.[size] || ''}
+                                                                                onChange={(e) => {
+                                                                                    const val = e.target.value;
+                                                                                    const updated = { ...(editingProduct.imgFiles || {}) };
+                                                                                    if (val) {
+                                                                                        updated[size] = val;
+                                                                                    } else {
+                                                                                        delete updated[size];
+                                                                                    }
+                                                                                    setEditingProduct({
+                                                                                        ...editingProduct,
+                                                                                        imgFiles: Object.keys(updated).length > 0 ? updated : undefined
+                                                                                    });
+                                                                                }}
+                                                                                className="w-full border rounded-lg p-1 text-[11px] text-gray-700 bg-white truncate"
+                                                                            >
+                                                                                <option value="">Por defecto (Principal)</option>
+                                                                                {availableImages.map(img => (
+                                                                                    <option key={img} value={img}>{img}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+
+                                                                        {/* Quick upload for this size */}
+                                                                        <label className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg cursor-pointer transition-colors" title={`Subir foto específica para ${size}`}>
+                                                                            <Upload size={13} />
+                                                                            <input
+                                                                                type="file"
+                                                                                accept="image/*"
+                                                                                className="hidden"
+                                                                                disabled={isUploading}
+                                                                                onChange={e => {
+                                                                                    const file = e.target.files?.[0];
+                                                                                    if (file) processAndUploadImage(file, size);
+                                                                                }}
+                                                                            />
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
@@ -2629,71 +2856,344 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                     </div>
                                 )}
 
-                                {/* 📷 TAB 7: IMÁGENES & MULTIMEDIA */}
+                                {/* 📷 TAB 7: IMÁGENES & MULTIMEDIA (CRUD PROFESIONAL POR PRODUCTO Y POR TAMAÑO) */}
                                 {modalTab === 'imagenes' && (
-                                    <div className="space-y-6">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Imagen Principal del Producto</label>
-                                            <input 
-                                                type="text" 
-                                                value={editingProduct.imgFile || ''} 
-                                                onChange={e => handleEditChange('imgFile', e.target.value)}
-                                                placeholder="nombre-de-imagen.webp"
-                                                className="w-full border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 bg-white font-mono mb-3"
-                                            />
+                                    <div className="space-y-8">
+                                        {/* Status / Upload progress banner */}
+                                        {isUploading && (
+                                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between text-xs text-blue-900 font-bold animate-pulse">
+                                                <div className="flex items-center gap-2">
+                                                    <Loader2 className="animate-spin text-blue-600" size={16} />
+                                                    <span>{uploadProgress || 'Procesando imagen WebP...'}</span>
+                                                </div>
+                                                <span className="text-[11px] text-blue-600 font-mono">WebP Nativo</span>
+                                            </div>
+                                        )}
+
+                                        {uploadError && (
+                                            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-xs text-red-700 font-bold">
+                                                <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
+                                                <span>{uploadError}</span>
+                                            </div>
+                                        )}
+
+                                        {/* 1. SECCIÓN: IMAGEN PRINCIPAL GENERAL */}
+                                        <div className="bg-slate-50/70 border border-slate-200 rounded-3xl p-5 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                                        <ImageIcon size={18} className="text-blue-600" />
+                                                        Imagen Principal del Producto
+                                                    </h4>
+                                                    <p className="text-xs text-slate-500">Se usará en la vitrina del catálogo y como respaldo predeterminado para todos los tamaños.</p>
+                                                </div>
+                                                <span className="text-[10px] font-mono bg-white px-2.5 py-1 rounded-full border border-slate-200 text-slate-600 font-bold">
+                                                    {editingProduct.imgFile || 'placeholder.png'}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex flex-col sm:flex-row items-center gap-4">
+                                                {/* Preview */}
+                                                <div className="relative w-28 h-28 rounded-2xl bg-white border-2 border-slate-200 shadow-xs overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                                    <Image 
+                                                        src={`/images/${editingProduct.imgFile || 'placeholder.png'}`} 
+                                                        alt="Principal" 
+                                                        fill 
+                                                        unoptimized 
+                                                        className="object-contain p-2" 
+                                                    />
+                                                </div>
+
+                                                <div className="flex-1 w-full space-y-2.5">
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            type="text" 
+                                                            value={editingProduct.imgFile || ''} 
+                                                            onChange={e => handleEditChange('imgFile', e.target.value)}
+                                                            placeholder="ej: detergente-ropa-20l.webp"
+                                                            className="flex-1 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 bg-white font-mono"
+                                                        />
+                                                        <label className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black px-4 py-2.5 rounded-xl cursor-pointer shadow-md shadow-blue-600/20 transition-colors">
+                                                            <Upload size={14} />
+                                                            <span>Subir WebP</span>
+                                                            <input 
+                                                                type="file" 
+                                                                accept="image/*" 
+                                                                className="hidden" 
+                                                                disabled={isUploading}
+                                                                onChange={e => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) processAndUploadImage(file, null);
+                                                                }}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        💡 La imagen se redimensiona automáticamente y se convierte a formato <strong>WebP ultra-liviano</strong> para máxima velocidad de carga.
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        {/* Subida & AI Background Removal */}
-                                        <div className="border border-dashed border-gray-300 rounded-2xl p-4 bg-gray-50 text-center space-y-2">
-                                            <Upload className="mx-auto text-gray-400" size={24} />
-                                            <div>
-                                                <label className="text-xs font-black text-blue-600 hover:underline cursor-pointer">
-                                                    <span>Haz clic para subir una foto de producto</span>
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*" 
-                                                        onChange={e => {
-                                                            const file = e.target.files?.[0];
-                                                            if (file) processAndUploadImage(file, 'imgFile');
-                                                        }} 
-                                                        className="hidden" 
-                                                        disabled={isUploading}
-                                                    />
-                                                </label>
-                                                <p className="text-[11px] text-gray-400 mt-0.5">Se optimizará a WebP y se procesará el fondo blanco con IA.</p>
+                                        {/* 2. SECCIÓN: IMÁGENES ESPECÍFICAS POR CADA TAMAÑO / PRESENTACIÓN */}
+                                        <div className="bg-white border border-slate-200 rounded-3xl p-5 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                                        <Boxes size={18} className="text-emerald-600" />
+                                                        Imágenes por Presentación / Tamaño
+                                                    </h4>
+                                                    <p className="text-xs text-slate-500">
+                                                        Permite que cuando el cliente elija <strong>1L</strong>, <strong>1 Galón (3.8L)</strong>, <strong>10L</strong> o <strong>20L</strong>, la foto cambie automáticamente al envase real.
+                                                    </p>
+                                                </div>
+                                                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                                                    {Object.keys(editingProduct.precios || {}).length} Presentaciones
+                                                </span>
                                             </div>
-                                            {isUploading && (
-                                                <div className="text-xs text-blue-700 font-bold flex items-center justify-center gap-2">
-                                                    <Loader2 className="animate-spin" size={14} />
-                                                    {uploadProgress}
+
+                                            {Object.keys(editingProduct.precios || {}).length === 0 ? (
+                                                <div className="p-6 border border-dashed rounded-2xl text-center text-slate-400 text-xs">
+                                                    Debes añadir al menos un tamaño o precio en la pestaña &quot;General&quot; para gestionar sus fotos.
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                                                    {Object.keys(editingProduct.precios || {}).map(size => {
+                                                        const customImg = editingProduct.imgFiles?.[size];
+                                                        const currentDisplayImg = customImg || editingProduct.imgFile || 'placeholder.png';
+                                                        const isCustom = !!customImg;
+
+                                                        return (
+                                                            <div 
+                                                                key={size}
+                                                                className={`p-3.5 rounded-2xl border transition-all ${
+                                                                    isCustom 
+                                                                        ? 'bg-emerald-50/50 border-emerald-200/90 shadow-xs' 
+                                                                        : 'bg-slate-50/60 border-slate-200'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-black text-xs text-slate-900 bg-white px-2 py-0.5 rounded-lg border shadow-2xs">
+                                                                            {size}
+                                                                        </span>
+                                                                        {isCustom ? (
+                                                                            <span className="text-[10px] font-bold text-emerald-700">Foto Propia</span>
+                                                                        ) : (
+                                                                            <span className="text-[10px] text-slate-400">Usa Principal</span>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {isCustom && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const nextImgFiles = { ...(editingProduct.imgFiles || {}) };
+                                                                                delete nextImgFiles[size];
+                                                                                setEditingProduct({
+                                                                                    ...editingProduct,
+                                                                                    imgFiles: Object.keys(nextImgFiles).length > 0 ? nextImgFiles : undefined
+                                                                                });
+                                                                                showToast(`Foto personalizada de ${size} removida.`);
+                                                                            }}
+                                                                            className="text-[10px] font-bold text-red-600 hover:text-red-800 cursor-pointer"
+                                                                        >
+                                                                            Restablecer
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="relative w-14 h-14 rounded-xl bg-white border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                                                        <Image 
+                                                                            src={`/images/${currentDisplayImg}`}
+                                                                            alt={`${editingProduct.nombre} ${size}`}
+                                                                            fill
+                                                                            unoptimized
+                                                                            className="object-contain p-1"
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="flex-1 min-w-0 space-y-1.5">
+                                                                        <select
+                                                                            value={customImg || ''}
+                                                                            onChange={e => {
+                                                                                const val = e.target.value;
+                                                                                const nextImgFiles = { ...(editingProduct.imgFiles || {}) };
+                                                                                if (val) {
+                                                                                    nextImgFiles[size] = val;
+                                                                                } else {
+                                                                                    delete nextImgFiles[size];
+                                                                                }
+                                                                                setEditingProduct({
+                                                                                    ...editingProduct,
+                                                                                    imgFiles: Object.keys(nextImgFiles).length > 0 ? nextImgFiles : undefined
+                                                                                });
+                                                                            }}
+                                                                            className="w-full border border-slate-200 rounded-lg p-1 text-[11px] text-slate-700 bg-white truncate"
+                                                                        >
+                                                                            <option value="">Por defecto (Principal)</option>
+                                                                            {availableImages.map(img => (
+                                                                                <option key={img} value={img}>{img}</option>
+                                                                            ))}
+                                                                        </select>
+
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <label className="flex-1 text-center py-1 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">
+                                                                                <span>Subir Foto {size}</span>
+                                                                                <input 
+                                                                                    type="file"
+                                                                                    accept="image/*"
+                                                                                    className="hidden"
+                                                                                    disabled={isUploading}
+                                                                                    onChange={e => {
+                                                                                        const file = e.target.files?.[0];
+                                                                                        if (file) processAndUploadImage(file, size);
+                                                                                    }}
+                                                                                />
+                                                                            </label>
+
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSelectedImageSizeTarget(size)}
+                                                                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                                                                    selectedImageSizeTarget === size 
+                                                                                        ? 'bg-blue-600 text-white border-blue-600' 
+                                                                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                                                                }`}
+                                                                                title="Seleccionar imagen desde la galería inferior para este tamaño"
+                                                                            >
+                                                                                Elegir de Galería
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Available Images Gallery */}
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-700 mb-2">Galería de Imágenes Disponibles en el Servidor</label>
-                                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 max-h-52 overflow-y-auto p-2 border rounded-2xl bg-gray-50">
-                                                {availableImages.map(img => (
-                                                    <button
-                                                        key={img}
-                                                        type="button"
-                                                        onClick={() => handleEditChange('imgFile', img)}
-                                                        className={`relative aspect-square rounded-xl border overflow-hidden p-1 bg-white cursor-pointer transition-all ${
-                                                            editingProduct.imgFile === img 
-                                                                ? 'ring-2 ring-red-600 border-red-600' 
-                                                                : 'hover:border-gray-400'
-                                                        }`}
-                                                    >
-                                                        <Image
-                                                            src={`/images/${img}`}
-                                                            alt={img}
-                                                            fill
-                                                            unoptimized
-                                                            className="object-contain p-1"
+                                        {/* 3. SECCIÓN: GALERÍA DE IMÁGENES DEL SERVIDOR CON CRUD Y BÚSQUEDA */}
+                                        <div className="bg-slate-50/80 border border-slate-200 rounded-3xl p-5 space-y-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                                        <ImageIcon size={18} className="text-purple-600" />
+                                                        Galería de Imágenes en el Servidor ({availableImages.length})
+                                                    </h4>
+                                                    <p className="text-xs text-slate-500">
+                                                        {selectedImageSizeTarget 
+                                                            ? `👉 Modo asignación: Haz clic en una foto para asignarla a la presentación [${selectedImageSizeTarget}]`
+                                                            : `Haz clic en una foto para asignarla como Imagen Principal.`}
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    {selectedImageSizeTarget && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSelectedImageSizeTarget(null)}
+                                                            className="text-xs bg-amber-100 text-amber-900 font-bold px-3 py-1 rounded-lg hover:bg-amber-200"
+                                                        >
+                                                            Cancelar asignación a {selectedImageSizeTarget}
+                                                        </button>
+                                                    )}
+                                                    <div className="relative">
+                                                        <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
+                                                        <input 
+                                                            type="text" 
+                                                            value={imageGallerySearchQuery} 
+                                                            onChange={e => setImageGallerySearchQuery(e.target.value)}
+                                                            placeholder="Buscar por nombre..." 
+                                                            className="border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs bg-white text-slate-800 w-44 sm:w-56"
                                                         />
-                                                    </button>
-                                                ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Grid of images */}
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-72 overflow-y-auto p-2 bg-white rounded-2xl border border-slate-200">
+                                                {availableImages
+                                                    .filter(img => img.toLowerCase().includes(imageGallerySearchQuery.toLowerCase()))
+                                                    .map(img => {
+                                                        const isMain = editingProduct.imgFile === img;
+                                                        const assignedSizes = Object.entries(editingProduct.imgFiles || {})
+                                                            .filter(([, val]) => val === img)
+                                                            .map(([sizeKey]) => sizeKey);
+
+                                                        return (
+                                                            <div
+                                                                key={img}
+                                                                className={`group relative aspect-square rounded-xl border p-1 bg-slate-50/50 flex flex-col justify-between overflow-hidden transition-all ${
+                                                                    isMain
+                                                                        ? 'ring-2 ring-blue-600 border-blue-600 bg-blue-50/40'
+                                                                        : assignedSizes.length > 0
+                                                                        ? 'ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/30'
+                                                                        : 'hover:border-slate-400'
+                                                                }`}
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        if (selectedImageSizeTarget) {
+                                                                            const nextImgFiles = { ...(editingProduct.imgFiles || {}) };
+                                                                            nextImgFiles[selectedImageSizeTarget] = img;
+                                                                            setEditingProduct({
+                                                                                ...editingProduct,
+                                                                                imgFiles: nextImgFiles
+                                                                            });
+                                                                            showToast(`Foto asignada a presentación ${selectedImageSizeTarget}.`);
+                                                                        } else {
+                                                                            handleEditChange('imgFile', img);
+                                                                            showToast(`Foto asignada como imagen principal.`);
+                                                                        }
+                                                                    }}
+                                                                    className="relative w-full h-full cursor-pointer"
+                                                                    title={`Asignar ${img}`}
+                                                                >
+                                                                    <Image
+                                                                        src={`/images/${img}`}
+                                                                        alt={img}
+                                                                        fill
+                                                                        unoptimized
+                                                                        className="object-contain p-1"
+                                                                    />
+                                                                </button>
+
+                                                                {/* Badges on image */}
+                                                                <div className="absolute top-1 left-1 flex flex-col gap-0.5 pointer-events-none">
+                                                                    {isMain && (
+                                                                        <span className="bg-blue-600 text-white text-[8px] font-black px-1 rounded shadow-xs">
+                                                                            PRINCIPAL
+                                                                        </span>
+                                                                    )}
+                                                                    {assignedSizes.map(s => (
+                                                                        <span key={s} className="bg-emerald-600 text-white text-[8px] font-black px-1 rounded shadow-xs">
+                                                                            {s}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+
+                                                                {/* Delete button from server */}
+                                                                {img !== 'placeholder.png' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={isDeletingImage === img}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeleteImageFromServer(img);
+                                                                        }}
+                                                                        className="absolute bottom-1 right-1 p-1 bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 cursor-pointer shadow-xs"
+                                                                        title="Eliminar archivo del servidor"
+                                                                    >
+                                                                        {isDeletingImage === img ? <Loader2 size={10} className="animate-spin" /> : <Trash2 size={10} />}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                             </div>
                                         </div>
                                     </div>
