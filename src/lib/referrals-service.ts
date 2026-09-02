@@ -41,6 +41,21 @@ const transactionsCollection = collection(db, 'referral_transactions');
 const configDocRef = doc(db, 'referral_config', 'main');
 
 /**
+ * Saneador recursivo para evitar que Firestore falle ante campos con valor undefined
+ */
+function removeUndefined<T>(obj: T): T {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+        return obj.map(item => removeUndefined(item)) as unknown as T;
+    }
+    return Object.fromEntries(
+        Object.entries(obj as Record<string, unknown>)
+            .filter(([, v]) => v !== undefined)
+            .map(([k, v]) => [k, typeof v === 'object' && v !== null ? removeUndefined(v) : v])
+    ) as T;
+}
+
+/**
  * Obtener la configuración general del programa de referidos
  */
 export async function getReferralConfig(): Promise<ReferralConfig> {
@@ -59,10 +74,11 @@ export async function getReferralConfig(): Promise<ReferralConfig> {
  * Guardar la configuración general del programa
  */
 export async function saveReferralConfig(config: Partial<ReferralConfig>): Promise<void> {
-    await setDoc(configDocRef, {
+    const payload = removeUndefined({
         ...config,
         updatedAt: Timestamp.now()
-    }, { merge: true });
+    });
+    await setDoc(configDocRef, payload, { merge: true });
 }
 
 /**
@@ -106,10 +122,10 @@ export async function getOrCreateReferralProfile(customerData: {
         id: cleanPhone,
         code: candidateCode,
         nombre: customerData.nombre,
-        cedula: customerData.cedula,
+        cedula: customerData.cedula || '000000',
         celular: customerData.celular,
-        email: customerData.email,
-        ciudad: customerData.ciudad,
+        email: customerData.email || '',
+        ciudad: customerData.ciudad || 'Colombia',
         tier: 'referidor',
         totalReferredOrders: 0,
         totalDeliveredOrders: 0,
@@ -122,7 +138,7 @@ export async function getOrCreateReferralProfile(customerData: {
         updatedAt: Timestamp.now()
     };
 
-    await setDoc(profileRef, newProfile);
+    await setDoc(profileRef, removeUndefined(newProfile));
     return newProfile;
 }
 
@@ -252,7 +268,7 @@ export async function recordReferralTransaction(params: {
         updatedAt: now
     };
 
-    await setDoc(txRef, newTx);
+    await setDoc(txRef, removeUndefined(newTx));
 
     // Incrementar balance pendiente en el perfil del embajador
     await updateDoc(profileRef, {
