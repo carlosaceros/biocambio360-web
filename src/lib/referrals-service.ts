@@ -258,6 +258,25 @@ export async function validateReferralCodeForOrder(
         return { valid: false, discountAmount: 0, message: 'Este código de referido ya no se encuentra activo.' };
     }
 
+    // Validación Antifraude: LISTA NEGRA / BLOQUEO POR FRAUDE
+    if (profile.isBlacklisted) {
+        return {
+            valid: false,
+            discountAmount: 0,
+            message: 'Este código de referido no está disponible por políticas de seguridad del programa.'
+        };
+    }
+
+    // Validación Antifraude: Límite Máximo de Referidos (Cap preventivo)
+    const maxCap = config.maxReferralsCap || 15;
+    if ((profile.totalReferredOrders || 0) >= maxCap) {
+        return {
+            valid: false,
+            discountAmount: 0,
+            message: 'Este código de embajador ha alcanzado el límite máximo de referidos permitidos.'
+        };
+    }
+
     // Validación de Compra Mínima Previa del Referidor (Mín. $50.000 COP)
     const minRequiredSpend = config.minReferrerSpend || 50000;
     const qualification = await checkReferrerQualifiedPurchase(profile.celular, minRequiredSpend);
@@ -531,4 +550,37 @@ export async function updateReferralProfileAdmin(
         ...updates,
         updatedAt: Timestamp.now()
     });
+}
+
+/**
+ * Poner en Lista Negra o rehabilitar un perfil de embajador por intento de fraude.
+ * Opcionalmente congela o pone en 0 el saldo disponible/pendiente como sanción.
+ */
+export async function toggleBlacklistReferralProfile(
+    profileId: string,
+    isBlacklisted: boolean,
+    reason?: string,
+    penalizeBalances = false
+): Promise<void> {
+    const profileRef = doc(profilesCollection, profileId);
+    const now = Timestamp.now();
+
+    const updates: Record<string, any> = {
+        isBlacklisted,
+        blacklistReason: isBlacklisted ? (reason || 'Sancionado por sospecha de fraude en referidos') : '',
+        isActive: !isBlacklisted,
+        fraudAlert: isBlacklisted,
+        updatedAt: now
+    };
+
+    if (isBlacklisted) {
+        updates.blockedAt = now;
+        if (penalizeBalances) {
+            // Cancelar y anular saldos por fraude demostrado
+            updates.balanceAvailable = 0;
+            updates.balancePending = 0;
+        }
+    }
+
+    await updateDoc(profileRef, updates);
 }

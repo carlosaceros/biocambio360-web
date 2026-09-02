@@ -20,7 +20,10 @@ import {
     ExternalLink,
     AlertCircle,
     FileSpreadsheet,
-    Wallet
+    Wallet,
+    ShieldAlert,
+    Ban,
+    CheckCircle2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -34,7 +37,8 @@ import {
     getAllReferralTransactions, 
     getReferralConfig, 
     saveReferralConfig, 
-    updateReferralProfileAdmin 
+    updateReferralProfileAdmin,
+    toggleBlacklistReferralProfile
 } from '@/lib/referrals-service';
 import { formatCurrency } from '@/lib/checkout-utils';
 
@@ -52,6 +56,8 @@ export default function AdminReferidosPage() {
     const [editBalance, setEditBalance] = useState(0);
     const [editTier, setEditTier] = useState<ReferralTier>('referidor');
     const [editIsActive, setEditIsActive] = useState(true);
+    const [editIsBlacklisted, setEditIsBlacklisted] = useState(false);
+    const [editBlacklistReason, setEditBlacklistReason] = useState('');
     const [savingProfile, setSavingProfile] = useState(false);
 
     // Guardado de configuración
@@ -115,23 +121,40 @@ export default function AdminReferidosPage() {
         setEditBalance(p.balanceAvailable || 0);
         setEditTier(p.tier || 'referidor');
         setEditIsActive(p.isActive !== false);
+        setEditIsBlacklisted(!!p.isBlacklisted);
+        setEditBlacklistReason(p.blacklistReason || '');
     };
 
     const handleSaveProfileUpdates = async () => {
         if (!selectedProfile) return;
         setSavingProfile(true);
         try {
-            await updateReferralProfileAdmin(selectedProfile.id, {
-                balanceAvailable: Number(editBalance),
-                tier: editTier,
-                isActive: editIsActive
-            });
+            if (editIsBlacklisted !== !!selectedProfile.isBlacklisted) {
+                // Cambio en lista negra
+                await toggleBlacklistReferralProfile(
+                    selectedProfile.id,
+                    editIsBlacklisted,
+                    editBlacklistReason,
+                    editIsBlacklisted // Anula saldo si entra a lista negra
+                );
+            } else {
+                await updateReferralProfileAdmin(selectedProfile.id, {
+                    balanceAvailable: Number(editBalance),
+                    tier: editTier,
+                    isActive: editIsActive,
+                    blacklistReason: editBlacklistReason
+                });
+            }
+
             // Refrescar local
             setProfiles(prev => prev.map(p => p.id === selectedProfile.id ? {
                 ...p,
-                balanceAvailable: Number(editBalance),
+                balanceAvailable: editIsBlacklisted ? 0 : Number(editBalance),
+                balancePending: editIsBlacklisted ? 0 : p.balancePending,
                 tier: editTier,
-                isActive: editIsActive
+                isActive: editIsBlacklisted ? false : editIsActive,
+                isBlacklisted: editIsBlacklisted,
+                blacklistReason: editBlacklistReason
             } : p));
             setSelectedProfile(null);
         } catch (err) {
@@ -442,9 +465,21 @@ export default function AdminReferidosPage() {
                                     {filteredProfiles.map((p) => (
                                         <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="py-3 px-4">
-                                                <p className="font-bold text-gray-900">{p.nombre}</p>
-                                                <p className="text-[11px] text-gray-500">{p.celular} • {p.ciudad || 'Colombia'}</p>
-                                            </td>
+                                                 <div className="flex items-center gap-1.5">
+                                                     <p className="font-bold text-gray-900">{p.nombre}</p>
+                                                     {p.isBlacklisted && (
+                                                         <span className="bg-red-100 text-red-800 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-sm border border-red-300 flex items-center gap-0.5">
+                                                             <Ban size={10} /> Lista Negra
+                                                         </span>
+                                                     )}
+                                                 </div>
+                                                 <p className="text-[11px] text-gray-500">{p.celular} • {p.ciudad || 'Colombia'}</p>
+                                                 {p.isBlacklisted && p.blacklistReason && (
+                                                     <p className="text-[10px] text-red-600 italic font-medium mt-0.5">
+                                                         Motivo: {p.blacklistReason}
+                                                     </p>
+                                                 )}
+                                             </td>
                                             <td className="py-3 px-4">
                                                 <span className="font-mono font-black text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded-md">
                                                     {p.code}
@@ -641,7 +676,9 @@ export default function AdminReferidosPage() {
                                         Mínimo que debe comprar el referido para recibir los $10.000 de descuento.
                                     </p>
                                 </div>
+                            </div>
 
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 mb-1">
                                         Compra Previa Mínima del Embajador (COP) *
@@ -656,6 +693,24 @@ export default function AdminReferidosPage() {
                                     />
                                     <p className="text-[11px] text-gray-400 mt-1">
                                         El referidor debe tener al menos 1 compra de este valor para que su código funcione.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        Límite Máximo de Referidos por Embajador *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={config.maxReferralsCap || 15}
+                                        onChange={(e) => setConfig({ ...config, maxReferralsCap: Number(e.target.value) })}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                                        min={1}
+                                        max={100}
+                                        required
+                                    />
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        Tope antifraude de amigos que pueden usar su código antes de requerir revisión gerencial.
                                     </p>
                                 </div>
                             </div>
@@ -770,6 +825,45 @@ export default function AdminReferidosPage() {
                                         className="w-4 h-4 text-purple-600 rounded"
                                     />
                                 </div>
+
+                                {/* Zona Antifraude / Lista Negra */}
+                                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 text-rose-900 font-black text-xs">
+                                            <ShieldAlert size={16} className="text-rose-600" />
+                                            <span>Bloqueo Antifraude / Lista Negra</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={editIsBlacklisted}
+                                            onChange={(e) => {
+                                                const val = e.target.checked;
+                                                setEditIsBlacklisted(val);
+                                                if (val) {
+                                                    setEditIsActive(false);
+                                                }
+                                            }}
+                                            className="w-4 h-4 text-rose-600 rounded cursor-pointer"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-rose-700 leading-relaxed font-medium">
+                                        Al marcar en lista negra, el código del embajador queda completamente <strong>inhabilitado en el checkout</strong> y sus saldos disponibles y pendientes se anulan por intento de fraude.
+                                    </p>
+                                    {editIsBlacklisted && (
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-rose-900 mb-1">
+                                                Motivo de la Sanción *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={editBlacklistReason}
+                                                onChange={(e) => setEditBlacklistReason(e.target.value)}
+                                                placeholder="Ej: Autorreferidos ficticios o recogida masiva sin recompra"
+                                                className="w-full px-3 py-1.5 text-xs border border-rose-300 rounded-xl bg-white font-medium focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="flex justify-end gap-2 mt-6">
@@ -782,9 +876,11 @@ export default function AdminReferidosPage() {
                                 <button
                                     onClick={handleSaveProfileUpdates}
                                     disabled={savingProfile}
-                                    className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl shadow cursor-pointer disabled:opacity-50"
+                                    className={`px-5 py-2 font-black text-xs rounded-xl shadow cursor-pointer disabled:opacity-50 text-white ${
+                                        editIsBlacklisted ? 'bg-rose-600 hover:bg-rose-700' : 'bg-purple-600 hover:bg-purple-700'
+                                    }`}
                                 >
-                                    {savingProfile ? 'Guardando...' : 'Guardar Cambios'}
+                                    {savingProfile ? 'Guardando...' : editIsBlacklisted ? 'Aplicar Sanción' : 'Guardar Cambios'}
                                 </button>
                             </div>
                         </motion.div>

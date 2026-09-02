@@ -9,6 +9,7 @@ export interface ReferralConfig {
     friendDiscountType: 'fixed' | 'percentage'; // 'fixed' o 'percentage'
     minOrderSubtotal: number; // Subtotal mínimo de compra para aplicar beneficio (ej: 50000)
     minReferrerSpend: number; // Compra mínima previa requerida por el referidor para que su código esté activo (ej: 50000)
+    maxReferralsCap?: number; // Límite máximo de referidos permitidos por embajador antes de requerir auditoría manual (ej: 10)
     validityDays: number; // Días de validez de la recompensa
     tierThresholds: {
         aliadoMinOrders: number; // ej: 3
@@ -36,6 +37,12 @@ export interface ReferralProfile {
     // Métricas de compra personal del embajador
     totalPersonalSpent?: number; // Total acumulado en compras propias
     hasQualifiedPurchase?: boolean; // Verdadero si tiene al menos 1 pedido >= minReferrerSpend
+
+    // Controles Antifraude & Lista Negra
+    isBlacklisted?: boolean; // Si está en lista negra por sospecha de fraude
+    blacklistReason?: string; // Motivo de sanción (ej: 'Múltiples pedidos recogidos por la misma persona sin recompra')
+    fraudAlert?: boolean; // Bandera de advertencia de auditoría
+    blockedAt?: Timestamp; // Fecha de bloqueo
 
     // Balances financieros (en COP)
     balancePending: number; // Por pedidos aún en preparación/camino
