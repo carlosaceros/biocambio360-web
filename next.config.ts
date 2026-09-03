@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    contentDispositionType: 'inline',
+  },
   /* config options here */
   async redirects() {
     return [

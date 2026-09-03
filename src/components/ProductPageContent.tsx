@@ -111,7 +111,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     // Reset image error state when size or product changes
     useEffect(() => {
         setImageError(false);
-    }, [selectedSize, product.id]);
+    }, [selectedSize, product.id, product.imgFile, product.imgFiles]);
 
     const price = product.precios[selectedSize] || 0;
 
@@ -262,6 +262,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                             alt={`${product.nombre} ${selectedSize}`}
                                             fill
                                             priority
+                                            unoptimized
                                             className="object-contain p-8"
                                             sizes="(max-width: 768px) 100vw, 50vw"
                                             onError={() => setImageError(true)}
