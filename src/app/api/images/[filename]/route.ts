@@ -46,15 +46,27 @@ export async function GET(
         // 2. Query Firestore 'product_images' collection
         try {
             const db = getAdminDB();
-            const docSnap = await db.collection('product_images').doc(filename).get();
+            const docRef = db.collection('product_images').doc(filename);
+            const docSnap = await docRef.get();
             if (docSnap.exists) {
                 const data = docSnap.data();
-                if (data?.base64) {
-                    const imgBuffer = Buffer.from(data.base64, 'base64');
+                let base64 = data?.base64 || '';
+
+                // If image was chunked, reassemble from subcollection
+                if (data?.isChunked) {
+                    const chunksSnap = await docRef.collection('chunks').orderBy('index', 'asc').get();
+                    base64 = '';
+                    chunksSnap.forEach(chunkDoc => {
+                        base64 += chunkDoc.data()?.data || '';
+                    });
+                }
+
+                if (base64) {
+                    const imgBuffer = Buffer.from(base64, 'base64');
                     return new NextResponse(imgBuffer, {
                         status: 200,
                         headers: {
-                            'Content-Type': data.mimeType || defaultMime,
+                            'Content-Type': data?.mimeType || defaultMime,
                             'Cache-Control': 'public, max-age=31536000, immutable',
                         },
                     });
