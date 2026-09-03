@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, CheckCircle2, X, Sparkles } from 'lucide-react';
+import { ShoppingBag, CheckCircle2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface RecentPurchaseItem {
@@ -24,6 +24,7 @@ export default function RecentSalesNotification() {
     const [isVisible, setIsVisible] = useState(false);
     const [isDismissed, setIsDismissed] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    const [imgFailed, setImgFailed] = useState(false);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Disable completely on checkout or admin pages
@@ -37,6 +38,9 @@ export default function RecentSalesNotification() {
             .then(res => res.json())
             .then(data => {
                 if (isMounted && data?.purchases?.length > 0) {
+                    // Pick a random starting index so notifications alternate differently on each session
+                    const randomStart = Math.floor(Math.random() * data.purchases.length);
+                    setCurrentIndex(randomStart);
                     setPurchases(data.purchases);
                 }
             })
@@ -47,14 +51,19 @@ export default function RecentSalesNotification() {
         };
     }, [isHiddenRoute]);
 
+    // Reset image error state on each purchase change
+    useEffect(() => {
+        setImgFailed(false);
+    }, [currentIndex]);
+
     // Notification display loop
     useEffect(() => {
         if (isDismissed || isHiddenRoute || purchases.length === 0) return;
 
-        // Start first notification after 4 seconds
+        // Start first notification after 3.5 seconds
         const initialTimeout = setTimeout(() => {
             setIsVisible(true);
-        }, 4000);
+        }, 3500);
 
         return () => clearTimeout(initialTimeout);
     }, [purchases, isDismissed, isHiddenRoute]);
@@ -63,15 +72,15 @@ export default function RecentSalesNotification() {
         if (isDismissed || isHiddenRoute || purchases.length === 0 || !isVisible) return;
         if (isPaused) return;
 
-        // Show for 6.5 seconds, then hide for 9 seconds before switching to next purchase
+        // Show for 6 seconds, then hide for 6.5 seconds before switching to next purchase
         const hideTimeout = setTimeout(() => {
             setIsVisible(false);
             const nextTimeout = setTimeout(() => {
                 setCurrentIndex(prev => (prev + 1) % purchases.length);
                 setIsVisible(true);
-            }, 9000);
+            }, 6500);
             timerRef.current = nextTimeout;
-        }, 6500);
+        }, 6000);
 
         return () => {
             clearTimeout(hideTimeout);
@@ -113,21 +122,19 @@ export default function RecentSalesNotification() {
                         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-600 via-cyan-400 to-emerald-500" />
 
                         {/* Product Thumbnail or Icon */}
-                        <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 overflow-hidden relative group-hover:scale-105 transition-transform">
-                            {currentItem.imgFile ? (
+                        <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden relative group-hover:scale-105 transition-transform bg-white">
+                            {currentItem.imgFile && !imgFailed ? (
                                 <img
                                     src={currentItem.imgFile}
                                     alt={currentItem.productName}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        // Fallback to icon
-                                        (e.target as HTMLElement).style.display = 'none';
-                                    }}
+                                    className="w-full h-full object-contain p-1"
+                                    onError={() => setImgFailed(true)}
                                 />
-                            ) : null}
-                            <div className="absolute inset-0 flex items-center justify-center bg-blue-600/10 pointer-events-none">
-                                <ShoppingBag size={18} className="text-blue-600" />
-                            </div>
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600">
+                                    <ShoppingBag size={20} />
+                                </div>
+                            )}
                         </div>
 
                         {/* Details */}
