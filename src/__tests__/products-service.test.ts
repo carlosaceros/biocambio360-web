@@ -163,6 +163,28 @@ describe('getAllProducts', () => {
         expect(products.find(x => x.id === 'detergente-test')).toBeUndefined();
     });
 
+    it('excluye productos con status=draft de Firestore por defecto (modo catálogo público)', async () => {
+        vi.mocked(firestore.getDocs).mockResolvedValue(makeSnapshot([{
+            id: 'detergente-test',
+            data: { ...STATIC_PRODUCT, status: 'draft' },
+        }]) as any);
+        const { getAllProducts } = await import('@/lib/products-service');
+        const products = await getAllProducts(true);
+        expect(products.find(x => x.id === 'detergente-test')).toBeUndefined();
+    });
+
+    it('incluye productos con status=draft si includeDrafts=true (modo admin CMS)', async () => {
+        vi.mocked(firestore.getDocs).mockResolvedValue(makeSnapshot([{
+            id: 'detergente-test',
+            data: { ...STATIC_PRODUCT, status: 'draft' },
+        }]) as any);
+        const { getAllProducts } = await import('@/lib/products-service');
+        const products = await getAllProducts({ forceRefresh: true, includeDrafts: true });
+        const p = products.find(x => x.id === 'detergente-test');
+        expect(p).toBeDefined();
+        expect(p!.status).toBe('draft');
+    });
+
     it('excluye productos con isDeleted=true de Firestore', async () => {
         vi.mocked(firestore.getDocs).mockResolvedValue(makeSnapshot([{
             id: 'detergente-test',
@@ -253,6 +275,24 @@ describe('getProductById', () => {
         );
         const { getProductById } = await import('@/lib/products-service');
         expect(await getProductById('detergente-test')).toBeNull();
+    });
+
+    it('retorna null si el producto está en draft y includeDrafts=false', async () => {
+        vi.mocked(firestore.getDoc).mockResolvedValue(
+            makeDocSnap('detergente-test', { ...STATIC_PRODUCT, status: 'draft' }) as any
+        );
+        const { getProductById } = await import('@/lib/products-service');
+        expect(await getProductById('detergente-test', false)).toBeNull();
+    });
+
+    it('retorna el producto si está en draft y includeDrafts=true', async () => {
+        vi.mocked(firestore.getDoc).mockResolvedValue(
+            makeDocSnap('detergente-test', { ...STATIC_PRODUCT, status: 'draft' }) as any
+        );
+        const { getProductById } = await import('@/lib/products-service');
+        const res = await getProductById('detergente-test', true);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe('draft');
     });
 
     it('usa fallback estático si el documento no existe en Firestore', async () => {

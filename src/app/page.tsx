@@ -180,9 +180,15 @@ function HomeContent() {
     setVisibleCount(12);
   }, [selectedCategory, selectedSubcategory, selectedSegment, selectedSolution, deferredQuery]);
 
+  // Active catalog products (strictly excluding draft, archived, and soft-deleted products)
+  const activeProducts = useMemo(() => {
+    const base = dbProducts.length > 0 ? dbProducts : PRODUCTOS;
+    return base.filter(p => p.status !== 'draft' && p.status !== 'archived' && !(p as any).isDeleted);
+  }, [dbProducts]);
+
   // SEARCH-02: Accent-insensitive normalized token matching with deferred value
   const filteredProducts = useMemo(() => {
-    let results = dbProducts.length > 0 ? dbProducts : PRODUCTOS;
+    let results = activeProducts;
 
     const normalizeText = (val?: string | null) =>
       (val || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -780,7 +786,7 @@ function HomeContent() {
 
           {/* ─── COMBOTIZER SECTION ─────────────────────────────── */}
           <div id="combos" className="px-6 pb-20">
-             <ComboBuilder products={PRODUCTOS} onAddToCart={handleAddToCart} />
+             <ComboBuilder products={activeProducts} onAddToCart={handleAddToCart} />
           </div>
 
           {/* ─── TRUST & FAQ ─────────────────────────────────── */}

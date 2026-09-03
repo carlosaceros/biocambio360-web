@@ -53,14 +53,23 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
     // 1. Direct match by generated slug or product ID
     const match = products.find(p => p.id === cleanSlug || generateProductSlug(p.id, p.nombre) === cleanSlug);
-    if (match) return match;
+    if (match) {
+        if (match.status === 'draft' || match.status === 'archived' || (match as any).isDeleted) {
+            return null;
+        }
+        return match;
+    }
 
     // 2. Legacy URL fallback aliases
     if (cleanSlug.includes('desengrasante-multiusos') || cleanSlug === 'desengrasante') {
-        return products.find(p => p.id === 'desengrasante') || null;
+        const found = products.find(p => p.id === 'desengrasante');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        return found || null;
     }
     if (cleanSlug.includes('bactokill') || cleanSlug.includes('bactokil') || cleanSlug.includes('desinfectante')) {
-        return products.find(p => p.id === 'bactokill') || null;
+        const found = products.find(p => p.id === 'bactokill');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        return found || null;
     }
 
     return null;

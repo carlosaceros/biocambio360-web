@@ -14,7 +14,7 @@ import { Product, PRODUCTOS } from './products';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const CACHE_TIME = IS_DEV ? 0 : 1000 * 60 * 5; // 0 cache in development, 5 minutes in production
-let cachedProducts: Product[] | null = null;
+let cachedRawProducts: Product[] | null = null;
 let lastFetchTime = 0;
 
 const productsCollection = collection(db, 'products');
@@ -27,6 +27,12 @@ const SUPPLY_KEYWORDS = [
     'frasco', 'garrafa vacia', 'garrafa vacía'
 ];
 
+export interface GetAllProductsOptions {
+    forceRefresh?: boolean;
+    includeDrafts?: boolean;
+    includeArchived?: boolean;
+}
+
 function isSupplyItem(p: Product): boolean {
     if (p.id === 'desinfectante-bicarbonato' || p.id.includes('destapacanerias')) return false;
     const name = p.nombre.toLowerCase();
@@ -35,87 +41,113 @@ function isSupplyItem(p: Product): boolean {
 }
 
 /**
- * Gets all products from Firestore with fallback to static catalog.
- * Live edits/creations/deletions from Admin Firestore take precedence.
+ * Gets products from Firestore with fallback to static catalog.
+ * By default (public storefront), returns only ACTIVE products (drafts and archived excluded).
+ * Pass { includeDrafts: true, includeArchived: true } for Admin CMS view.
  */
-export async function getAllProducts(forceRefresh = false): Promise<Product[]> {
-    if (!forceRefresh && cachedProducts && Date.now() - lastFetchTime < CACHE_TIME) {
-        return cachedProducts;
-    }
+export async function getAllProducts(
+    optionsOrForceRefresh: boolean | GetAllProductsOptions = false
+): Promise<Product[]> {
+    const options: GetAllProductsOptions = typeof optionsOrForceRefresh === 'boolean'
+        ? { forceRefresh: optionsOrForceRefresh }
+        : (optionsOrForceRefresh || {});
 
-    const dbProductsMap = new Map<string, Product>();
-    try {
-        const q = query(productsCollection, orderBy('nombre', 'asc'));
-        const snapshot = await getDocs(q);
-        snapshot.forEach((docSnap) => {
-            dbProductsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Product);
-        });
-    } catch (e) {
-        console.warn('Warning: Could not fetch products from Firestore, using static fallback:', e);
-    }
+    const {
+        forceRefresh = false,
+        includeDrafts = false,
+        includeArchived = false
+    } = options;
 
-    const allProductsMap = new Map<string, Product>();
-
-    // 1. Load static catalog as base template
-    PRODUCTOS.forEach(p => {
-        const dbP = dbProductsMap.get(p.id);
-        if (dbP) {
-            // Check if product was deleted or archived
-            if (dbP.status === 'archived' || (dbP as any).isDeleted) {
-                return;
-            }
-            allProductsMap.set(p.id, {
-                ...p,
-                ...dbP,
-                precios: dbP.precios && Object.keys(dbP.precios).length > 0 ? dbP.precios : p.precios,
-                competidorPromedio: dbP.competidorPromedio || p.competidorPromedio,
-                stock: dbP.stock || p.stock,
-                nombre: dbP.nombre || p.nombre,
-                slogan: dbP.slogan || p.slogan,
-                descripcion: dbP.descripcion || p.descripcion,
-                shortDescription: dbP.shortDescription || p.shortDescription,
-                categoria: dbP.categoria || p.categoria,
-                subcategoria: dbP.subcategoria !== undefined ? dbP.subcategoria : p.subcategoria,
-                imgFile: dbP.imgFile || p.imgFile,
-                imgFiles: dbP.imgFiles || p.imgFiles,
-                badge: dbP.badge !== undefined ? dbP.badge : p.badge,
-                beneficios: dbP.beneficios && dbP.beneficios.length > 0 ? dbP.beneficios : p.beneficios,
-                faqs: dbP.faqs && dbP.faqs.length > 0 ? dbP.faqs : p.faqs,
-                sku: dbP.sku || p.sku,
-                status: dbP.status || 'active',
-                diferenciadores: dbP.diferenciadores || p.diferenciadores,
-                instrucciones: dbP.instrucciones || p.instrucciones,
-                ph: dbP.ph !== undefined ? dbP.ph : p.ph,
-                dilucion: dbP.dilucion !== undefined ? dbP.dilucion : p.dilucion,
-                biodegradabilidad: dbP.biodegradabilidad !== undefined ? dbP.biodegradabilidad : p.biodegradabilidad,
-                usoRecomendado: dbP.usoRecomendado !== undefined ? dbP.usoRecomendado : p.usoRecomendado,
-                schwartzCopy: dbP.schwartzCopy || p.schwartzCopy,
-                manualContent: dbP.manualContent || p.manualContent
+    if (forceRefresh || !cachedRawProducts || Date.now() - lastFetchTime >= CACHE_TIME) {
+        const dbProductsMap = new Map<string, Product>();
+        try {
+            const q = query(productsCollection, orderBy('nombre', 'asc'));
+            const snapshot = await getDocs(q);
+            snapshot.forEach((docSnap) => {
+                dbProductsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Product);
             });
-        } else {
-            allProductsMap.set(p.id, p);
+        } catch (e) {
+            console.warn('Warning: Could not fetch products from Firestore, using static fallback:', e);
         }
-    });
 
-    // 2. Include any NEW custom products created by the admin in Firestore that are not in the static file
-    dbProductsMap.forEach((dbP, id) => {
-        if (!allProductsMap.has(id)) {
-            if (dbP.status === 'archived' || (dbP as any).isDeleted) return;
-            allProductsMap.set(id, dbP);
+        const allProductsMap = new Map<string, Product>();
+
+        // 1. Load static catalog as base template
+        PRODUCTOS.forEach(p => {
+            const dbP = dbProductsMap.get(p.id);
+            if (dbP) {
+                allProductsMap.set(p.id, {
+                    ...p,
+                    ...dbP,
+                    precios: dbP.precios && Object.keys(dbP.precios).length > 0 ? dbP.precios : p.precios,
+                    competidorPromedio: dbP.competidorPromedio || p.competidorPromedio,
+                    stock: dbP.stock || p.stock,
+                    nombre: dbP.nombre || p.nombre,
+                    slogan: dbP.slogan || p.slogan,
+                    descripcion: dbP.descripcion || p.descripcion,
+                    shortDescription: dbP.shortDescription || p.shortDescription,
+                    categoria: dbP.categoria || p.categoria,
+                    subcategoria: dbP.subcategoria !== undefined ? dbP.subcategoria : p.subcategoria,
+                    imgFile: dbP.imgFile || p.imgFile,
+                    imgFiles: dbP.imgFiles || p.imgFiles,
+                    badge: dbP.badge !== undefined ? dbP.badge : p.badge,
+                    beneficios: dbP.beneficios && dbP.beneficios.length > 0 ? dbP.beneficios : p.beneficios,
+                    faqs: dbP.faqs && dbP.faqs.length > 0 ? dbP.faqs : p.faqs,
+                    sku: dbP.sku || p.sku,
+                    status: dbP.status || 'active',
+                    isDeleted: (dbP as any).isDeleted ?? (dbP.status === 'archived'),
+                    diferenciadores: dbP.diferenciadores || p.diferenciadores,
+                    instrucciones: dbP.instrucciones || p.instrucciones,
+                    ph: dbP.ph !== undefined ? dbP.ph : p.ph,
+                    dilucion: dbP.dilucion !== undefined ? dbP.dilucion : p.dilucion,
+                    biodegradabilidad: dbP.biodegradabilidad !== undefined ? dbP.biodegradabilidad : p.biodegradabilidad,
+                    usoRecomendado: dbP.usoRecomendado !== undefined ? dbP.usoRecomendado : p.usoRecomendado,
+                    schwartzCopy: dbP.schwartzCopy || p.schwartzCopy,
+                    manualContent: dbP.manualContent || p.manualContent
+                });
+            } else {
+                allProductsMap.set(p.id, {
+                    ...p,
+                    status: p.status || 'active',
+                    isDeleted: false
+                });
+            }
+        });
+
+        // 2. Include any NEW custom products created by the admin in Firestore that are not in the static file
+        dbProductsMap.forEach((dbP, id) => {
+            if (!allProductsMap.has(id)) {
+                allProductsMap.set(id, {
+                    ...dbP,
+                    status: dbP.status || 'active',
+                    isDeleted: (dbP as any).isDeleted ?? (dbP.status === 'archived')
+                });
+            }
+        });
+
+        cachedRawProducts = Array.from(allProductsMap.values())
+            .filter(p => !isSupplyItem(p))
+            .map(p => ensureStockDefaults(p));
+        lastFetchTime = Date.now();
+    }
+
+    // Filter according to requested visibility options:
+    return (cachedRawProducts || []).filter(p => {
+        if (!includeArchived && (p.status === 'archived' || (p as any).isDeleted)) {
+            return false;
         }
+        if (!includeDrafts && p.status === 'draft') {
+            return false;
+        }
+        return true;
     });
-
-    cachedProducts = Array.from(allProductsMap.values())
-        .filter(p => !isSupplyItem(p))
-        .map(p => ensureStockDefaults(p));
-    lastFetchTime = Date.now();
-    return cachedProducts;
 }
 
 /**
- * Gets a specific product by its ID (slug)
+ * Gets a specific product by its ID (slug).
+ * By default, returns null if product is draft, archived, or deleted.
  */
-export async function getProductById(id: string): Promise<Product | null> {
+export async function getProductById(id: string, includeDrafts = false): Promise<Product | null> {
     const docRef = doc(db, 'products', id);
     const docSnap = await getDoc(docRef);
     const fallback = PRODUCTOS.find(p => p.id === id);
@@ -123,7 +155,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     let res: Product | null = null;
     if (docSnap.exists()) {
         const dbData = { id: docSnap.id, ...docSnap.data() } as Product;
-        if ((dbData as any).isDeleted || dbData.status === 'archived') {
+        if ((dbData as any).isDeleted || dbData.status === 'archived' || (!includeDrafts && dbData.status === 'draft')) {
             return null;
         }
         if (fallback) {
@@ -137,6 +169,9 @@ export async function getProductById(id: string): Promise<Product | null> {
         }
     } else {
         res = fallback || null;
+        if (res && !includeDrafts && res.status === 'draft') {
+            return null;
+        }
     }
 
     return res ? ensureStockDefaults(res) : null;
@@ -332,7 +367,7 @@ export async function saveProduct(
     }
     
     // Invalidate cache immediately
-    cachedProducts = null;
+    cachedRawProducts = null;
     lastFetchTime = 0;
 }
 
@@ -355,7 +390,7 @@ export async function updateProductVisibility(
     }
 
     // Invalidate cache immediately
-    cachedProducts = null;
+    cachedRawProducts = null;
     lastFetchTime = 0;
 }
 
@@ -370,7 +405,7 @@ export async function updateProductStock(id: string, size: string, newStockQuant
     const docRef = doc(db, 'products', id);
     await setDoc(docRef, { stock: updatedStock, updatedAt: new Date().toISOString() }, { merge: true });
 
-    cachedProducts = null;
+    cachedRawProducts = null;
     lastFetchTime = 0;
 }
 
@@ -388,7 +423,7 @@ export async function deleteProduct(id: string): Promise<void> {
     }
     
     // Invalidate cache immediately
-    cachedProducts = null;
+    cachedRawProducts = null;
     lastFetchTime = 0;
 }
 

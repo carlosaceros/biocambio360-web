@@ -132,7 +132,7 @@ export default function InventoryAdminPage() {
     const loadProducts = async () => {
         setLoading(true);
         try {
-            const data = await getAllProducts(true);
+            const data = await getAllProducts({ forceRefresh: true, includeDrafts: true, includeArchived: true });
             setProducts(data);
         } catch (error) {
             console.error('Error cargando productos:', error);
