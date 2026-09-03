@@ -703,6 +703,7 @@ export default function AnalisisFinancieroPage() {
                                                                 src={`/images/${prod.imgFile}`}
                                                                 alt={prod.name}
                                                                 fill
+                                                                unoptimized
                                                                 className="object-contain p-0.5"
                                                             />
                                                         </div>

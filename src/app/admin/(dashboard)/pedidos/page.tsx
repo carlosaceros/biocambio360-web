@@ -648,6 +648,7 @@ export default function PedidosPage() {
                                                                 src={`/images/${item.product?.imgFile || 'placeholder.png'}`}
                                                                 alt={item.product?.nombre || item.nombre || 'Producto'}
                                                                 fill
+                                                                unoptimized
                                                                 className="object-contain p-1"
                                                             />
                                                         </div>

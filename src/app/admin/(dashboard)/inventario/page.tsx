@@ -226,6 +226,7 @@ export default function InventarioViewPage() {
                                                                 src={`/images/${product.imgFile}`}
                                                                 alt={product.nombre}
                                                                 fill
+                                                                unoptimized
                                                                 className="object-contain p-0.5"
                                                             />
                                                         </div>
@@ -304,6 +305,7 @@ export default function InventarioViewPage() {
                                             src={`/images/${selectedProductForModal.imgFile}`}
                                             alt={selectedProductForModal.nombre}
                                             fill
+                                            unoptimized
                                             className="object-contain p-1"
                                         />
                                     </div>
