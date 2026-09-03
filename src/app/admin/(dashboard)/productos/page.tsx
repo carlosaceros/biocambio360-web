@@ -8,7 +8,8 @@ import {
     XCircle, RefreshCw, MessageSquare, TrendingUp, DollarSign, Layers,
     Copy, ExternalLink, ShieldCheck, Zap, Eye, EyeOff, Check, Tag, HelpCircle,
     Boxes, Smartphone, Image as ImageIcon, SlidersHorizontal, FileText,
-    ClipboardList, FlaskConical, Lightbulb, BookOpen, Shield
+    ClipboardList, FlaskConical, Lightbulb, BookOpen, Shield,
+    ChevronLeft, ChevronRight, UploadCloud
 } from 'lucide-react';
 import { Product, UsageRow, SchwartzCopyData, ManualContentData } from '@/lib/products';
 import { getAllProducts, saveProduct, deleteProduct, updateProductStock, updateProductVisibility, getPriceAuditLogs, PriceAuditLog } from '@/lib/products-service';
@@ -71,6 +72,8 @@ export default function InventoryAdminPage() {
     const [selectedImageSizeTarget, setSelectedImageSizeTarget] = useState<string | null>(null); // null = imagen principal, '1L', '20L', etc.
     const [imageGallerySearchQuery, setImageGallerySearchQuery] = useState('');
     const [isDeletingImage, setIsDeletingImage] = useState<string | null>(null);
+    const [galleryPage, setGalleryPage] = useState<number>(1);
+    const IMAGES_PER_PAGE = 24;
     const [isSeeding, setIsSeeding] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -928,68 +931,78 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
      */
     const processAndUploadImage = async (file: File, targetSize?: string | null) => {
         setIsUploading(true);
-        setUploadProgress('Optimizando y convirtiendo a WebP...');
+        setUploadProgress('Optimizando imagen...');
         setUploadError(null);
 
         try {
-            // 1. Read file as Image
-            const imageUrl = URL.createObjectURL(file);
-            const img = new window.Image();
+            let uploadBlob: Blob = file;
+            let finalExt = 'webp';
 
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = () => reject(new Error('No se pudo cargar el archivo de imagen seleccionado'));
-                img.src = imageUrl;
-            });
+            // 1. Attempt client-side Canvas optimization to crisp, ultra-light WebP
+            try {
+                const imageUrl = URL.createObjectURL(file);
+                const img = new window.Image();
 
-            // 2. Calculate proportional bounding box (max 1600x1600 for crisp web display)
-            const MAX_DIM = 1600;
-            let width = img.width;
-            let height = img.height;
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = () => reject(new Error('No se pudo decodificar la imagen'));
+                    img.src = imageUrl;
+                });
 
-            if (width > MAX_DIM || height > MAX_DIM) {
-                if (width > height) {
-                    height = Math.round((height * MAX_DIM) / width);
-                    width = MAX_DIM;
-                } else {
-                    width = Math.round((width * MAX_DIM) / height);
-                    height = MAX_DIM;
+                // Max 1200x1200 for crisp web display & ultra-light payload (<70KB)
+                const MAX_DIM = 1200;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_DIM || height > MAX_DIM) {
+                    if (width > height) {
+                        height = Math.round((height * MAX_DIM) / width);
+                        width = MAX_DIM;
+                    } else {
+                        width = Math.round((width * MAX_DIM) / height);
+                        height = MAX_DIM;
+                    }
                 }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, width, height);
+                    URL.revokeObjectURL(imageUrl);
+
+                    const webpBlob = await new Promise<Blob | null>((resolve) => {
+                        canvas.toBlob(resolve, 'image/webp', 0.85);
+                    });
+
+                    if (webpBlob) {
+                        uploadBlob = webpBlob;
+                        finalExt = 'webp';
+                    }
+                }
+            } catch (canvasErr) {
+                console.warn('Canvas optimization fallback to original file:', canvasErr);
+                uploadBlob = file;
+                const origExt = (file.name.split('.').pop() || 'png').toLowerCase();
+                finalExt = origExt;
             }
 
-            // 3. Draw on Canvas and export as WebP (quality 0.85)
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('No se pudo inicializar el lienzo de procesamiento');
+            setUploadProgress('Guardando en el servidor...');
 
-            // Draw image smoothly
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, 0, 0, width, height);
-            URL.revokeObjectURL(imageUrl);
-
-            setUploadProgress('Comprimiendo imagen...');
-            const webpBlob = await new Promise<Blob>((resolve, reject) => {
-                canvas.toBlob((blob) => {
-                    if (blob) resolve(blob);
-                    else reject(new Error('Fallo al exportar formato WebP'));
-                }, 'image/webp', 0.85);
-            });
-
-            // 4. Prepare sanitized filename
-            setUploadProgress('Subiendo al servidor...');
+            // 2. Prepare sanitized filename
             const uploadFormData = new FormData();
             const originalName = file.name || 'producto';
             const baseName = originalName.replace(/\.[^.]+$/, '').toLowerCase()
                 .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
             
             const sizeSuffix = targetSize ? `_${targetSize.toLowerCase().replace(/[^a-z0-9]/g, '')}` : '';
-            const finalFilename = `${baseName || 'producto'}${sizeSuffix}_${Date.now().toString().slice(-6)}.webp`;
-            uploadFormData.append('file', webpBlob, finalFilename);
+            const finalFilename = `${baseName || 'producto'}${sizeSuffix}_${Date.now().toString().slice(-6)}.${finalExt}`;
+            uploadFormData.append('file', uploadBlob, finalFilename);
 
-            // 5. Send to API
+            // 3. Send to API
             const res = await fetch('/api/admin/images', {
                 method: 'POST',
                 body: uploadFormData
@@ -1001,11 +1014,10 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
             }
 
             const data = await res.json();
-            const savedFilename = data.filename;
+            const savedFilename = data.filename || finalFilename;
 
-            // 6. Update local editing state immediately
+            // 4. Update local editing state immediately
             if (targetSize) {
-                // Set for specific size
                 setEditingProduct(prev => {
                     if (!prev) return null;
                     const nextImgFiles = { ...(prev.imgFiles || {}) };
@@ -1015,12 +1027,15 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                         imgFiles: nextImgFiles
                     };
                 });
-                showToast(`✅ Imagen para tamaño ${targetSize} actualizada a "${savedFilename}".`);
+                showToast(`✅ Imagen para presentación [${targetSize}] actualizada a "${savedFilename}".`);
             } else {
-                // Set as main product image
                 handleEditChange('imgFile', savedFilename);
                 showToast(`✅ Imagen principal actualizada a "${savedFilename}".`);
             }
+
+            // Prepend new image to availableImages so it appears instantly at the top of gallery
+            setAvailableImages(prev => [savedFilename, ...prev.filter(x => x !== savedFilename)]);
+            setGalleryPage(1);
 
             await loadImages();
             setUploadProgress('¡Imagen optimizada y guardada!');
@@ -3075,127 +3090,230 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                             )}
                                         </div>
 
-                                        {/* 3. SECCIÓN: GALERÍA DE IMÁGENES DEL SERVIDOR CON CRUD Y BÚSQUEDA */}
-                                        <div className="bg-slate-50/80 border border-slate-200 rounded-3xl p-5 space-y-4">
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                                <div>
-                                                    <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                                                        <ImageIcon size={18} className="text-purple-600" />
-                                                        Galería de Imágenes en el Servidor ({availableImages.length})
-                                                    </h4>
-                                                    <p className="text-xs text-slate-500">
-                                                        {selectedImageSizeTarget 
-                                                            ? `👉 Modo asignación: Haz clic en una foto para asignarla a la presentación [${selectedImageSizeTarget}]`
-                                                            : `Haz clic en una foto para asignarla como Imagen Principal.`}
-                                                    </p>
-                                                </div>
+                                        {/* 3. SECCIÓN: GALERÍA DE IMÁGENES DEL SERVIDOR CON CRUD Y PAGINACIÓN OPTIMIZADA */}
+                                        {(() => {
+                                            const filteredGalleryImages = availableImages.filter(img => 
+                                                img.toLowerCase().includes(imageGallerySearchQuery.toLowerCase().trim())
+                                            );
+                                            const totalGalleryPages = Math.max(1, Math.ceil(filteredGalleryImages.length / IMAGES_PER_PAGE));
+                                            const currentGalleryPage = Math.min(Math.max(1, galleryPage), totalGalleryPages);
+                                            const paginatedGalleryImages = filteredGalleryImages.slice(
+                                                (currentGalleryPage - 1) * IMAGES_PER_PAGE,
+                                                currentGalleryPage * IMAGES_PER_PAGE
+                                            );
 
-                                                <div className="flex items-center gap-2">
-                                                    {selectedImageSizeTarget && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedImageSizeTarget(null)}
-                                                            className="text-xs bg-amber-100 text-amber-900 font-bold px-3 py-1 rounded-lg hover:bg-amber-200"
-                                                        >
-                                                            Cancelar asignación a {selectedImageSizeTarget}
-                                                        </button>
-                                                    )}
-                                                    <div className="relative">
-                                                        <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
-                                                        <input 
-                                                            type="text" 
-                                                            value={imageGallerySearchQuery} 
-                                                            onChange={e => setImageGallerySearchQuery(e.target.value)}
-                                                            placeholder="Buscar por nombre..." 
-                                                            className="border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs bg-white text-slate-800 w-44 sm:w-56"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            return (
+                                                <div className="bg-slate-50/80 border border-slate-200 rounded-3xl p-5 space-y-4">
+                                                    {/* Header with Search and Mode info */}
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                        <div>
+                                                            <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                                                <ImageIcon size={18} className="text-purple-600" />
+                                                                Galería de Imágenes en el Servidor ({availableImages.length})
+                                                            </h4>
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                {selectedImageSizeTarget 
+                                                                    ? `👉 Modo asignación activo: Haz clic en una foto para asignarla a la presentación [${selectedImageSizeTarget}]`
+                                                                    : `Haz clic en una foto para asignarla como Imagen Principal.`}
+                                                            </p>
+                                                        </div>
 
-                                            {/* Grid of images */}
-                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-72 overflow-y-auto p-2 bg-white rounded-2xl border border-slate-200">
-                                                {availableImages
-                                                    .filter(img => img.toLowerCase().includes(imageGallerySearchQuery.toLowerCase()))
-                                                    .map(img => {
-                                                        const isMain = editingProduct.imgFile === img;
-                                                        const assignedSizes = Object.entries(editingProduct.imgFiles || {})
-                                                            .filter(([, val]) => val === img)
-                                                            .map(([sizeKey]) => sizeKey);
-
-                                                        return (
-                                                            <div
-                                                                key={img}
-                                                                className={`group relative aspect-square rounded-xl border p-1 bg-slate-50/50 flex flex-col justify-between overflow-hidden transition-all ${
-                                                                    isMain
-                                                                        ? 'ring-2 ring-blue-600 border-blue-600 bg-blue-50/40'
-                                                                        : assignedSizes.length > 0
-                                                                        ? 'ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/30'
-                                                                        : 'hover:border-slate-400'
-                                                                }`}
-                                                            >
+                                                        <div className="flex items-center gap-2">
+                                                            {selectedImageSizeTarget && (
                                                                 <button
                                                                     type="button"
-                                                                    onClick={() => {
-                                                                        if (selectedImageSizeTarget) {
-                                                                            const nextImgFiles = { ...(editingProduct.imgFiles || {}) };
-                                                                            nextImgFiles[selectedImageSizeTarget] = img;
-                                                                            setEditingProduct({
-                                                                                ...editingProduct,
-                                                                                imgFiles: nextImgFiles
-                                                                            });
-                                                                            showToast(`Foto asignada a presentación ${selectedImageSizeTarget}.`);
-                                                                        } else {
-                                                                            handleEditChange('imgFile', img);
-                                                                            showToast(`Foto asignada como imagen principal.`);
+                                                                    onClick={() => setSelectedImageSizeTarget(null)}
+                                                                    className="text-xs bg-amber-100 text-amber-900 font-bold px-3 py-1.5 rounded-xl hover:bg-amber-200 transition-colors cursor-pointer"
+                                                                >
+                                                                    Cancelar asignación a {selectedImageSizeTarget}
+                                                                </button>
+                                                            )}
+                                                            <div className="relative">
+                                                                <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={imageGallerySearchQuery} 
+                                                                    onChange={e => {
+                                                                        setImageGallerySearchQuery(e.target.value);
+                                                                        setGalleryPage(1);
+                                                                    }}
+                                                                    placeholder="Buscar por nombre..." 
+                                                                    className="border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs bg-white text-slate-800 w-44 sm:w-56 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Dedicated PC Upload Box */}
+                                                    <div className="p-4 bg-blue-50/60 border-2 border-dashed border-blue-200 hover:border-blue-400 rounded-2xl transition-colors">
+                                                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                                                    <UploadCloud size={20} />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-black text-slate-900">
+                                                                        {selectedImageSizeTarget 
+                                                                            ? `Subir Foto para Presentación [${selectedImageSizeTarget}] desde tu PC`
+                                                                            : 'Subir Nueva Foto de Producto desde tu Computador'}
+                                                                    </p>
+                                                                    <p className="text-[11px] text-slate-500 font-medium">
+                                                                        Se optimiza automáticamente a WebP liviano y se guarda permanentemente en la nube.
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <label className={`bg-blue-600 hover:bg-blue-700 text-white text-xs font-black px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                                                {isUploading ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
+                                                                <span>{isUploading ? 'Subiendo...' : 'Seleccionar Foto...'}</span>
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    className="hidden"
+                                                                    disabled={isUploading}
+                                                                    onChange={e => {
+                                                                        const file = e.target.files?.[0];
+                                                                        if (file) {
+                                                                            processAndUploadImage(file, selectedImageSizeTarget);
+                                                                            e.target.value = '';
                                                                         }
                                                                     }}
-                                                                    className="relative w-full h-full cursor-pointer"
-                                                                    title={`Asignar ${img}`}
-                                                                >
-                                                                    <Image
-                                                                        src={`/images/${img}`}
-                                                                        alt={img}
-                                                                        fill
-                                                                        unoptimized
-                                                                        className="object-contain p-1"
-                                                                    />
-                                                                </button>
+                                                                />
+                                                            </label>
+                                                        </div>
 
-                                                                {/* Badges on image */}
-                                                                <div className="absolute top-1 left-1 flex flex-col gap-0.5 pointer-events-none">
-                                                                    {isMain && (
-                                                                        <span className="bg-blue-600 text-white text-[8px] font-black px-1 rounded shadow-xs">
-                                                                            PRINCIPAL
-                                                                        </span>
-                                                                    )}
-                                                                    {assignedSizes.map(s => (
-                                                                        <span key={s} className="bg-emerald-600 text-white text-[8px] font-black px-1 rounded shadow-xs">
-                                                                            {s}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-
-                                                                {/* Delete button from server */}
-                                                                {img !== 'placeholder.png' && (
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={isDeletingImage === img}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDeleteImageFromServer(img);
-                                                                        }}
-                                                                        className="absolute bottom-1 right-1 p-1 bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 cursor-pointer shadow-xs"
-                                                                        title="Eliminar archivo del servidor"
-                                                                    >
-                                                                        {isDeletingImage === img ? <Loader2 size={10} className="animate-spin" /> : <Trash2 size={10} />}
-                                                                    </button>
-                                                                )}
+                                                        {uploadProgress && (
+                                                            <div className="mt-3 flex items-center gap-2 text-xs font-bold text-blue-700">
+                                                                <Loader2 size={14} className="animate-spin" />
+                                                                <span>{uploadProgress}</span>
                                                             </div>
-                                                        );
-                                                    })}
-                                            </div>
-                                        </div>
+                                                        )}
+                                                        {uploadError && (
+                                                            <div className="mt-3 text-xs font-bold text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                                                                ❌ {uploadError}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Grid of images with fixed dimensions (no collapsing cards) */}
+                                                    {paginatedGalleryImages.length === 0 ? (
+                                                        <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs font-bold">
+                                                            No se encontraron imágenes con el término "{imageGallerySearchQuery}".
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 min-h-[140px] p-3 bg-white rounded-2xl border border-slate-200">
+                                                            {paginatedGalleryImages.map(img => {
+                                                                const isMain = editingProduct.imgFile === img;
+                                                                const assignedSizes = Object.entries(editingProduct.imgFiles || {})
+                                                                    .filter(([, val]) => val === img)
+                                                                    .map(([sizeKey]) => sizeKey);
+
+                                                                return (
+                                                                    <div
+                                                                        key={img}
+                                                                        onClick={() => {
+                                                                            if (selectedImageSizeTarget) {
+                                                                                const nextImgFiles = { ...(editingProduct.imgFiles || {}) };
+                                                                                nextImgFiles[selectedImageSizeTarget] = img;
+                                                                                setEditingProduct({
+                                                                                    ...editingProduct,
+                                                                                    imgFiles: nextImgFiles
+                                                                                });
+                                                                                showToast(`Foto asignada a presentación [${selectedImageSizeTarget}].`);
+                                                                            } else {
+                                                                                handleEditChange('imgFile', img);
+                                                                                showToast(`Foto asignada como imagen principal.`);
+                                                                            }
+                                                                        }}
+                                                                        className={`group relative h-28 rounded-xl border p-1.5 bg-slate-50 hover:bg-white hover:border-blue-500 hover:shadow-md flex flex-col justify-between overflow-hidden transition-all cursor-pointer ${
+                                                                            isMain
+                                                                                ? 'ring-2 ring-blue-600 border-blue-600 bg-blue-50/50'
+                                                                                : assignedSizes.length > 0
+                                                                                ? 'ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/40'
+                                                                                : 'border-slate-200'
+                                                                        }`}
+                                                                        title={selectedImageSizeTarget ? `Asignar a presentación ${selectedImageSizeTarget}` : `Asignar como imagen principal`}
+                                                                    >
+                                                                        <div className="relative w-full h-18 bg-white rounded-lg overflow-hidden flex items-center justify-center p-1 border border-slate-100">
+                                                                            <img
+                                                                                src={img.startsWith('http') || img.startsWith('data:') ? img : `/images/${img}`}
+                                                                                alt={img}
+                                                                                loading="lazy"
+                                                                                className="w-full h-full object-contain pointer-events-none"
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="text-[10px] text-slate-600 font-semibold truncate text-center w-full px-0.5">
+                                                                            {img.replace(/\.webp$|\.png$|\.jpg$|\.jpeg$/, '')}
+                                                                        </div>
+
+                                                                        {/* Badges on top-left */}
+                                                                        <div className="absolute top-1 left-1 flex flex-col gap-0.5 pointer-events-none z-10">
+                                                                            {isMain && (
+                                                                                <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs">
+                                                                                    PRINCIPAL
+                                                                                </span>
+                                                                            )}
+                                                                            {assignedSizes.map(s => (
+                                                                                <span key={s} className="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs">
+                                                                                    {s}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+
+                                                                        {/* Delete button on top-right */}
+                                                                        {img !== 'placeholder.png' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={isDeletingImage === img}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleDeleteImageFromServer(img);
+                                                                                }}
+                                                                                className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-700 transition-opacity cursor-pointer shadow-xs z-20"
+                                                                                title="Eliminar archivo del servidor"
+                                                                            >
+                                                                                {isDeletingImage === img ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Pagination Controls */}
+                                                    {totalGalleryPages > 1 && (
+                                                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-slate-600">
+                                                            <div className="font-bold text-slate-500">
+                                                                Mostrando {filteredGalleryImages.length > 0 ? (currentGalleryPage - 1) * IMAGES_PER_PAGE + 1 : 0} - {Math.min(currentGalleryPage * IMAGES_PER_PAGE, filteredGalleryImages.length)} de {filteredGalleryImages.length} fotos
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={currentGalleryPage <= 1}
+                                                                    onClick={() => setGalleryPage(p => Math.max(1, p - 1))}
+                                                                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                                                >
+                                                                    <ChevronLeft size={14} /> Anterior
+                                                                </button>
+                                                                <span className="font-black text-slate-800 px-2">
+                                                                    Página {currentGalleryPage} de {totalGalleryPages}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={currentGalleryPage >= totalGalleryPages}
+                                                                    onClick={() => setGalleryPage(p => Math.min(totalGalleryPages, p + 1))}
+                                                                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                                                >
+                                                                    Siguiente <ChevronRight size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>

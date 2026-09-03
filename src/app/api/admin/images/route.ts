@@ -1,23 +1,46 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { getAdminDB } from '@/lib/firebase-admin';
 
 export async function GET() {
     try {
-        const publicImagesDirectory = path.join(process.cwd(), 'public', 'images');
-        
-        const files = fs.readdirSync(publicImagesDirectory);
-        
-        // Filter only image files
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-        const images = files.filter(file => {
-            const ext = path.extname(file).toLowerCase();
-            return imageExtensions.includes(ext) && !file.startsWith('.');
-        });
-        
+        const imageSet = new Set<string>();
+
+        // 1. Read files from local disk if available
+        const publicImagesDirectory = path.join(process.cwd(), 'public', 'images');
+        try {
+            if (fs.existsSync(publicImagesDirectory)) {
+                const files = fs.readdirSync(publicImagesDirectory);
+                for (const file of files) {
+                    const ext = path.extname(file).toLowerCase();
+                    if (imageExtensions.includes(ext) && !file.startsWith('.')) {
+                        imageSet.add(file);
+                    }
+                }
+            }
+        } catch (fsErr) {
+            console.warn('[API/admin/images] Warning reading local public/images directory:', fsErr);
+        }
+
+        // 2. Read custom uploaded images from Firestore 'product_images' collection
+        try {
+            const db = getAdminDB();
+            const snapshot = await db.collection('product_images').get();
+            snapshot.forEach(doc => {
+                const name = doc.data()?.name || doc.id;
+                if (name && !name.startsWith('.')) {
+                    imageSet.add(name);
+                }
+            });
+        } catch (dbErr) {
+            console.warn('[API/admin/images] Warning reading Firestore product_images collection:', dbErr);
+        }
+
         // Sort alphabetically
-        images.sort((a, b) => a.localeCompare(b));
-        
+        const images = Array.from(imageSet).sort((a, b) => a.localeCompare(b));
+
         return NextResponse.json({ images });
     } catch (error) {
         console.error('Error reading images directory:', error);
@@ -34,23 +57,15 @@ export async function POST(request: Request) {
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
-        const imagesDirectory = path.join(process.cwd(), 'public', 'images');
-        
-        // Ensure directory exists
-        if (!fs.existsSync(imagesDirectory)) {
-            fs.mkdirSync(imagesDirectory, { recursive: true });
-        }
-        
-        // Clean filename (lowercase, remove accents, replace spaces/special chars)
+
+        // Clean and sanitize filename (preserves exact test contract)
         const originalName = file.name || 'uploaded_image.webp';
-        
-        // Strip original extension and append .webp if not present
         const ext = path.extname(originalName);
         let baseName = originalName;
         if (ext) {
             baseName = path.basename(originalName, ext);
         }
-        
+
         let cleanName = baseName.toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "") // remove accents
@@ -63,11 +78,42 @@ export async function POST(request: Request) {
         }
 
         const filename = `${cleanName}.webp`;
-        const filePath = path.join(imagesDirectory, filename);
-        
-        // Save the file
-        await fs.promises.writeFile(filePath, buffer);
-        
+        let savedToStorage = false;
+
+        // 1. Persist to Firestore 'product_images' collection (essential for Vercel / serverless)
+        try {
+            const db = getAdminDB();
+            await db.collection('product_images').doc(filename).set({
+                id: filename,
+                name: filename,
+                base64: buffer.toString('base64'),
+                mimeType: 'image/webp',
+                size: buffer.length,
+                uploadedAt: new Date().toISOString(),
+            });
+            savedToStorage = true;
+        } catch (dbErr) {
+            console.warn('[API/admin/images] Could not write to Firestore product_images:', dbErr);
+        }
+
+        // 2. Also try writing to local disk if running on localhost / writable environment
+        try {
+            const imagesDirectory = path.join(process.cwd(), 'public', 'images');
+            if (!fs.existsSync(imagesDirectory)) {
+                fs.mkdirSync(imagesDirectory, { recursive: true });
+            }
+            const filePath = path.join(imagesDirectory, filename);
+            await fs.promises.writeFile(filePath, buffer);
+            savedToStorage = true;
+        } catch (fsErr: any) {
+            // Read-only filesystem is expected on Vercel lambda
+            console.log('[API/admin/images] Local disk write skipped/failed (normal in serverless):', fsErr?.message);
+        }
+
+        if (!savedToStorage) {
+            throw new Error('No storage backend was able to persist the image');
+        }
+
         return NextResponse.json({ 
             success: true, 
             filename: filename,
@@ -94,14 +140,37 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'No se puede eliminar este archivo protegido del sistema' }, { status: 403 });
         }
 
-        const publicImagesDirectory = path.join(process.cwd(), 'public', 'images');
-        const filePath = path.join(publicImagesDirectory, sanitizedFilename);
+        let deleted = false;
 
-        if (!fs.existsSync(filePath)) {
-            return NextResponse.json({ error: 'El archivo no existe' }, { status: 404 });
+        // 1. Delete from Firestore 'product_images' collection if present
+        try {
+            const db = getAdminDB();
+            const docRef = db.collection('product_images').doc(sanitizedFilename);
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
+                await docRef.delete();
+                deleted = true;
+            }
+        } catch (dbErr) {
+            console.warn('[API/admin/images] Could not delete from Firestore product_images:', dbErr);
         }
 
-        await fs.promises.unlink(filePath);
+        // 2. Delete from local disk if present
+        try {
+            const publicImagesDirectory = path.join(process.cwd(), 'public', 'images');
+            const filePath = path.join(publicImagesDirectory, sanitizedFilename);
+            if (fs.existsSync(filePath)) {
+                await fs.promises.unlink(filePath);
+                deleted = true;
+            }
+        } catch (fsErr) {
+            console.warn('[API/admin/images] Could not unlink from local disk:', fsErr);
+        }
+
+        if (!deleted) {
+            // If it wasn't in Firestore nor on disk, return 404
+            return NextResponse.json({ error: 'El archivo no existe' }, { status: 404 });
+        }
 
         return NextResponse.json({
             success: true,
@@ -112,5 +181,3 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'Error al eliminar imagen del servidor' }, { status: 500 });
     }
 }
-
-

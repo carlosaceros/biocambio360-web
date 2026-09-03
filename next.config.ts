@@ -65,6 +65,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return {
+      fallback: [
+        {
+          source: '/images/:path*',
+          destination: '/api/images/:path*',
+        },
+      ],
+    };
+  },
 };
 
 export default nextConfig;
