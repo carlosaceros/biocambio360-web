@@ -23,9 +23,8 @@ export default function RecentSalesNotification() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isVisible, setIsVisible] = useState(false);
     const [isDismissed, setIsDismissed] = useState(false);
-    const [isPaused, setIsPaused] = useState(false);
     const [imgFailed, setImgFailed] = useState(false);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const isPausedRef = useRef(false);
 
     // Disable completely on checkout or admin pages
     const isHiddenRoute = pathname?.startsWith('/checkout') || pathname?.startsWith('/admin');
@@ -56,37 +55,63 @@ export default function RecentSalesNotification() {
         setImgFailed(false);
     }, [currentIndex]);
 
-    // Notification display loop
+    // Self-sustaining notification cycle: shows 1 notification every 35 seconds
     useEffect(() => {
         if (isDismissed || isHiddenRoute || purchases.length === 0) return;
 
-        // Start first notification after 3.5 seconds
-        const initialTimeout = setTimeout(() => {
+        let active = true;
+        let hideTimer: NodeJS.Timeout | null = null;
+        let nextTimer: NodeJS.Timeout | null = null;
+
+        const scheduleNext = (delayMs: number) => {
+            if (!active) return;
+            nextTimer = setTimeout(() => {
+                if (!active) return;
+                showNotification();
+            }, delayMs);
+        };
+
+        const showNotification = () => {
+            if (!active) return;
             setIsVisible(true);
-        }, 3500);
 
-        return () => clearTimeout(initialTimeout);
-    }, [purchases, isDismissed, isHiddenRoute]);
+            let elapsed = 0;
+            const VISIBLE_DURATION = 6000; // Visible for 6 seconds
+            const TICK = 500;
 
-    useEffect(() => {
-        if (isDismissed || isHiddenRoute || purchases.length === 0 || !isVisible) return;
-        if (isPaused) return;
+            const checkHide = () => {
+                if (!active) return;
+                // Keep showing if user is hovering over notification
+                if (isPausedRef.current) {
+                    hideTimer = setTimeout(checkHide, TICK);
+                    return;
+                }
 
-        // Show for 6 seconds, then hide for 6.5 seconds before switching to next purchase
-        const hideTimeout = setTimeout(() => {
-            setIsVisible(false);
-            const nextTimeout = setTimeout(() => {
-                setCurrentIndex(prev => (prev + 1) % purchases.length);
-                setIsVisible(true);
-            }, 6500);
-            timerRef.current = nextTimeout;
-        }, 6000);
+                elapsed += TICK;
+                if (elapsed >= VISIBLE_DURATION) {
+                    setIsVisible(false);
+                    // Rotate to the next purchase in the list
+                    setCurrentIndex(prev => (prev + 1) % purchases.length);
+                    // Schedule next notification in 35 seconds
+                    scheduleNext(35000);
+                } else {
+                    hideTimer = setTimeout(checkHide, TICK);
+                }
+            };
+
+            hideTimer = setTimeout(checkHide, TICK);
+        };
+
+        // First notification appears after 4 seconds of entering the page
+        const initialTimer = setTimeout(showNotification, 4000);
 
         return () => {
-            clearTimeout(hideTimeout);
-            if (timerRef.current) clearTimeout(timerRef.current);
+            active = false;
+            clearTimeout(initialTimer);
+            if (hideTimer) clearTimeout(hideTimer);
+            if (nextTimer) clearTimeout(nextTimer);
         };
-    }, [isVisible, isPaused, purchases.length, isDismissed, isHiddenRoute]);
+    }, [purchases.length, isDismissed, isHiddenRoute]);
 
     if (isHiddenRoute || isDismissed || purchases.length === 0) {
         return null;
@@ -110,8 +135,8 @@ export default function RecentSalesNotification() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.95 }}
                     transition={{ duration: 0.35, ease: 'easeOut' }}
-                    onMouseEnter={() => setIsPaused(true)}
-                    onMouseLeave={() => setIsPaused(false)}
+                    onMouseEnter={() => { isPausedRef.current = true; }}
+                    onMouseLeave={() => { isPausedRef.current = false; }}
                     className="fixed bottom-4 left-4 z-40 max-w-[340px] sm:max-w-[380px]"
                 >
                     <Link
