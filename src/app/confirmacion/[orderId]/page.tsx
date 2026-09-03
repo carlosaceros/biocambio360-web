@@ -42,6 +42,8 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
     const [order, setOrder] = useState<Order | null>(null);
     const [orderId, setOrderId] = useState<string>('');
     const [wompiStatus, setWompiStatus] = useState<string | null>(null);
+    const [referralCode, setReferralCode] = useState<string>('');
+    const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
     useEffect(() => {
         params.then(({ orderId }) => {
@@ -56,6 +58,40 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
 
             const parsedOrder = JSON.parse(orderData);
             setOrder(parsedOrder);
+
+            // Look up or auto-register ambassador profile to get official code
+            if (parsedOrder.cliente?.celular) {
+                const cleanPhone = parsedOrder.cliente.celular.replace(/\D/g, '');
+                if (cleanPhone.length >= 10) {
+                    fetch(`/api/referrals/lookup?phone=${cleanPhone}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data?.exists && data?.profile?.code) {
+                                setReferralCode(data.profile.code);
+                            } else {
+                                fetch('/api/referrals/register', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        nombre: parsedOrder.cliente.nombre || 'Cliente',
+                                        celular: cleanPhone,
+                                        cedula: parsedOrder.cliente.cedula || '000000',
+                                        ciudad: parsedOrder.cliente.ciudad || 'Colombia',
+                                        email: parsedOrder.cliente.email || ''
+                                    })
+                                })
+                                .then(r => r.json())
+                                .then(regData => {
+                                    if (regData?.profile?.code) {
+                                        setReferralCode(regData.profile.code);
+                                    }
+                                })
+                                .catch(err => console.warn('[Confirmacion] Error auto-registering referral:', err));
+                            }
+                        })
+                        .catch(err => console.warn('[Confirmacion] Error looking up referral code:', err));
+                }
+            }
 
             // If Wompi was used, check/reconcile status with Wompi API
             if (parsedOrder.metodoPago === 'wompi' && typeof window !== 'undefined') {
@@ -127,6 +163,50 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
 
     const isWompiApproved = wompiStatus === 'APPROVED';
     const isWompiDeclined = wompiStatus === 'DECLINED' || wompiStatus === 'ERROR' || wompiStatus === 'VOIDED';
+
+    const customerFirstName = order.cliente?.nombre?.trim().split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO';
+    const cleanCustomerPhone = order.cliente?.celular?.replace(/\D/g, '') || '';
+    const customerPhoneSuffix = cleanCustomerPhone.slice(-3) || '360';
+    const activeReferralCode = referralCode || `${customerFirstName}${customerPhoneSuffix}`;
+    const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://biocambio360.com';
+    const referralShareUrl = `${originUrl}/?ref=${activeReferralCode}`;
+    const referralWhatsappText = `¡Hola! Te recomiendo Biocambio360, compran directo a fábrica productos de aseo concentrados biodegradables. Entra con mi enlace y te dan $10.000 COP de descuento en tu primera compra: ${referralShareUrl}`;
+    const referralWhatsappUrl = `https://wa.me/?text=${encodeURIComponent(referralWhatsappText)}`;
+
+    const handleCopyReferralLink = async () => {
+        let success = false;
+        try {
+            if (navigator?.clipboard?.writeText) {
+                await navigator.clipboard.writeText(referralShareUrl);
+                success = true;
+            }
+        } catch (clipErr) {
+            console.warn('[Confirmacion] navigator.clipboard error:', clipErr);
+        }
+
+        if (!success) {
+            try {
+                const tempInput = document.createElement('textarea');
+                tempInput.value = referralShareUrl;
+                tempInput.setAttribute('readonly', '');
+                tempInput.style.position = 'fixed';
+                tempInput.style.top = '0';
+                tempInput.style.left = '0';
+                tempInput.style.opacity = '0';
+                document.body.appendChild(tempInput);
+                tempInput.focus();
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                success = true;
+            } catch (execErr) {
+                console.warn('[Confirmacion] execCommand copy error:', execErr);
+            }
+        }
+
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 3000);
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-gray-50 py-12">
@@ -322,38 +402,47 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                             <div className="text-left w-full sm:w-auto">
                                 <p className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Tu Enlace de Embajador:</p>
                                 <p className="text-sm font-mono font-bold text-amber-300 truncate max-w-xs sm:max-w-md">
-                                    {typeof window !== 'undefined' ? `${window.location.origin}/?ref=${order.cliente?.nombre?.split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO'}${order.cliente?.celular?.replace(/\D/g, '').slice(-3) || '360'}` : 'biocambio360.com'}
+                                    {referralShareUrl}
                                 </p>
                             </div>
                             <button
-                                onClick={() => {
-                                    const shareLink = `${window.location.origin}/?ref=${order.cliente?.nombre?.split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO'}${order.cliente?.celular?.replace(/\D/g, '').slice(-3) || '360'}`;
-                                    navigator.clipboard.writeText(shareLink);
-                                    alert('¡Enlace de referido copiado al portapapeles!');
-                                }}
-                                className="w-full sm:w-auto px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-black transition-colors shrink-0"
+                                type="button"
+                                onClick={handleCopyReferralLink}
+                                className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-md ${
+                                    copiedLink 
+                                        ? 'bg-emerald-500 text-white ring-2 ring-emerald-300 scale-105' 
+                                        : 'bg-white/20 hover:bg-white/30 text-white'
+                                }`}
                             >
-                                📋 Copiar Enlace
+                                {copiedLink ? (
+                                    <>
+                                        <span>✅</span>
+                                        <span>¡Enlace Copiado!</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>📋</span>
+                                        <span>Copiar Enlace</span>
+                                    </>
+                                )}
                             </button>
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-3">
                             <a
-                                href={`https://wa.me/?text=${encodeURIComponent(
-                                    `¡Hola! Te recomiendo Biocambio360, compran directo a fábrica productos de aseo concentrados biodegradables. Entra con mi enlace y te dan $10.000 COP de descuento en tu primera compra: ${typeof window !== 'undefined' ? `${window.location.origin}/?ref=${order.cliente?.nombre?.split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO'}${order.cliente?.celular?.replace(/\D/g, '').slice(-3) || '360'}` : 'https://biocambio360-web.vercel.app'}`
-                                )}`}
+                                href={referralWhatsappUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm"
+                                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm cursor-pointer"
                             >
                                 <MessageCircle size={18} />
                                 Compartir en WhatsApp con 1 Clic
                             </a>
                             <Link
-                                href="/comunidad"
-                                className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs flex items-center justify-center transition-colors"
+                                href={`/comunidad?phone=${encodeURIComponent(cleanCustomerPhone)}`}
+                                className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs flex items-center justify-center transition-colors border border-white/10 hover:border-white/25"
                             >
-                                Ver Mi Saldo & Aliados →
+                                Ver Mi Espacio de Embajador →
                             </Link>
                         </div>
                     </div>

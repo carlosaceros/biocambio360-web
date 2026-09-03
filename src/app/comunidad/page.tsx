@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Users, 
@@ -22,7 +23,7 @@ import { formatCurrency } from '@/lib/checkout-utils';
 import { ReferralProfile, ReferralTier } from '@/types/referral';
 import Link from 'next/link';
 
-export default function ComunidadPage() {
+function ComunidadContent() {
     const [searchPhone, setSearchPhone] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [profile, setProfile] = useState<ReferralProfile | null>(null);
@@ -42,9 +43,10 @@ export default function ComunidadPage() {
     const [redeemSuccess, setRedeemSuccess] = useState<string | null>(null);
     const [redeemError, setRedeemError] = useState<string | null>(null);
 
-    const handleSearch = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        const clean = searchPhone.replace(/\D/g, '');
+    const searchParams = useSearchParams();
+
+    const lookupProfileByPhone = useCallback(async (phoneToQuery: string) => {
+        const clean = phoneToQuery.replace(/\D/g, '');
         if (clean.length < 10) {
             setErrorMessage('Ingresa un número de celular válido de 10 dígitos.');
             return;
@@ -62,14 +64,33 @@ export default function ComunidadPage() {
             const data = await res.json();
             if (data.exists && data.profile) {
                 setProfile(data.profile);
+                setIsRegistering(false);
             } else {
                 setErrorMessage('No encontramos un perfil de embajador con este celular. ¡Regístrate gratis a continuación!');
+                setIsRegistering(true);
             }
         } catch (err: any) {
             setErrorMessage('Error al consultar. Inténtalo de nuevo.');
         } finally {
             setIsLoading(false);
         }
+    }, []);
+
+    // Auto-lookup if coming from order confirmation (?phone=3XXXXXXXXX)
+    useEffect(() => {
+        const phoneParam = searchParams.get('phone') || searchParams.get('celular');
+        if (phoneParam) {
+            const clean = phoneParam.replace(/\D/g, '');
+            if (clean.length >= 10) {
+                setSearchPhone(clean);
+                lookupProfileByPhone(clean);
+            }
+        }
+    }, [searchParams, lookupProfileByPhone]);
+
+    const handleSearch = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        await lookupProfileByPhone(searchPhone);
     };
 
     const handleRegister = async (e: React.FormEvent) => {
@@ -108,11 +129,41 @@ export default function ComunidadPage() {
         }
     };
 
-    const handleCopyLink = () => {
+    const handleCopyLink = async () => {
         if (!profile) return;
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://biocambio360-web.vercel.app';
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://biocambio360.com';
         const link = `${origin}/?ref=${profile.code}`;
-        navigator.clipboard.writeText(link);
+
+        let success = false;
+        try {
+            if (navigator?.clipboard?.writeText) {
+                await navigator.clipboard.writeText(link);
+                success = true;
+            }
+        } catch (e) {
+            console.warn('[Comunidad] clipboard writeText error:', e);
+        }
+
+        if (!success) {
+            try {
+                const el = document.createElement('textarea');
+                el.value = link;
+                el.setAttribute('readonly', '');
+                el.style.position = 'fixed';
+                el.style.top = '0';
+                el.style.left = '0';
+                el.style.opacity = '0';
+                document.body.appendChild(el);
+                el.focus();
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                success = true;
+            } catch (err2) {
+                console.warn('[Comunidad] execCommand error:', err2);
+            }
+        }
+
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2500);
     };
@@ -520,5 +571,20 @@ export default function ComunidadPage() {
 
             <Footer />
         </div>
+    );
+}
+
+export default function ComunidadPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="animate-pulse flex flex-col items-center gap-3 text-slate-600">
+                    <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="font-bold text-sm">Cargando comunidad...</p>
+                </div>
+            </div>
+        }>
+            <ComunidadContent />
+        </Suspense>
     );
 }
