@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Calendar, User, Tag, ShoppingBag, ArrowRight } from 'lucide-react';
 import { BLOG_POSTS, BlogPost } from '@/lib/blog-data';
-import { PRODUCTOS } from '@/lib/products-data';
+import { getAllProducts } from '@/lib/products-service';
 import { generateProductSlug } from '@/lib/product-utils';
 import Footer from '@/components/Footer';
 
@@ -36,8 +36,14 @@ export default async function BlogPostDetailPage({ params }: BlogPostPageProps) 
         notFound();
     }
 
-    // Find related products in store data
-    const relatedProducts = PRODUCTOS.filter(prod => post.relatedProductIds.includes(prod.id));
+    // Find related products in active store catalog
+    const allProducts = await getAllProducts();
+    const normalizeRelatedId = (id: string) => {
+        if (id === 'detergente') return 'detergente-liquido-multiusos';
+        return id;
+    };
+    const targetIds = post.relatedProductIds.map(normalizeRelatedId);
+    const relatedProducts = allProducts.filter(prod => targetIds.includes(prod.id));
 
     // Generate FAQ Schema JSON-LD
     const faqSchema = {

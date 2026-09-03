@@ -60,16 +60,78 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
         return match;
     }
 
-    // 2. Legacy URL fallback aliases
-    if (cleanSlug.includes('desengrasante-multiusos') || cleanSlug === 'desengrasante') {
+    // 2. Legacy & Semantic URL fallback aliases
+    // Detergente
+    if (
+        cleanSlug.includes('detergente') ||
+        cleanSlug === 'jabon-ropa' ||
+        cleanSlug === 'detergente-liquido'
+    ) {
+        if (cleanSlug.includes('negra') || cleanSlug.includes('oscura')) {
+            const found = products.find(p => p.id === 'detergente-ropa-negra-oscura');
+            if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+            if (found) return found;
+        }
+
+        const found = products.find(p => p.id === 'detergente-liquido-multiusos')
+            || products.find(p => p.id === 'detergente-liquido-industrial-heavy-duty')
+            || products.find(p => p.id === 'detergente');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        if (found) return found;
+    }
+
+    // Desengrasante
+    if (cleanSlug.includes('desengrasante')) {
+        if (cleanSlug.includes('industrial') || cleanSlug.includes('pro')) {
+            const found = products.find(p => p.id === 'desengrasante-industrial');
+            if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+            if (found) return found;
+        }
         const found = products.find(p => p.id === 'desengrasante');
         if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
-        return found || null;
+        if (found) return found;
     }
-    if (cleanSlug.includes('bactokill') || cleanSlug.includes('bactokil') || cleanSlug.includes('desinfectante')) {
+
+    // Bactokill / Desinfectante
+    if (cleanSlug.includes('bactokill') || cleanSlug.includes('bactokil') || cleanSlug === 'desinfectante') {
         const found = products.find(p => p.id === 'bactokill');
         if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
-        return found || null;
+        if (found) return found;
+    }
+
+    // Suavizante
+    if (cleanSlug.includes('suavizante')) {
+        const found = products.find(p => p.id === 'suavizante') || products.find(p => p.id === 'suavizante-motas-de-algodon');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        if (found) return found;
+    }
+
+    // Blanqueador / Cloro
+    if (cleanSlug.includes('blanqueador') || cleanSlug.includes('cloro')) {
+        const found = products.find(p => p.id === 'blanqueador');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        if (found) return found;
+    }
+
+    // Lavaloza
+    if (cleanSlug.includes('lavaloza') || cleanSlug.includes('jabon-loza') || cleanSlug.includes('lavavajillas')) {
+        const found = products.find(p => p.id === 'lavaloza-liquido');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        if (found) return found;
+    }
+
+    // Limpiapisos
+    if (cleanSlug.includes('limpiapisos') || cleanSlug.includes('ambientador-pisos')) {
+        const found = products.find(p => p.id === 'limpiapisos') || products.find(p => p.id === 'limpiapisos-lavanda');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        if (found) return found;
+    }
+
+    // Jabón de Manos
+    if (cleanSlug.includes('jabon-de-manos') || cleanSlug.includes('jabon-manos')) {
+        const found = products.find(p => p.id === 'jabon-de-manos') || products.find(p => p.id === 'jabon-manos-antibacterial');
+        if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+        if (found) return found;
     }
 
     return null;
