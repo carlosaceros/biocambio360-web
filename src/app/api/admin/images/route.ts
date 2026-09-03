@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
 import { getAdminDB } from '@/lib/firebase-admin';
 
 export async function GET() {
@@ -78,43 +77,33 @@ export async function POST(request: Request) {
             cleanName = 'image_' + Date.now();
         }
 
-        const filename = `${cleanName}.webp`;
-
-        // 1. Process image with Sharp (Auto-rotate EXIF, resize max 1200x1200, WebP quality 80)
-        let processedBuffer = rawBuffer;
-        let mimeType = 'image/webp';
-        try {
-            processedBuffer = await sharp(rawBuffer)
-                .rotate() // auto-orient based on EXIF
-                .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-                .webp({ quality: 80, effort: 4 })
-                .toBuffer();
-        } catch (sharpErr) {
-            console.warn('[API/admin/images] Sharp processing warning, using raw buffer:', sharpErr);
-        }
+        // Preserve webp or jpg extension
+        const targetExt = ext && ['.jpg', '.jpeg', '.png', '.webp'].includes(ext.toLowerCase()) ? ext.toLowerCase() : '.webp';
+        const filename = `${cleanName}${targetExt}`;
+        const mimeType = file.type || (targetExt === '.png' ? 'image/png' : targetExt === '.jpg' || targetExt === '.jpeg' ? 'image/jpeg' : 'image/webp');
 
         let savedToStorage = false;
 
-        // 2. Persist to Firestore 'product_images' collection (essential for Vercel / serverless)
+        // 1. Persist to Firestore 'product_images' collection (essential for Vercel / serverless)
         try {
             const db = getAdminDB();
             const docRef = db.collection('product_images').doc(filename);
-            const base64Str = processedBuffer.toString('base64');
-            const CHUNK_SIZE = 400 * 1024; // 400KB safe chunk size
+            const base64Str = rawBuffer.toString('base64');
+            const CHUNK_SIZE = 450 * 1024; // 450KB chunk size (well within Firestore 1MB document limit)
 
-            if (base64Str.length <= 750 * 1024) {
-                // Normal document (under 750KB base64)
+            if (base64Str.length <= 700 * 1024) {
+                // Small file: single document
                 await docRef.set({
                     id: filename,
                     name: filename,
                     base64: base64Str,
                     mimeType,
-                    size: processedBuffer.length,
+                    size: rawBuffer.length,
                     uploadedAt: new Date().toISOString(),
                     isChunked: false,
                 });
             } else {
-                // Chunked document for very large images
+                // Large file: chunked storage in subcollection
                 const totalChunks = Math.ceil(base64Str.length / CHUNK_SIZE);
                 const batch = db.batch();
 
@@ -122,7 +111,7 @@ export async function POST(request: Request) {
                     id: filename,
                     name: filename,
                     mimeType,
-                    size: processedBuffer.length,
+                    size: rawBuffer.length,
                     uploadedAt: new Date().toISOString(),
                     isChunked: true,
                     totalChunks,
@@ -142,14 +131,14 @@ export async function POST(request: Request) {
             console.error('[API/admin/images] Could not write to Firestore product_images:', dbErr?.message || dbErr);
         }
 
-        // 3. Also try writing to local disk if running on localhost / writable environment
+        // 2. Also try writing to local disk if running on localhost / writable environment
         try {
             const imagesDirectory = path.join(process.cwd(), 'public', 'images');
             if (!fs.existsSync(imagesDirectory)) {
                 fs.mkdirSync(imagesDirectory, { recursive: true });
             }
             const filePath = path.join(imagesDirectory, filename);
-            await fs.promises.writeFile(filePath, processedBuffer);
+            await fs.promises.writeFile(filePath, rawBuffer);
             savedToStorage = true;
         } catch (fsErr: any) {
             // Read-only filesystem is expected on Vercel lambda

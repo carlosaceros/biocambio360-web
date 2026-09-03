@@ -936,9 +936,9 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
 
         try {
             let uploadBlob: Blob = file;
-            let finalExt = 'webp';
+            let finalFilename = file.name || 'producto.webp';
 
-            // 1. Attempt client-side Canvas optimization to crisp, ultra-light WebP
+            // 1. Client-side Canvas optimization (downscales to max 1200px)
             try {
                 const imageUrl = URL.createObjectURL(file);
                 const img = new window.Image();
@@ -949,7 +949,6 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                     img.src = imageUrl;
                 });
 
-                // Max 1200x1200 for crisp web display & ultra-light payload (<70KB)
                 const MAX_DIM = 1200;
                 let width = img.width;
                 let height = img.height;
@@ -974,32 +973,34 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                     ctx.drawImage(img, 0, 0, width, height);
                     URL.revokeObjectURL(imageUrl);
 
-                    const webpBlob = await new Promise<Blob | null>((resolve) => {
-                        canvas.toBlob(resolve, 'image/webp', 0.85);
-                    });
+                    // First try exporting as WebP (supported on Chrome/Edge/modern browsers)
+                    let blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/webp', 0.82));
+                    let ext = 'webp';
 
-                    if (webpBlob) {
-                        uploadBlob = webpBlob;
-                        finalExt = 'webp';
+                    // Fallback to JPEG if WebP is unsupported or excessive in size (common on Safari macOS)
+                    if (!blob || blob.type !== 'image/webp' || blob.size > 500 * 1024) {
+                        blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.82));
+                        ext = 'jpg';
+                    }
+
+                    if (blob && blob.size > 0) {
+                        uploadBlob = blob;
+                        const originalName = file.name || 'producto';
+                        const baseName = originalName.replace(/\.[^.]+$/, '').toLowerCase()
+                            .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+                        const sizeSuffix = targetSize ? `_${targetSize.toLowerCase().replace(/[^a-z0-9]/g, '')}` : '';
+                        finalFilename = `${baseName || 'producto'}${sizeSuffix}_${Date.now().toString().slice(-6)}.${ext}`;
                     }
                 }
             } catch (canvasErr) {
                 console.warn('Canvas optimization fallback to original file:', canvasErr);
                 uploadBlob = file;
-                const origExt = (file.name.split('.').pop() || 'png').toLowerCase();
-                finalExt = origExt;
             }
 
             setUploadProgress('Guardando en el servidor...');
 
-            // 2. Prepare sanitized filename
+            // 2. Prepare sanitized FormData
             const uploadFormData = new FormData();
-            const originalName = file.name || 'producto';
-            const baseName = originalName.replace(/\.[^.]+$/, '').toLowerCase()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
-            
-            const sizeSuffix = targetSize ? `_${targetSize.toLowerCase().replace(/[^a-z0-9]/g, '')}` : '';
-            const finalFilename = `${baseName || 'producto'}${sizeSuffix}_${Date.now().toString().slice(-6)}.${finalExt}`;
             uploadFormData.append('file', uploadBlob, finalFilename);
 
             // 3. Send to API
