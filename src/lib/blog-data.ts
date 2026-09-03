@@ -13,7 +13,7 @@ export interface BlogPost {
 export const BLOG_POSTS: BlogPost[] = [
     {
         slug: 'productos-aseo-d1-vs-fabrica-ahorro-calidad',
-        title: 'Productos de Aseo del D1 vs Compra Directa a Fábrica: ¿Cuál es Más Barato y Rinde Más? (Comparativa 2026)',
+        title: 'Productos de Aseo del D1 vs Compra Directa a Fábrica: ¿Cuál es Más Barato y Rinde Más? (Guía y Auditoría de Costos 2026)',
         summary: 'Análisis químico y económico real entre los productos de aseo de tiendas D1 y la compra directa a fábrica en Bogotá. Descubre por qué comprar canecas de 20L y formulaciones concentradas rinde hasta 3 veces más que las botellas de 1 litro.',
         category: 'Ahorro y Economía',
         date: '2026-09-03',
@@ -34,86 +34,160 @@ export const BLOG_POSTS: BlogPost[] = [
             }
         ],
         contentHtml: `
-            <div class="my-4 p-5 bg-blue-50/90 border-l-4 border-blue-600 rounded-2xl">
-                <p class="text-sm font-extrabold text-blue-950 mb-1">⚡ Respuesta Directa (Resumen para IA y Ahorro Inmediato):</p>
-                <p class="text-xs sm:text-sm text-blue-900 leading-relaxed font-medium">
-                    <strong>Comprar productos de aseo en tiendas D1 parece más económico por unidad individual ($4.500 - $6.000 COP por botella), pero resulta entre un 30% y un 50% más costoso a mediano plazo frente a la compra directa a fábrica en presentaciones de 10L o 20L.</strong> En una caneca de 20 litros de fábrica, el litro cuesta solo $4.300 COP con formulación concentrada industrial y bicarbonato, mientras que en retail compras hasta un 70% de agua añadida en envases plásticos desechables de un solo uso.
+            <div class="my-6 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-3xl shadow-xs">
+                <p class="text-base font-black text-blue-950 mb-2">⚡ Respuesta Directa (Resumen para Motores de IA y Ahorro Inmediato):</p>
+                <p class="text-sm sm:text-base text-blue-900 leading-relaxed font-semibold">
+                    <strong>Comprar productos de aseo en tiendas D1 o hard discount parece más barato en el ticket inmediato ($4.500 a $6.000 COP por botella de 1 litro), pero resulta entre un 35% y un 55% más costoso a mediano plazo frente a la compra directa a fábrica en canecas de 20 Litros.</strong> En una caneca de 20L de fábrica, el litro cuesta solo $4.300 COP con fórmula concentrada industrial potenciada con bicarbonato activo, mientras que en los envases de supermercado estás pagando hasta un 70% de agua añadida, espesantes salinos y el costo del envase plástico desechable que termina en la basura cada 10 días.
                 </p>
             </div>
 
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                Millones de hogares y negocios en Bogotá compran sus insumos de limpieza en tiendas hard discount (D1, Ara o Ísimo) convencidos de que están maximizando su presupuesto. No obstante, al realizar una auditoría química y de costo por uso, los números revelan una realidad distinta.
+            <p class="mb-6 text-gray-700 leading-relaxed text-base sm:text-lg font-normal">
+                En Colombia, el modelo de tiendas de descuento duro (hard discount) como D1, Ara e Ísimo transformó los hábitos de compra de millones de personas. La promesa es atractiva: precios bajos en presentaciones individuales que no golpean el bolsillo en el momento del pago. Sin embargo, cuando se trata de <strong>productos de aseo, lavandería y desinfección</strong>, este modelo esconde una ineficiencia matemática y química que pocos consumidores logran advertir a simple vista.
             </p>
 
-            <h3 class="text-xl font-black text-gray-900 mt-8 mb-4">1. La Trampa del "Desembolso Pequeño" vs Costo por Lavada</h3>
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                Una botella de detergente de 1 litro de hard discount cuesta alrededor de $5.500 COP. Si para una lavadora de 12 kg necesitas usar 120 ml porque el producto es diluido, la botella te alcanza para apenas 8 lavadas, arrojando un costo de <strong>$687 COP por lavada</strong>.
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                1. La Ilusión del "Ticket Bajo": ¿Por Qué Pagas Más Gastando Menos en Cada Visita?
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                El cerebro humano tiende a comparar precios nominales: ver un detergente líquido de 1 litro a $5.500 COP se percibe como una "ganga" frente a ver una caneca industrial de 20 Litros a $86.000 COP. La barrera psicológica de los $86.000 hace que muchas familias y administradores de negocios prefieran ir al D1 dos o tres veces por semana a comprar frascos pequeños.
             </p>
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                En contraste, la caneca de 20 litros de <a href="/detergente-liquido-por-mayor-bogota" class="text-blue-600 font-bold hover:underline">detergente líquido al por mayor en Bogotá</a> de <strong>Biocambio360</strong> cuesta <strong>$86.000 COP</strong> y rinde 280 lavadas con su dosis recomendada de 70 ml (gracias a su concentración de tensoactivos y bicarbonato). El costo por lavada es de solo <strong>$307 COP</strong>.
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Pero analicemos la matemática del consumo. Una botella de 1 litro de detergente comercial contiene 1.000 mililitros. Si tu lavadora es de 10 a 14 kg y el producto está diluido, necesitas utilizar al menos 120 a 140 ml para que la ropa quede limpia. Eso significa que esa botella te rinde para apenas <strong>7 u 8 lavadas</strong>. Al dividir $5.500 entre 8 lavadas, el costo real es de <strong>$687 COP por ciclo de lavado</strong>.
+            </p>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                En cambio, al adquirir una caneca de 20 litros de <a href="/detergente-liquido-por-mayor-bogota" class="text-blue-600 font-bold hover:underline">detergente líquido al por mayor en Bogotá</a> directamente a la fábrica de <strong>Biocambio360</strong> a <strong>$86.000 COP</strong>, dispones de 20.000 mililitros de formulación concentrada. Como contiene tensoactivos de grado industrial y bicarbonato activo, solo necesitas 70 ml por carga. El resultado: <strong>280 lavadas completas a solo $307 COP por lavada</strong>.
             </p>
 
-            <div class="my-6 p-5 bg-white border border-gray-200 rounded-2xl shadow-xs">
-                <h4 class="text-base font-black text-gray-900 mb-3">📊 Tabla Comparativa de Rendimiento (Familia de 4 personas):</h4>
+            <div class="my-8 p-6 bg-white border border-gray-200 rounded-3xl shadow-sm">
+                <h3 class="text-lg sm:text-xl font-black text-gray-900 mb-4">📊 Auditoría Financiera Real (280 Ciclos de Lavado):</h3>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-xs text-left border-collapse">
+                    <table class="w-full text-sm text-left border-collapse">
                         <thead>
-                            <tr class="bg-gray-100 text-gray-800 font-bold uppercase">
-                                <th class="p-3">Concepto</th>
-                                <th class="p-3">Hard Discount (D1)</th>
-                                <th class="p-3 text-blue-700 bg-blue-50 font-black">Biocambio360 (Fábrica Directa)</th>
+                            <tr class="bg-gray-100 text-gray-900 font-black uppercase text-xs">
+                                <th class="p-4">Criterio de Evaluación</th>
+                                <th class="p-4">Tiendas Hard Discount (D1)</th>
+                                <th class="p-4 text-blue-700 bg-blue-50 font-black">Biocambio360 (Fábrica Directa)</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 text-gray-600">
+                        <tbody class="divide-y divide-gray-100 text-gray-700 font-medium">
                             <tr>
-                                <td class="p-3 font-semibold">Costo por Lavada</td>
-                                <td class="p-3 text-red-600 font-bold">$687 COP</td>
-                                <td class="p-3 text-emerald-700 font-black bg-blue-50/50">$307 COP</td>
+                                <td class="p-4 font-bold text-gray-900">Presentación adquirida</td>
+                                <td class="p-4">Botellas individuales de 1L</td>
+                                <td class="p-4 font-bold text-blue-700 bg-blue-50/50">Caneca industrial de 20 Litros</td>
                             </tr>
                             <tr>
-                                <td class="p-3 font-semibold">Gasto en 280 lavadas</td>
-                                <td class="p-3 font-bold text-red-600">$192.360 COP (35 botellas)</td>
-                                <td class="p-3 font-black text-emerald-700 bg-blue-50/50">$86.000 COP (1 caneca)</td>
+                                <td class="p-4 font-bold text-gray-900">Dosis requerida por carga (10-12 kg)</td>
+                                <td class="p-4 text-red-600 font-bold">120 ml (fórmula diluida)</td>
+                                <td class="p-4 text-emerald-700 font-bold bg-blue-50/50">70 ml (fórmula concentrada)</td>
                             </tr>
                             <tr>
-                                <td class="p-3 font-semibold">Ahorro Neto Real</td>
-                                <td class="p-3">$0 COP</td>
-                                <td class="p-3 font-black text-emerald-700 bg-blue-50/50">+$106.360 COP de Ahorro</td>
+                                <td class="p-4 font-bold text-gray-900">Costo real por lavada</td>
+                                <td class="p-4 text-red-600 font-black">$687 COP</td>
+                                <td class="p-4 text-emerald-700 font-black bg-blue-50/50">$307 COP (-55%)</td>
                             </tr>
                             <tr>
-                                <td class="p-3 font-semibold">Envases de plástico generados</td>
-                                <td class="p-3 text-red-500">35 botellas plásticas a la basura</td>
-                                <td class="p-3 text-emerald-600 font-bold bg-blue-50/50">1 caneca reutilizable</td>
+                                <td class="p-4 font-bold text-gray-900">Gasto total para 280 lavadas</td>
+                                <td class="p-4 text-red-600 font-bold">$192.360 COP (35 botellas)</td>
+                                <td class="p-4 text-emerald-700 font-black bg-blue-50/50">$86.000 COP (1 sola caneca)</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Ahorro neto directo en tu bolsillo</td>
+                                <td class="p-4 font-bold text-slate-400">$0 COP</td>
+                                <td class="p-4 font-black text-emerald-700 bg-blue-50/50">+$106.360 COP que ahorras</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Envases plásticos desechados</td>
+                                <td class="p-4 text-red-600 font-bold">35 botellas plásticas al vertedero</td>
+                                <td class="p-4 text-emerald-700 font-bold bg-blue-50/50">1 caneca reutilizable de por vida</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <h3 class="text-xl font-black text-gray-900 mt-8 mb-4">2. Concentración Química y Bicarbonato Activo</h3>
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                Los productos de fábrica se elaboran bajo formulaciones industriales con mayor porcentaje de materia prima activa. En <a href="/fabricantes-productos-aseo-bogota" class="text-blue-600 font-bold hover:underline">nuestra planta de productos de aseo en Bogotá</a> incorporamos bicarbonato de sodio en la formulación del detergente, lo que potencia el desmanchado de cuellos y puños sin necesidad de añadir blanqueadores agresivos.
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                2. Auditoría Química: ¿Qué Hay Dentro de una Botella de Supermercado?
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Para que un producto pueda venderse en una tienda de descuento a $4.500 o $5.500 COP y generar utilidad para el supermercado, el fabricante debe recortar agresivamente los costos de materia prima. ¿Cómo lo logran?
+            </p>
+            <ul class="space-y-4 mb-6 text-gray-700 text-base sm:text-lg">
+                <li class="flex items-start gap-3">
+                    <span class="text-red-500 font-black text-xl">✗</span>
+                    <div>
+                        <strong>Agua como vehículo mayoritario (65% al 75%):</strong> En gran medida, cuando compras botellas pequeñas de marcas masivas estás pagando por agua purificada transportada en camión, no por ingrediente activo limpiador.
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-red-500 font-black text-xl">✗</span>
+                    <div>
+                        <strong>Uso de cloruro de sodio (sal) como espesante artificial:</strong> Para que el detergente no parezca agua pura y tenga cuerpo "viscoso", se añade sal industrial. Esta sal no limpia nada; al contrario, deja depósitos salinos en los rodamientos de la lavadora y reseca las fibras de algodón de las prendas.
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-red-500 font-black text-xl">✗</span>
+                    <div>
+                        <strong>Fragancias sintéticas de baja permanencia:</strong> Huelen fuerte en la botella, pero al salir de la secadora o del tendedero en el clima frío de Bogotá, el aroma se evapora casi por completo.
+                    </div>
+                </li>
+            </ul>
+
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Por el contrario, en <a href="/fabricantes-productos-aseo-bogota" class="text-blue-600 font-bold hover:underline">nuestra planta química en Soacha</a> formulamos para lavanderías industriales, hoteles y hogares exigentes. La materia activa de tensoactivos biodegradables supera el 18% y se complementa con <strong>bicarbonato de sodio micronizado</strong>. El bicarbonato actúa como un buffer de pH natural que emulsiona grasas corporales y neutraliza los olores a sudor y humedad sin desgastar la ropa.
             </p>
 
-            <h3 class="text-xl font-black text-gray-900 mt-8 mb-4">3. ¿Cómo empezar a comprar a precio de fábrica?</h3>
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                No necesitas tener una gran empresa para acceder a estos precios. Puedes pedir desde 1 caneca de 20 Litros o un galón de 3.8L en nuestro catálogo online con despacho a domicilio en 24h en Bogotá y Soacha, o visitar nuestro punto de despacho en fábrica para ahorrar el 100% del flete.
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                3. El Mito de la Espuma Abundante: Más Espuma NO Significa Más Limpieza
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Uno de los errores más comunes del comprador colombiano es juzgar la calidad de un detergente por la cantidad de espuma que genera en la lavadora. En química de superficies, la espuma es simplemente aire atrapado por un tensoactivo; <strong>la capacidad de limpieza depende de la reducción de la tensión superficial del agua</strong>, no de las burbujas.
+            </p>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                De hecho, las lavadoras modernas automáticas y de alta eficiencia (HE, Carga Frontal o Superior) requieren <strong>detergentes de baja espuma controlada</strong>. La espuma excesiva actúa como un colchón que frena el choque mecánico de las prendas entre sí (lo que realmente saca el mugre), engaña a los sensores ópticos de la máquina disparando códigos de error como "SUD" o "5UD", y exige ciclos de enjuague adicionales que disparan la factura del agua.
             </p>
 
-            <div class="my-8 p-6 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-2xl text-center">
-                <h4 class="text-xl font-black mb-2">Pásate al Ahorro Real de Fábrica</h4>
-                <p class="text-xs sm:text-sm text-blue-100 mb-4 max-w-xl mx-auto">
-                    Conoce la caneca de 20L de detergente líquido multiusos por solo $86.000 COP con despacho a toda Bogotá.
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                4. El Costo Oculto de la Carga Física y el Tiempo de Recompra
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Hay un factor que casi nadie cuantifica: <strong>el esfuerzo y el tiempo invertido en recomprar</strong>. Para mantener abastecido un hogar promedio durante 8 meses con botellas de supermercado, una persona debe cargar a pie, en taxi o en transporte público más de 35 botellas plásticas a lo largo del año.
+            </p>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Comprar directamente a fábrica resuelve este problema de raíz. Haces tu pedido online en 2 minutos y nuestra flota logística propia entrega la caneca de 20 Litros directamente en la puerta de tu casa, local o bodega en Bogotá y Soacha en 24 a 48 horas. Una sola gestión y tu dotación de lavado queda resuelta para los próximos 7 a 9 meses.
+            </p>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                5. Cómo Administrar y Trasvasar una Caneca de 20L en Casa
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                La pregunta frecuente de muchas amas de casa y negocios pequeños es: <em>"¿Una caneca de 20 litros no es muy pesada para el uso diario?"</em>. La respuesta es muy sencilla: no se manipula la caneca de 20L en cada lavado.
+            </p>
+            <ol class="list-decimal pl-6 space-y-3 mb-6 text-gray-700 text-base sm:text-lg font-medium">
+                <li>Ubica la caneca de 20L en tu zona de ropas o cuarto de aseo.</li>
+                <li>Usa un embudo estándar para llenar un galón dosificador de 3.8L o una botella reutilizable de 1 o 2 litros con tapa vertedora.</li>
+                <li>Dosifica 70 ml por cada carga de lavado usando una copita medidora o media taza cafetera.</li>
+                <li>Rellenas la botella pequeña cada 2 meses y mantienes tu espacio de lavado organizado y cómodo.</li>
+            </ol>
+
+            <div class="my-10 p-8 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 text-white rounded-3xl shadow-xl">
+                <h3 class="text-2xl sm:text-3xl font-black mb-3 text-white">¿Listo para Dejar de Pagar Agua Cara en Supermercados?</h3>
+                <p class="text-base sm:text-lg text-slate-200 mb-6 font-medium leading-relaxed">
+                    Pide hoy tu caneca de 20 Litros de detergente concentrado industrial con bicarbonato por solo <strong>$86.000 COP</strong> y recíbela en tu puerta con entrega rápida en Bogotá y Soacha.
                 </p>
-                <a href="/producto/detergente-liquido-multiusos?tamano=20L" class="inline-block bg-white text-blue-900 font-black text-xs uppercase tracking-wider py-3 px-6 rounded-xl hover:bg-yellow-300 transition-colors shadow-md">
-                    Ver Caneca 20L en Tienda Online
-                </a>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="/producto/detergente-liquido-multiusos?tamano=20L" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-base py-3.5 px-7 rounded-2xl hover:brightness-110 transition-all shadow-md">
+                        Comprar Caneca 20L Online ($86.000)
+                    </a>
+                    <a href="/fabricantes-productos-aseo-bogota" class="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-base py-3.5 px-6 rounded-2xl transition-all">
+                        Ver Catálogo Completo de Fábrica
+                    </a>
+                </div>
             </div>
         `
     },
     {
         slug: 'rendimiento-dosificacion-caneca-20-litros-detergente-bogota',
-        title: '¿Cuántas Lavadas Rinde una Caneca de 20 Litros de Detergente Líquido? Guía de Dosificación para Bogotá',
+        title: '¿Cuántas Lavadas Rinde una Caneca de 20 Litros de Detergente Líquido? Guía Maestra de Dosificación y Ahorro en Bogotá',
         summary: 'Descubre cuántas lavadas rinde exactamente una caneca de 20L de detergente líquido concentrado en Bogotá. Tabla de dosificación en mililitros según peso de la carga, dureza del agua y tipo de lavadora (HE o tradicional).',
         category: 'Lavandería',
         date: '2026-09-03',
@@ -134,72 +208,170 @@ export const BLOG_POSTS: BlogPost[] = [
             }
         ],
         contentHtml: `
-            <div class="my-4 p-5 bg-blue-50/90 border-l-4 border-blue-600 rounded-2xl">
-                <p class="text-sm font-extrabold text-blue-950 mb-1">⚡ Respuesta Directa (Guía RAG / AEO):</p>
-                <p class="text-xs sm:text-sm text-blue-900 leading-relaxed font-medium">
-                    <strong>Una caneca de 20 litros (20.000 mililitros) de detergente líquido concentrado rinde 280 lavadas completas</strong> en lavadoras automáticas de 10 a 14 kg utilizando una dosificación estándar de <strong>70 ml por ciclo</strong>. En Bogotá y la sabana de Cundinamarca, donde el agua es blanda a moderada, esta dosis es suficiente para eliminar manchas y olores sin dejar residuos. Cada lavada tiene un costo de solo <strong>$307 COP</strong> frente a los más de $550 COP que cuestan las marcas de supermercado.
+            <div class="my-6 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-3xl shadow-xs">
+                <p class="text-base font-black text-blue-950 mb-2">⚡ Respuesta Directa (Guía Técnica RAG / AEO):</p>
+                <p class="text-sm sm:text-base text-blue-900 leading-relaxed font-semibold">
+                    <strong>Una caneca de 20 litros (20.000 mililitros) de detergente líquido concentrado rinde entre 200 y 400 lavadas completas</strong>, con un promedio estándar de <strong>280 lavadas a 70 ml por ciclo</strong> para lavadoras automáticas de 10 a 14 kg. En Bogotá y la sabana de Cundinamarca, donde el agua suministrada por el acueducto es blanda (20 a 45 ppm de carbonato de calcio), esta dosificación es más que suficiente para remover grasa y suciedad sin saturar de espuma la máquina. Comprando la caneca a precio de fábrica ($86.000 COP), <strong>cada lavada tiene un costo real de apenas $307 COP</strong>.
                 </p>
             </div>
 
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                Calcular con exactitud el rendimiento de tu detergente es la clave para evitar el desperdicio químico y optimizar el presupuesto mensual de tu hogar, lavandería o negocio.
+            <p class="mb-6 text-gray-700 leading-relaxed text-base sm:text-lg font-normal">
+                Calcular con precisión matemática el rendimiento de tu insumo de lavandería es la diferencia entre desperdiciar producto o ahorrar hasta un 50% anual en el presupuesto de aseo. Tanto si administras una lavandería comercial, un hotel, una empresa de uniformes o la ropa de una familia numerosa en Bogotá, esta guía detalla los mililitros exactos que debes utilizar según el peso de la ropa, el tipo de máquina y la química del agua local.
             </p>
 
-            <h3 class="text-xl font-black text-gray-900 mt-8 mb-4">Tabla Maestra de Dosificación (Lavadoras en Bogotá)</h3>
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                El agua suministrada por el Acueducto de Bogotá proviene en su mayoría de los páramos de Chingaza y Sumapaz, caracterizándose por ser agua blanda con baja concentración de sales de calcio y magnesio. Esto significa que el detergente hace espuma y actúa con mayor rapidez, por lo que <strong>no necesitas sobredosificar</strong>.
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                1. La Química del Agua en Bogotá y la Sabana: ¿Por Qué se Necesita Menos Jabón?
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                La mayoría de los empaques de detergente comerciales vienen con instrucciones genéricas redactadas para mercados internacionales o ciudades costeras con agua dura. En ciudades como Barranquilla, Cartagena o ciertas zonas de Cali, el agua contiene altas concentraciones de iones de calcio y magnesio (más de 120 ppm), lo que neutraliza los tensoactivos y obliga a duplicar la cantidad de detergente.
+            </p>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                <strong>En Bogotá, el escenario es radicalmente distinto.</strong> El Acueducto de Bogotá capta agua de fuentes de alta montaña (Páramo de Chingaza, embalses de Chuza y San Rafael, y Páramo de Sumapaz). Esta agua se clasifica técnicamente como <strong>blanda a semiblanda</strong> (entre 20 y 45 ppm de CaCO3). Al haber escasa interferencia mineral, los agentes limpiadores y el bicarbonato activo se disuelven de inmediato y actúan a máxima potencia. Por tanto, <strong>cualquier dosis superior a 80 ml en una lavadora de hogar en Bogotá es un desperdicio innecesario de dinero</strong>.
             </p>
 
-            <div class="my-6 p-5 bg-white border border-gray-200 rounded-2xl shadow-xs">
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                2. Tabla Maestra de Dosificación Milimétrica (Bogotá y Cundinamarca)
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Utiliza esta tabla para calibrar tus lavados diarios con el <a href="/detergente-liquido-por-mayor-bogota" class="text-blue-600 font-bold hover:underline">detergente líquido industrial en caneca de 20L</a> de Biocambio360:
+            </p>
+
+            <div class="my-8 p-6 bg-white border border-gray-200 rounded-3xl shadow-sm">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-xs text-left border-collapse">
+                    <table class="w-full text-sm text-left border-collapse">
                         <thead>
-                            <tr class="bg-gray-100 text-gray-800 font-bold uppercase">
-                                <th class="p-3">Tipo de Carga</th>
-                                <th class="p-3">Peso Ropa</th>
-                                <th class="p-3">Dosis Recomendada</th>
-                                <th class="p-3 text-blue-700 bg-blue-50 font-black">Lavadas por Caneca 20L</th>
-                                <th class="p-3">Costo por Lavada</th>
+                            <tr class="bg-gray-100 text-gray-900 font-black uppercase text-xs">
+                                <th class="p-4">Tipo de Carga Textil</th>
+                                <th class="p-4">Capacidad de Carga</th>
+                                <th class="p-4">Dosis Recomendada</th>
+                                <th class="p-4 text-blue-700 bg-blue-50 font-black">Rendimiento en Caneca 20L</th>
+                                <th class="p-4">Costo por Lavada COP</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 text-slate-600">
+                        <tbody class="divide-y divide-gray-100 text-gray-700 font-medium">
                             <tr>
-                                <td class="p-3 font-semibold">Carga Ligera (Poco sucia)</td>
-                                <td class="p-3">6 - 8 kg</td>
-                                <td class="p-3 font-bold text-blue-600">50 ml</td>
-                                <td class="p-3 font-black text-emerald-700 bg-blue-50/50">400 lavadas</td>
-                                <td class="p-3 font-bold text-emerald-700">$215 COP</td>
+                                <td class="p-4 font-bold text-gray-900">Prendas Delicadas / Oficina (Poco sucias)</td>
+                                <td class="p-4">5 a 8 kg</td>
+                                <td class="p-4 font-black text-blue-600">50 ml</td>
+                                <td class="p-4 font-black text-emerald-700 bg-blue-50/50">400 lavadas</td>
+                                <td class="p-4 font-bold text-emerald-700">$215 COP</td>
                             </tr>
                             <tr>
-                                <td class="p-3 font-semibold">Carga Estándar (Suciedad normal)</td>
-                                <td class="p-3">10 - 12 kg</td>
-                                <td class="p-3 font-bold text-blue-600">70 ml</td>
-                                <td class="p-3 font-black text-emerald-700 bg-blue-50/50">280 lavadas</td>
-                                <td class="p-3 font-bold text-emerald-700">$307 COP</td>
+                                <td class="p-4 font-bold text-gray-900">Carga Estándar de Hogar (Ropa diaria, algodón)</td>
+                                <td class="p-4">9 a 12 kg</td>
+                                <td class="p-4 font-black text-blue-600">70 ml</td>
+                                <td class="p-4 font-black text-emerald-700 bg-blue-50/50">280 lavadas</td>
+                                <td class="p-4 font-bold text-emerald-700">$307 COP</td>
                             </tr>
                             <tr>
-                                <td class="p-3 font-semibold">Carga Pesada (Jeans, toallas, grasa)</td>
-                                <td class="p-3">14 - 18 kg</td>
-                                <td class="p-3 font-bold text-blue-600">100 ml</td>
-                                <td class="p-3 font-black text-emerald-700 bg-blue-50/50">200 lavadas</td>
-                                <td class="p-3 font-bold text-emerald-700">$430 COP</td>
+                                <td class="p-4 font-bold text-gray-900">Carga Pesada (Jeans, toallas, sábanas)</td>
+                                <td class="p-4">13 a 16 kg</td>
+                                <td class="p-4 font-black text-blue-600">90 ml</td>
+                                <td class="p-4 font-black text-emerald-700 bg-blue-50/50">222 lavadas</td>
+                                <td class="p-4 font-bold text-emerald-700">$387 COP</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Suciedad Extrema / Grasa / Uniformes de Taller</td>
+                                <td class="p-4">15 a 18 kg</td>
+                                <td class="p-4 font-black text-blue-600">100 ml</td>
+                                <td class="p-4 font-black text-emerald-700 bg-blue-50/50">200 lavadas</td>
+                                <td class="p-4 font-bold text-emerald-700">$430 COP</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <h3 class="text-xl font-black text-gray-900 mt-8 mb-4">¿Cómo Medir la Dosis sin Vaso Dosificador?</h3>
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                Si no tienes vaso medidor en mililitros, puedes usar como referencia una taza de café estándar (que equivale a unos 150 ml, por lo que media taza equivale a 75 ml) o adquirir nuestro vaso dosificador graduado junto con tu caneca.
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                3. Cronograma de Duración: ¿Cuántos Meses te Dura una Sola Caneca?
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                La durabilidad en el tiempo depende exclusivamente de la frecuencia con la que enciendes la lavadora. Aquí tienes la proyección calculada con una dosis estándar de 70 ml:
             </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <h3 class="text-lg font-black text-slate-900 mb-2">👤 Persona Sola o Pareja (2 lavadas/semana)</h3>
+                    <p class="text-sm sm:text-base text-slate-600 leading-relaxed">
+                        Total lavadas al mes: ~8 lavadas.<br>
+                        <strong>Duración estimada de la caneca: 30 a 35 meses (casi 3 años).</strong><br>
+                        <span class="text-emerald-700 font-bold text-xs mt-1 block">Ideal compartirla con un familiar o comprar el bidón de 10L.</span>
+                    </p>
+                </div>
+                <div class="p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+                    <h3 class="text-lg font-black text-blue-950 mb-2">👨‍👩‍👧‍👦 Familia de 3 a 4 personas (4 a 5 lavadas/semana)</h3>
+                    <p class="text-sm sm:text-base text-blue-900 leading-relaxed">
+                        Total lavadas al mes: ~18 lavadas.<br>
+                        <strong>Duración estimada de la caneca: 14 a 16 meses.</strong><br>
+                        <span class="text-blue-700 font-bold text-xs mt-1 block">La opción más rentable: compras una vez y te olvidas por más de un año.</span>
+                    </p>
+                </div>
+                <div class="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                    <h3 class="text-lg font-black text-emerald-950 mb-2">🏠 Familia Numerosa de 5+ personas (8 a 10 lavadas/semana)</h3>
+                    <p class="text-sm sm:text-base text-emerald-900 leading-relaxed">
+                        Total lavadas al mes: ~38 lavadas.<br>
+                        <strong>Duración estimada de la caneca: 7 a 8 meses.</strong><br>
+                        <span class="text-emerald-800 font-bold text-xs mt-1 block">Ahorro comprobado de más de $260.000 COP al año frente a supermercados.</span>
+                    </p>
+                </div>
+                <div class="p-6 bg-purple-50 border border-purple-200 rounded-2xl">
+                    <h3 class="text-lg font-black text-purple-950 mb-2">🧺 Lavandería Comercial o Hotel Boutique (6 cargas/día)</h3>
+                    <p class="text-sm sm:text-base text-purple-900 leading-relaxed">
+                        Total lavadas al mes: ~180 lavadas.<br>
+                        <strong>Duración estimada de la caneca: 1.5 a 2 meses.</strong><br>
+                        <span class="text-purple-800 font-bold text-xs mt-1 block">Costo operativo por kilo de ropa desplomado a menos de la mitad.</span>
+                    </p>
+                </div>
+            </div>
 
-            <p class="mb-4 text-gray-700 leading-relaxed">
-                Para conocer más detalles sobre combinaciones con suavizante y protocolos de remojo, consulta nuestra <a href="/guia-uso-y-mezclas" class="text-blue-600 font-bold hover:underline">guía completa de uso y mezclas</a> o adquiere tu <a href="/detergente-liquido-por-mayor-bogota" class="text-blue-600 font-bold hover:underline">caneca de 20L de detergente al por mayor en Bogotá</a> directamente en nuestra fábrica.
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                4. ¿Por Qué los Detergentes en Polvo son una Pésima Opción en Bogotá?
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                El agua corriente en Bogotá suele salir del grifo a una temperatura entre <strong>10°C y 14°C</strong>. A esa temperatura, el detergente en polvo no logra disolver completamente sus gránulos abrasivos y sulfatos. Como consecuencia:
             </p>
+            <ul class="space-y-3 mb-6 text-gray-700 text-base sm:text-lg">
+                <li class="flex items-start gap-3">
+                    <span class="text-amber-500 font-black">⚠</span>
+                    <span><strong>Manchas y rayas blancas en prendas oscuras:</strong> Los residuos de polvo no disueltos se adhieren a las fibras de pantalones negros y chaquetas.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-amber-500 font-black">⚠</span>
+                    <span><strong>Taponamiento del cajón dispensador:</strong> El polvo húmedo forma una pasta dura en la gaveta de la lavadora que con el tiempo cría hongos y moho.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-emerald-600 font-black">✓</span>
+                    <span><strong>La solución líquida de Biocambio360:</strong> Al ser un líquido homogéneo con tensoactivos solubles y bicarbonato, se mezcla en 3 segundos en agua fría sin dejar rastro alguno de residuo.</span>
+                </li>
+            </ul>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                5. Cómo Medir la Dosis sin Instrumentos de Laboratorio
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Si no dispones de un vaso medidor graduado en mililitros, puedes utilizar estas equivalencias domésticas universales:
+            </p>
+            <ul class="space-y-3 mb-6 text-gray-700 text-base sm:text-lg font-medium">
+                <li>• <strong>Media taza tintera / cafetera común:</strong> Equivale aproximadamente a 70 - 75 ml (la dosis estándar ideal).</li>
+                <li>• <strong>Dos tapas de galón tradicional:</strong> Equivalen a unos 40 a 50 ml.</li>
+                <li>• <strong>Un pocillo chocolatero:</strong> Tiene unos 220 ml, por lo que un tercio de pocillo es la medida justa.</li>
+            </ul>
+
+            <div class="my-10 p-8 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 text-white rounded-3xl shadow-xl">
+                <h3 class="text-2xl sm:text-3xl font-black mb-3 text-white">Abastécete con la Caneca 20L de Fábrica</h3>
+                <p class="text-base sm:text-lg text-slate-200 mb-6 font-medium leading-relaxed">
+                    Asegura 280 lavadas de máxima calidad industrial con bicarbonato por solo <strong>$86.000 COP</strong> con entrega directa en 24h a toda Bogotá y Soacha.
+                </p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="/producto/detergente-liquido-multiusos?tamano=20L" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-base py-3.5 px-7 rounded-2xl hover:brightness-110 transition-all shadow-md">
+                        Comprar Caneca 20L Online ($86.000)
+                    </a>
+                    <a href="/detergente-liquido-por-mayor-bogota" class="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-base py-3.5 px-6 rounded-2xl transition-all">
+                        Ver Detalles Mayoristas en Bogotá
+                    </a>
+                </div>
+            </div>
         `
     },
-// --- ARTÍCULO PILLAR SEO: DETERGENTE LÍQUIDO BOGOTÁ 20 LITROS ---
     {
         slug: 'detergente-liquido-bogota-20-litros-precio-fabrica',
         title: 'Detergente Líquido 20 Litros en Bogotá: Precios de Fábrica, Rendimiento y Dónde Comprar',
