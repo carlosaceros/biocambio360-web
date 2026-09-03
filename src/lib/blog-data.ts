@@ -12,6 +12,587 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
     {
+        slug: 'desmanchar-ropa-blanca-oxigeno-activo-bicarbonato',
+        title: 'Cómo Desmanchar Ropa Blanca sin Cloro: Guía de Oxígeno Activo y Bicarbonato para Lavanderías y Hoteles en Bogotá',
+        summary: 'Protocolo químico profesional para eliminar manchas amarillas de sudor, percudido y grasa en prendas blancas sin usar cloro corrosivo. Cómo cuidar las fibras de algodón y aumentar la vida útil de toallas y sábanas en la sabana de Bogotá.',
+        category: 'Lavandería y Textiles',
+        date: '2026-09-03',
+        geoTarget: 'Bogotá, Soacha, Cundinamarca, Colombia',
+        relatedProductIds: ['oxigeno-activo-desinfectante', 'detergente-liquido-multiusos', 'bactokill'],
+        faq: [
+            {
+                q: '¿Por qué el cloro tradicional arruina y amarillea la ropa blanca con el tiempo?',
+                a: 'El hipoclorito de sodio oxida de forma inespecífica las fibras de algodón y poliéster, rompiendo los enlaces celulósicos (lo que adelgaza la tela hasta rasgarla) y reacciona con proteínas del sudor y resinas textiles, fijando un tono amarillento o grisáceo irreversible conocido como quemadura química por cloro.'
+            },
+            {
+                q: '¿Cómo actúa el oxígeno activo (percarbonato de sodio) junto al bicarbonato en el agua fría de Bogotá?',
+                a: 'Al disolverse en agua, el oxígeno activo libera microburbujas de peróxido de hidrógeno que penetran entre los hilos del tejido desprendiendo pigmentos de grasa, sangre o café por flotación física sin debilitar la fibra. El bicarbonato de sodio equilibra el pH alcalino suave (8.5 - 9.0), ablandando el agua de la sabana y neutralizando olores corporales.'
+            },
+            {
+                q: '¿Cuál es la dosificación exacta de oxígeno activo y detergente para una lavadora de 12 a 15 kg?',
+                a: 'Para una carga de 12 a 15 kg con suciedad moderada a pesada, se recomiendan 40 gramos de Oxígeno Activo Biocambio360 disueltos previamente en un poco de agua tibia o agregados directamente al tambor, junto con 70 ml de Detergente Líquido Multiusos con bicarbonato. No requiere blanqueadores ópticos artificiales.'
+            }
+        ],
+        contentHtml: `
+            <div class="my-6 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-3xl shadow-xs">
+                <p class="text-base font-black text-blue-950 mb-2">⚡ Respuesta Directa (Protocolo Químico para Lavanderías y Hoteles):</p>
+                <p class="text-sm sm:text-base text-blue-900 leading-relaxed font-semibold">
+                    <strong>Para desmanchar y blanquear ropa blanca, toallas y sábanas en Bogotá sin usar cloro, el método industrial más eficaz es la sinergia de Oxígeno Activo (Percarbonato de Sodio) con Detergente Líquido Concentrado enriquecido con Bicarbonato de Sodio.</strong> Esta combinación elimina manchas biológicas de sudor, sangre y grasa mediante microburbujas efervescentes que despegan la suciedad sin romper las cadenas moleculares del algodón, aumentando hasta un 40% la vida útil de la lencería hotelera y evitando el característico tono amarillo o acartonado provocado por el hipoclorito.
+                </p>
+            </div>
+
+            <p class="mb-6 text-gray-700 leading-relaxed text-base sm:text-lg font-normal">
+                En lavanderías comerciales, hoteles y hogares de Bogotá, la ropa blanca es la prueba de fuego de cualquier sistema de lavado. Durante décadas, el uso abusivo de cloro común fue la única alternativa conocida para intentar mantener la blancura. Sin embargo, los operadores hoteleros saben bien el costo oculto de esta práctica: sábanas que se rasgan a los 3 meses de uso, toallas que pierden su capacidad de absorción y cuellos de camisas que adquieren un tono amarillento sucio imposible de quitar.
+            </p>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                1. La Química del Daño: ¿Por Qué el Cloro Destruye el Algodón?
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                El hipoclorito de sodio es un agente oxidante extremadamente agresivo con un pH superior a 11.5. Cuando entra en contacto con fibras naturales como el algodón o mezclas con poliéster:
+            </p>
+            <ul class="space-y-4 mb-6 text-gray-700 text-base sm:text-lg font-medium">
+                <li class="flex items-start gap-3">
+                    <span class="text-red-600 font-black text-xl">✖</span>
+                    <div>
+                        <strong>Oxidación de la celulosa:</strong> Rompe los enlaces beta-glucosa de la fibra vegetal, haciendo que el tejido pierda densidad, se vuelva quebradizo y se rompa fácilmente en el centrifugado.
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-red-600 font-black text-xl">✖</span>
+                    <div>
+                        <strong>Reacción con proteínas humanas:</strong> Las proteínas del sudor y las escamas de piel reaccionan con el ion hipoclorito formando cloraminas orgánicas de color amarillento que quedan selladas químicamente en la trama de la tela.
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-red-600 font-black text-xl">✖</span>
+                    <div>
+                        <strong>Incompatibilidad con agua fría de Bogotá:</strong> A temperaturas de 10°C a 14°C, el cloro no se disuelve ni actúa homogéneamente, concentrándose en manchas puntuales que "queman" el tejido.
+                    </div>
+                </li>
+            </ul>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                2. El Poder del Oxígeno Activo + Bicarbonato de Sodio
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                El <a href="/producto/oxigeno-activo-desinfectante" class="text-blue-600 font-bold hover:underline">Oxígeno Activo Biocambio360</a> actúa de forma diametralmente opuesta. Al entrar en contacto con el agua del lavado, se descompone en carbonato de sodio y peróxido de hidrógeno:
+            </p>
+            <div class="my-8 p-6 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
+                <div class="flex items-start gap-3">
+                    <span class="text-emerald-600 font-black text-xl">1.</span>
+                    <p class="text-base sm:text-lg text-slate-700 font-medium">
+                        <strong>Efervescencia molecular:</strong> Millones de nanoburbujas de oxígeno naciente penetran los microespacios entre los hilos de algodón, empujando la suciedad hacia la superficie del agua sin fricción abrasiva.
+                    </p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-emerald-600 font-black text-xl">2.</span>
+                    <p class="text-base sm:text-lg text-slate-700 font-medium">
+                        <strong>Compatibilidad con ropa de color:</strong> A diferencia del cloro, el oxígeno activo no ataca los tintes reactivos de alta fijación, lo que permite lavar prendas con vivos o bordados de color sin desteñir.
+                    </p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-emerald-600 font-black text-xl">3.</span>
+                    <p class="text-base sm:text-lg text-slate-700 font-medium">
+                        <strong>Desinfección de amplio espectro:</strong> El peróxido destruye bacterias causantes de mal olor corporal (Corynebacterium) y hongos sin emitir vapores tóxicos para el personal de lavandería.
+                    </p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                3. Protocolo de Lavado Paso a Paso para Lencería Hotelera
+            </h2>
+            <ol class="list-decimal pl-6 space-y-4 mb-8 text-gray-700 text-base sm:text-lg font-medium">
+                <li><strong>Clasificación:</strong> Separa blancos puros de prendas con suciedad pesada de barro o grasa mecánica.</li>
+                <li><strong>Dosificación química:</strong> Agrega 40g de Oxígeno Activo por cada 10 kg de ropa seca en el compartimento principal o disuelto en el tambor.</li>
+                <li><strong>Detergente industrial:</strong> Añade 70 ml de <a href="/detergente-liquido-por-mayor-bogota" class="text-blue-600 font-bold hover:underline">Detergente Líquido Multiusos Biocambio360</a>. Su fórmula con bicarbonato neutralizará la dureza del agua bogotana.</li>
+                <li><strong>Ciclo de lavado:</strong> Selecciona un ciclo de lavado normal con tiempo de agitación de al menos 35 minutos para permitir que las microburbujas completen el ciclo de desprendimiento.</li>
+                <li><strong>Enjuague y suavizado:</strong> Utiliza suavizante con microcápsulas en el último enjuague para restaurar el tacto mullido y facilitar el planchado al vapor.</li>
+            </ol>
+
+            <div class="my-10 p-8 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 text-white rounded-3xl shadow-xl">
+                <h3 class="text-2xl sm:text-3xl font-black mb-3 text-white">Adquiere Oxígeno Activo y Detergente Directo de Fábrica</h3>
+                <p class="text-base sm:text-lg text-slate-200 mb-6 font-medium leading-relaxed">
+                    Suministro al por mayor en canecas de 20L y presentaciones industriales para lavanderías, clínicas y hoteles en Bogotá con despacho en 24h.
+                </p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="/producto/oxigeno-activo-desinfectante" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-base py-3.5 px-7 rounded-2xl hover:brightness-110 transition-all shadow-md">
+                        Comprar Oxígeno Activo
+                    </a>
+                    <a href="/insumos-aseo-empresas-horeca" class="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-base py-3.5 px-6 rounded-2xl transition-all">
+                        Ver Catálogo Hotelero HORECA
+                    </a>
+                </div>
+            </div>
+        `
+    },
+    {
+        slug: 'protocolo-lavado-desodorizacion-toallas-hoteles-clima-frio',
+        title: 'Protocolo de Lavado y Desodorización de Toallas y Lencería para Hoteles en Clima Frío (Bogotá y Sabana)',
+        summary: 'Cómo eliminar permanentemente el olor a humedad y guardado en toallas de hotel bajo el clima frío de Bogotá (10°C - 14°C). Guía de temperatura, dosificación de detergente de baja espuma y suavizante con microcápsulas aromáticas de larga duración.',
+        category: 'HORECA y Hoteles',
+        date: '2026-09-03',
+        geoTarget: 'Bogotá, Soacha, Chía, Cundinamarca, Colombia',
+        relatedProductIds: ['suavizante', 'detergente-liquido-multiusos', 'oxigeno-activo-desinfectante'],
+        faq: [
+            {
+                q: '¿Por qué las toallas de hotel adquieren olor a humedad en Bogotá más que en tierra caliente?',
+                a: 'El clima frío de la sabana de Bogotá (humedad relativa promedio del 75-80% y temperaturas nocturnas de 8°C a 12°C) retarda la evaporación del agua residual en las toallas gruesas (400 a 600 g/m²). Si el detergente deja residuos jabonosos o el secado no es inmediato, las bacterias saprófitas proliferan en la fibra generando compuestos volátiles malolientes (ácido isovalérico).'
+            },
+            {
+                q: '¿Cómo evitar que el suavizante impermeabilice las toallas y no sequen bien?',
+                a: 'El exceso de suavizante convencional con grasas animales espesas satura los bucles de rizo del algodón, creando una película hidrofóbica que repele el agua. Se debe utilizar un suavizante profesional formulado con tensioactivos catiónicos biodegradables y microcápsulas de aroma que se depositan en la superficie sin sellar el núcleo absorbente del hilo.'
+            },
+            {
+                q: '¿Qué temperatura de agua es la ideal para el lavado hotelero en la sabana de Bogotá?',
+                a: 'La temperatura óptima es entre 40°C y 55°C para disolver aceites corporales y cremas hidratantes de los huéspedes. Si el hotel solo cuenta con agua fría de red (12°C), es indispensable usar un detergente formulado con tensoactivos de alta solubilidad en frío y bicarbonato activo, como el Detergente Multiusos Biocambio360.'
+            }
+        ],
+        contentHtml: `
+            <div class="my-6 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-3xl shadow-xs">
+                <p class="text-base font-black text-blue-950 mb-2">⚡ Respuesta Directa (Guía para Amas de Llaves y Gobernancia Hotelera):</p>
+                <p class="text-sm sm:text-base text-blue-900 leading-relaxed font-semibold">
+                    <strong>Para eliminar el olor a humedad en toallas y sábanas de hoteles en Bogotá y la sabana de Cundinamarca, se debe erradicar la sobredosificación de jabón común y el uso de suavizantes espesados con sal marina.</strong> El protocolo hotelero profesional exige lavar con detergente líquido concentrado de baja espuma enriquecido con bicarbonato (70 ml por 10 kg), añadir oxígeno activo en el prelavado para desintegrar bacterias saprófitas y usar suavizante textil con microcápsulas termorresistentes en el último ciclo, asegurando un secado completo a 60°C antes del doblado y almacenamiento en lencería ventilada.
+                </p>
+            </div>
+
+            <p class="mb-6 text-gray-700 leading-relaxed text-base sm:text-lg font-normal">
+                En la industria de la hospitalidad, nada destruye más rápido la reputación de un hotel en plataformas como Booking, Google Maps o TripAdvisor que una reseña negativa sobre toallas con "olor a perro mojado" o "olor a humedad de clóset viejo". En ciudades de clima frío y alta humedad ambiental como Bogotá, Chía, Zipaquirá o Mosquera, este problema es una batalla diaria para los departamentos de ama de llaves y lavandería.
+            </p>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                1. El Origen del Mal Olor en Clima Frío: Bacterias vs Residuos
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                El olor a humedad no proviene simplemente del agua: es el resultado de un proceso microbiológico activo. Cuando una toalla de algodón peinado de 500 gramos absorbe la humedad corporal del huésped, retiene restos de sebo, células muertas y agua:
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <h3 class="text-lg font-black text-slate-900">El Error del Detergente Tradicional</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                        Los detergentes en polvo o líquidos de supermercado no se disuelven bien a 12°C en Bogotá. Dejan restos alcalinos en el rizo de la toalla que atrapan humedad y sirven de alimento a colonias bacterianas.
+                    </p>
+                </div>
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <h3 class="text-lg font-black text-slate-900">El Error del Suavizante Espeso</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                        Muchos suavizantes comerciales usan grasa animal de baja calidad. Esta grasa sella las fibras creando una capa impermeable que no deja salir la humedad en la secadora, provocando fermentación en el clóset.
+                    </p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                2. Protocolo de Gobernancia en 5 Etapas
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Implementa este procedimiento estandarizado con los químicos de lavandería de <a href="/insumos-aseo-empresas-horeca" class="text-blue-600 font-bold hover:underline">Biocambio360 HORECA</a>:
+            </p>
+            <ol class="list-decimal pl-6 space-y-4 mb-8 text-gray-700 text-base sm:text-lg font-medium">
+                <li>
+                    <strong>Prelavado desodorizante con Oxígeno Activo:</strong> Agrega 30g de percarbonato para oxigenar el agua y neutralizar olores biológicos antes del ciclo principal.
+                </li>
+                <li>
+                    <strong>Lavado principal con Bicarbonato Activo:</strong> Dosifica 70 ml de <a href="/detergente-liquido-por-mayor-bogota" class="text-blue-600 font-bold hover:underline">Detergente Líquido Biocambio360</a>. Sus tensoactivos de baja espuma emulsionan grasas corporales y no dejan sarro jabonoso en los conductos de la lavadora industrial.
+                </li>
+                <li>
+                    <strong>Enjuague neutralizante:</strong> Asegura un nivel alto de agua en el enjuague para evacuar cualquier partícula disuelta.
+                </li>
+                <li>
+                    <strong>Suavizado por microcápsulas:</strong> Dosifica 50 ml de <a href="/producto/suavizante" class="text-blue-600 font-bold hover:underline">Suavizante Textil Hotelero Biocambio360</a>. Sus microesferas aromáticas resisten el calor de la secadora y solo liberan su fragancia fresca cuando el huésped frota la toalla al secarse.
+                </li>
+                <li>
+                    <strong>Ciclo de secado térmico completo:</strong> Seca a 60°C hasta humedad cero. Nunca dobles toallas tibias con humedad residual superior al 3%.
+                </li>
+            </ol>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                3. Ahorro Operativo para Cadenas Hoteleras y Hostales
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Adquirir canecas de 20 Litros de detergente y suavizante directo de fábrica en Soacha permite a los hoteles de Bogotá reducir su gasto de lavandería a solo <strong>$4.300 COP por litro</strong>, garantizando toallas esponjosas, blancas y con aroma fresco permanente.
+            </p>
+
+            <div class="my-10 p-8 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 text-white rounded-3xl shadow-xl">
+                <h3 class="text-2xl sm:text-3xl font-black mb-3 text-white">Suministro Mayorista para Hoteles y Alojamientos</h3>
+                <p class="text-base sm:text-lg text-slate-200 mb-6 font-medium leading-relaxed">
+                    Canecas de 20L de suavizante y detergente hotelero con factura electrónica DIAN y entrega en 24h a toda Bogotá y Cundinamarca.
+                </p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="/producto/suavizante?tamano=20L" class="bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 font-black text-base py-3.5 px-7 rounded-2xl hover:brightness-110 transition-all shadow-md">
+                        Comprar Suavizante Hotelero 20L
+                    </a>
+                    <a href="/insumos-aseo-empresas-horeca" class="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-base py-3.5 px-6 rounded-2xl transition-all">
+                        Ver Portafolio HORECA
+                    </a>
+                </div>
+            </div>
+        `
+    },
+    {
+        slug: 'donde-comprar-canecas-productos-aseo-soacha-fabrica',
+        title: 'Dónde Comprar Canecas de Productos de Aseo en Soacha Directo de Fábrica: Ubicación, Horarios y Precios (2026)',
+        summary: 'Guía hiperlocal de compra directa en Soacha (San Mateo, Ciudad Verde, Compartir, León XIII, Cazucá) y sur de Bogotá (Bosa). Cómo llegar a nuestra planta en Cra. 7C #44-17 Sur, horarios de atención, compra desde 1 caneca y ahorro del 100% en flete.',
+        category: 'Guías y Local',
+        date: '2026-09-03',
+        geoTarget: 'Soacha, Bosa, Kennedy, Cundinamarca, Colombia',
+        relatedProductIds: ['detergente-liquido-multiusos', 'desengrasante', 'lavaloza-liquido'],
+        faq: [
+            {
+                q: '¿Dónde está ubicada la fábrica de Biocambio360 en Soacha y cuál es el horario de atención?',
+                a: 'Nuestra planta de producción y punto de atención está ubicada en la Cra. 7C #44-17 Sur, Soacha, Cundinamarca (muy cerca de la Autopista Sur y límites con Bosa). Atendemos de lunes a viernes de 8:00 am a 5:30 pm y sábados de 8:00 am a 1:00 pm para compras presenciales y retiro de pedidos.'
+            },
+            {
+                q: '¿Puedo comprar solo 1 caneca de 20L a precio de fábrica o exigen compras grandes?',
+                a: 'Puedes comprar desde una sola caneca de 20 Litros, un bidón de 10L o un galón de 3.8L al mismo precio directo de fábrica. No exigimos pedidos mínimos ni afiliaciones para acceder a los precios mayoristas.'
+            },
+            {
+                q: '¿Qué medios de pago aceptan en el punto de fábrica en Soacha?',
+                a: 'Aceptamos efectivo, transferencias inmediatas por Nequi, Daviplata, Bancolombia, y pagos electrónicos mediante tarjeta débito/crédito y PSE a través de nuestra pasarela web.'
+            }
+        ],
+        contentHtml: `
+            <div class="my-6 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-3xl shadow-xs">
+                <p class="text-base font-black text-blue-950 mb-2">⚡ Respuesta Directa (Guía Local Soacha y Sur de Bogotá):</p>
+                <p class="text-sm sm:text-base text-blue-900 leading-relaxed font-semibold">
+                    <strong>La fábrica de productos de aseo Biocambio360 está ubicada en la Carrera 7C #44-17 Sur, Soacha, Cundinamarca.</strong> En este punto puedes adquirir canecas de 20 Litros de detergente líquido ($86.000 COP), desengrasante industrial ($108.000 COP), suavizante textil ($86.000 COP) y amonio cuaternario Bactokill a precio directo de planta, retirando de inmediato sin costo alguno de flete o solicitando despacho a domicilio en 24h a cualquier barrio de Soacha (San Mateo, Ciudad Verde, Hogares Soacha, Compartir, León XIII) y localidades del sur de Bogotá (Bosa, Kennedy, Tunjuelito).
+                </p>
+            </div>
+
+            <p class="mb-6 text-gray-700 leading-relaxed text-base sm:text-lg font-normal">
+                Para los habitantes, administradores de conjuntos residenciales, dueños de lavanderías y comerciantes de Soacha y el sur de Bogotá, comprar productos de limpieza tradicionalmente implicaba viajar hasta Paloquemao, comprar en tiendas de hard discount pagando altos precios por litros individuales, o pagar costosos fletes de transportadoras desde otras ciudades.
+            </p>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                1. Ventajas de Comprar Directo en Planta en Soacha
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <div class="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center font-black text-lg">
+                        🚚
+                    </div>
+                    <h3 class="text-lg font-black text-slate-900">0% Costo de Envío</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                        Ven en tu vehículo, moto o taxi y carga tus canecas de 20L ahorrando el 100% del flete de transporte.
+                    </p>
+                </div>
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <div class="w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center font-black text-lg">
+                        🏷
+                    </div>
+                    <h3 class="text-lg font-black text-slate-900">Desde 1 Caneca</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                        No necesitas ser una multinacional: accedes a precio mayorista de planta desde una sola unidad de 20 Litros.
+                    </p>
+                </div>
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <div class="w-10 h-10 bg-purple-100 text-purple-700 rounded-xl flex items-center justify-center font-black text-lg">
+                        🧪
+                    </div>
+                    <h3 class="text-lg font-black text-slate-900">Producto Fresco</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                        Lotes recién formulados en planta con Registro INVIMA y máxima concentración de materia activa.
+                    </p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                2. Precios Vigentes de Fábrica en Soacha (Canecas 20 Litros)
+            </h2>
+            <div class="my-8 p-6 bg-white border border-gray-200 rounded-3xl shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-900 font-black uppercase text-xs">
+                                <th class="p-4">Producto Industrial</th>
+                                <th class="p-4">Presentación</th>
+                                <th class="p-4 text-blue-700 bg-blue-50 font-black">Precio de Fábrica Soacha</th>
+                                <th class="p-4">Costo por Litro</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-gray-700 font-medium">
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Detergente Líquido Multiusos con Bicarbonato</td>
+                                <td class="p-4">Caneca 20 Litros</td>
+                                <td class="p-4 font-black text-blue-700 bg-blue-50/50 text-base">$86.000 COP</td>
+                                <td class="p-4 font-bold text-emerald-700">$4.300 / L</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Desengrasante Pesado Industrial</td>
+                                <td class="p-4">Caneca 20 Litros</td>
+                                <td class="p-4 font-black text-blue-700 bg-blue-50/50 text-base">$108.000 COP</td>
+                                <td class="p-4 font-bold text-emerald-700">$5.400 / L</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Suavizante Textil con Microcápsulas</td>
+                                <td class="p-4">Caneca 20 Litros</td>
+                                <td class="p-4 font-black text-blue-700 bg-blue-50/50 text-base">$86.000 COP</td>
+                                <td class="p-4 font-bold text-emerald-700">$4.300 / L</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Bactokill Amonio Cuaternario 5ta Gen</td>
+                                <td class="p-4">Caneca 20 Litros</td>
+                                <td class="p-4 font-black text-blue-700 bg-blue-50/50 text-base">$86.000 COP</td>
+                                <td class="p-4 font-bold text-emerald-700">$4.300 / L</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                3. Cómo Llegar y Cobertura de Despacho Domiciliario
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Nuestra sede está estratégicamente ubicada para fácil acceso desde la Autopista Sur. Además del retiro presencial, contamos con rutas de entrega diaria con flete económico a los siguientes sectores:
+            </p>
+            <ul class="space-y-2 mb-8 text-gray-700 text-base sm:text-lg font-medium">
+                <li>• <strong>Comunas de Soacha:</strong> San Mateo, Ciudad Verde, Hogares Soacha, San Humberto, Compartir, León XIII, Cazucá, Rincón de Santafé.</li>
+                <li>• <strong>Sur y Occidente de Bogotá:</strong> Bosa (Carbonell, Recreo, Laureles), Kennedy, Tunjuelito, Ciudad Bolívar y Puente Aranda.</li>
+            </ul>
+
+            <div class="my-10 p-8 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 text-white rounded-3xl shadow-xl">
+                <h3 class="text-2xl sm:text-3xl font-black mb-3 text-white">¿Quieres Hacer tu Pedido o Coordinar tu Retiro?</h3>
+                <p class="text-base sm:text-lg text-slate-200 mb-6 font-medium leading-relaxed">
+                    Escríbenos directamente por WhatsApp para confirmar existencias o pedir despacho a tu dirección en Soacha y Bogotá.
+                </p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="https://wa.me/573223600360?text=Hola,%20quisiera%20comprar%20canecas%20en%20la%20f%C3%A1brica%20de%20Soacha" target="_blank" rel="noopener noreferrer" class="bg-gradient-to-r from-emerald-400 to-emerald-500 text-slate-950 font-black text-base py-3.5 px-7 rounded-2xl hover:brightness-110 transition-all shadow-md">
+                        Contactar Sede Soacha por WhatsApp
+                    </a>
+                    <a href="/fabricantes-productos-aseo-bogota" class="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-base py-3.5 px-6 rounded-2xl transition-all">
+                        Ver Sede y Fábrica Bogotá
+                    </a>
+                </div>
+            </div>
+        `
+    },
+    {
+        slug: 'errores-dilucion-limpiapisos-lavaloza-perdida-dinero',
+        title: '5 Errores Comunes de Dilución en Limpiapisos, Desengrasantes y Lavaloza que Hacen Perder Millones a tu Negocio',
+        summary: 'Auditoría operativa para cuartos de aseo en restaurantes, empresas y conjuntos residenciales. Por qué mezclar cloro con jabón inactiva la desinfección, el peligro del "cálculo a ojo" y cómo estandarizar bombas dosificadoras para ahorrar hasta 40% mensual.',
+        category: 'Ahorro y Operaciones',
+        date: '2026-09-03',
+        geoTarget: 'Bogotá, Soacha, Colombia',
+        relatedProductIds: ['limpiapisos-lavanda', 'desengrasante', 'lavaloza-liquido'],
+        faq: [
+            {
+                q: '¿Por qué nunca se debe mezclar cloro con limpiapisos o lavaloza?',
+                a: 'El cloro (hipoclorito de sodio) es un oxidante fuerte que al mezclarse con jabones y tensoactivos sufre una reacción ácido-base que neutraliza inmediatamente el poder desinfectante de ambos. Peor aún, desprende gas cloro y cloraminas altamente tóxicas para el sistema respiratorio y los ojos del trabajador de aseo.'
+            },
+            {
+                q: '¿Cuánto dinero se pierde típicamente por sobredosificación en un negocio mediano?',
+                a: 'Cuando el personal de limpieza dosifica "a ojo" vertiendo directamente de la caneca o botella al balde, se utiliza en promedio entre 2.5 y 4 veces la cantidad química requerida. En una empresa con 5 personas de servicios generales, esto representa un sobrecosto evitable de $350.000 a $600.000 COP mensuales en químicos que se van literalmente por el sifón.'
+            },
+            {
+                q: '¿Cómo solucionar el problema de la dilución sin gastar en equipos costosos?',
+                a: 'La solución más rentable es instalar bombas dosificadoras manuales de émbolo (pumps) calibradas a 30 ml por bombeo en las canecas de 20L o bidones, rotular claramente los baldes con la marca de llenado de agua (ej. 5 litros) y capacitar al equipo en la regla de "1 bombeo por balde".'
+            }
+        ],
+        contentHtml: `
+            <div class="my-6 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-3xl shadow-xs">
+                <p class="text-base font-black text-blue-950 mb-2">⚡ Respuesta Directa (Guía de Control de Costos para Gerentes Operativos):</p>
+                <p class="text-sm sm:text-base text-blue-900 leading-relaxed font-semibold">
+                    <strong>Los 5 errores más costosos en el uso de productos de aseo son: (1) dosificar "al ojo" generando hasta 300% de sobredosificación, (2) mezclar cloro con detergente anulando la desinfección, (3) no respetar el tiempo de contacto químico (dwell time), (4) limpiar con agua sucia recirculando bacterias, y (5) comprar envases de 1 litro en lugar de canecas de 20L concentradas.</strong> Corregir estos 5 hábitos mediante bombas dosificadoras de émbolo y capacitación básica del personal reduce el gasto mensual de aseo entre un 30% y un 45% de forma inmediata.
+                </p>
+            </div>
+
+            <p class="mb-6 text-gray-700 leading-relaxed text-base sm:text-lg font-normal">
+                Muchas empresas, colegios, restaurantes y copropiedades en Bogotá creen que su presupuesto de aseo es elevado porque los productos "están caros". Sin embargo, las auditorías de operaciones demuestran que más del 40% del dinero invertido en químicos se desperdicia en los cuartos de aseo debido a malos hábitos de dilución y falta de estandarización en los procedimientos de limpieza.
+            </p>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                Los 5 Errores Críticos que Debes Corregir Hoy Mismo
+            </h2>
+
+            <div class="space-y-6 my-8">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <h3 class="text-xl font-black text-red-600">Error #1: El "Chorrito al Ojo" que Cuadriplica el Gasto</h3>
+                    <p class="text-base text-slate-700 font-medium leading-relaxed">
+                        Sin un dosificador calibrado, el operario inclina la caneca o galón sobre el balde hasta que "haga bastante espuma". Los productos industriales de <a href="/productos-aseo-al-por-mayor-bogota" class="text-blue-600 font-bold hover:underline">Biocambio360</a> son formulaciones concentradas: solo requieren 30 a 50 ml por balde de 8 litros. Verter medio vaso desechable (150 ml) no limpia más; solo deja los pisos pegajosos, atrae mugre más rápido y agota la caneca en una semana.
+                    </p>
+                </div>
+
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <h3 class="text-xl font-black text-red-600">Error #2: La Mezcla Tóxica e Inútil de Cloro + Detergente</h3>
+                    <p class="text-base text-slate-700 font-medium leading-relaxed">
+                        Existe la falsa creencia popular de que "juntar cloro con jabón lava y desinfecta al tiempo". Químicamente, el cloro oxida los tensoactivos, anulando el poder desengrasante del jabón y destruyendo el poder bactericida del cloro. Además, la reacción produce gas cloro y cloraminas que irritan los pulmones del personal, disparando incapacidades médicas laborales.
+                    </p>
+                </div>
+
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <h3 class="text-xl font-black text-red-600">Error #3: No Dejar Actuar el Desengrasante (Falta de Dwell Time)</h3>
+                    <p class="text-base text-slate-700 font-medium leading-relaxed">
+                        Aplicar desengrasante sobre una campana o plancha y pasar inmediatamente el trapo obliga a restregar con fuerza física. Los desengrasantes alcalinos requieren entre 10 y 15 minutos de tiempo de contacto (dwell time) para que las moléculas saponifiquen los ácidos grasos. Al esperar ese tiempo, la grasa se retira suavemente sin esfuerzo.
+                    </p>
+                </div>
+
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <h3 class="text-xl font-black text-red-600">Error #4: Fregar con Agua Negra Reutilizada</h3>
+                    <p class="text-base text-slate-700 font-medium leading-relaxed">
+                        En edificios de varios pisos, es común ver traperos sumergidos en agua que ya parece chocolate. Cuando el agua se satura de partículas, el desinfectante queda inactivado y el trapero solo redistribuye una película fina de bacterias por todo el pasillo.
+                    </p>
+                </div>
+
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <h3 class="text-xl font-black text-red-600">Error #5: Comprar Envases Pequeños de 1 Litro</h3>
+                    <p class="text-base text-slate-700 font-medium leading-relaxed">
+                        Comprar botellitas de 1L en supermercados o hard discount implica pagar un sobrecosto del 50% solo en plástico, etiquetas y transporte. Comprar en canecas de 20L y trasvasar a envases rotulados con dispensador es la estrategia número uno de los departamentos de compras eficientes.
+                    </p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                Tabla Práctica de Dilución para Cuartos de Aseo
+            </h2>
+            <div class="my-8 p-6 bg-white border border-gray-200 rounded-3xl shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-900 font-black uppercase text-xs">
+                                <th class="p-4">Producto</th>
+                                <th class="p-4">Superficie a Limpiar</th>
+                                <th class="p-4">Dosis Recomendada</th>
+                                <th class="p-4">Modo de Aplicación</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-gray-700 font-medium">
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Limpiapisos Concentrado</td>
+                                <td class="p-4">Pisos cerámicos, baldosa, porcelanato</td>
+                                <td class="p-4 font-bold text-blue-700">30 a 50 ml por balde (8L)</td>
+                                <td class="p-4">Trapero húmedo bien escurrido. No requiere enjuague.</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Desengrasante Industrial</td>
+                                <td class="p-4">Campanas, filtros, motores, hornos</td>
+                                <td class="p-4 font-bold text-blue-700">Puro o 1:3 en agua tibia</td>
+                                <td class="p-4">Aspersión, esperar 12 min y retirar con agua.</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-bold text-gray-900">Amonio Cuaternario Bactokill</td>
+                                <td class="p-4">Mesones, manijas, baños, gimnasios</td>
+                                <td class="p-4 font-bold text-blue-700">10 ml por litro de agua</td>
+                                <td class="p-4">Atomizador y paño de microfibra. Acción residual.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="my-10 p-8 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 text-white rounded-3xl shadow-xl">
+                <h3 class="text-2xl sm:text-3xl font-black mb-3 text-white">Estandariza los Insumos de tu Empresa con Biocambio360</h3>
+                <p class="text-base sm:text-lg text-slate-200 mb-6 font-medium leading-relaxed">
+                    Accede a canecas de 20L de alta concentración y asesoría técnica para tu personal de servicios generales con factura electrónica DIAN.
+                </p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="/guia-uso-y-mezclas" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-base py-3.5 px-7 rounded-2xl hover:brightness-110 transition-all shadow-md">
+                        Ver Guía Completa de Uso y Mezclas
+                    </a>
+                    <a href="/productos-aseo-al-por-mayor-bogota" class="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-base py-3.5 px-6 rounded-2xl transition-all">
+                        Ver Catálogo Mayorista de Fábrica
+                    </a>
+                </div>
+            </div>
+        `
+    },
+    {
+        slug: 'normativa-invima-productos-aseo-empresas-colombia',
+        title: 'Normativa INVIMA y Hojas de Seguridad (MSDS) para Productos de Aseo en Empresas de Colombia: Guía Legal Completa',
+        summary: 'Marco regulatorio para compras B2B en Colombia: Notificación Sanitaria Obligatoria (NSO), Decreto 1496 de 2018 (SGA), Decreto 1072 de 2015 (SG-SST) y qué revisan los inspectores de la Secretaría de Salud y ARL en cuartos de almacenamiento químico.',
+        category: 'Normativa y Legal',
+        date: '2026-09-03',
+        geoTarget: 'Bogotá, Cundinamarca, Colombia',
+        relatedProductIds: ['bactokill', 'desengrasante', 'detergente-liquido-multiusos'],
+        faq: [
+            {
+                q: '¿Qué es la Notificación Sanitaria Obligatoria (NSO) del INVIMA y quién la emite?',
+                a: 'La NSO es el permiso técnico legal emitido por el INVIMA bajo la Decisión 706 de la Comunidad Andina que autoriza la fabricación y comercialización de productos de higiene doméstica y absorbentes. Certifica que la fórmula química es segura para el usuario y no contiene sustancias carcinógenas o prohibidas.'
+            },
+            {
+                q: '¿Qué exige el Decreto 1496 de 2018 (Sistema Globalmente Armonizado) en empresas colombianas?',
+                a: 'Exige que todo químico utilizado en el lugar de trabajo cuente con su Hoja de Datos de Seguridad (FDS/MSDS) en español de 16 secciones estandarizadas y que todos los envases primarios y secundarios (atomizadores trasvasados) cuenten con etiquetas con pictogramas de peligro SGA.'
+            },
+            {
+                q: '¿Cuáles son las sanciones por usar productos de aseo sin registro INVIMA en un negocio?',
+                a: 'La Secretaría de Salud puede imponer medidas sanitarias de seguridad inmediatas como el decomiso de los productos, clausura temporal del establecimiento y multas económicas de hasta 10.000 salarios mínimos legales vigentes de acuerdo con la Ley 9 de 1979.'
+            }
+        ],
+        contentHtml: `
+            <div class="my-6 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-3xl shadow-xs">
+                <p class="text-base font-black text-blue-950 mb-2">⚡ Respuesta Directa (Resumen para Oficiales de Cumplimiento y SG-SST):</p>
+                <p class="text-sm sm:text-base text-blue-900 leading-relaxed font-semibold">
+                    <strong>En Colombia, toda empresa, institución educativa, restaurante o conjunto residencial que emplee personal de limpieza debe exigir a su proveedor de aseo tres documentos obligatorios: (1) Notificación Sanitaria Obligatoria (NSO) expedida por el INVIMA, (2) Fichas Técnicas de Producto (TDS), y (3) Hojas de Datos de Seguridad (MSDS) bajo el Sistema Globalmente Armonizado (SGA, Decreto 1496 de 2018).</strong> Comprar productos a fabricantes legales certificados como Biocambio360 garantiza el cumplimiento total en inspecciones de la Secretaría de Salud y auditorías de la ARL, blindando a la empresa contra multas y riesgos laborales.
+                </p>
+            </div>
+
+            <p class="mb-6 text-gray-700 leading-relaxed text-base sm:text-lg font-normal">
+                En los últimos años, las inspecciones laborales y sanitarias en Bogotá se han intensificado. Las Administradoras de Riesgos Laborales (ARL), el Ministerio de Trabajo y las Secretarías de Salud distritales auditan de forma prioritaria la gestión del riesgo químico en las empresas. A pesar de esto, muchos gerentes y administradores delegan la compra de insumos de aseo sin verificar si los productos cuentan con respaldo legal, exponiéndose a sanciones devastadoras.
+            </p>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                1. Notificación Sanitaria Obligatoria (NSO) INVIMA
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Bajo la <em>Decisión 706 de la Comunidad Andina de Naciones (CAN)</em>, los productos de aseo doméstico e industrial no requieren un "Registro Sanitario" médico tradicional, sino una <strong>Notificación Sanitaria Obligatoria (NSO)</strong>. Este documento certifica ante el Estado colombiano que:
+            </p>
+            <ul class="space-y-3 mb-6 text-gray-700 text-base sm:text-lg font-medium">
+                <li>• La planta de fabricación cuenta con condiciones higiénicas y técnicas adecuadas.</li>
+                <li>• La fórmula cuali-cuantitativa no contiene ingredientes restringidos internacionalmente.</li>
+                <li>• El fabricante asume la responsabilidad civil y penal sobre la seguridad toxicológica del producto.</li>
+            </ul>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                2. El Sistema Globalmente Armonizado (SGA - Decreto 1496 de 2018)
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                El Decreto 1496 de 2018 adoptó el SGA de Naciones Unidas en Colombia para la clasificación y etiquetado de productos químicos. Para cualquier auditoría de SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo), tu empresa debe contar con:
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <h3 class="text-lg font-black text-slate-900">Hoja de Datos de Seguridad (MSDS/FDS)</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                        Debe constar obligatoriamente de 16 secciones numeradas: identificación del químico, peligros, primeros auxilios, medidas contra incendios, almacenamiento seguro, EPP requeridos y disposición final de residuos.
+                    </p>
+                </div>
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <h3 class="text-lg font-black text-slate-900">Rotulado de Envases Secundarios</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                        Si en tu empresa se trasvasa desengrasante o amonio cuaternario desde una caneca de 20L a un atomizador de 500 ml, ese atomizador debe llevar una etiqueta con el nombre del producto, palabra de advertencia y pictogramas de peligro SGA.
+                    </p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-900 mt-10 mb-5 leading-tight">
+                3. Lista de Chequeo para Compras B2B Seguras en Bogotá
+            </h2>
+            <p class="mb-5 text-gray-700 leading-relaxed text-base sm:text-lg">
+                Antes de aprobar una orden de compra o firmar un contrato de suministro de aseo, verifica que tu proveedor cumpla estos 4 puntos:
+            </p>
+            <ol class="list-decimal pl-6 space-y-3 mb-8 text-gray-700 text-base sm:text-lg font-medium">
+                <li>¿El producto cuenta con código NSO INVIMA impreso en la etiqueta original?</li>
+                <li>¿El proveedor entrega Fichas Técnicas (TDS) y Hojas de Seguridad (MSDS) en español?</li>
+                <li>¿La factura es electrónica ante la DIAN emitida por la razón social fabricante?</li>
+                <li>¿Ofrece asesoría técnica para la matriz de compatibilidad química en tu bodega?</li>
+            </ol>
+
+            <div class="my-10 p-8 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 text-white rounded-3xl shadow-xl">
+                <h3 class="text-2xl sm:text-3xl font-black mb-3 text-white">Biocambio360: Proveedor Certificado con Respaldo Legal</h3>
+                <p class="text-base sm:text-lg text-slate-200 mb-6 font-medium leading-relaxed">
+                    Suministro industrial con toda la documentación sanitaria y factura electrónica DIAN para blindar a tu empresa ante cualquier inspección.
+                </p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="/fabricantes-productos-aseo-bogota" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-base py-3.5 px-7 rounded-2xl hover:brightness-110 transition-all shadow-md">
+                        Conoce Nuestra Fábrica en Bogotá
+                    </a>
+                    <a href="/cotizador-b2b" class="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-base py-3.5 px-6 rounded-2xl transition-all">
+                        Generar Cotización B2B con Fichas
+                    </a>
+                </div>
+            </div>
+        `
+    },
+    {
         slug: 'proveedores-productos-aseo-colegios-conjuntos-bogota',
         title: 'Proveedores de Productos de Aseo para Colegios, Empresas y Conjuntos Residenciales en Bogotá: Guía de Compra y Ahorro de Fábrica (2026)',
         summary: 'Guía integral para administradores de propiedad horizontal, directores de compras y colegios en Bogotá. Requisitos de auditoría de Secretaría de Salud (SGA, INVIMA, fichas técnicas TDS/MSDS), dotación mensual por metro cuadrado y ahorro del 40% comprando canecas de 20L directo de fábrica.',
