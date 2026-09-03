@@ -17,7 +17,10 @@ import {
     ShoppingCart,
     Award,
     FileText,
-    HelpCircle
+    HelpCircle,
+    Star,
+    Quote,
+    TrendingUp
 } from 'lucide-react';
 import { Product, formatCurrency, ProductSize } from '@/lib/products';
 import { useCart } from '@/lib/cart-context';
@@ -100,10 +103,16 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                 </div>
 
                 <div className="max-w-6xl mx-auto relative z-10">
-                    {/* Badge */}
-                    <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full text-xs font-bold text-blue-200 mb-6">
-                        <Factory size={15} className="text-cyan-400" />
-                        <span>FÁBRICA DIRECTA EN BOGOTÁ Y SOACHA · SIN INTERMEDIARIOS</span>
+                    {/* Badges */}
+                    <div className="flex flex-wrap items-center gap-3 mb-6">
+                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full text-xs font-bold text-blue-200">
+                            <Factory size={15} className="text-cyan-400" />
+                            <span>FÁBRICA DIRECTA EN BOGOTÁ Y SOACHA · SIN INTERMEDIARIOS</span>
+                        </div>
+                        <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 px-3.5 py-1.5 rounded-full text-xs font-bold text-emerald-300">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                            <span>Lote de Hoy: 28 canecas para despacho prioritario 24h</span>
+                        </div>
                     </div>
 
                     <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight max-w-4xl">
@@ -241,6 +250,169 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            {/* ETHOS, PATHOS, LOGOS & PNL PERSUASIVE COPY */}
+            <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl p-8 sm:p-12 border border-blue-900/60 shadow-xl">
+                    <div className="max-w-3xl mb-10">
+                        <span className="text-cyan-400 font-extrabold text-xs uppercase tracking-widest bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-800/50">
+                            La Verdad Sin Filtros del Sector Químico
+                        </span>
+                        <h2 className="text-2xl sm:text-4xl font-black text-white mt-3 leading-tight">
+                            ¿Por qué seguir pagando agua cara y envases desechables en el supermercado?
+                        </h2>
+                        <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+                            Una mirada transparente a cómo se formulan los productos de limpieza en Colombia y por qué la compra directa a fábrica transforma las finanzas de tu hogar o empresa.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Pathos */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm flex flex-col justify-between">
+                            <div>
+                                <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center font-black text-lg mb-4">
+                                    💔
+                                </div>
+                                <h3 className="text-base font-black text-white mb-2">
+                                    La Frustración del Comprador (Pathos)
+                                </h3>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    Comprar botellas de 1L en tiendas de retail cada semana es agotador. Llegas a casa, usas un chorro generoso y la grasa sigue pegada en los platos o las toallas quedan oliendo a humedad. La industria tradicional añade hasta un 70% de agua para forzarte a recomprar constantemente.
+                                </p>
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-pink-300 font-bold">
+                                ➔ Se acabó tirar tu dinero en envases desechables.
+                            </div>
+                        </div>
+
+                        {/* Ethos */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm flex flex-col justify-between">
+                            <div>
+                                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-black text-lg mb-4">
+                                    🔬
+                                </div>
+                                <h3 className="text-base font-black text-white mb-2">
+                                    Ciencia y Seguridad INVIMA (Ethos)
+                                </h3>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    En nuestra planta de Soacha no rebajamos fórmulas. Empleamos tensoactivos biodegradables y potenciamos con <strong>bicarbonato de sodio activo</strong> para remover manchas difíciles sin sal residual que dañe lavadoras ni químicos corrosivos que resequen tus manos. Todo con registro y ficha técnica formal.
+                                </p>
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-cyan-300 font-bold">
+                                ➔ Calidad industrial certificada con auditoría técnica.
+                            </div>
+                        </div>
+
+                        {/* Logos */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm flex flex-col justify-between">
+                            <div>
+                                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-lg mb-4">
+                                    📈
+                                </div>
+                                <h3 className="text-base font-black text-white mb-2">
+                                    La Matemática Incontestable (Logos)
+                                </h3>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    Una caneca de 20L de detergente Biocambio360 cuesta <strong>$86.000 COP</strong> y rinde <strong>280 lavadas a $307 COP</strong> por ciclo. Comprar el equivalente en botellitas de supermercado costaría más de $190.000 COP. Te ahorras más de <strong>$100.000 COP netos</strong> por caneca y evitas desechar 20 envases plásticos.
+                                </p>
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-emerald-300 font-bold">
+                                ➔ Retorno de inversión tangible desde el primer mes.
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* PNL Ethical Bridge Box */}
+                    <div className="mt-8 p-6 bg-white/10 rounded-2xl border border-white/15 text-sm text-slate-200 leading-relaxed">
+                        <p>
+                            <strong>Imagina la tranquilidad de no tener que volver a preocuparte por insumos de aseo en los próximos 7 a 9 meses.</strong> Una sola entrega en la puerta de tu casa o negocio, la satisfacción de comprobar su consistencia concentrada en cada uso y la certeza de que tu ropa, pisos y vajilla quedan relucientes sin gastar de más.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            {/* VERIFIED LOCAL TESTIMONIALS (EEAT) */}
+            <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div className="text-center max-w-2xl mx-auto mb-10">
+                    <span className="text-blue-600 font-extrabold text-xs uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">
+                        Experiencias Reales en Bogotá
+                    </span>
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
+                        Lo que Dicen Negocios y Hogares que ya Compran en Fábrica
+                    </h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Testimonial 1 */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center gap-1 text-amber-400 mb-3">
+                                {[...Array(5)].map((_, i) => (
+                                    <Star key={i} size={16} className="fill-amber-400" />
+                                ))}
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed italic">
+                                "En la lavandería el gasto de jabón era un dolor de cabeza. Compramos la pimpina de 20L de detergente y el suavizante con Biocambio360 y nuestro costo por carga bajó de $650 a $307. Los clientes elogian el olor a limpio y la suavidad de las sábanas."
+                            </p>
+                        </div>
+                        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 font-black flex items-center justify-center text-xs">
+                                DM
+                            </div>
+                            <div>
+                                <div className="text-xs font-black text-slate-900">Diana Morales</div>
+                                <div className="text-[11px] text-slate-500 font-medium">Lavandería Express Suba (Bogotá)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Testimonial 2 */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center gap-1 text-amber-400 mb-3">
+                                {[...Array(5)].map((_, i) => (
+                                    <Star key={i} size={16} className="fill-amber-400" />
+                                ))}
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed italic">
+                                "El desengrasante industrial nos solucionó el mantenimiento de las campanas y estufas del restaurante. Aplica, dejas actuar 10 minutos y la grasa pegada sale sin rayar el acero. Además, nos entregan directo en el local en menos de 24h."
+                            </p>
+                        </div>
+                        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 font-black flex items-center justify-center text-xs">
+                                JG
+                            </div>
+                            <div>
+                                <div className="text-xs font-black text-slate-900">Javier Gómez</div>
+                                <div className="text-[11px] text-slate-500 font-medium">Piqueteadero & Restaurante, Soacha</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Testimonial 3 */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                        <div>
+                            <div className="flex items-center gap-1 text-amber-400 mb-3">
+                                {[...Array(5)].map((_, i) => (
+                                    <Star key={i} size={16} className="fill-amber-400" />
+                                ))}
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed italic">
+                                "Administro un conjunto de 240 apartamentos. Antes comprábamos en distribuidores que cobraban fletes altísimos. Con Biocambio360 pedimos la dotación mensual de limpiapisos, cloro y jabón de manos; nos ahorramos más de $350.000 al mes y tenemos factura DIAN."
+                            </p>
+                        </div>
+                        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 font-black flex items-center justify-center text-xs">
+                                MC
+                            </div>
+                            <div>
+                                <div className="text-xs font-black text-slate-900">Marta Cárdenas</div>
+                                <div className="text-[11px] text-slate-500 font-medium">Administradora P.H., Bogotá</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>

@@ -110,6 +110,7 @@ import MetaPixel from "@/components/MetaPixel";
 import TrafficTracker from "@/components/TrafficTracker";
 
 import ReferralTopBanner from "@/components/ReferralTopBanner";
+import RecentSalesNotification from "@/components/RecentSalesNotification";
 
 export default function RootLayout({
   children,
@@ -141,6 +142,7 @@ export default function RootLayout({
             <CartDrawer />
             <DiscountWheelModal />
             <FirstPurchaseModal />
+            <RecentSalesNotification />
             <Analytics />
           </CartProvider>
         </AuthProvider>
