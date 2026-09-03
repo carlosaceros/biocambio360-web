@@ -131,13 +131,13 @@ export default function RecentSalesNotification() {
         <AnimatePresence>
             {isVisible && (
                 <motion.div
-                    initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                    transition={{ duration: 0.35, ease: 'easeOut' }}
+                    initial={{ opacity: 0, x: -70, scale: 0.96 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -70, scale: 0.96 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 26 }}
                     onMouseEnter={() => { isPausedRef.current = true; }}
                     onMouseLeave={() => { isPausedRef.current = false; }}
-                    className="fixed bottom-4 left-4 z-40 max-w-[340px] sm:max-w-[380px]"
+                    className="fixed bottom-[96px] sm:bottom-4 left-3 sm:left-4 z-[50] w-[calc(100%-1.5rem)] sm:w-auto max-w-[360px] sm:max-w-[380px]"
                 >
                     <Link
                         href={`/producto/${currentItem.productSlug}`}
