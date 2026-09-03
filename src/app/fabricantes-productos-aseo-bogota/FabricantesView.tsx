@@ -19,7 +19,8 @@ import {
     FileText,
     HelpCircle,
     Star,
-    Zap
+    Zap,
+    Video
 } from 'lucide-react';
 import { Product, formatCurrency, ProductSize } from '@/lib/products';
 import { useCart } from '@/lib/cart-context';
@@ -90,12 +91,22 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                 onClose={() => setToastMessage({ ...toastMessage, show: false })}
             />
 
-            {/* HERO SECTION */}
+            {/* HERO SECTION WITH VIDEO STREAM */}
             <section className="relative overflow-hidden bg-gradient-to-b from-[#0b172a] via-[#0f213d] to-[#0b172a] text-white pt-14 pb-24 px-4 sm:px-6 lg:px-8">
-                <div className="absolute inset-0 opacity-15 mix-blend-screen pointer-events-none">
-                    <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500 rounded-full blur-[120px]"></div>
-                    <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-cyan-400 rounded-full blur-[120px]"></div>
+                {/* Background Ambient Video Stream */}
+                <div className="absolute inset-0 z-0 overflow-hidden opacity-20 mix-blend-luminosity pointer-events-none">
+                    <video
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover scale-105"
+                    >
+                        <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
+                        <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
+                    </video>
                 </div>
+                <div className="absolute inset-0 bg-gradient-to-b from-[#0b172a]/85 via-[#0f213d]/90 to-[#0b172a] z-[1] pointer-events-none" />
 
                 <div className="max-w-6xl mx-auto relative z-10">
                     {/* Badges */}
@@ -160,7 +171,7 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                         </a>
                     </div>
 
-                    {/* Enlarged Trust Micro-badges (Screenshot 2) */}
+                    {/* Enlarged Trust Micro-badges */}
                     <div className="mt-14 pt-10 border-t border-white/15 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="flex items-center gap-3.5 bg-white/5 border border-white/15 p-4 rounded-2xl">
                             <CheckCircle2 size={28} className="text-cyan-400 shrink-0" />
@@ -182,7 +193,7 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                 </div>
             </section>
 
-            {/* COMPARISON SECTION: FABRICA VS DISTRIBUIDORES VS SUPERMERCADO */}
+            {/* COMPARISON SECTION */}
             <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                 <div className="text-center max-w-3xl mx-auto mb-12">
                     <span className="text-blue-600 font-black text-sm uppercase tracking-widest bg-blue-50 px-4 py-1.5 rounded-full">
@@ -250,7 +261,7 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                 </div>
             </section>
 
-            {/* PERSUASIVE VALUE PROPOSITION (PERSUASIVE VALUE PROPOSITION) */}
+            {/* PERSUASIVE VALUE PROPOSITION */}
             <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
                 <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl p-8 sm:p-14 border border-blue-900/60 shadow-xl">
                     <div className="max-w-3xl mb-12">
@@ -326,6 +337,111 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                         <p>
                             <strong className="text-white font-black">Imagina la tranquilidad de no tener que volver a preocuparte por insumos de aseo en los próximos 7 a 9 meses.</strong> Una sola entrega en la puerta de tu casa o negocio, la satisfacción de comprobar su consistencia concentrada en cada uso y la certeza de que tu ropa, pisos y vajilla quedan relucientes sin pagar de más.
                         </p>
+                    </div>
+                </div>
+            </section>
+
+            {/* 3 VIDEOS SHOWCASE: CERCANÍA, PLANTA Y FACTOR HUMANO */}
+            <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                <div className="text-center max-w-3xl mx-auto mb-12">
+                    <span className="text-blue-600 font-black text-sm uppercase tracking-widest bg-blue-50 px-4 py-1.5 rounded-full border border-blue-200 inline-flex items-center gap-2">
+                        <Video size={16} />
+                        Cercanía, Transparencia y Factor Humano
+                    </span>
+                    <h2 className="text-3xl sm:text-5xl font-black text-slate-900 mt-3 leading-tight">
+                        Conoce Quiénes Somos: 3 Videos Reales de Nuestra Planta y Equipo
+                    </h2>
+                    <p className="text-lg sm:text-xl text-slate-600 font-semibold mt-3">
+                        No somos intermediarios ni una bodega fantasma en internet. Fabricamos en Soacha y te abrimos las puertas de nuestras instalaciones en video.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {/* Video 1: Planta de Fabricación */}
+                    <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
+                        <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            >
+                                <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
+                                <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
+                            </video>
+                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-cyan-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                                🏭 PLANTA DE PRODUCCIÓN
+                            </div>
+                        </div>
+                        <div className="p-6 sm:p-7 space-y-2">
+                            <h3 className="text-xl font-black text-slate-900 leading-snug">
+                                Formulación Química de Planta
+                            </h3>
+                            <p className="text-base sm:text-lg text-slate-600 font-medium leading-relaxed">
+                                Observa nuestros procesos de mezclado con tensoactivos biodegradables y bicarbonato activo bajo estándares INVIMA.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Video 2: Punto de Venta y Despacho */}
+                    <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
+                        <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            >
+                                <source src="/videos/punto-de-venta-soacha.mp4" type="video/mp4" />
+                                <source src="/videos/punto-de-venta-soacha.mov" type="video/quicktime" />
+                            </video>
+                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                📍 SEDE Y RETIRO EN SOACHA
+                            </div>
+                        </div>
+                        <div className="p-6 sm:p-7 space-y-2">
+                            <h3 className="text-xl font-black text-slate-900 leading-snug">
+                                Atención Vecina y Despacho Directo
+                            </h3>
+                            <p className="text-base sm:text-lg text-slate-600 font-medium leading-relaxed">
+                                Conoce a nuestro equipo en Cra. 7C #44-17 Sur. Puedes comprar presencialmente y ahorrarte el 100% del costo de envío.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Video 3: Pruebas de Calidad / Detergente Tipo Rey */}
+                    <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
+                        <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            >
+                                <source src="/videos/detergente-tipo-rey.mp4" type="video/mp4" />
+                                <source src="/videos/detergente-tipo-rey.mov" type="video/quicktime" />
+                            </video>
+                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                                🔬 PRUEBA DE CONCENTRACIÓN
+                            </div>
+                        </div>
+                        <div className="p-6 sm:p-7 space-y-2">
+                            <h3 className="text-xl font-black text-slate-900 leading-snug">
+                                Densidad y Poder Desengrasante
+                            </h3>
+                            <p className="text-base sm:text-lg text-slate-600 font-medium leading-relaxed">
+                                Comprobación directa de consistencia: un producto espeso por materia activa limpiadora, sin sal marina de relleno que dañe telas.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </section>

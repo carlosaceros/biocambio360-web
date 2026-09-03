@@ -17,7 +17,8 @@ import {
     Droplet,
     DollarSign,
     Zap,
-    Star
+    Star,
+    Video
 } from 'lucide-react';
 import { Product, formatCurrency, ProductSize } from '@/lib/products';
 import { useCart } from '@/lib/cart-context';
@@ -106,8 +107,23 @@ export default function DetergenteView({ detergenteProduct }: DetergenteViewProp
                 onClose={() => setToastMessage({ ...toastMessage, show: false })}
             />
 
-            {/* HERO SECTION */}
+            {/* HERO SECTION WITH VIDEO BACKGROUND */}
             <section className="relative overflow-hidden bg-gradient-to-b from-[#0a192f] via-[#102444] to-[#0a192f] text-white pt-14 pb-24 px-4 sm:px-6 lg:px-8">
+                {/* Ambient Video Stream */}
+                <div className="absolute inset-0 z-0 overflow-hidden opacity-20 mix-blend-luminosity pointer-events-none">
+                    <video
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover scale-105"
+                    >
+                        <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
+                        <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
+                    </video>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-b from-[#0a192f]/85 via-[#102444]/90 to-[#0a192f] z-[1] pointer-events-none" />
+
                 <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
                     
                     {/* Left Column: Copy & Pricing */}
@@ -241,7 +257,7 @@ export default function DetergenteView({ detergenteProduct }: DetergenteViewProp
                     </div>
                 </div>
 
-                {/* Trust micro-badges (Screenshot 2 enlarged) */}
+                {/* Trust micro-badges */}
                 <div className="max-w-6xl mx-auto mt-14 pt-10 border-t border-white/15 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="flex items-center gap-3.5 bg-white/5 border border-white/15 p-4 rounded-2xl">
                         <CheckCircle2 size={28} className="text-cyan-400 shrink-0" />
@@ -401,7 +417,7 @@ export default function DetergenteView({ detergenteProduct }: DetergenteViewProp
                 </div>
             </section>
 
-            {/* PERSUASIVE VALUE PROPOSITION SECTION (PERSUASIVE VALUE PROPOSITION) */}
+            {/* PERSUASIVE VALUE PROPOSITION SECTION */}
             <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <div className="bg-gradient-to-br from-slate-900 via-[#0e213d] to-slate-900 text-white rounded-3xl p-8 sm:p-12 border border-blue-900/60 shadow-xl">
                     <div className="max-w-3xl mb-10">
@@ -469,6 +485,111 @@ export default function DetergenteView({ detergenteProduct }: DetergenteViewProp
                             <div className="mt-4 pt-3 border-t border-white/10 text-sm text-emerald-300 font-bold">
                                 ➔ Menos de la mitad del costo de las botellas comerciales.
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* 3 VIDEOS SHOWCASE: TRANSPARENCIA Y FACTOR HUMANO EN LAVANDERÍA */}
+            <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div className="text-center max-w-2xl mx-auto mb-10">
+                    <span className="text-blue-600 font-black text-sm uppercase tracking-widest bg-blue-50 px-4 py-1.5 rounded-full border border-blue-200 inline-flex items-center gap-2">
+                        <Video size={16} />
+                        Transparencia y Factor Humano
+                    </span>
+                    <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3 leading-tight">
+                        3 Videos Reales: Así Elaboramos y Probamos tu Detergente
+                    </h2>
+                    <p className="text-base sm:text-lg text-slate-600 font-medium mt-2">
+                        Comprueba con tus propios ojos la textura, formulación de planta y la atención directa de nuestro equipo en Colombia.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Video 1: Prueba de Consistencia Detergente Tipo Rey */}
+                    <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
+                        <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            >
+                                <source src="/videos/detergente-tipo-rey.mp4" type="video/mp4" />
+                                <source src="/videos/detergente-tipo-rey.mov" type="video/quicktime" />
+                            </video>
+                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                                🧪 TEXTURA TIPO REY CONCENTRADA
+                            </div>
+                        </div>
+                        <div className="p-5 sm:p-6 space-y-2">
+                            <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-snug">
+                                Densidad Real con Bicarbonato
+                            </h3>
+                            <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                                Observa la consistencia viscosa activa del producto: no usamos sal marina como relleno, sino tensoactivos biodegradables de alto poder desmanchador.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Video 2: Envasado en Planta de Canecas 20L */}
+                    <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
+                        <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            >
+                                <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
+                                <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
+                            </video>
+                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-cyan-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                                🏭 PLANTA DE ENLACE Y LLENADO
+                            </div>
+                        </div>
+                        <div className="p-5 sm:p-6 space-y-2">
+                            <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-snug">
+                                Envasado Directo de Canecas 20L
+                            </h3>
+                            <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                                Conoce nuestras líneas de llenado de canecas y bidones en Soacha bajo estrictos controles sanitarios con Registro INVIMA.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Video 3: Punto de Entrega y Despacho Vecino */}
+                    <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
+                        <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            >
+                                <source src="/videos/punto-de-venta-soacha.mp4" type="video/mp4" />
+                                <source src="/videos/punto-de-venta-soacha.mov" type="video/quicktime" />
+                            </video>
+                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                📍 SEDE VECINA EN SOACHA
+                            </div>
+                        </div>
+                        <div className="p-5 sm:p-6 space-y-2">
+                            <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-snug">
+                                Equipo Real y Despachos 24h
+                            </h3>
+                            <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
+                                Personas de carne y hueso preparando tu pedido diario hacia Bogotá o listas para recibirte en nuestro punto de retiro presencial.
+                            </p>
                         </div>
                     </div>
                 </div>
