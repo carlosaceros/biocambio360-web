@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircle, Package, MapPin, Phone, MessageCircle, Home } from 'lucide-react';
@@ -44,8 +44,12 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
     const [wompiStatus, setWompiStatus] = useState<string | null>(null);
     const [referralCode, setReferralCode] = useState<string>('');
     const [copiedLink, setCopiedLink] = useState<boolean>(false);
+    const hasInitializedRef = useRef(false);
 
     useEffect(() => {
+        if (hasInitializedRef.current) return;
+        hasInitializedRef.current = true;
+
         params.then(({ orderId }) => {
             setOrderId(orderId);
             // Get order from sessionStorage

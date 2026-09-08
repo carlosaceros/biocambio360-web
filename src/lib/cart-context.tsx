@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Product, ProductSize } from './products';
 import { calcularAhorro } from './products';
 import { getCartPackagingAnalysis, PackagingAnalysis } from './shipping-zones';
@@ -161,13 +161,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
     };
 
-    const removeFromCart = (productId: string, size: string) => {
+    const removeFromCart = useCallback((productId: string, size: string) => {
         setCart(prevCart => prevCart.filter(
             item => !(item.product.id === productId && item.size === size)
         ));
-    };
+    }, []);
 
-    const updateQuantity = (productId: string, size: string, cantidad: number) => {
+    const updateQuantity = useCallback((productId: string, size: string, cantidad: number) => {
         if (cantidad <= 0) {
             removeFromCart(productId, size);
             return;
@@ -180,18 +180,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
                     : item
             )
         );
-    };
+    }, [removeFromCart]);
 
-    const clearCart = () => {
+    const clearCart = useCallback(() => {
         setCart([]);
         setAppliedCoupon(null);
-    };
+    }, []);
 
-    const restoreCart = (items: CartItem[]) => {
+    const restoreCart = useCallback((items: CartItem[]) => {
         if (Array.isArray(items)) {
             setCart(items);
         }
-    };
+    }, []);
 
     const getTotalItems = () => {
         return cart.reduce((total, item) => total + (item?.cantidad || 0), 0);

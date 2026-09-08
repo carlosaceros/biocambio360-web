@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -44,6 +44,7 @@ function ComunidadContent() {
     const [redeemError, setRedeemError] = useState<string | null>(null);
 
     const searchParams = useSearchParams();
+    const lookedUpPhoneRef = useRef<string | null>(null);
 
     const lookupProfileByPhone = useCallback(async (phoneToQuery: string) => {
         const clean = phoneToQuery.replace(/\D/g, '');
@@ -81,7 +82,8 @@ function ComunidadContent() {
         const phoneParam = searchParams.get('phone') || searchParams.get('celular');
         if (phoneParam) {
             const clean = phoneParam.replace(/\D/g, '');
-            if (clean.length >= 10) {
+            if (clean.length >= 10 && lookedUpPhoneRef.current !== clean) {
+                lookedUpPhoneRef.current = clean;
                 setSearchPhone(clean);
                 lookupProfileByPhone(clean);
             }

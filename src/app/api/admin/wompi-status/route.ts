@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, Timestamp, arrayUnion } from 'firebase/firestore';
 import { OrderStatus, TimelineEvent } from '@/types/order';
+import { rateLimit, getClientIp } from '@/lib/rate-limiter';
 
 export async function GET(request: Request) {
     try {
@@ -13,12 +14,47 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Falta orderId' }, { status: 400 });
         }
 
+        // 1. Rate Limiting: Max 30 requests per minute per IP
+        const clientIp = getClientIp(request);
+        const rl = rateLimit(`wompi_status_${clientIp}`, 30, 60 * 1000);
+        if (!rl.success) {
+            return NextResponse.json(
+                { error: 'Demasiadas solicitudes. Por favor espera un momento.' },
+                { status: 429, headers: { 'Retry-After': '60' } }
+            );
+        }
+
+        // 2. Obtener el pedido actual en Firestore PRIMERO (evita llamadas externas innecesarias)
+        const orderRef = doc(db, 'orders', orderId);
+        const orderSnap = await getDoc(orderRef);
+
+        if (!orderSnap.exists()) {
+            return NextResponse.json({ error: 'Pedido no encontrado en base de datos' }, { status: 404 });
+        }
+
+        const currentOrder = orderSnap.data();
+
+        // 3. Si el pedido ya está APROBADO o CONFIRMADO, retornar de inmediato sin consultar a Wompi nuevamente
+        if (currentOrder.wompiTransaction?.status === 'APPROVED' || currentOrder.status === 'confirmado') {
+            return NextResponse.json({
+                found: true,
+                orderId,
+                wompiTransaction: currentOrder.wompiTransaction,
+                orderStatus: currentOrder.status,
+                message: 'Transacción previamente confirmada y aprobada.'
+            }, {
+                headers: {
+                    'Cache-Control': 'private, max-age=60'
+                }
+            });
+        }
+
         const isProd = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY?.startsWith('pub_prod_');
         const baseUrl = isProd ? 'https://production.wompi.co/v1' : 'https://sandbox.wompi.co/v1';
 
         let transactionData: any = null;
 
-        // 1. Si tenemos transactionId, consultar directamente
+        // 4. Si tenemos transactionId, consultar directamente a Wompi
         if (transactionId) {
             try {
                 const res = await fetch(`${baseUrl}/transactions/${transactionId}`, {
@@ -36,7 +72,7 @@ export async function GET(request: Request) {
             }
         }
 
-        // 2. Si no hay transactionId o falló, buscar por reference = orderId
+        // 5. Si no hay transactionId o falló, buscar por reference = orderId
         if (!transactionData) {
             try {
                 const res = await fetch(`${baseUrl}/transactions?reference=${orderId}`, {
@@ -49,7 +85,6 @@ export async function GET(request: Request) {
                     const json = await res.json();
                     const list = json.data || [];
                     if (list.length > 0) {
-                        // Tomar la más reciente
                         transactionData = list[0];
                     }
                 }
@@ -58,17 +93,7 @@ export async function GET(request: Request) {
             }
         }
 
-        // 3. Obtener el pedido actual en Firestore
-        const orderRef = doc(db, 'orders', orderId);
-        const orderSnap = await getDoc(orderRef);
-        
-        if (!orderSnap.exists()) {
-            return NextResponse.json({ error: 'Pedido no encontrado en base de datos' }, { status: 404 });
-        }
-
-        const currentOrder = orderSnap.data();
-
-        // 4. Si encontramos datos en Wompi, sincronizar con el pedido
+        // 6. Si encontramos datos en Wompi, sincronizar con el pedido
         if (transactionData) {
             const wompiStatus = transactionData.status; // 'APPROVED' | 'PENDING' | 'DECLINED' | 'VOIDED' | 'ERROR'
             const paymentMethodType = transactionData.payment_method_type || transactionData.payment_method?.type || 'ONLINE';
@@ -120,7 +145,7 @@ export async function GET(request: Request) {
             });
         }
 
-        // 5. Si no se encontró transacción en Wompi API aún
+        // 7. Si no se encontró transacción en Wompi API aún
         return NextResponse.json({
             found: false,
             orderId,

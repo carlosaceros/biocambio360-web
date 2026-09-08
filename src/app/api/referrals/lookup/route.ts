@@ -2,12 +2,23 @@ import { NextResponse } from 'next/server';
 import { 
     getReferralProfileByPhone, 
     getReferralProfileByCode, 
-    checkReferrerQualifiedPurchase,
+    checkReferrerQualifiedPurchase, 
     getReferralConfig 
 } from '@/lib/referrals-service';
+import { rateLimit, getClientIp } from '@/lib/rate-limiter';
 
 export async function GET(request: Request) {
     try {
+        // 1. Rate Limiting: Max 60 requests per minute per IP
+        const clientIp = getClientIp(request);
+        const rl = rateLimit(`ref_lookup_${clientIp}`, 60, 60 * 1000);
+        if (!rl.success) {
+            return NextResponse.json(
+                { exists: false, message: 'Demasiadas consultas. Por favor espera un momento.' },
+                { status: 429, headers: { 'Retry-After': '60' } }
+            );
+        }
+
         const { searchParams } = new URL(request.url);
         const phone = searchParams.get('phone');
         const code = searchParams.get('code');
@@ -43,6 +54,10 @@ export async function GET(request: Request) {
             profile: enrichedProfile,
             isQualified: enrichedProfile.hasQualifiedPurchase,
             minReferrerSpend: minSpend
+        }, {
+            headers: {
+                'Cache-Control': 'private, max-age=15, stale-while-revalidate=30'
+            }
         });
     } catch (error: any) {
         return NextResponse.json({ exists: false, message: error.message }, { status: 500 });
