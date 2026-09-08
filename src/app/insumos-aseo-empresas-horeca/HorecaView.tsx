@@ -29,6 +29,7 @@ import {
     DollarSign 
 } from 'lucide-react';
 import { Product, formatCurrency, ProductSize } from '@/lib/products';
+import SmartVideo from '@/components/SmartVideo';
 import { useCart } from '@/lib/cart-context';
 import Toast from '@/components/Toast';
 
@@ -110,16 +111,12 @@ export default function HorecaView({ products }: HorecaViewProps) {
             <section className="relative overflow-hidden bg-gradient-to-b from-[#0a1628] via-[#0f2547] to-[#0a1628] text-white pt-14 pb-24 px-4 sm:px-6 lg:px-8">
                 {/* Ambient Video Background */}
                 <div className="absolute inset-0 z-0 overflow-hidden opacity-20 mix-blend-luminosity pointer-events-none">
-                    <video
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
+                    <SmartVideo
                         className="w-full h-full object-cover scale-105"
                     >
                         <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                         <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                    </video>
+                    </SmartVideo>
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0a1628]/85 via-[#0f2547]/90 to-[#0a1628] z-[1] pointer-events-none" />
 
@@ -218,22 +215,18 @@ export default function HorecaView({ products }: HorecaViewProps) {
                         {/* Left: Video 1 (Planta de Producción) */}
                         <div className="lg:col-span-6">
                             <div className="relative rounded-3xl overflow-hidden border-2 border-slate-200 shadow-xl bg-slate-950 aspect-[4/5] group">
-                                <video
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
+                                <SmartVideo
                                     controls
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 >
                                     <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                                     <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                                </video>
-                                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
+                                </SmartVideo>
+                                <div className="absolute top-4 left-4 bg-black/80 md:backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                                     <span>🏭 FORMULACIÓN INDUSTRIAL SOACHA</span>
                                 </div>
-                                <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-xs text-white/90">
+                                <div className="absolute bottom-4 left-4 right-4 bg-black/85 md:backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs text-white/90">
                                     <p className="font-extrabold text-white text-sm">Reactores de Grado Alimentario</p>
                                     <p className="text-xs text-slate-300 mt-0.5">
                                         Cumplimiento estricto de estándares sanitarios para inocuidad en cocinas de restaurantes.
@@ -414,22 +407,18 @@ export default function HorecaView({ products }: HorecaViewProps) {
                         {/* Right: Video 2 (Prueba de Densidad y Textura) */}
                         <div className="lg:col-span-6">
                             <div className="relative rounded-3xl overflow-hidden border-2 border-white/20 shadow-xl bg-slate-950 aspect-[4/5] group">
-                                <video
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
+                                <SmartVideo
                                     controls
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 >
                                     <source src="/videos/detergente-tipo-rey.mp4" type="video/mp4" />
                                     <source src="/videos/detergente-tipo-rey.mov" type="video/quicktime" />
-                                </video>
-                                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
+                                </SmartVideo>
+                                <div className="absolute top-4 left-4 bg-black/80 md:backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                                     <span>🔬 PRUEBA REAL DE DENSIDAD Y CONCENTRACIÓN</span>
                                 </div>
-                                <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-xs text-white/90">
+                                <div className="absolute bottom-4 left-4 right-4 bg-black/85 md:backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs text-white/90">
                                     <p className="font-extrabold text-white text-sm">Fórmula Textil e Industrial</p>
                                     <p className="text-xs text-slate-300 mt-0.5">
                                         Textura espesa auténtica sin sal marina añadida: alto rendimiento en agua fría de Bogotá.
@@ -556,22 +545,18 @@ export default function HorecaView({ products }: HorecaViewProps) {
                         {/* Right: Video 3 (Punto de Venta y Despacho Vecino) */}
                         <div className="lg:col-span-6">
                             <div className="relative rounded-3xl overflow-hidden border-2 border-slate-200 shadow-xl bg-slate-950 aspect-[4/5] group">
-                                <video
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
+                                <SmartVideo
                                     controls
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 >
                                     <source src="/videos/punto-de-venta-soacha.mp4" type="video/mp4" />
                                     <source src="/videos/punto-de-venta-soacha.mov" type="video/quicktime" />
-                                </video>
-                                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
+                                </SmartVideo>
+                                <div className="absolute top-4 left-4 bg-black/80 md:backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                                     <span>📍 ATENCIÓN DIRECTA Y RETIRO EN SOACHA</span>
                                 </div>
-                                <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-xs text-white/90">
+                                <div className="absolute bottom-4 left-4 right-4 bg-black/85 md:backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs text-white/90">
                                     <p className="font-extrabold text-white text-sm">Equipo Listo para Despachar</p>
                                     <p className="text-xs text-slate-300 mt-0.5">
                                         Atención ágil para pedidos urgentes de restaurantes y cadenas hoteleras.

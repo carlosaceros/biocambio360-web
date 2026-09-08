@@ -23,6 +23,7 @@ import {
     Video
 } from 'lucide-react';
 import { Product, formatCurrency, ProductSize } from '@/lib/products';
+import SmartVideo from '@/components/SmartVideo';
 import { useCart } from '@/lib/cart-context';
 import Toast from '@/components/Toast';
 
@@ -95,16 +96,12 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
             <section className="relative overflow-hidden bg-gradient-to-b from-[#0b172a] via-[#0f213d] to-[#0b172a] text-white pt-14 pb-24 px-4 sm:px-6 lg:px-8">
                 {/* Background Ambient Video Stream */}
                 <div className="absolute inset-0 z-0 overflow-hidden opacity-20 mix-blend-luminosity pointer-events-none">
-                    <video
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
+                    <SmartVideo
                         className="w-full h-full object-cover scale-105"
                     >
                         <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                         <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                    </video>
+                    </SmartVideo>
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0b172a]/85 via-[#0f213d]/90 to-[#0b172a] z-[1] pointer-events-none" />
 
@@ -360,18 +357,14 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                     {/* Video 1: Planta de Fabricación */}
                     <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
                         <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
-                            <video
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
+                            <SmartVideo
                                 controls
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             >
                                 <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                                 <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                            </video>
-                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-cyan-300 flex items-center gap-2">
+                            </SmartVideo>
+                            <div className="absolute top-3 left-3 bg-black/80 md:backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-cyan-300 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
                                 🏭 PLANTA DE PRODUCCIÓN
                             </div>
@@ -389,18 +382,14 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                     {/* Video 2: Punto de Venta y Despacho */}
                     <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
                         <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
-                            <video
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
+                            <SmartVideo
                                 controls
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             >
                                 <source src="/videos/punto-de-venta-soacha.mp4" type="video/mp4" />
                                 <source src="/videos/punto-de-venta-soacha.mov" type="video/quicktime" />
-                            </video>
-                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
+                            </SmartVideo>
+                            <div className="absolute top-3 left-3 bg-black/80 md:backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                                 📍 SEDE Y RETIRO EN SOACHA
                             </div>
@@ -418,18 +407,14 @@ export default function FabricantesView({ products }: FabricantesViewProps) {
                     {/* Video 3: Pruebas de Calidad / Detergente Tipo Rey */}
                     <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all">
                         <div className="relative aspect-[4/5] bg-slate-950 overflow-hidden">
-                            <video
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
+                            <SmartVideo
                                 controls
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             >
                                 <source src="/videos/detergente-tipo-rey.mp4" type="video/mp4" />
                                 <source src="/videos/detergente-tipo-rey.mov" type="video/quicktime" />
-                            </video>
-                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
+                            </SmartVideo>
+                            <div className="absolute top-3 left-3 bg-black/80 md:backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                                 🔬 PRUEBA DE CONCENTRACIÓN
                             </div>

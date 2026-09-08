@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { ShieldCheck, Sparkles, TrendingUp, Lock, Truck, ArrowRight, Award, CheckCircle2 } from 'lucide-react';
+import SmartVideo from '@/components/SmartVideo';
 
 export default function FactoryTrustSection() {
     return (
@@ -10,16 +11,12 @@ export default function FactoryTrustSection() {
                 
                 {/* Background Video Stream */}
                 <div className="absolute inset-0 z-0 overflow-hidden opacity-25 mix-blend-luminosity">
-                    <video
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
+                    <SmartVideo
                         className="w-full h-full object-cover scale-105"
                     >
                         <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                         <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                    </video>
+                    </SmartVideo>
                 </div>
 
                 {/* Overlays & Bokeh */}
@@ -54,7 +51,7 @@ export default function FactoryTrustSection() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
                             
                             {/* Autoridad & Origen */}
-                            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl space-y-2 hover:bg-white/10 transition-colors">
+                            <div className="bg-white/10 md:backdrop-blur-sm border border-white/10 p-5 rounded-2xl space-y-2 hover:bg-white/15 transition-colors">
                                 <div className="w-9 h-9 rounded-xl bg-[var(--brand-blue)]/20 text-[var(--brand-blue-light)] flex items-center justify-center font-black text-sm">
                                     🏛️
                                 </div>
@@ -65,7 +62,7 @@ export default function FactoryTrustSection() {
                             </div>
 
                             {/* Cuidado & Salud Familiar */}
-                            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl space-y-2 hover:bg-white/10 transition-colors">
+                            <div className="bg-white/10 md:backdrop-blur-sm border border-white/10 p-5 rounded-2xl space-y-2 hover:bg-white/15 transition-colors">
                                 <div className="w-9 h-9 rounded-xl bg-pink-500/20 text-pink-300 flex items-center justify-center font-black text-sm">
                                     💙
                                 </div>
@@ -76,7 +73,7 @@ export default function FactoryTrustSection() {
                             </div>
 
                             {/* Rendimiento & Ahorro 60% */}
-                            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl space-y-2 hover:bg-white/10 transition-colors">
+                            <div className="bg-white/10 md:backdrop-blur-sm border border-white/10 p-5 rounded-2xl space-y-2 hover:bg-white/15 transition-colors">
                                 <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-black text-sm">
                                     📊
                                 </div>
@@ -109,25 +106,21 @@ export default function FactoryTrustSection() {
                     {/* Right: Embedded Interactive Video Showcase Frame (5 cols) */}
                     <div className="lg:col-span-5 relative">
                         <div className="relative rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl bg-black aspect-[4/5] group">
-                            <video
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
+                            <SmartVideo
                                 controls
                                 className="w-full h-full object-cover"
                             >
                                 <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                                 <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                            </video>
+                            </SmartVideo>
 
                             {/* Floating overlay badge */}
-                            <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-[10px] font-extrabold text-white flex items-center gap-2">
+                            <div className="absolute top-4 left-4 bg-black/80 md:backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-white/20 text-[10px] font-extrabold text-white flex items-center gap-2">
                                 <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
                                 PLANTA DE PRODUCCIÓN SOACHA · EN VIVO
                             </div>
 
-                            <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-xs text-white/90">
+                            <div className="absolute bottom-4 left-4 right-4 bg-black/85 md:backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs text-white/90">
                                 <p className="font-extrabold text-white mb-1">🏭 Fabricación 100% Nacional</p>
                                 <p className="text-[11px] text-white/70">
                                     Cada lote es elaborado y verificado en laboratorio para garantizar máxima potencia de limpieza sin sulfatos nocivos.

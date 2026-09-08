@@ -8,7 +8,7 @@ export default function Header() {
     const { getTotalItems, setIsCartOpen } = useCart();
 
     return (
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-xs">
+        <header className="sticky top-0 z-40 bg-white/95 md:backdrop-blur-md border-b border-gray-100 shadow-xs">
             <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2 shrink-0">

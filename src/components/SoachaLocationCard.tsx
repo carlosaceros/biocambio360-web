@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Clock, ShoppingBag, Store, Navigation, Phone, Sparkles } from 'lucide-react';
+import SmartVideo from '@/components/SmartVideo';
 
 export default function SoachaLocationCard() {
     const [isHovered, setIsHovered] = useState(false);
@@ -16,16 +17,12 @@ export default function SoachaLocationCard() {
             >
                 {/* Video Background */}
                 <div className="absolute inset-0 z-0 overflow-hidden">
-                    <video
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
+                    <SmartVideo
                         className="w-full h-full object-cover scale-105 group-hover:scale-110 transition-transform duration-700 opacity-60 group-hover:opacity-40"
                     >
                         <source src="/videos/punto-de-venta-soacha.mp4" type="video/mp4" />
                         <source src="/videos/punto-de-venta-soacha.mov" type="video/quicktime" />
-                    </video>
+                    </SmartVideo>
                 </div>
 
                 {/* Gradient Overlays */}
@@ -34,7 +31,7 @@ export default function SoachaLocationCard() {
 
                 {/* Badges Top Left & Right */}
                 <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-10 pointer-events-none">
-                    <div className="bg-white/90 backdrop-blur-md text-[var(--brand-dark)] font-black text-[10px] uppercase px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+                    <div className="bg-white/95 md:backdrop-blur-md text-[var(--brand-dark)] font-black text-[10px] uppercase px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
                         <Store size={14} className="text-[var(--brand-blue)]" />
                         PUNTO DE VENTA & FÁBRICA DIRECTA
                     </div>
@@ -47,7 +44,7 @@ export default function SoachaLocationCard() {
                 {/* Card Content & Hover Reveal */}
                 <div className="relative z-10 max-w-3xl space-y-4">
                     
-                    <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1 rounded-full text-xs font-bold text-white">
+                    <div className="inline-flex items-center gap-2 bg-white/15 md:backdrop-blur-sm border border-white/20 px-3.5 py-1 rounded-full text-xs font-bold text-white">
                         <Sparkles size={14} className="text-yellow-400" />
                         ¡Atención Veci en Soacha y Sur de Bogotá! 👋
                     </div>
@@ -64,7 +61,7 @@ export default function SoachaLocationCard() {
                     </p>
 
                     {/* Interactive Hover Address Box */}
-                    <div className={`transition-all duration-500 overflow-hidden bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-5 text-white ${isHovered ? 'max-h-96 opacity-100 mt-4' : 'max-h-24 opacity-90'}`}>
+                    <div className={`transition-all duration-500 overflow-hidden bg-[#0a1324]/90 md:backdrop-blur-md border border-white/20 rounded-2xl p-5 text-white ${isHovered ? 'max-h-96 opacity-100 mt-4' : 'max-h-24 opacity-90'}`}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold">
                             
                             <div className="flex items-start gap-2.5">

@@ -45,7 +45,7 @@ export default function KitsSection({ onAddToCart, onViewDetails, onVerTodosKits
     };
 
     return (
-        <section id="kits-especiales" className="my-12 px-4 md:px-6 max-w-7xl mx-auto scroll-mt-24">
+        <section id="kits-especiales" className="my-12 px-4 md:px-6 max-w-7xl mx-auto scroll-mt-24 content-auto">
             <div className="bg-gradient-to-br from-amber-500/10 via-pink-500/5 to-purple-600/10 rounded-[3rem] border-2 border-pink-500/20 p-6 md:p-12 shadow-2xl relative overflow-hidden">
                 
                 {/* Header Info */}
@@ -109,7 +109,7 @@ export default function KitsSection({ onAddToCart, onViewDetails, onVerTodosKits
                     </div>
                 )}
 
-                <div className="mt-8 text-center bg-white/80 backdrop-blur-md rounded-2xl p-4 border border-pink-100 flex flex-wrap items-center justify-around gap-4 text-xs font-extrabold text-gray-700">
+                <div className="mt-8 text-center bg-white/95 rounded-2xl p-4 border border-pink-100 flex flex-wrap items-center justify-around gap-4 text-xs font-extrabold text-gray-700">
                     <span className="flex items-center gap-1.5">
                         <ShieldCheck size={16} className="text-emerald-600" />
                         Garantía Directa de Fábrica

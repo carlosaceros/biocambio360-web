@@ -109,14 +109,19 @@ const organizationSchema = {
 };
 
 import { Suspense } from 'react';
-import CartDrawer from "@/components/CartDrawer";
-import DiscountWheelModal from "@/components/DiscountWheelModal";
-import FirstPurchaseModal from "@/components/FirstPurchaseModal";
+import { Barlow } from 'next/font/google';
 import MetaPixel from "@/components/MetaPixel";
 import TrafficTracker from "@/components/TrafficTracker";
-
 import ReferralTopBanner from "@/components/ReferralTopBanner";
-import RecentSalesNotification from "@/components/RecentSalesNotification";
+import ClientModals from "@/components/ClientModals";
+
+// Auto-hospedaje de fuente Barlow nativo de Next.js (0 peticiones externas, cero bloqueo de render)
+const barlow = Barlow({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  display: 'swap',
+  variable: '--font-barlow',
+});
 
 export default function RootLayout({
   children,
@@ -124,11 +129,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" className={barlow.className} suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&display=swap" rel="stylesheet" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
@@ -145,10 +147,7 @@ export default function RootLayout({
               <ReferralTopBanner />
             </Suspense>
             {children}
-            <CartDrawer />
-            <DiscountWheelModal />
-            <FirstPurchaseModal />
-            <RecentSalesNotification />
+            <ClientModals />
             <Analytics />
           </CartProvider>
         </AuthProvider>

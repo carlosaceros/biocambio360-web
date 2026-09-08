@@ -21,7 +21,6 @@ function ComboCard({ combo, onSelect }: { combo: Combo; onSelect: (combo: Combo)
 
     return (
         <motion.div
-            layout
             whileHover={{ y: -8, scale: 1.02 }}
             onHoverStart={() => setIsHovered(true)}
             onHoverEnd={() => setIsHovered(false)}
@@ -123,7 +122,7 @@ function ComboCard({ combo, onSelect }: { combo: Combo; onSelect: (combo: Combo)
             </div>
 
             {/* Duration tag */}
-            <div className="absolute top-3 right-3 bg-black/20 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-1 rounded-full z-20">
+            <div className="absolute top-3 right-3 bg-black/60 text-white text-[9px] font-bold px-2.5 py-1 rounded-full z-20">
                 ⏱️ Rinde {combo.duracion}
             </div>
         </motion.div>

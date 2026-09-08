@@ -39,6 +39,7 @@ import HeaderMessage from '@/components/HeaderMessage';
 import ComboBuilder from '@/components/ComboBuilder';
 import SidebarMenu from '@/components/SidebarMenu';
 import ProductQuickView from '@/components/ProductQuickView';
+import SmartVideo from '@/components/SmartVideo';
 import { Product, ProductSize } from '@/lib/products';
 import { PRODUCTOS } from '@/lib/products-data';
 import { useCart } from '@/lib/cart-context';
@@ -291,7 +292,7 @@ function HomeContent() {
       <FomoTopBanner />
 
       {/* ─── HEADER ─────────────────────────────────────────── */}
-      <header className="bg-white/90 backdrop-blur-2xl border-b border-[var(--brand-border)] sticky top-0 z-50 shadow-sm">
+      <header className="bg-white/95 md:backdrop-blur-md border-b border-[var(--brand-border)] sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5 max-w-7xl">
           
           {/* Top Bar for Mobile / Main Brand Area */}
@@ -498,16 +499,12 @@ function HomeContent() {
           <div className="p-4 md:p-6">
             <div className="rounded-[2.5rem] relative overflow-hidden bg-[var(--brand-dark)] min-h-[400px] flex flex-col justify-center px-8 md:px-16 py-12">
               {/* Background Design & Video Stream */}
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
+              <SmartVideo
                 className="absolute inset-0 w-full h-full object-cover opacity-70 scale-105 z-0"
               >
                 <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                 <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-              </video>
+              </SmartVideo>
               <div className="absolute inset-0 bg-gradient-to-br from-[#1a2744]/40 via-[var(--brand-dark)]/60 to-[#0c1221]/70 z-[1]" />
               <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 bg-[url('/images/logo-biocambio360.png')] bg-no-repeat bg-right-center bg-contain mix-blend-overlay grayscale z-[2]" />
               <div className="absolute -top-24 -left-24 w-96 h-96 bg-[var(--brand-blue)]/20 rounded-full blur-[120px] z-[2]" />
@@ -789,12 +786,12 @@ function HomeContent() {
           </div>
 
           {/* ─── COMBOTIZER SECTION ─────────────────────────────── */}
-          <div id="combos" className="px-6 pb-20">
+          <div id="combos" className="px-6 pb-20 content-auto">
              <ComboBuilder products={activeProducts} onAddToCart={handleAddToCart} />
           </div>
 
           {/* ─── TRUST & FAQ ─────────────────────────────────── */}
-          <div className="px-6 space-y-20">
+          <div className="px-6 space-y-20 content-auto">
             <div className="bg-white rounded-[3rem] p-12 border border-gray-100 shadow-sm relative overflow-hidden">
                <div className="grid md:grid-cols-3 gap-12 text-center">
                   <div>
@@ -901,7 +898,7 @@ function HomeContent() {
 
       {/* Floating Thumb-Bar for Mobile Nav */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[55] w-[92%] max-w-md">
-        <div className="bg-[var(--brand-dark)]/95 backdrop-blur-xl border border-white/10 rounded-3xl p-2 flex items-center justify-between shadow-2xl">
+        <div className="bg-[var(--brand-dark)]/95 md:backdrop-blur-md border border-white/10 rounded-3xl p-2 flex items-center justify-between shadow-2xl">
           <button 
             onClick={() => setIsSidebarOpen(true)}
             className="flex-1 flex flex-col items-center gap-1 py-1.5 text-white/70 hover:text-white transition-colors"

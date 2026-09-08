@@ -28,6 +28,7 @@ import {
     DollarSign
 } from 'lucide-react';
 import { Product, formatCurrency, ProductSize } from '@/lib/products';
+import SmartVideo from '@/components/SmartVideo';
 import { useCart } from '@/lib/cart-context';
 import Toast from '@/components/Toast';
 
@@ -113,16 +114,12 @@ export default function MayoristaView({ products }: MayoristaViewProps) {
             <section className="relative overflow-hidden bg-gradient-to-b from-[#091527] via-[#0d213e] to-[#091527] text-white pt-14 pb-24 px-4 sm:px-6 lg:px-8">
                 {/* Ambient Video Background */}
                 <div className="absolute inset-0 z-0 overflow-hidden opacity-20 mix-blend-luminosity pointer-events-none">
-                    <video
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
+                    <SmartVideo
                         className="w-full h-full object-cover scale-105"
                     >
                         <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                         <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                    </video>
+                    </SmartVideo>
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-b from-[#091527]/85 via-[#0d213e]/90 to-[#091527] z-[1] pointer-events-none" />
 
@@ -221,22 +218,18 @@ export default function MayoristaView({ products }: MayoristaViewProps) {
                         {/* Left: Video 1 (Planta de Producción) */}
                         <div className="lg:col-span-6">
                             <div className="relative rounded-3xl overflow-hidden border-2 border-slate-200 shadow-xl bg-slate-950 aspect-[4/5] group">
-                                <video
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
+                                <SmartVideo
                                     controls
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 >
                                     <source src="/videos/fabrica-biocambio360.mp4" type="video/mp4" />
                                     <source src="/videos/fabrica-biocambio360.mov" type="video/quicktime" />
-                                </video>
-                                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-xs font-black text-cyan-300 flex items-center gap-2">
+                                </SmartVideo>
+                                <div className="absolute top-4 left-4 bg-black/80 md:backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-xs font-black text-cyan-300 flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
                                     <span>🏭 PLANTA DE PRODUCCIÓN SOACHA</span>
                                 </div>
-                                <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-xs text-white/90">
+                                <div className="absolute bottom-4 left-4 right-4 bg-black/85 md:backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs text-white/90">
                                     <p className="font-extrabold text-white text-sm">Capacidad Industrial Diaria</p>
                                     <p className="text-xs text-slate-300 mt-0.5">
                                         Formulamos lotes frescos con trazabilidad química y control de calidad lote por lote.
@@ -417,22 +410,18 @@ export default function MayoristaView({ products }: MayoristaViewProps) {
                         {/* Right: Video 2 (Prueba de Concentración / Detergente Tipo Rey) */}
                         <div className="lg:col-span-6">
                             <div className="relative rounded-3xl overflow-hidden border-2 border-white/20 shadow-xl bg-slate-950 aspect-[4/5] group">
-                                <video
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
+                                <SmartVideo
                                     controls
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 >
                                     <source src="/videos/detergente-tipo-rey.mp4" type="video/mp4" />
                                     <source src="/videos/detergente-tipo-rey.mov" type="video/quicktime" />
-                                </video>
-                                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
+                                </SmartVideo>
+                                <div className="absolute top-4 left-4 bg-black/80 md:backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-xs font-black text-amber-300 flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                                     <span>🔬 PRUEBA REAL DE VISCOSIDAD Y DENSIDAD</span>
                                 </div>
-                                <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-xs text-white/90">
+                                <div className="absolute bottom-4 left-4 right-4 bg-black/85 md:backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs text-white/90">
                                     <p className="font-extrabold text-white text-sm">Fórmula Textil Tipo Rey</p>
                                     <p className="text-xs text-slate-300 mt-0.5">
                                         Observa la caída espesa y el poder espumante controlado diseñado para lavadoras industriales y domésticas.
@@ -544,22 +533,18 @@ export default function MayoristaView({ products }: MayoristaViewProps) {
                         {/* Right: Video 3 (Punto de Venta y Despacho Vecino) */}
                         <div className="lg:col-span-6">
                             <div className="relative rounded-3xl overflow-hidden border-2 border-slate-200 shadow-xl bg-slate-950 aspect-[4/5] group">
-                                <video
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
+                                <SmartVideo
                                     controls
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 >
                                     <source src="/videos/punto-de-venta-soacha.mp4" type="video/mp4" />
                                     <source src="/videos/punto-de-venta-soacha.mov" type="video/quicktime" />
-                                </video>
-                                <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
+                                </SmartVideo>
+                                <div className="absolute top-4 left-4 bg-black/80 md:backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-xs font-black text-emerald-300 flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                                     <span>📍 PUNTO DE ATENCIÓN Y DESPACHO VECINO</span>
                                 </div>
-                                <div className="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-xs text-white/90">
+                                <div className="absolute bottom-4 left-4 right-4 bg-black/85 md:backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs text-white/90">
                                     <p className="font-extrabold text-white text-sm">Equipo Humano Cercano</p>
                                     <p className="text-xs text-slate-300 mt-0.5">
                                         Personal capacitado para asesorarte en dosificación y cargue de tus insumos de aseo.

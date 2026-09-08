@@ -99,3 +99,23 @@ p {
   font-size: 14px;
   line-height: 1.6;
 }
+
+/* Performance Optimizations for 60fps Mobile Scroll */
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 600px;
+}
+
+/* GPU Hardware Acceleration */
+.gpu-accel {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Touch optimization */
+.touch-fast {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+

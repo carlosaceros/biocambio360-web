@@ -24,6 +24,7 @@ import { useCart } from '@/lib/cart-context';
 import ProductCard from '@/components/ProductCard';
 import Toast from '@/components/Toast';
 import AddiWidget from '@/components/AddiWidget';
+import SmartVideo from '@/components/SmartVideo';
 import { getRichProductDetails, getSchwartzCopy, getProductImage, generateProductSlug } from '@/lib/product-utils';
 import { getManualContentForProduct, MANUAL_NOTICE_TEXT } from '@/lib/products-rich-data';
 import { trackViewContent } from '@/lib/meta-pixel';
@@ -256,17 +257,13 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden">
                                 {mediaTab === 'video' && (product.id === 'detergente' || product.nombre.toLowerCase().includes('detergente')) ? (
                                     <div className="relative w-full h-full bg-black rounded-xl overflow-hidden">
-                                        <video
+                                        <SmartVideo
                                             controls
-                                            autoPlay
-                                            muted
-                                            loop
-                                            playsInline
                                             className="w-full h-full object-cover"
                                         >
                                             <source src="/videos/detergente-tipo-rey.mp4" type="video/mp4" />
                                             <source src="/videos/detergente-tipo-rey.mov" type="video/quicktime" />
-                                        </video>
+                                        </SmartVideo>
                                         <div className="absolute top-3 left-3 bg-[var(--brand-pink)] text-white text-[9px] font-black px-3 py-1 rounded-full shadow z-10 uppercase tracking-widest">
                                             🎥 Pruebas de Fábrica · Detergente Ropa Tipo Rey
                                         </div>
