@@ -15,7 +15,11 @@ import {
     Search,
     Sparkles,
     MessageCircle,
-    HelpCircle
+    HelpCircle,
+    Scale,
+    FileText,
+    ShieldCheck,
+    AlertCircle
 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -267,6 +271,14 @@ function ComunidadContent() {
                             </button>
                         </form>
                     </div>
+
+                    <p className="mt-3 text-[11px] text-white/60 text-center max-w-sm mx-auto leading-tight">
+                        Al consultar o registrarte aceptas los{' '}
+                        <Link href="/terminos-programa-referidos" className="text-amber-300 underline hover:text-amber-200 font-bold">
+                            Términos y Condiciones del Programa
+                        </Link>{' '}
+                        (Ley 1480 de 2011 y Ley 1581 de 2012).
+                    </p>
 
                     {errorMessage && (
                         <p className="mt-3 text-sm text-pink-300 font-bold">{errorMessage}</p>
@@ -566,6 +578,120 @@ function ComunidadContent() {
                             <p className="text-gray-600 leading-relaxed">
                                 Por políticas antifraude de la empresa, el beneficio solo aplica para compras de personas o empresas distintas (no se admiten autorreferidos con el mismo celular o cédula).
                             </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Marco Legal & Aclaraciones Normativas (Ley 1480 de 2011) */}
+                <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-10 border border-slate-800 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="relative z-10 space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                            <div>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-wider mb-2 border border-emerald-400/30">
+                                    <ShieldCheck size={14} /> Transparencia & Cumplimiento Legal
+                                </span>
+                                <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                                    Marco Legal y Aclaraciones al Consumidor
+                                </h3>
+                                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                                    Conforme al Estatuto del Consumidor (Ley 1480 de 2011, Art. 33) y Régimen de Datos Personales (Ley 1581 de 2012).
+                                </p>
+                            </div>
+                            <Link
+                                href="/terminos-programa-referidos"
+                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-lg shrink-0"
+                            >
+                                <FileText size={16} />
+                                <span>Ver Términos Completos</span>
+                                <ArrowRight size={14} />
+                            </Link>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            {/* Cláusula 1: Naturaleza del Saldo */}
+                            <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 space-y-2">
+                                <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-wider">
+                                    <Scale size={16} />
+                                    <span>Naturaleza Comercial</span>
+                                </div>
+                                <h4 className="text-sm font-black text-white">No Constituye Dinero en Efectivo</h4>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    Los saldos acumulados son <strong>bonos de descuento comercial promocional</strong> exclusivos para compras de productos en BioCambio360. No son canjeables por dinero en efectivo, transferencias bancarias (Nequi, Daviplata, etc.) ni son transferibles entre usuarios.
+                                </p>
+                            </div>
+
+                            {/* Cláusula 2: Compra Calificada */}
+                            <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 space-y-2">
+                                <div className="flex items-center gap-2 text-teal-400 font-black text-xs uppercase tracking-wider">
+                                    <ShoppingBag size={16} />
+                                    <span>Compra Calificada</span>
+                                </div>
+                                <h4 className="text-sm font-black text-white">Subtotal Mínimo de $50.000 COP</h4>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    Para que aplique el bono de $10.000 COP del amigo y el saldo del embajador, el pedido del referido debe ser igual o superior a <strong>$50.000 COP</strong> en productos. El embajador debe contar previamente con al menos 1 compra en la tienda.
+                                </p>
+                            </div>
+
+                            {/* Cláusula 3: Condición Suspensiva */}
+                            <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 space-y-2">
+                                <div className="flex items-center gap-2 text-emerald-400 font-black text-xs uppercase tracking-wider">
+                                    <CheckCircle2 size={16} />
+                                    <span>Acreditación Efectiva</span>
+                                </div>
+                                <h4 className="text-sm font-black text-white">Entrega Física y Recaudo</h4>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    El saldo se genera como <em>&quot;Pendiente&quot;</em> al crearse la orden y pasa a <em>&quot;Disponible&quot;</em> únicamente cuando la transportadora certifica la entrega real y el recaudo exitoso del pedido. No aplica para órdenes canceladas o devueltas.
+                                </p>
+                            </div>
+
+                            {/* Cláusula 4: Límite de Redención */}
+                            <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 space-y-2">
+                                <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-wider">
+                                    <Wallet size={16} />
+                                    <span>Tope de Redención</span>
+                                </div>
+                                <h4 className="text-sm font-black text-white">Hasta el 50% de tu Compra</h4>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    Por sostenibilidad comercial, los cupones generados a partir de saldos acumulados cubren como máximo hasta el <strong>50% del valor</strong> de la compra propia del embajador. El excedente y flete se cancelan por los métodos habituales.
+                                </p>
+                            </div>
+
+                            {/* Cláusula 5: Vigencia y Caducidad */}
+                            <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 space-y-2">
+                                <div className="flex items-center gap-2 text-rose-400 font-black text-xs uppercase tracking-wider">
+                                    <AlertCircle size={16} />
+                                    <span>Vigencia de Bonos</span>
+                                </div>
+                                <h4 className="text-sm font-black text-white">Caducidad a los 60 Días</h4>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    Conforme al Art. 33 de la Ley 1480 de 2011, los saldos en estado Disponible tienen una vigencia de <strong>sesenta (60) días calendario</strong> contados desde su acreditación. Transcurrido este plazo expiran de pleno derecho.
+                                </p>
+                            </div>
+
+                            {/* Cláusula 6: Política Antifraude */}
+                            <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 space-y-2">
+                                <div className="flex items-center gap-2 text-purple-400 font-black text-xs uppercase tracking-wider">
+                                    <ShieldCheck size={16} />
+                                    <span>Política Antifraude</span>
+                                </div>
+                                <h4 className="text-sm font-black text-white">Cero Autorreferidos & Anti-Spam</h4>
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    Prohibido el uso de códigos para compras propias simuladas (mismo celular, cédula, dirección o IP). BioCambio360 audita transacciones y anulará de inmediato cuentas y saldos obtenidos mediante prácticas desleales o spam no consentido.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-950/60 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+                            <p>
+                                Programa operado por <strong>BIOCAMBIO360 S.A.S. (NIT 901.798.484-4)</strong>. Vigilado por la Superintendencia de Industria y Comercio (SIC).
+                            </p>
+                            <Link
+                                href="/terminos-programa-referidos"
+                                className="text-amber-400 font-bold hover:underline shrink-0 flex items-center gap-1"
+                            >
+                                Leer reglamento jurídico completo (15 cláusulas) &rarr;
+                            </Link>
                         </div>
                     </div>
                 </div>

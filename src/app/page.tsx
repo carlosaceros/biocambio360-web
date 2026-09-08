@@ -856,6 +856,7 @@ function HomeContent() {
                 <li><a href="/privacidad" className="hover:text-white transition-colors">Privacidad y Tratamiento de Datos</a></li>
                 <li><a href="/politica-tratamiento-datos-biocambio360-2026.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-1">📄 Política Tratamiento de Datos (PDF)</a></li>
                 <li><a href="/terminos" className="hover:text-white transition-colors">Términos y Condiciones</a></li>
+                <li><Link href="/terminos-programa-referidos" className="hover:text-amber-400 text-amber-300/90 transition-colors font-bold flex items-center gap-1.5">🎁 Términos Programa de Referidos</Link></li>
                 <li><Link href="/blog" className="hover:text-white transition-colors">Blog & Academia</Link></li>
                 <li><Link href="/guia-uso-y-mezclas" className="hover:text-white transition-colors text-blue-400 flex items-center gap-1 font-black">🧪 Guía de Mezclas & Bioseguridad</Link></li>
               </ul>
