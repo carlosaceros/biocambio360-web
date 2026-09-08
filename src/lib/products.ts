@@ -1,6 +1,14 @@
-// Product data types and constants
-// Sizes: 1L, 1/2G (½ Galón ≈ 1.9L), 3.8L (Galón), 10L, 20L
-export type ProductSize = '1L' | '1/2G' | '3.8L' | '10L' | '20L';
+// Sizes: 1/2G (½ Galón ≈ 1.9L), 3.8L (Galón), 10L, 20L
+export type ProductSize = '1/2G' | '3.8L' | '10L' | '20L';
+
+/**
+ * Checks if a size key is disallowed across all products (specifically 1 Liter / 1L / 1000ml).
+ */
+export function isDisallowedSize(size?: string | null): boolean {
+    if (!size) return false;
+    const normalized = size.trim().toUpperCase().replace(/\s+/g, '');
+    return normalized === '1L' || normalized === '1LITRO' || normalized === '1000ML';
+}
 
 export interface FAQ {
     q: string;
@@ -82,8 +90,7 @@ export interface SavingsData {
 }
 
 // Volume in liters for each size
-const SIZE_LITERS: Record<ProductSize, number> = {
-    '1L': 1,
+const SIZE_LITERS: Record<string, number> = {
     '1/2G': 1.9,
     '3.8L': 3.8,
     '10L': 10,

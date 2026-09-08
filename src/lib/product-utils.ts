@@ -134,6 +134,23 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
         if (found) return found;
     }
 
+    // Silicona
+    if (cleanSlug.includes('silicona')) {
+        if (cleanSlug.includes('moto')) {
+            const found = products.find(p => p.id === 'silicona-para-motos');
+            if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+            if (found) return found;
+        } else if (cleanSlug.includes('mueble')) {
+            const found = products.find(p => p.id === 'silicona-lustramuebles');
+            if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+            if (found) return found;
+        } else {
+            const found = products.find(p => p.id === 'silicona-autos');
+            if (found && (found.status === 'draft' || found.status === 'archived' || (found as any).isDeleted)) return null;
+            if (found) return found;
+        }
+    }
+
     return null;
 }
 
@@ -162,10 +179,12 @@ export function generateProductMetadata(product: Product, size?: string): Metada
     const slug = generateProductSlug(product.id, product.nombre);
     
     // Safety check: pick the first available size if '10L' is missing
-    const availableSizes = Object.keys(product.precios);
-    const selectedSize = (size && product.precios[size]) ? size : (product.precios['10L'] ? '10L' : availableSizes[0]);
+    const availableSizes = Object.keys(product.precios || {});
+    const selectedSize = (size && product.precios?.[size]) 
+        ? size 
+        : (product.precios?.['10L'] ? '10L' : (availableSizes[0] || '3.8L'));
     
-    const price = product.precios[selectedSize] || 0;
+    const price = product.precios?.[selectedSize] || 0;
     
     // Improved price calculation to handle '1/2G' or 'DEFAULT'
     let liters = 1;
@@ -173,7 +192,7 @@ export function generateProductMetadata(product: Product, size?: string): Metada
     else if (selectedSize === '3.8L') liters = 3.8;
     else if (selectedSize === '20L') liters = 20;
     else if (selectedSize === '10L') liters = 10;
-    else {
+    else if (selectedSize) {
         const parsed = parseFloat(selectedSize.replace(/[^0-9.]/g, ''));
         liters = isNaN(parsed) || parsed === 0 ? 1 : parsed;
     }
@@ -274,9 +293,9 @@ export function generateProductSchema(product: Product, size: string = '10L') {
     // Build one Offer per size variant (better for Google Shopping)
     // Filter to only include sizes that actually have a price for this specific product
     const possibleSizes = ['1/2G', '3.8L', '10L', '20L', 'DEFAULT'];
-    const actualSizes = Object.keys(product.precios).filter(s => possibleSizes.includes(s));
+    const actualSizes = Object.keys(product.precios || {}).filter(s => possibleSizes.includes(s));
     
-    const offers = actualSizes.map((s) => {
+    const offers = actualSizes.length > 0 ? actualSizes.map((s) => {
         const price = product.precios[s];
         const variantUrl = s !== 'DEFAULT' ? `${BASE_URL}/producto/${slug}?tamano=${encodeURIComponent(s)}` : `${BASE_URL}/producto/${slug}`;
         return {
@@ -334,7 +353,21 @@ export function generateProductSchema(product: Product, size: string = '10L') {
                 "returnFees": "https://schema.org/FreeReturn"
             }
         };
-    });
+    }) : [{
+        "@type": "Offer",
+        "url": `${BASE_URL}/producto/${slug}`,
+        "priceCurrency": "COP",
+        "price": 0,
+        "priceValidUntil": "2026-12-31",
+        "availability": "https://schema.org/InStock",
+        "itemCondition": "https://schema.org/NewCondition",
+        "name": product.nombre,
+        "sku": product.id.toUpperCase(),
+        "seller": {
+            "@type": "Organization",
+            "name": "Biocambio360 S.A.S."
+        }
+    }];
 
     return {
         "@context": "https://schema.org",

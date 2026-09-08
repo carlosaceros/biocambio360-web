@@ -19,7 +19,7 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Product, formatCurrency, calcularAhorro } from '@/lib/products';
+import { Product, formatCurrency, calcularAhorro, isDisallowedSize } from '@/lib/products';
 import { useCart } from '@/lib/cart-context';
 import ProductCard from '@/components/ProductCard';
 import Toast from '@/components/Toast';
@@ -51,9 +51,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     
     const searchParams = useSearchParams();
 
-    // Memoize available sizes array to prevent infinite re-render loops
+    // Memoize available sizes array to prevent infinite re-render loops (strictly excluding disallowed sizes like 1L)
     const availableSizes = useMemo(() => {
-        const rawSizes = Object.keys(product.precios || {});
+        const rawSizes = Object.keys(product.precios || {}).filter(s => !isDisallowedSize(s));
         const hasOtherSizes = rawSizes.some(s => s !== 'DEFAULT');
         const filteredSizes = hasOtherSizes ? rawSizes.filter(s => s !== 'DEFAULT') : rawSizes;
 
@@ -70,7 +70,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     const paramSizeRaw = (searchParams?.get('tamano') || searchParams?.get('size') || searchParams?.get('presentacion') || '').trim();
     
     const findMatchingSize = useCallback((target: string): string | undefined => {
-        if (!target) return undefined;
+        if (!target || isDisallowedSize(target)) return undefined;
         const normalized = target.toLowerCase().replace(/[^a-z0-9]/g, '');
         return availableSizes.find(s => {
             const sNorm = s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -84,12 +84,25 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     // Sync if URL search params change
     useEffect(() => {
         if (paramSizeRaw) {
+            if (isDisallowedSize(paramSizeRaw)) {
+                // If user entered a disallowed size like 1L, redirect/rewrite param to valid fallback size
+                const fallback = availableSizes[0] || '10L';
+                setSelectedSize(fallback);
+                if (typeof window !== 'undefined') {
+                    try {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('tamano', fallback);
+                        window.history.replaceState({}, '', url.toString());
+                    } catch (_) {}
+                }
+                return;
+            }
             const matched = findMatchingSize(paramSizeRaw);
             if (matched && matched !== selectedSize) {
                 setSelectedSize(matched);
             }
         }
-    }, [paramSizeRaw, findMatchingSize, selectedSize]);
+    }, [paramSizeRaw, findMatchingSize, selectedSize, availableSizes]);
 
     const handleSizeSelect = (newSize: string) => {
         if (newSize === selectedSize) return;

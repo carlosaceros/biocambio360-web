@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Plus, Minus, ArrowRight, ShieldCheck, Truck, CreditCard } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Product, ProductSize, calcularAhorro, formatCurrency } from '@/lib/products';
+import { Product, ProductSize, calcularAhorro, formatCurrency, isDisallowedSize } from '@/lib/products';
 import Link from 'next/link';
 import { generateProductSlug, getProductImage } from '@/lib/product-utils';
 
@@ -14,7 +14,7 @@ interface ProductQuickViewProps {
     onAddToCart: (product: Product, size: string, price: number, cantidad: number) => void;
 }
 
-const SIZE_ORDER: string[] = ['500ML', '1L', '1/2G', '3.8L', '10L', '20L'];
+const SIZE_ORDER: string[] = ['500ML', '1/2G', '3.8L', '10L', '20L'];
 
 const SIZE_LABELS: Record<string, string> = {
     '500ML': '500 ML',
@@ -37,7 +37,9 @@ export default function ProductQuickView({ product, isOpen, onClose, onAddToCart
 
     useEffect(() => {
         if (product) {
-            const sizes = Object.keys(product.precios || {}).sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+            const sizes = Object.keys(product.precios || {})
+                .filter(s => !isDisallowedSize(s))
+                .sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
             setSelectedSize(sizes[0] || '3.8L');
             setQuantity(1);
         }
@@ -45,8 +47,10 @@ export default function ProductQuickView({ product, isOpen, onClose, onAddToCart
 
     if (!product) return null;
 
-    const availableSizes = Object.keys(product.precios || {}).sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
-    const effectiveSize = (product.precios && product.precios[selectedSize] !== undefined)
+    const availableSizes = Object.keys(product.precios || {})
+        .filter(s => !isDisallowedSize(s))
+        .sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+    const effectiveSize = (product.precios && product.precios[selectedSize] !== undefined && !isDisallowedSize(selectedSize))
         ? selectedSize
         : (availableSizes[0] || selectedSize);
     const price = product.precios?.[effectiveSize] || Object.values(product.precios || {})[0] || 0;

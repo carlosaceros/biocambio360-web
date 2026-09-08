@@ -10,7 +10,7 @@ import {
     orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Product, PRODUCTOS } from './products';
+import { Product, PRODUCTOS, isDisallowedSize } from './products';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const CACHE_TIME = IS_DEV ? 0 : 1000 * 60 * 5; // 0 cache in development, 5 minutes in production
@@ -38,6 +38,58 @@ function isSupplyItem(p: Product): boolean {
     const name = p.nombre.toLowerCase();
     const id = p.id.toLowerCase();
     return SUPPLY_KEYWORDS.some(kw => name.includes(kw) || id.includes(kw));
+}
+
+export { isDisallowedSize };
+
+/**
+ * Strips disallowed sizes (e.g. 1L) from a product's prices, competitor prices, stock, and size-specific images.
+ */
+export function sanitizeProductSizes<T extends Product>(product: T): T {
+    if (!product) return product;
+    const sanitized = { ...product };
+
+    if (sanitized.precios) {
+        const cleanedPrecios: Record<string, number> = {};
+        for (const [size, price] of Object.entries(sanitized.precios)) {
+            if (!isDisallowedSize(size)) {
+                cleanedPrecios[size] = price;
+            }
+        }
+        sanitized.precios = cleanedPrecios;
+    }
+
+    if (sanitized.competidorPromedio) {
+        const cleanedComp: Record<string, number> = {};
+        for (const [size, price] of Object.entries(sanitized.competidorPromedio)) {
+            if (!isDisallowedSize(size)) {
+                cleanedComp[size] = price;
+            }
+        }
+        sanitized.competidorPromedio = cleanedComp;
+    }
+
+    if (sanitized.stock) {
+        const cleanedStock: Record<string, number> = {};
+        for (const [size, qty] of Object.entries(sanitized.stock)) {
+            if (!isDisallowedSize(size)) {
+                cleanedStock[size] = qty;
+            }
+        }
+        sanitized.stock = cleanedStock;
+    }
+
+    if (sanitized.imgFiles) {
+        const cleanedImgFiles: Record<string, string> = {};
+        for (const [size, img] of Object.entries(sanitized.imgFiles)) {
+            if (!isDisallowedSize(size)) {
+                cleanedImgFiles[size] = img;
+            }
+        }
+        sanitized.imgFiles = cleanedImgFiles;
+    }
+
+    return sanitized;
 }
 
 /**
@@ -127,7 +179,7 @@ export async function getAllProducts(
 
         cachedRawProducts = Array.from(allProductsMap.values())
             .filter(p => !isSupplyItem(p))
-            .map(p => ensureStockDefaults(p));
+            .map(p => ensureStockDefaults(sanitizeProductSizes(p)));
         lastFetchTime = Date.now();
     }
 
@@ -137,6 +189,9 @@ export async function getAllProducts(
             return false;
         }
         if (!includeDrafts && p.status === 'draft') {
+            return false;
+        }
+        if (!includeDrafts && (!p.precios || Object.keys(p.precios).length === 0)) {
             return false;
         }
         return true;
@@ -174,7 +229,7 @@ export async function getProductById(id: string, includeDrafts = false): Promise
         }
     }
 
-    return res ? ensureStockDefaults(res) : null;
+    return res ? ensureStockDefaults(sanitizeProductSizes(res)) : null;
 }
 
 function cleanBadge(badge?: string): string {
@@ -193,6 +248,7 @@ function ensureStockDefaults(product: Product): Product {
     // Initialize stock for all price sizes if not present
     if (product.precios) {
         Object.keys(product.precios).forEach(size => {
+            if (isDisallowedSize(size)) return;
             if (stock[size] === undefined) {
                 // Default initial stock per size
                 stock[size] = size === '20L' ? 10 : size === '10L' ? 15 : size === '3.8L' ? 30 : 25;
@@ -291,6 +347,7 @@ export async function saveProduct(
     product: Product,
     userContext?: { email?: string; nombre?: string; role?: string }
 ): Promise<void> {
+    product = sanitizeProductSizes(product);
     // 1. Audit price changes if previous product exists
     try {
         const previousProduct = await getProductById(product.id);

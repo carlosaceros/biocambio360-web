@@ -34,7 +34,7 @@ const STANDARD_CATEGORIES = [
     'Hogar & Comercio'
 ];
 
-const STANDARD_SIZES = ['1L', '1/2G', '3.8L', '10L', '20L', 'COMBO'];
+const STANDARD_SIZES = ['1/2G', '3.8L', '10L', '20L', 'COMBO'];
 
 const BADGE_PRESETS = [
     '🔥 MÁS VENDIDO',
@@ -69,7 +69,7 @@ export default function InventoryAdminPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
     const [uploadError, setUploadError] = useState<string | null>(null);
-    const [selectedImageSizeTarget, setSelectedImageSizeTarget] = useState<string | null>(null); // null = imagen principal, '1L', '20L', etc.
+    const [selectedImageSizeTarget, setSelectedImageSizeTarget] = useState<string | null>(null); // null = imagen principal, '10L', '20L', etc.
     const [imageGallerySearchQuery, setImageGallerySearchQuery] = useState('');
     const [isDeletingImage, setIsDeletingImage] = useState<string | null>(null);
     const [galleryPage, setGalleryPage] = useState<number>(1);

@@ -45,6 +45,11 @@ const STATIC_PRODUCT = {
 
 vi.mock('@/lib/products', () => ({
     PRODUCTOS: [STATIC_PRODUCT],
+    isDisallowedSize: (size?: string | null) => {
+        if (!size) return false;
+        const normalized = size.trim().toUpperCase().replace(/\s+/g, '');
+        return normalized === '1L' || normalized === '1LITRO' || normalized === '1000ML';
+    },
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -603,4 +608,68 @@ describe('Filtro de extensiones de imagen — lógica pura', () => {
     it('rechaza sin extensión',  () => expect(isValidImage('sinext')).toBe(false));
     it('rechaza .env (archivo oculto)', () => expect(isValidImage('.env')).toBe(false));
     it('es insensible a mayúsculas de extensión (.JPG)', () => expect(isValidImage('foto.JPG')).toBe(true));
+});
+
+// ─── Exclusión estricta de 1 Litro / 1L ────────────────────────────────────────
+
+describe('Exclusión y sanitización de tamaño 1L (1 Litro)', () => {
+    it('isDisallowedSize identifica correctamente variaciones de 1 Litro', async () => {
+        const { isDisallowedSize } = await import('@/lib/products-service');
+        expect(isDisallowedSize('1L')).toBe(true);
+        expect(isDisallowedSize('1l')).toBe(true);
+        expect(isDisallowedSize(' 1 L ')).toBe(true);
+        expect(isDisallowedSize('1Litro')).toBe(true);
+        expect(isDisallowedSize('1 LITRO')).toBe(true);
+        expect(isDisallowedSize('1000ml')).toBe(true);
+        expect(isDisallowedSize('1000 ML')).toBe(true);
+
+        // Tamaños válidos permitidos
+        expect(isDisallowedSize('1/2G')).toBe(false);
+        expect(isDisallowedSize('3.8L')).toBe(false);
+        expect(isDisallowedSize('10L')).toBe(false);
+        expect(isDisallowedSize('20L')).toBe(false);
+        expect(isDisallowedSize('500ML')).toBe(false);
+        expect(isDisallowedSize('COMBO')).toBe(false);
+    });
+
+    it('sanitizeProductSizes elimina 1L de precios, competidorPromedio, stock y imgFiles', async () => {
+        const { sanitizeProductSizes } = await import('@/lib/products-service');
+        const rawProduct: any = {
+            id: 'alcohol-glicerinado-70',
+            nombre: 'Alcohol Glicerinado 70%',
+            precios: {
+                '1L': 16000,
+                '1/2G': 28000,
+                '3.8L': 45000,
+                '20L': 190000
+            },
+            competidorPromedio: {
+                '1L': 22000,
+                '3.8L': 55000
+            },
+            stock: {
+                '1L': 10,
+                '3.8L': 25
+            },
+            imgFiles: {
+                '1L': 'alcohol-1l.webp',
+                '20L': 'alcohol-20l.webp'
+            }
+        };
+
+        const cleaned = sanitizeProductSizes(rawProduct);
+        expect(cleaned.precios['1L']).toBeUndefined();
+        expect(cleaned.precios['1/2G']).toBe(28000);
+        expect(cleaned.precios['3.8L']).toBe(45000);
+        expect(cleaned.precios['20L']).toBe(190000);
+
+        expect(cleaned.competidorPromedio['1L']).toBeUndefined();
+        expect(cleaned.competidorPromedio['3.8L']).toBe(55000);
+
+        expect(cleaned.stock['1L']).toBeUndefined();
+        expect(cleaned.stock['3.8L']).toBe(25);
+
+        expect(cleaned.imgFiles['1L']).toBeUndefined();
+        expect(cleaned.imgFiles['20L']).toBe('alcohol-20l.webp');
+    });
 });

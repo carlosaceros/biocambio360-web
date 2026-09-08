@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ShoppingCart, Search, Plus, Minus } from 'lucide-react';
-import { Product, ProductSize, calcularAhorro, formatCurrency } from '@/lib/products';
+import { Product, ProductSize, calcularAhorro, formatCurrency, isDisallowedSize } from '@/lib/products';
 import { generateProductSlug, getProductImage } from '@/lib/product-utils';
 
 interface ProductCardProps {
@@ -13,11 +13,11 @@ interface ProductCardProps {
     onViewDetails?: (product: Product) => void;
 }
 
-// Top 5 most purchased sizes displayed in the initial catalog grid
-const TOP_SIZES: ProductSize[] = ['1L', '1/2G', '3.8L', '10L', '20L'];
+// Top most purchased sizes displayed in the initial catalog grid
+const TOP_SIZES: ProductSize[] = ['1/2G', '3.8L', '10L', '20L'];
 
 // Ordered from smallest to largest
-const SIZE_ORDER: ProductSize[] = ['1L', '1/2G', '3.8L', '10L', '20L'];
+const SIZE_ORDER: ProductSize[] = ['1/2G', '3.8L', '10L', '20L'];
 
 // Human-readable label for each size
 const SIZE_LABELS: Record<string, string> = {
@@ -51,33 +51,35 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
 
     if (!product || !product.id) return null;
 
-    // Get all sizes sorted by size order
-    const allSizes = Object.keys(product.precios || {}).sort(
-        (a, b) => (SIZE_ORDER.indexOf(a as ProductSize) !== -1 ? SIZE_ORDER.indexOf(a as ProductSize) : 99) - 
-                  (SIZE_ORDER.indexOf(b as ProductSize) !== -1 ? SIZE_ORDER.indexOf(b as ProductSize) : 99)
-    );
+    // Get all sizes sorted by size order (strictly excluding 1L)
+    const allSizes = Object.keys(product.precios || {})
+        .filter(s => !isDisallowedSize(s))
+        .sort(
+            (a, b) => (SIZE_ORDER.indexOf(a as ProductSize) !== -1 ? SIZE_ORDER.indexOf(a as ProductSize) : 99) - 
+                      (SIZE_ORDER.indexOf(b as ProductSize) !== -1 ? SIZE_ORDER.indexOf(b as ProductSize) : 99)
+        );
     
-    // Filter to top 5 most purchased sizes for grid view
+    // Filter to most purchased sizes for grid view
     const mainSizes = allSizes.filter(s => TOP_SIZES.includes(s as ProductSize));
     const displaySizes = mainSizes.length > 0 ? mainSizes : allSizes;
 
     const initialSize = (product.precios && product.precios[displaySizes[0]] !== undefined) 
         ? displaySizes[0] 
-        : (Object.keys(product.precios || {})[0] || '3.8L');
+        : (displaySizes[0] || '3.8L');
 
     const [selectedSize, setSelectedSize] = useState<string>(initialSize);
 
     // Keep selectedSize synchronized with valid keys of current product
     useEffect(() => {
-        if (!product.precios || product.precios[selectedSize] === undefined) {
-            const fallback = displaySizes[0] || Object.keys(product.precios || {})[0] || '3.8L';
+        if (!product.precios || product.precios[selectedSize] === undefined || isDisallowedSize(selectedSize)) {
+            const fallback = displaySizes[0] || '3.8L';
             setSelectedSize(fallback);
         }
     }, [product, displaySizes, selectedSize]);
 
-    const effectiveSize = (product.precios && product.precios[selectedSize] !== undefined)
+    const effectiveSize = (product.precios && product.precios[selectedSize] !== undefined && !isDisallowedSize(selectedSize))
         ? selectedSize
-        : (displaySizes[0] || Object.keys(product.precios || {})[0] || selectedSize);
+        : (displaySizes[0] || selectedSize);
 
     const currentPrice = product.precios?.[effectiveSize] 
         || product.precios?.[displaySizes[0]] 
