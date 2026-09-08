@@ -195,7 +195,12 @@ export function generateProductMetadata(product: Product, size?: string): Metada
         description = `Compra ${product.nombre} ${selectedSize} a precio directo de fábrica ($${price.toLocaleString('es-CO')}). ${product.descripcion} Envíos a Bogotá, Cundinamarca y Colombia.`;
     }
 
-    const absoluteImageUrl = `${BASE_URL}/images/${product.imgFile.replace(/%20/g, ' ')}`;
+    const effectiveImg = (product.imgFile && product.imgFile !== 'placeholder.png' && !product.imgFile.includes('placeholder'))
+        ? product.imgFile.replace(/%20/g, ' ')
+        : 'logo-biocambio360.png';
+    const absoluteImageUrl = effectiveImg.startsWith('http')
+        ? effectiveImg
+        : `${BASE_URL}/images/${effectiveImg}`;
 
     return {
         title,
@@ -1474,13 +1479,13 @@ const SIZE_VOLUMES: Record<string, number> = {
  * distance to all configured sizes and returns the image filename of the closest size.
  */
 export function getProductImage(product: Product | null | undefined, selectedSize: string): string {
-    if (!product) return 'placeholder.png';
+    if (!product) return 'logo-biocambio360.png';
     const size = selectedSize || 'DEFAULT';
     
     // 1. If product has custom size images mapped
     if (product.imgFiles && Object.keys(product.imgFiles).length > 0) {
         // 1.1 Direct match
-        if (product.imgFiles[size]) {
+        if (product.imgFiles[size] && product.imgFiles[size] !== 'placeholder.png') {
             return product.imgFiles[size];
         }
         
@@ -1493,7 +1498,7 @@ export function getProductImage(product: Product | null | undefined, selectedSiz
         let minDiff = Infinity;
         
         for (const [sizeKey, imgFilename] of Object.entries(product.imgFiles)) {
-            if (!imgFilename || imgFilename === 'placeholder.png') continue;
+            if (!imgFilename || imgFilename === 'placeholder.png' || imgFilename.includes('placeholder')) continue;
             const sizeKeyUpper = sizeKey.toUpperCase();
             const sizeVolume = SIZE_VOLUMES[sizeKeyUpper] !== undefined
                 ? SIZE_VOLUMES[sizeKeyUpper]
@@ -1512,11 +1517,15 @@ export function getProductImage(product: Product | null | undefined, selectedSiz
     }
     
     // 2. Legacy fallback
-    if (size === '3.8L' && product.imgFileSmall) {
+    if (size === '3.8L' && product.imgFileSmall && product.imgFileSmall !== 'placeholder.png') {
         return product.imgFileSmall;
     }
     
-    return product.imgFile || 'placeholder.png';
+    if (product.imgFile && product.imgFile !== 'placeholder.png' && !product.imgFile.includes('placeholder')) {
+        return product.imgFile;
+    }
+
+    return 'logo-biocambio360.png';
 }
 
 

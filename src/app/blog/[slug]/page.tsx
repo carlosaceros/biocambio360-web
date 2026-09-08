@@ -26,6 +26,25 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
         title: `${post.title} | Academia Biocambio360`,
         description: post.summary,
         keywords: [post.category.toLowerCase(), post.geoTarget.toLowerCase(), 'productos de aseo', 'biocambio360'],
+        openGraph: {
+            title: `${post.title} | Biocambio360`,
+            description: post.summary,
+            type: 'article',
+            images: [
+                {
+                    url: '/images/og-biocambio360.png',
+                    width: 1200,
+                    height: 630,
+                    alt: post.title
+                }
+            ]
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: `${post.title} | Biocambio360`,
+            description: post.summary,
+            images: ['/images/og-biocambio360.png']
+        }
     };
 }
 

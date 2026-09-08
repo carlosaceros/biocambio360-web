@@ -76,15 +76,32 @@ export async function GET(
             console.error('[API/images] Error reading from Firestore product_images:', dbErr);
         }
 
-        // 3. Fallback: placeholder
-        const placeholderPath = path.join(process.cwd(), 'public', 'images', 'placeholder.png');
-        if (fs.existsSync(placeholderPath)) {
-            const placeholderBuffer = await fs.promises.readFile(placeholderPath);
-            return new NextResponse(placeholderBuffer, {
+        // 3. Fallback: Si no se encuentra la imagen en disco ni en Firestore,
+        // por defecto entregar la imagen OG oficial o el logo de Biocambio360
+        const isOgRequest = filename.toLowerCase().includes('og') || filename.toLowerCase().includes('opengraph') || filename.toLowerCase().includes('social');
+        const primaryFallback = isOgRequest ? 'og-biocambio360.png' : 'logo-biocambio360.png';
+        const primaryPath = path.join(process.cwd(), 'public', 'images', primaryFallback);
+
+        if (fs.existsSync(primaryPath)) {
+            const buffer = await fs.promises.readFile(primaryPath);
+            return new NextResponse(buffer, {
                 status: 200,
                 headers: {
                     'Content-Type': 'image/png',
-                    'Cache-Control': 'public, max-age=3600',
+                    'Cache-Control': 'public, max-age=86400',
+                },
+            });
+        }
+
+        // Fallback secundario: logo oficial
+        const logoPath = path.join(process.cwd(), 'public', 'images', 'logo-biocambio360.png');
+        if (fs.existsSync(logoPath)) {
+            const logoBuffer = await fs.promises.readFile(logoPath);
+            return new NextResponse(logoBuffer, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'image/png',
+                    'Cache-Control': 'public, max-age=86400',
                 },
             });
         }

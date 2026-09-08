@@ -50,6 +50,12 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         alt: "Biocambio360 — Limpieza Industrial Premium"
+      },
+      {
+        url: `${BASE_URL}/images/logo-biocambio360.png`,
+        width: 1415,
+        height: 894,
+        alt: "Logo Biocambio360"
       }
     ]
   },
@@ -57,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Biocambio360 — Limpieza Industrial de Calidad Premium",
     description: "Productos de limpieza concentrados. Fábrica propia en Soacha, Colombia.",
-    images: [`${BASE_URL}/images/og-biocambio360.png`]
+    images: [`${BASE_URL}/images/og-biocambio360.png`, `${BASE_URL}/images/logo-biocambio360.png`]
   },
   robots: {
     index: true,
