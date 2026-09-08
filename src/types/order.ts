@@ -69,11 +69,13 @@ export interface WompiTransactionDetails {
 export interface AddiTransactionDetails {
     applicationId?: string;
     orderId?: string;
+    attemptId?: string;
     status?: 'APPROVED' | 'REJECTED' | 'DECLINED' | 'PENDING' | string;
-    approvedAmount?: number;
+    approvedAmount?: number | string;
     currency?: string;
     updatedAt?: string;
     raw?: any;
+    note?: string;
 }
 
 export interface Order {
