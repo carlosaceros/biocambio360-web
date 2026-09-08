@@ -132,6 +132,7 @@ export default function AnalisisFinancieroPage() {
         let grossSales = 0;
         let deliveredSales = 0;
         let wompiSales = 0;
+        let addiSales = 0;
         let cashSales = 0;
         let shippingRevenue = 0;
         let couponDiscounts = 0;
@@ -172,12 +173,14 @@ export default function AnalisisFinancieroPage() {
                     couponDiscounts += order.cuponAplicado.discountAmount;
                 }
 
-                if (st === 'entregado' || order.wompiTransaction?.status === 'APPROVED') {
+                if (st === 'entregado' || order.wompiTransaction?.status === 'APPROVED' || order.addiTransaction?.status === 'APPROVED') {
                     deliveredSales += (order.total || 0);
                 }
 
                 if (order.metodoPago === 'wompi') {
                     wompiSales += (order.total || 0);
+                } else if (order.metodoPago === 'addi') {
+                    addiSales += (order.total || 0);
                 } else {
                     cashSales += (order.total || 0);
                 }
@@ -260,6 +263,7 @@ export default function AnalisisFinancieroPage() {
             grossSales,
             deliveredSales,
             wompiSales,
+            addiSales,
             cashSales,
             shippingRevenue,
             couponDiscounts,
@@ -294,6 +298,8 @@ export default function AnalisisFinancieroPage() {
             'Metodo Pago',
             'Estado Wompi',
             'ID Transaccion Wompi',
+            'Estado Addi',
+            'ID Solicitud Addi',
             'Cupon Codigo',
             'Descuento Cupon',
             'Subtotal',
@@ -323,6 +329,8 @@ export default function AnalisisFinancieroPage() {
                 `"${o.metodoPago || ''}"`,
                 `"${o.wompiTransaction?.status || 'N/A'}"`,
                 `"${o.wompiTransaction?.id || ''}"`,
+                `"${o.addiTransaction?.status || 'N/A'}"`,
+                `"${o.addiTransaction?.applicationId || ''}"`,
                 `"${o.cuponAplicado?.code || ''}"`,
                 o.cuponAplicado?.discountAmount || 0,
                 o.subtotal || 0,
@@ -589,6 +597,24 @@ export default function AnalisisFinancieroPage() {
                                     <div
                                         className="bg-blue-600 h-full rounded-full transition-all"
                                         style={{ width: `${financials.grossSales > 0 ? Math.round((financials.wompiSales / financials.grossSales) * 100) : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* ADDI */}
+                            <div>
+                                <div className="flex justify-between items-center text-xs font-bold mb-1.5">
+                                    <span className="text-slate-800 flex items-center gap-1.5">
+                                        ✨ ADDI (Pago a Cuotas 0% Interés)
+                                    </span>
+                                    <span className="text-purple-700 font-mono">
+                                        {formatCurrency(financials.addiSales)} ({financials.grossSales > 0 ? Math.round((financials.addiSales / financials.grossSales) * 100) : 0}%)
+                                    </span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                                    <div
+                                        className="bg-purple-600 h-full rounded-full transition-all"
+                                        style={{ width: `${financials.grossSales > 0 ? Math.round((financials.addiSales / financials.grossSales) * 100) : 0}%` }}
                                     />
                                 </div>
                             </div>

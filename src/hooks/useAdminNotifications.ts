@@ -45,11 +45,49 @@ function buildOrderNotification(docId: string, data: Order): AdminNotification {
     const customerName = data.cliente?.nombre || 'Cliente';
     const total = formatPrice(data.total || 0);
     const isWompi = data.metodoPago === 'wompi';
+    const isAddi = data.metodoPago === 'addi';
     const wompiStatus = (data.wompiTransaction?.status || '').toUpperCase();
     const isWompiApproved = wompiStatus === 'APPROVED' || data.status === 'confirmado';
     const isWompiDeclined = wompiStatus === 'DECLINED' || wompiStatus === 'ERROR' || wompiStatus === 'VOIDED' || data.status === 'cancelado';
 
-    if (isWompi) {
+    const addiStatus = (data.addiTransaction?.status || '').toUpperCase();
+    const isAddiApproved = addiStatus === 'APPROVED' || (isAddi && data.status === 'confirmado');
+    const isAddiDeclined = addiStatus === 'DECLINED' || addiStatus === 'REJECTED' || (isAddi && data.status === 'cancelado');
+
+    if (isAddi) {
+        if (isAddiApproved) {
+            const appId = data.addiTransaction?.applicationId || '';
+            return {
+                id: `${docId}_addi_appr_${Date.now()}`,
+                title: '🔵 ¡Crédito Aprobado en ADDI!',
+                body: `${customerName} · ${total} aprobado a cuotas (0% interés) ${appId ? `(Solicitud: ${appId.slice(-6)})` : ''}`,
+                timestamp: safeToDate(data.updatedAt || data.createdAt),
+                read: false,
+                type: 'payment_confirmed',
+                orderId: docId,
+            };
+        } else if (isAddiDeclined) {
+            return {
+                id: `${docId}_addi_decl_${Date.now()}`,
+                title: '🔴 Solicitud ADDI No Aprobada / Cancelada',
+                body: `${customerName} · ${total} cancelada o declinada en Addi`,
+                timestamp: safeToDate(data.updatedAt || data.createdAt),
+                read: false,
+                type: 'payment_declined',
+                orderId: docId,
+            };
+        } else {
+            return {
+                id: `${docId}_addi_pend_${Date.now()}`,
+                title: '🟣 Solicitud ADDI Iniciada (Pendiente)',
+                body: `${customerName} · ${total} (Validación de crédito iniciada en Addi)`,
+                timestamp: safeToDate(data.createdAt),
+                read: false,
+                type: 'payment_pending',
+                orderId: docId,
+            };
+        }
+    } else if (isWompi) {
         if (isWompiApproved) {
             const wompiId = data.wompiTransaction?.id || (data as any).wompiTransactionId || '';
             return {

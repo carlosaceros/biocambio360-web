@@ -35,16 +35,34 @@ export async function POST(request: Request) {
             style: 'currency', currency: 'COP', maximumFractionDigits: 0
         }) || '';
 
-        const isOnline = metodoPago === 'wompi';
+        const isWompi = metodoPago === 'wompi';
+        const isAddi = metodoPago === 'addi';
+        const isOnline = isWompi || isAddi;
+
+        const pushTitle = isAddi
+            ? '🟣 Pedido ADDI (Solicitud Iniciada)'
+            : isWompi
+            ? '🟡 Pedido Wompi (Checkout Iniciado)'
+            : '🛒 ¡Nuevo Pedido Contraentrega!';
+
+        const pushBody = isAddi
+            ? `${customerName} · ${formattedTotal} (Pendiente de validación en Addi)`
+            : isWompi
+            ? `${customerName} · ${formattedTotal} (Pendiente de confirmación de pasarela)`
+            : `${customerName} · ${formattedTotal} (Pago en efectivo al entregar)`;
 
         // 1. Push notification to admin (fire and forget)
         sendAdminPushNotification({
-            title: isOnline ? '🟡 Pedido Wompi (Checkout Iniciado)' : '🛒 ¡Nuevo Pedido Contraentrega!',
-            body: isOnline
-                ? `${customerName} · ${formattedTotal} (Pendiente de confirmación de pasarela)`
-                : `${customerName} · ${formattedTotal} (Pago en efectivo al entregar)`,
+            title: pushTitle,
+            body: pushBody,
             data: { orderId, type: isOnline ? 'payment_pending' : 'new_order' },
         }).catch(e => console.warn('[FCM] Push failed (non-fatal):', e));
+
+        const displayPaymentMethod = isAddi
+            ? 'ADDI - Pago a Cuotas (0% Interés)'
+            : isWompi
+            ? 'Tarjeta / Wompi'
+            : 'Pago Contraentrega (Efectivo/Nequi)';
 
         // 2. Email confirmation to customer
         if (customerEmail) {
@@ -55,7 +73,7 @@ export async function POST(request: Request) {
                     customerEmail,
                     total,
                     items: productos || items || [],
-                    metodoPago: metodoPago || 'Tarjeta / Wompi',
+                    metodoPago: displayPaymentMethod,
                     direccionEnvio: {
                         direccion: direccion || 'N/A',
                         ciudad: ciudad || 'N/A',
@@ -72,7 +90,7 @@ export async function POST(request: Request) {
                 orderId,
                 customerName,
                 total,
-                metodoPago,
+                metodoPago: displayPaymentMethod,
                 ciudad,
                 customerEmail,
                 telefono,

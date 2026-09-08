@@ -32,6 +32,7 @@ export async function POST(request: Request) {
         try {
             const db = getAdminDB();
             await db.collection('orders').doc(orderId).set({
+                metodoPago: 'addi',
                 addiTransaction: {
                     attemptId: result.orderAttemptId,
                     applicationId: result.applicationId || null,

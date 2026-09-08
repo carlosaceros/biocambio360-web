@@ -29,13 +29,25 @@ export async function GET(request: Request) {
         }
 
         const data = orderDoc.data()!;
+        const addiStatus = data.addiTransaction?.status || (data.status === 'cancelado' ? 'DECLINED' : data.status === 'confirmado' ? 'APPROVED' : 'PENDING');
+        let message = 'Solicitud registrada con método de pago ADDI';
+
+        if (addiStatus === 'APPROVED') {
+            const amount = data.addiTransaction?.approvedAmount || data.total || 0;
+            message = `Crédito ADDI APROBADO ($${Number(amount).toLocaleString('es-CO')})`;
+        } else if (addiStatus === 'DECLINED' || addiStatus === 'REJECTED') {
+            message = 'Solicitud DECLINADA o cancelada por el usuario en ADDI';
+        } else if (addiStatus === 'PENDING') {
+            message = 'Solicitud en trámite en ADDI (Pendiente de validación)';
+        }
 
         return NextResponse.json({
             found: true,
             orderId,
             orderStatus: data.status,
             addiTransaction: data.addiTransaction || null,
-            metodoPago: data.metodoPago
+            metodoPago: data.metodoPago || 'addi',
+            message
         });
     } catch (error: any) {
         console.error('[AddiStatus] Error consultando estado Addi:', error);

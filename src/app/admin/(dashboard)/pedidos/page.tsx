@@ -204,6 +204,21 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                             <CreditCard size={11} className="text-blue-600" />
                             {order.wompiTransaction?.status === 'APPROVED' ? 'Wompi: Pagado' : 'Wompi'}
                         </span>
+                    ) : order.metodoPago === 'addi' ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                            order.addiTransaction?.status === 'APPROVED'
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : order.addiTransaction?.status === 'DECLINED' || order.addiTransaction?.status === 'REJECTED' || order.status === 'cancelado'
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                            <span className="text-[10px]">✨</span>
+                            {order.addiTransaction?.status === 'APPROVED'
+                                ? 'Addi: Pagado'
+                                : order.addiTransaction?.status === 'DECLINED' || order.addiTransaction?.status === 'REJECTED' || order.status === 'cancelado'
+                                ? 'Addi: Cancelado'
+                                : 'Addi: Cuotas'}
+                        </span>
                     ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
                             💵 Contraentrega
@@ -346,6 +361,29 @@ export default function PedidosPage() {
         }
     };
 
+    const [isCheckingAddi, setIsCheckingAddi] = useState(false);
+    const [addiStatusFeedback, setAddiStatusFeedback] = useState<string | null>(null);
+
+    const handleCheckAddi = async (orderId: string) => {
+        setIsCheckingAddi(true);
+        setAddiStatusFeedback(null);
+        try {
+            const res = await fetch(`/api/admin/addi-status?orderId=${orderId}`);
+            const data = await res.json();
+            if (data.addiTransaction) {
+                setActiveOrder(prev => prev && prev.id === orderId ? { ...prev, addiTransaction: data.addiTransaction, status: data.orderStatus || prev.status } : prev);
+                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, addiTransaction: data.addiTransaction, status: data.orderStatus || o.status } : o));
+                setAddiStatusFeedback(`✅ Sincronizado: ${data.addiTransaction.status || data.orderStatus}`);
+            } else {
+                setAddiStatusFeedback(`ℹ️ ${data.message || 'Sin transacción Addi confirmada aún'}`);
+            }
+        } catch (e: any) {
+            setAddiStatusFeedback(`❌ Error al consultar Addi: ${e.message}`);
+        } finally {
+            setIsCheckingAddi(false);
+        }
+    };
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -481,7 +519,10 @@ export default function PedidosPage() {
             order.id.toLowerCase().includes(query) ||
             order.cliente.nombre.toLowerCase().includes(query) ||
             order.cliente.celular.includes(query) ||
-            order.cliente.ciudad.toLowerCase().includes(query)
+            order.cliente.ciudad.toLowerCase().includes(query) ||
+            (order.metodoPago && order.metodoPago.toLowerCase().includes(query)) ||
+            (order.addiTransaction?.status && order.addiTransaction.status.toLowerCase().includes(query)) ||
+            (order.wompiTransaction?.status && order.wompiTransaction.status.toLowerCase().includes(query))
         );
     });
 
@@ -813,35 +854,43 @@ export default function PedidosPage() {
                                             </div>
                                         </div>
 
-                                        {/* Payment Method & Wompi Technical Transaction Card */}
+                                        {/* Payment Method & Technical Transaction Card */}
                                         <div>
                                             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                <CreditCard className="text-blue-600" size={18} />
+                                                <CreditCard className={activeOrder.metodoPago === 'addi' ? 'text-purple-600' : activeOrder.metodoPago === 'wompi' ? 'text-blue-600' : 'text-amber-600'} size={18} />
                                                 Método de Pago & Transacción
                                             </h3>
                                             <div className={`border rounded-xl p-4 space-y-3 ${
-                                                activeOrder.metodoPago === 'wompi'
+                                                activeOrder.metodoPago === 'addi'
+                                                    ? 'bg-purple-50/40 border-purple-200'
+                                                    : activeOrder.metodoPago === 'wompi'
                                                     ? 'bg-blue-50/40 border-blue-200'
                                                     : 'bg-amber-50/40 border-amber-200'
                                             }`}>
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xl">
-                                                            {activeOrder.metodoPago === 'wompi' ? '💳' : '💵'}
+                                                            {activeOrder.metodoPago === 'addi' ? '✨' : activeOrder.metodoPago === 'wompi' ? '💳' : '💵'}
                                                         </span>
                                                         <div>
                                                             <p className="font-black text-gray-900 text-sm">
-                                                                {activeOrder.metodoPago === 'wompi'
+                                                                {activeOrder.metodoPago === 'addi'
+                                                                    ? 'Pago a Cuotas con ADDI'
+                                                                    : activeOrder.metodoPago === 'wompi'
                                                                     ? 'Pago en Línea (Wompi)'
                                                                     : 'Pago Contraentrega (Efectivo/Nequi)'}
                                                             </p>
                                                             <p className="text-xs text-gray-500">
-                                                                {activeOrder.metodoPago === 'wompi'
+                                                                {activeOrder.metodoPago === 'addi'
+                                                                    ? 'Pasarela ADDI · 0% Interés en hasta 3 cuotas'
+                                                                    : activeOrder.metodoPago === 'wompi'
                                                                     ? 'Pasarela Wompi · Bancolombia'
                                                                     : 'Cobro por repartidor / transportadora'}
                                                             </p>
                                                         </div>
                                                     </div>
+
+                                                    {/* Badge de Estado Wompi */}
                                                     {activeOrder.metodoPago === 'wompi' && (
                                                         <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase flex items-center gap-1 ${
                                                             activeOrder.wompiTransaction?.status === 'APPROVED'
@@ -857,9 +906,27 @@ export default function PedidosPage() {
                                                                 : '⏳ SIN PAGO EN PASARELA'}
                                                         </span>
                                                     )}
+
+                                                    {/* Badge de Estado Addi */}
+                                                    {activeOrder.metodoPago === 'addi' && (
+                                                        <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase flex items-center gap-1 ${
+                                                            activeOrder.addiTransaction?.status === 'APPROVED'
+                                                                ? 'bg-green-100 text-green-800 border border-green-300'
+                                                                : activeOrder.addiTransaction?.status === 'DECLINED' || activeOrder.addiTransaction?.status === 'REJECTED' || activeOrder.status === 'cancelado'
+                                                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                                        }`}>
+                                                            {activeOrder.addiTransaction?.status === 'APPROVED'
+                                                                ? '✅ CRÉDITO APROBADO (ADDI)'
+                                                                : activeOrder.addiTransaction?.status === 'DECLINED' || activeOrder.addiTransaction?.status === 'REJECTED' || activeOrder.status === 'cancelado'
+                                                                ? '❌ SOLICITUD CANCELADA / RECHAZADA'
+                                                                : '⏳ SOLICITUD EN TRÁMITE / PENDIENTE'}
+                                                        </span>
+                                                    )}
                                                 </div>
 
-                                                {activeOrder.metodoPago === 'wompi' ? (
+                                                {/* Detalle Wompi */}
+                                                {activeOrder.metodoPago === 'wompi' && (
                                                     <div className="bg-white rounded-lg p-3.5 border border-blue-100 space-y-3 text-xs">
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div>
@@ -939,7 +1006,114 @@ export default function PedidosPage() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                ) : (
+                                                )}
+
+                                                {/* Detalle Addi */}
+                                                {activeOrder.metodoPago === 'addi' && (
+                                                    <div className="bg-white rounded-lg p-3.5 border border-purple-100 space-y-3 text-xs">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div>
+                                                                <span className="text-gray-500 block font-medium">Referencia Pedido:</span>
+                                                                <span className="font-mono font-bold text-gray-900 break-all">{activeOrder.id}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-gray-500 block font-medium">ID Solicitud Addi:</span>
+                                                                <span className={`font-mono font-bold break-all ${activeOrder.addiTransaction?.applicationId ? 'text-purple-700' : 'text-gray-500'}`}>
+                                                                    {activeOrder.addiTransaction?.applicationId || 'Sin ID asignado aún'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                                                            <div>
+                                                                <span className="text-gray-500 block font-medium">Estado en Addi:</span>
+                                                                <span className={`font-black uppercase ${
+                                                                    activeOrder.addiTransaction?.status === 'APPROVED'
+                                                                        ? 'text-green-700'
+                                                                        : activeOrder.addiTransaction?.status === 'DECLINED' || activeOrder.addiTransaction?.status === 'REJECTED' || activeOrder.status === 'cancelado'
+                                                                        ? 'text-red-700'
+                                                                        : 'text-amber-700'
+                                                                }`}>
+                                                                    {activeOrder.addiTransaction?.status || (activeOrder.status === 'cancelado' ? 'DECLINED' : 'PENDING')}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-gray-500 block font-medium">Monto Aprobado Addi:</span>
+                                                                <span className="font-black text-gray-900">
+                                                                    {formatCurrency(
+                                                                        activeOrder.addiTransaction?.approvedAmount != null
+                                                                            ? Number(activeOrder.addiTransaction.approvedAmount)
+                                                                            : (activeOrder.addiTransaction?.status === 'APPROVED' ? activeOrder.total : 0)
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {activeOrder.addiTransaction?.attemptId && (
+                                                            <div className="pt-2 border-t border-gray-100">
+                                                                <span className="text-gray-500 block text-[11px]">ID de Intento Interno:</span>
+                                                                <span className="font-mono text-gray-600 text-[11px] break-all">{activeOrder.addiTransaction.attemptId}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Status explanation for Admin / Logistics */}
+                                                        {activeOrder.addiTransaction?.status === 'APPROVED' ? (
+                                                            <div className="p-2.5 bg-green-50 border border-green-200 rounded-lg text-green-900 flex items-start gap-2">
+                                                                <span className="text-base leading-none">✅</span>
+                                                                <div>
+                                                                    <p className="font-bold">Crédito 100% verificado y aprobado por ADDI</p>
+                                                                    <p className="text-[11px] text-green-700 mt-0.5">
+                                                                        Addi transfiere los fondos a Biocambio360. <strong>NO cobrar ningún valor al cliente al momento de la entrega</strong>. Despachar este pedido con normalidad.
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        ) : activeOrder.addiTransaction?.status === 'DECLINED' || activeOrder.addiTransaction?.status === 'REJECTED' || activeOrder.status === 'cancelado' ? (
+                                                            <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-900 space-y-1">
+                                                                <div className="flex items-center gap-1.5 font-bold text-[11px] text-red-800">
+                                                                    <span>❌ Solicitud Cancelada o Declinada en ADDI:</span>
+                                                                </div>
+                                                                <p className="text-[11px] text-red-800 leading-snug">
+                                                                    El cliente canceló el proceso o la solicitud de crédito no fue aprobada por la pasarela de Addi.
+                                                                </p>
+                                                                <p className="text-[11px] text-red-900 font-medium">
+                                                                    • <strong>NO despachar este pedido</strong> a menos que el cliente acuerde pagar contraentrega o por transferencia.<br />
+                                                                    • Puedes contactarlo por WhatsApp para brindarle alternativas de compra.
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 space-y-1">
+                                                                <div className="flex items-center gap-1.5 font-bold text-[11px] text-amber-800">
+                                                                    <span>⏳ Solicitud en Trámite:</span>
+                                                                </div>
+                                                                <p className="text-[11px] text-amber-800 leading-snug">
+                                                                    El cliente inició la solicitud en Addi pero aún no se ha registrado confirmación final.
+                                                                </p>
+                                                                <p className="text-[11px] text-amber-900 font-medium">
+                                                                    • Pulsa el botón morado <strong>"Consultar / Sincronizar en ADDI"</strong> para refrescar el estado en vivo.
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Live check button */}
+                                                        <div className="pt-2 flex items-center justify-between gap-2 flex-wrap border-t border-gray-100">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleCheckAddi(activeOrder.id)}
+                                                                disabled={isCheckingAddi}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                            >
+                                                                <RefreshCw size={13} className={isCheckingAddi ? 'animate-spin' : ''} />
+                                                                {isCheckingAddi ? 'Consultando Addi...' : '🔍 Consultar / Sincronizar en ADDI'}
+                                                            </button>
+                                                            {addiStatusFeedback && (
+                                                                <span className="text-[11px] font-bold text-gray-700">{addiStatusFeedback}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Detalle Contraentrega */}
+                                                {activeOrder.metodoPago === 'contraentrega' && (
                                                     <div className="bg-white rounded-lg p-3 border border-amber-100 text-xs text-amber-900 space-y-1">
                                                         <p className="font-bold flex items-center gap-1">
                                                             ⚠️ Cobro en destino: {formatCurrency(activeOrder.total)}
