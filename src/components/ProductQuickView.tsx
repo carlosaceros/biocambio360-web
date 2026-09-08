@@ -14,11 +14,9 @@ interface ProductQuickViewProps {
     onAddToCart: (product: Product, size: string, price: number, cantidad: number) => void;
 }
 
-const SIZE_ORDER: string[] = ['500ML', '1/2G', '3.8L', '10L', '20L'];
+const SIZE_ORDER: string[] = ['1/2G', '3.8L', '10L', '20L'];
 
 const SIZE_LABELS: Record<string, string> = {
-    '500ML': '500 ML',
-    '1L':    '1 L',
     '1/2G':  '½ Gal',
     '3.8L':  '1 Gal',
     '10L':   '10 L',

@@ -2,12 +2,20 @@
 export type ProductSize = '1/2G' | '3.8L' | '10L' | '20L';
 
 /**
- * Checks if a size key is disallowed across all products (specifically 1 Liter / 1L / 1000ml).
+ * Checks if a size key is disallowed across all products (specifically 1 Liter / 1L and 500ml / 500ML).
  */
 export function isDisallowedSize(size?: string | null): boolean {
     if (!size) return false;
     const normalized = size.trim().toUpperCase().replace(/\s+/g, '');
-    return normalized === '1L' || normalized === '1LITRO' || normalized === '1000ML';
+    return (
+        normalized === '1L' ||
+        normalized === '1LITRO' ||
+        normalized === '1000ML' ||
+        normalized === '500ML' ||
+        normalized === '500' ||
+        normalized === '0.5L' ||
+        normalized === '500CC'
+    );
 }
 
 export interface FAQ {

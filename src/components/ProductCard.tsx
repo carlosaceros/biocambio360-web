@@ -21,12 +21,10 @@ const SIZE_ORDER: ProductSize[] = ['1/2G', '3.8L', '10L', '20L'];
 
 // Human-readable label for each size
 const SIZE_LABELS: Record<string, string> = {
-    '1L':   '1 L',
     '1/2G': '½ Gal',
     '3.8L': '1 Gal',
     '10L':  '10 L',
     '20L':  '20 L 🔥',
-    '500ML': '500 ml',
     '60ML': '60 ml',
     '15L': '15 L',
     '1KG': '1 Kg',

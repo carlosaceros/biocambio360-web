@@ -11,7 +11,7 @@ import {
     ClipboardList, FlaskConical, Lightbulb, BookOpen, Shield,
     ChevronLeft, ChevronRight, UploadCloud
 } from 'lucide-react';
-import { Product, UsageRow, SchwartzCopyData, ManualContentData } from '@/lib/products';
+import { Product, UsageRow, SchwartzCopyData, ManualContentData, isDisallowedSize } from '@/lib/products';
 import { getAllProducts, saveProduct, deleteProduct, updateProductStock, updateProductVisibility, getPriceAuditLogs, PriceAuditLog } from '@/lib/products-service';
 import { getRichProductDetails, getSchwartzCopy } from '@/lib/product-utils';
 import { getManualContentForProduct } from '@/lib/products-rich-data';
@@ -795,6 +795,10 @@ export default function InventoryAdminPage() {
     const handleAddSize = (size: string) => {
         if (!size.trim() || !editingProduct) return;
         const cleanSize = size.trim();
+        if (isDisallowedSize(cleanSize)) {
+            alert('Las presentaciones de 1 Litro y 500 ml están deshabilitadas por política de marca.');
+            return;
+        }
         const currentPrices = { ...(editingProduct.precios || {}) };
         const currentCompetitor = { ...(editingProduct.competidorPromedio || {}) };
         const currentStock = { ...(editingProduct.stock || {}) };
@@ -2161,7 +2165,7 @@ Fórmula industrial de grado profesional ideal para ${cat.toLowerCase()} en rest
                                                         type="text"
                                                         value={newSizeInput}
                                                         onChange={e => setNewSizeInput(e.target.value)}
-                                                        placeholder="Ej: 5L o 500ML"
+                                                        placeholder="Ej: 5L o 15L"
                                                         className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-28 text-gray-900 bg-white"
                                                     />
                                                     <button

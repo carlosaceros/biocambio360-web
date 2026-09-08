@@ -48,7 +48,15 @@ vi.mock('@/lib/products', () => ({
     isDisallowedSize: (size?: string | null) => {
         if (!size) return false;
         const normalized = size.trim().toUpperCase().replace(/\s+/g, '');
-        return normalized === '1L' || normalized === '1LITRO' || normalized === '1000ML';
+        return (
+            normalized === '1L' ||
+            normalized === '1LITRO' ||
+            normalized === '1000ML' ||
+            normalized === '500ML' ||
+            normalized === '500' ||
+            normalized === '0.5L' ||
+            normalized === '500CC'
+        );
     },
 }));
 
@@ -610,11 +618,12 @@ describe('Filtro de extensiones de imagen — lógica pura', () => {
     it('es insensible a mayúsculas de extensión (.JPG)', () => expect(isValidImage('foto.JPG')).toBe(true));
 });
 
-// ─── Exclusión estricta de 1 Litro / 1L ────────────────────────────────────────
+// ─── Exclusión estricta de 1 Litro (1L) y 500 ml (500ML) ────────────────────────
 
-describe('Exclusión y sanitización de tamaño 1L (1 Litro)', () => {
-    it('isDisallowedSize identifica correctamente variaciones de 1 Litro', async () => {
+describe('Exclusión y sanitización de tamaños 1L y 500ML', () => {
+    it('isDisallowedSize identifica correctamente variaciones de 1 Litro y 500 ml', async () => {
         const { isDisallowedSize } = await import('@/lib/products-service');
+        // 1 Litro
         expect(isDisallowedSize('1L')).toBe(true);
         expect(isDisallowedSize('1l')).toBe(true);
         expect(isDisallowedSize(' 1 L ')).toBe(true);
@@ -623,53 +632,71 @@ describe('Exclusión y sanitización de tamaño 1L (1 Litro)', () => {
         expect(isDisallowedSize('1000ml')).toBe(true);
         expect(isDisallowedSize('1000 ML')).toBe(true);
 
+        // 500 ml
+        expect(isDisallowedSize('500ML')).toBe(true);
+        expect(isDisallowedSize('500ml')).toBe(true);
+        expect(isDisallowedSize('500 ML')).toBe(true);
+        expect(isDisallowedSize(' 500 ml ')).toBe(true);
+        expect(isDisallowedSize('500')).toBe(true);
+        expect(isDisallowedSize('0.5L')).toBe(true);
+        expect(isDisallowedSize('500CC')).toBe(true);
+
         // Tamaños válidos permitidos
         expect(isDisallowedSize('1/2G')).toBe(false);
         expect(isDisallowedSize('3.8L')).toBe(false);
         expect(isDisallowedSize('10L')).toBe(false);
         expect(isDisallowedSize('20L')).toBe(false);
-        expect(isDisallowedSize('500ML')).toBe(false);
         expect(isDisallowedSize('COMBO')).toBe(false);
     });
 
-    it('sanitizeProductSizes elimina 1L de precios, competidorPromedio, stock y imgFiles', async () => {
+    it('sanitizeProductSizes elimina 1L y 500ML de precios, competidorPromedio, stock y imgFiles', async () => {
         const { sanitizeProductSizes } = await import('@/lib/products-service');
         const rawProduct: any = {
-            id: 'alcohol-glicerinado-70',
-            nombre: 'Alcohol Glicerinado 70%',
+            id: 'lavaloza-liquido',
+            nombre: 'Lavaloza Líquido Concentrado',
             precios: {
-                '1L': 16000,
-                '1/2G': 28000,
-                '3.8L': 45000,
-                '20L': 190000
+                '500ML': 7500,
+                '1L': 12500,
+                '1/2G': 19000,
+                '3.8L': 35000,
+                '10L': 57000,
+                '20L': 86000
             },
             competidorPromedio: {
-                '1L': 22000,
-                '3.8L': 55000
+                '500ML': 11000,
+                '1L': 18000,
+                '3.8L': 45000
             },
             stock: {
+                '500ML': 50,
                 '1L': 10,
                 '3.8L': 25
             },
             imgFiles: {
-                '1L': 'alcohol-1l.webp',
-                '20L': 'alcohol-20l.webp'
+                '500ML': 'lavaloza-500ml.webp',
+                '1L': 'lavaloza-1l.webp',
+                '20L': 'lavaloza-20l.webp'
             }
         };
 
         const cleaned = sanitizeProductSizes(rawProduct);
+        expect(cleaned.precios['500ML']).toBeUndefined();
         expect(cleaned.precios['1L']).toBeUndefined();
-        expect(cleaned.precios['1/2G']).toBe(28000);
-        expect(cleaned.precios['3.8L']).toBe(45000);
-        expect(cleaned.precios['20L']).toBe(190000);
+        expect(cleaned.precios['1/2G']).toBe(19000);
+        expect(cleaned.precios['3.8L']).toBe(35000);
+        expect(cleaned.precios['10L']).toBe(57000);
+        expect(cleaned.precios['20L']).toBe(86000);
 
+        expect(cleaned.competidorPromedio['500ML']).toBeUndefined();
         expect(cleaned.competidorPromedio['1L']).toBeUndefined();
-        expect(cleaned.competidorPromedio['3.8L']).toBe(55000);
+        expect(cleaned.competidorPromedio['3.8L']).toBe(45000);
 
+        expect(cleaned.stock['500ML']).toBeUndefined();
         expect(cleaned.stock['1L']).toBeUndefined();
         expect(cleaned.stock['3.8L']).toBe(25);
 
+        expect(cleaned.imgFiles['500ML']).toBeUndefined();
         expect(cleaned.imgFiles['1L']).toBeUndefined();
-        expect(cleaned.imgFiles['20L']).toBe('alcohol-20l.webp');
+        expect(cleaned.imgFiles['20L']).toBe('lavaloza-20l.webp');
     });
 });
