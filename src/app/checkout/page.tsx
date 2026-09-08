@@ -81,7 +81,7 @@ export default function CheckoutPage() {
     const [citySearch, setCitySearch] = useState('');
     const [citySearchOpen, setCitySearchOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<'contraentrega' | 'wompi'>('contraentrega');
+    const [paymentMethod, setPaymentMethod] = useState<'contraentrega' | 'wompi' | 'addi'>('contraentrega');
 
     const [couponCodeInput, setCouponCodeInput] = useState('');
     const [couponError, setCouponError] = useState('');
@@ -581,6 +581,46 @@ export default function CheckoutPage() {
                 });
                 
                 // Keep subitting true while the widget is open
+            } else if (paymentMethod === 'addi') {
+                // Handle Addi Flow
+                const addiRes = await fetch('/api/addi/create-application', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId,
+                        total,
+                        shippingCost: effectiveShippingCost,
+                        customer: {
+                            nombre: formData.nombre,
+                            cedula: formData.cedula,
+                            celular: formData.celular,
+                            email: formData.email,
+                            ciudad: formData.ciudad,
+                            direccion: formData.direccion
+                        },
+                        items: cart.map(item => ({
+                            nombre: `${item.product.nombre} (${item.size})`,
+                            sku: `${item.product.id}-${item.size}`,
+                            cantidad: item.cantidad,
+                            price: item.price,
+                            imgFile: item.product.imgFile
+                        }))
+                    })
+                });
+
+                if (!addiRes.ok) {
+                    const errData = await addiRes.json().catch(() => ({}));
+                    throw new Error(errData.error || 'Error al conectar con la pasarela de Addi');
+                }
+
+                const addiData = await addiRes.json();
+                if (!addiData.redirectUrl) {
+                    throw new Error('No se recibió la dirección de pago de Addi');
+                }
+
+                // Redirect client browser directly to Addi checkout
+                window.location.href = addiData.redirectUrl;
+                return;
             } else {
                 // Contraentrega flow
                 // Redirect to confirmation immediately
@@ -898,6 +938,56 @@ export default function CheckoutPage() {
                                         </div>
                                     </div>
 
+                                    {/* ADDI - Pago a Cuotas */}
+                                    <div
+                                        className={`border-2 rounded-xl p-4 cursor-pointer transition-colors relative overflow-hidden ${paymentMethod === 'addi'
+                                                ? 'bg-blue-50/80 border-[#0050FF] shadow-sm'
+                                                : 'bg-white border-gray-200 hover:border-blue-300'
+                                            }`}
+                                        onClick={() => setPaymentMethod('addi')}
+                                    >
+                                        {/* Addi Badge */}
+                                        <div className="absolute top-0 right-0 bg-gradient-to-r from-[#0050FF] to-[#FF3366] text-white text-[10px] font-black px-2.5 py-1 rounded-bl-lg tracking-wider">
+                                            0% INTERÉS
+                                        </div>
+
+                                        <div className="flex items-start gap-3">
+                                            <input
+                                                type="radio"
+                                                id="addi"
+                                                name="paymentMethod"
+                                                value="addi"
+                                                checked={paymentMethod === 'addi'}
+                                                onChange={(e) => setPaymentMethod(e.target.value as 'contraentrega' | 'wompi' | 'addi')}
+                                                className="mt-1"
+                                            />
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <label htmlFor="addi" className="font-bold text-gray-900 cursor-pointer">
+                                                        Paga a Cuotas con ADDI
+                                                    </label>
+                                                    <span className="text-xs font-black text-white bg-[#0050FF] px-2 py-0.5 rounded">
+                                                        ADDI
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-gray-600 mt-1">
+                                                    Hasta 3 cuotas con <strong>0% de interés</strong>. Sin tarjeta de crédito ni papeleos. Solo necesitas tu cédula y celular con WhatsApp.
+                                                </p>
+                                                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                                                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded">
+                                                        ⚡ Aprobación en 2 min
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+                                                        ✓ 0% Interés
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded">
+                                                        📱 Cédula + WhatsApp
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Wompi */}
                                     <div
                                         className={`border-2 rounded-xl p-4 cursor-pointer transition-colors relative overflow-hidden ${paymentMethod === 'wompi'
@@ -918,7 +1008,7 @@ export default function CheckoutPage() {
                                                 name="paymentMethod"
                                                 value="wompi"
                                                 checked={paymentMethod === 'wompi'}
-                                                onChange={(e) => setPaymentMethod(e.target.value as 'contraentrega' | 'wompi')}
+                                                onChange={(e) => setPaymentMethod(e.target.value as 'contraentrega' | 'wompi' | 'addi')}
                                                 className="mt-1"
                                             />
                                             <div className="flex-1">
@@ -968,7 +1058,10 @@ export default function CheckoutPage() {
                                 whileTap={{ scale: 0.98 }}
                                 type="submit"
                                 disabled={isSubmitting || !!shippingInfo.loading || !!shippingInfo.sinCobertura}
-                                className={`w-full text-white font-black py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer ${paymentMethod === 'wompi'
+                                className={`w-full text-white font-black py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer ${
+                                    paymentMethod === 'addi'
+                                        ? 'bg-gradient-to-r from-[#0050FF] to-[#0038b8] hover:from-[#0040E0] hover:to-[#002f9e] shadow-blue-300'
+                                        : paymentMethod === 'wompi'
                                         ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                         : 'bg-red-600 hover:bg-red-700 shadow-red-200'
                                     }`}
@@ -979,7 +1072,11 @@ export default function CheckoutPage() {
                                         Procesando...
                                     </>
                                 ) : (
-                                    paymentMethod === 'wompi' ? 'IR A PAGAR CON WOMPI' : 'CONFIRMAR PEDIDO CONTRAENTREGA'
+                                    paymentMethod === 'addi'
+                                        ? 'IR A PAGAR A CUOTAS CON ADDI'
+                                        : paymentMethod === 'wompi'
+                                        ? 'IR A PAGAR CON WOMPI'
+                                        : 'CONFIRMAR PEDIDO CONTRAENTREGA'
                                 )}
                             </motion.button>
                         </form>

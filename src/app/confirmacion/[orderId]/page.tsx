@@ -26,7 +26,8 @@ interface Order {
     envio: number;
     total: number;
     metodoPago: string;
-    estado: string;
+    estado?: string;
+    status?: string;
     createdAt: string;
     cuponAplicado?: {
         code: string;
@@ -42,6 +43,7 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
     const [order, setOrder] = useState<Order | null>(null);
     const [orderId, setOrderId] = useState<string>('');
     const [wompiStatus, setWompiStatus] = useState<string | null>(null);
+    const [addiStatus, setAddiStatus] = useState<string | null>(null);
     const [referralCode, setReferralCode] = useState<string>('');
     const [copiedLink, setCopiedLink] = useState<boolean>(false);
     const hasInitializedRef = useRef(false);
@@ -112,6 +114,20 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                     .catch(err => console.warn('[Confirmacion] Wompi status check error:', err));
             }
 
+            // If Addi was used, check/reconcile status with Addi API
+            if (parsedOrder.metodoPago === 'addi' && typeof window !== 'undefined') {
+                fetch(`/api/admin/addi-status?orderId=${orderId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data?.addiTransaction?.status) {
+                            setAddiStatus(data.addiTransaction.status);
+                        } else if (data?.orderStatus === 'confirmado') {
+                            setAddiStatus('APPROVED');
+                        }
+                    })
+                    .catch(err => console.warn('[Confirmacion] Addi status check error:', err));
+            }
+
             // Meta Pixel: Track Purchase (Deduplicated with sessionStorage per orderId)
             try {
                 const trackedKey = `pixel_purchased_${orderId}`;
@@ -168,6 +184,9 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
     const isWompiApproved = wompiStatus === 'APPROVED';
     const isWompiDeclined = wompiStatus === 'DECLINED' || wompiStatus === 'ERROR' || wompiStatus === 'VOIDED';
 
+    const isAddiApproved = addiStatus === 'APPROVED' || order.status === 'confirmado' || order.estado === 'confirmado';
+    const isAddiDeclined = addiStatus === 'REJECTED' || addiStatus === 'DECLINED' || order.status === 'cancelado' || order.estado === 'cancelado';
+
     const customerFirstName = order.cliente?.nombre?.trim().split(' ')[0]?.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'BIO';
     const cleanCustomerPhone = order.cliente?.celular?.replace(/\D/g, '') || '';
     const customerPhoneSuffix = cleanCustomerPhone.slice(-3) || '360';
@@ -223,25 +242,37 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                     className="text-center mb-8"
                 >
                     <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full mb-4 ${
-                        isWompiDeclined ? 'bg-red-500' : 'bg-green-500'
+                        isWompiDeclined || isAddiDeclined ? 'bg-red-500' : 'bg-green-500'
                     }`}>
                         <CheckCircle className="text-white" size={56} />
                     </div>
                     <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
-                        {isWompiApproved 
-                            ? '¡PAGO CONFIRMADO CON ÉXITO!' 
-                            : isWompiDeclined 
-                                ? 'PAGO NO COMPLETADO' 
-                                : '¡PEDIDO RECIBIDO!'}
+                        {order.metodoPago === 'addi'
+                            ? isAddiApproved
+                                ? '¡SOLICITUD ADDI APROBADA!'
+                                : isAddiDeclined
+                                    ? 'SOLICITUD ADDI NO COMPLETADA'
+                                    : '¡SOLICITUD ADDI EN PROCESO!'
+                            : isWompiApproved 
+                                ? '¡PAGO CONFIRMADO CON ÉXITO!' 
+                                : isWompiDeclined 
+                                    ? 'PAGO NO COMPLETADO' 
+                                    : '¡PEDIDO RECIBIDO!'}
                     </h1>
                     <p className="text-gray-600 text-lg">
-                        {order.metodoPago === 'wompi'
-                            ? isWompiApproved
-                                ? 'Tu pago ha sido acreditado correctamente en Wompi. Ya estamos preparando tu despacho.'
-                                : isWompiDeclined
-                                    ? 'La entidad financiera rechazó la transacción. Puedes intentar nuevamente o pagar contraentrega.'
-                                    : 'Estamos confirmando tu pago en línea. Pronto recibirás noticias.'
-                            : 'Tu pedido ha sido recibido exitosamente'}
+                        {order.metodoPago === 'addi'
+                            ? isAddiApproved
+                                ? 'Tu crédito a cuotas con Addi fue aprobado con éxito. Ya estamos preparando tu despacho directo de fábrica.'
+                                : isAddiDeclined
+                                    ? 'La solicitud no pudo completarse con Addi. Puedes intentar nuevamente o comunicarte con nosotros por WhatsApp.'
+                                    : 'Addi está validando tu solicitud de crédito. Pronto recibirás la confirmación oficial en tu WhatsApp y correo.'
+                            : order.metodoPago === 'wompi'
+                                ? isWompiApproved
+                                    ? 'Tu pago ha sido acreditado correctamente en Wompi. Ya estamos preparando tu despacho.'
+                                    : isWompiDeclined
+                                        ? 'La entidad financiera rechazó la transacción. Puedes intentar nuevamente o pagar contraentrega.'
+                                        : 'Estamos confirmando tu pago en línea. Pronto recibirás noticias.'
+                                : 'Tu pedido ha sido recibido exitosamente'}
                     </p>
                 </motion.div>
 
@@ -330,14 +361,25 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                     </div>
 
                     {/* Payment Method */}
-                    <div className={`mt-6 border-2 rounded-xl p-4 ${order.metodoPago === 'wompi' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                    <div className={`mt-6 border-2 rounded-xl p-4 ${
+                        order.metodoPago === 'addi'
+                            ? 'bg-blue-50/80 border-[#0050FF]/40'
+                            : order.metodoPago === 'wompi'
+                            ? 'bg-blue-50 border-blue-200'
+                            : 'bg-gray-50 border-gray-200'
                         }`}>
                         <p className="text-sm font-bold text-gray-700 mb-1">Método de Pago</p>
-                        <p className="text-gray-900 font-black">
-                            {order.metodoPago === 'wompi' ? '💳 Pago en Línea (Wompi)' : '💵 Pago Contraentrega'}
+                        <p className="text-gray-900 font-black flex items-center gap-2">
+                            {order.metodoPago === 'addi'
+                                ? '⚡ Pago a Cuotas (ADDI 0% Interés)'
+                                : order.metodoPago === 'wompi'
+                                ? '💳 Pago en Línea (Wompi)'
+                                : '💵 Pago Contraentrega'}
                         </p>
                         <p className="text-xs text-gray-600 mt-2">
-                            {order.metodoPago === 'wompi'
+                            {order.metodoPago === 'addi'
+                                ? 'Tu compra está financiada en cuotas a través de Addi. Las fechas y canales de pago de tus cuotas llegarán a tu WhatsApp y correo registrado.'
+                                : order.metodoPago === 'wompi'
                                 ? 'Tu pago está siendo procesado o ya fue confirmado. Te notificaremos cualquier novedad.'
                                 : 'Pagarás al recibir tu pedido. Puedes pagar en efectivo o transferencia Nequi.'}
                         </p>

@@ -23,6 +23,7 @@ import { Product, formatCurrency, calcularAhorro } from '@/lib/products';
 import { useCart } from '@/lib/cart-context';
 import ProductCard from '@/components/ProductCard';
 import Toast from '@/components/Toast';
+import AddiWidget from '@/components/AddiWidget';
 import { getRichProductDetails, getSchwartzCopy, getProductImage, generateProductSlug } from '@/lib/product-utils';
 import { getManualContentForProduct, MANUAL_NOTICE_TEXT } from '@/lib/products-rich-data';
 import { trackViewContent } from '@/lib/meta-pixel';
@@ -409,6 +410,11 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                             </span>
                                         </div>
                                     )}
+
+                                    {/* Widget oficial Addi: Cuotas sin interés */}
+                                    <div className="mt-3 pt-3 border-t border-gray-200/70">
+                                        <AddiWidget price={price} />
+                                    </div>
                                 </div>
 
                                 {/* Quantity Selector */}

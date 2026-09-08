@@ -66,6 +66,16 @@ export interface WompiTransactionDetails {
     raw?: any;
 }
 
+export interface AddiTransactionDetails {
+    applicationId?: string;
+    orderId?: string;
+    status?: 'APPROVED' | 'REJECTED' | 'DECLINED' | 'PENDING' | string;
+    approvedAmount?: number;
+    currency?: string;
+    updatedAt?: string;
+    raw?: any;
+}
+
 export interface Order {
     id: string;
     cliente: OrderCustomer;
@@ -73,7 +83,7 @@ export interface Order {
     subtotal: number;
     envio: number;
     total: number;
-    metodoPago: 'contraentrega' | 'wompi';
+    metodoPago: 'contraentrega' | 'wompi' | 'addi';
     status: OrderStatus;
     cuponAplicado?: {
         code: string;
@@ -102,6 +112,7 @@ export interface Order {
         discountAmount: number;
     };
     wompiTransaction?: WompiTransactionDetails;
+    addiTransaction?: AddiTransactionDetails;
     timeline: TimelineEvent[];
     notasInternas?: OrderInternalNote[];
     whatsappConversation?: string[];

@@ -32,6 +32,7 @@ import FAQSection from '@/components/FAQSection';
 import FactoryTrustSection from '@/components/FactoryTrustSection';
 import SoachaLocationCard from '@/components/SoachaLocationCard';
 import FomoTopBanner from '@/components/FomoTopBanner';
+import AddiPromoBanner from '@/components/AddiPromoBanner';
 import KitsSection from '@/components/KitsSection';
 import Toast from '@/components/Toast';
 import HeaderMessage from '@/components/HeaderMessage';
@@ -551,6 +552,9 @@ function HomeContent() {
               </div>
             </div>
           </div>
+
+          {/* Banner Promocional Oficial de ADDI (0% Interés) */}
+          <AddiPromoBanner />
 
           {/* Kits & Combos Section (Hidden when searching so user sees search results immediately) */}
           {!isSearching && (
