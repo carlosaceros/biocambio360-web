@@ -334,22 +334,24 @@ export default function DiscountWheelModal() {
             {/* Modal */}
             <AnimatePresence>
                 {isOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
                         {/* Backdrop */}
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                            transition={{ duration: 0.2 }}
+                            className="absolute inset-0 bg-black/75 md:backdrop-blur-sm touch-none"
                             onClick={() => setIsOpen(false)}
                         />
 
                         {/* Modal Container */}
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            initial={{ scale: 0.95, opacity: 0, y: 15 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="relative bg-white rounded-3xl shadow-2xl p-5 sm:p-8 max-w-lg w-full z-10 text-center border border-gray-100 my-auto"
+                            exit={{ scale: 0.95, opacity: 0, y: 15 }}
+                            transition={{ duration: 0.2 }}
+                            className="relative bg-white rounded-3xl shadow-2xl p-5 sm:p-8 max-w-lg w-full z-10 text-center border border-gray-100 my-auto will-change-transform"
                         >
                             <button
                                 onClick={() => setIsOpen(false)}

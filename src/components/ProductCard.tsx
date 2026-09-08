@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ShoppingCart, Search, Plus, Minus } from 'lucide-react';
@@ -97,32 +96,25 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     };
 
     return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            whileHover={{ y: -6 }}
+        <div
             onClick={handleCardClick}
-            className="bg-white rounded-[2rem] shadow-sm border border-gray-100 flex flex-col hover:shadow-2xl hover:shadow-[var(--brand-blue)]/10 transition-all duration-500 group overflow-hidden cursor-pointer h-full"
+            className="bg-white rounded-[2rem] shadow-sm border border-gray-100 flex flex-col md:hover:-translate-y-1.5 md:hover:shadow-2xl md:hover:shadow-[var(--brand-blue)]/10 transition-all duration-300 group overflow-hidden cursor-pointer h-full"
         >
             {/* Product image container */}
             <div className="group/img relative h-60 bg-gradient-to-br from-gray-50 to-[var(--brand-blue-50)]/50 flex items-center justify-center p-6 overflow-hidden">
-                <div className="absolute inset-0 opacity-0 group-hover/img:opacity-100 transition-all duration-700 bg-radial-gradient from-[var(--brand-blue)]/5 to-transparent" />
+                <div className="absolute inset-0 opacity-0 group-hover/img:opacity-100 transition-all duration-500 bg-radial-gradient from-[var(--brand-blue)]/5 to-transparent" />
                 
                 {imgError ? (
                     <div className="flex flex-col items-center justify-center gap-2 z-10">
                         <span className="text-6xl select-none">{PLACEHOLDER_EMOJI[product.id] ?? '🧹'}</span>
                     </div>
                 ) : (
-                    <motion.img
+                    <img
                         key={selectedSize}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ scale: 1.08, rotate: 2 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
                         src={imgSrc}
                         alt={product.nombre}
-                        className="max-h-full max-w-full object-contain drop-shadow-2xl z-10"
+                        loading="lazy"
+                        className="max-h-full max-w-full object-contain drop-shadow-2xl z-10 transition-transform duration-500 md:group-hover/img:scale-105"
                         onError={() => setImgError(true)}
                     />
                 )}
@@ -134,8 +126,8 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
                     </div>
                 )}
 
-                {/* Quick View Overlay (Only when hovering directly over image area) */}
-                <div className="absolute inset-0 flex items-center justify-center bg-[var(--brand-dark)]/5 backdrop-blur-[2px] opacity-0 group-hover/img:opacity-100 transition-all duration-300 z-20 pointer-events-none">
+                {/* Quick View Overlay (Solo en desktop con hover) */}
+                <div className="hidden md:flex absolute inset-0 items-center justify-center bg-black/10 opacity-0 group-hover/img:opacity-100 transition-all duration-300 z-20 pointer-events-none">
                     <div className="bg-white text-[var(--brand-dark)] font-black text-[10px] px-5 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 transform translate-y-4 group-hover/img:translate-y-0 transition-transform">
                         <Search size={14} strokeWidth={3} />
                         VISTA RÁPIDA
@@ -215,7 +207,7 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
                     </button>
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 }
 

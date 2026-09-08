@@ -93,24 +93,24 @@ export default function FirstPurchaseModal() {
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6">
+                <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6 overscroll-contain">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="absolute inset-0 bg-black/50 backdrop-blur-[3px]"
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0 bg-black/60 md:backdrop-blur-sm touch-none"
                         onClick={handleDismiss}
                     />
 
                     {/* Card — más ancho, festivo */}
                     <motion.div
-                        initial={{ y: 80, opacity: 0, scale: 0.95 }}
+                        initial={{ y: 60, opacity: 0, scale: 0.95 }}
                         animate={{ y: 0, opacity: 1, scale: 1 }}
-                        exit={{ y: 50, opacity: 0, scale: 0.95 }}
-                        transition={{ type: 'spring', damping: 24, stiffness: 260 }}
-                        className="relative w-full sm:max-w-lg z-10 sm:rounded-3xl overflow-hidden shadow-2xl"
+                        exit={{ y: 40, opacity: 0, scale: 0.95 }}
+                        transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+                        className="relative w-full sm:max-w-lg z-10 sm:rounded-3xl overflow-hidden shadow-2xl will-change-transform"
                         style={{
                             background: 'linear-gradient(150deg, #0c1a2e 0%, #0d3d45 45%, #0c1a2e 100%)'
                         }}

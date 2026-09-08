@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     ShoppingCart, 
@@ -50,29 +50,32 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     
     const searchParams = useSearchParams();
 
-    // Sort available sizes and pick the first one, filtering out DEFAULT if other sizes exist
-    const rawSizes = Object.keys(product.precios);
-    const hasOtherSizes = rawSizes.some(s => s !== 'DEFAULT');
-    const filteredSizes = hasOtherSizes ? rawSizes.filter(s => s !== 'DEFAULT') : rawSizes;
+    // Memoize available sizes array to prevent infinite re-render loops
+    const availableSizes = useMemo(() => {
+        const rawSizes = Object.keys(product.precios || {});
+        const hasOtherSizes = rawSizes.some(s => s !== 'DEFAULT');
+        const filteredSizes = hasOtherSizes ? rawSizes.filter(s => s !== 'DEFAULT') : rawSizes;
 
-    const availableSizes = filteredSizes.sort((a, b) => {
-        const indexA = SIZE_ORDER.indexOf(a);
-        const indexB = SIZE_ORDER.indexOf(b);
-        if (indexA === -1 && indexB === -1) return a.localeCompare(b);
-        if (indexA === -1) return 1;
-        if (indexB === -1) return -1;
-        return indexA - indexB;
-    });
+        return filteredSizes.sort((a, b) => {
+            const indexA = SIZE_ORDER.indexOf(a);
+            const indexB = SIZE_ORDER.indexOf(b);
+            if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+        });
+    }, [product.precios]);
 
     const paramSizeRaw = (searchParams?.get('tamano') || searchParams?.get('size') || searchParams?.get('presentacion') || '').trim();
-    const findMatchingSize = (target: string): string | undefined => {
+    
+    const findMatchingSize = useCallback((target: string): string | undefined => {
         if (!target) return undefined;
         const normalized = target.toLowerCase().replace(/[^a-z0-9]/g, '');
         return availableSizes.find(s => {
             const sNorm = s.toLowerCase().replace(/[^a-z0-9]/g, '');
             return sNorm === normalized || s.toLowerCase() === target.toLowerCase();
         });
-    };
+    }, [availableSizes]);
 
     const initialSize = findMatchingSize(paramSizeRaw) || availableSizes[0] || '10L';
     const [selectedSize, setSelectedSize] = useState<string>(initialSize);
@@ -85,14 +88,17 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                 setSelectedSize(matched);
             }
         }
-    }, [paramSizeRaw, availableSizes]);
+    }, [paramSizeRaw, findMatchingSize, selectedSize]);
 
     const handleSizeSelect = (newSize: string) => {
+        if (newSize === selectedSize) return;
         setSelectedSize(newSize);
         if (typeof window !== 'undefined') {
-            const url = new URL(window.location.href);
-            url.searchParams.set('tamano', newSize);
-            window.history.replaceState({}, '', url.toString());
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tamano', newSize);
+                window.history.replaceState({}, '', url.toString());
+            } catch (_) {}
         }
     };
 
@@ -104,9 +110,11 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     });
     const [mediaTab, setMediaTab] = useState<'image' | 'video'>('image');
     const [imageError, setImageError] = useState(false);
-    const richDetails = getRichProductDetails(product);
-    const schwartzCopy = getSchwartzCopy(product);
-    const manualContent = getManualContentForProduct(product);
+
+    // Memoize heavy text generation functions to keep thread fast on touch interactions
+    const richDetails = useMemo(() => getRichProductDetails(product), [product.id, product.categoria]);
+    const schwartzCopy = useMemo(() => getSchwartzCopy(product), [product.id, product.nombre, product.categoria]);
+    const manualContent = useMemo(() => getManualContentForProduct(product), [product.id]);
     const [expandedSection, setExpandedSection] = useState<string | null>('dosificacion');
 
     // Reset image error state when size or product changes
@@ -115,10 +123,12 @@ export default function ProductPageContent({ product, relatedProducts }: Product
     }, [selectedSize, product.id, product.imgFile, product.imgFiles]);
 
     const price = product.precios[selectedSize] || 0;
+    const effectiveTotalPrice = price * quantity;
 
-    // Meta Pixel: Track ViewContent when viewing product
+    // Meta Pixel: Track ViewContent with debounce so quick size taps don't freeze the mobile UI
     useEffect(() => {
-        if (product && product.id) {
+        if (!product || !product.id) return;
+        const timer = setTimeout(() => {
             const currentPrice = product.precios[selectedSize] || Object.values(product.precios)[0] || 0;
             trackViewContent({
                 content_ids: [product.sku || `${product.id}-${selectedSize}`],
@@ -127,14 +137,18 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                 currency: 'COP',
                 value: currentPrice,
             });
-        }
-    }, [product, selectedSize]);
+        }, 500);
 
-    const savingsData = calcularAhorro(
-        price,
-        selectedSize,
-        product.competidorPromedio[selectedSize] || price * 1.5
-    );
+        return () => clearTimeout(timer);
+    }, [product.id, product.nombre, product.sku, product.precios, selectedSize]);
+
+    const savingsData = useMemo(() => {
+        return calcularAhorro(
+            price,
+            selectedSize,
+            product.competidorPromedio?.[selectedSize] || price * 1.5
+        );
+    }, [price, selectedSize, product.competidorPromedio]);
 
     const handleAddToCart = () => {
         addToCart(product, selectedSize as any, price, quantity);
@@ -206,8 +220,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-16">
                         {/* Left: Product Image & Video Gallery */}
                         <motion.div
-                            initial={{ opacity: 0, x: -50 }}
-                            animate={{ opacity: 1, x: 0 }}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.35 }}
                             className="bg-white rounded-2xl p-8 shadow-lg"
                         >
                             {/* Media Tab Selector for Detergente product */}
@@ -275,14 +290,12 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                         )}
                                         {/* Size badge on photo */}
                                         {SIZE_PHOTO_BADGE[selectedSize] && (
-                                            <motion.div
+                                            <div
                                                 key={selectedSize}
-                                                initial={{ scale: 0.7, opacity: 0 }}
-                                                animate={{ scale: 1, opacity: 1 }}
                                                 className={`absolute bottom-4 right-4 ${SIZE_PHOTO_BADGE[selectedSize]!.bg} text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg`}
                                             >
                                                 {SIZE_PHOTO_BADGE[selectedSize]!.label}
-                                            </motion.div>
+                                            </div>
                                         )}
                                         {/* Colombia badge */}
                                         <div className="absolute bottom-4 left-4 flex items-center gap-1 bg-white/95 text-[10px] font-black px-2.5 py-1.5 rounded-full shadow text-gray-700">
@@ -311,8 +324,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
 
                         {/* Right: Product Info + Purchase */}
                         <motion.div
-                            initial={{ opacity: 0, x: 50 }}
-                            animate={{ opacity: 1, x: 0 }}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.35, delay: 0.05 }}
                             className="flex flex-col"
                         >
                             <div className="bg-white rounded-2xl p-6 md:p-8 shadow-lg sticky top-4">
@@ -365,22 +379,25 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                             Selecciona Presentación:
                                         </label>
                                         <div className="grid grid-cols-3 gap-3">
-                                            {availableSizes.map(size => (
-                                                <motion.button
-                                                    key={size}
-                                                    whileTap={{ scale: 0.95 }}
-                                                    onClick={() => handleSizeSelect(size)}
-                                                    className={`p-4 rounded-xl border-2 transition-all ${selectedSize === size
-                                                            ? 'border-[var(--brand-pink)] bg-[var(--brand-pink-50)] shadow-md'
-                                                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                                                        }`}
-                                                >
-                                                    <div className="text-2xl font-black text-gray-900">{size}</div>
-                                                    <div className={`text-xs mt-1 ${selectedSize === size ? 'text-[var(--brand-pink)]' : 'text-gray-500'}`}>
-                                                        {formatCurrency(product.precios[size] || 0)}
-                                                    </div>
-                                                </motion.button>
-                                            ))}
+                                            {availableSizes.map(size => {
+                                                const isSelected = selectedSize === size;
+                                                return (
+                                                    <button
+                                                        key={size}
+                                                        type="button"
+                                                        onClick={() => handleSizeSelect(size)}
+                                                        className={`p-4 rounded-xl border-2 transition-all duration-150 touch-manipulation cursor-pointer active:scale-[0.97] text-left ${isSelected
+                                                                ? 'border-[var(--brand-pink)] bg-[var(--brand-pink-50)] shadow-md'
+                                                                : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50'
+                                                            }`}
+                                                    >
+                                                        <div className="text-2xl font-black text-gray-900 leading-none">{size}</div>
+                                                        <div className={`text-xs mt-1.5 font-bold ${isSelected ? 'text-[var(--brand-pink)]' : 'text-gray-500'}`}>
+                                                            {formatCurrency(product.precios[size] || 0)}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -411,9 +428,14 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                         </div>
                                     )}
 
-                                    {/* Widget oficial Addi: Cuotas sin interés */}
+                                    {/* Widget oficial Addi: Cuotas sin interés con cálculo dinámico */}
                                     <div className="mt-3 pt-3 border-t border-gray-200/70">
-                                        <AddiWidget price={price} />
+                                        <AddiWidget
+                                            price={effectiveTotalPrice}
+                                            unitPrice={price}
+                                            quantity={quantity}
+                                            onSetQuantity={(qty) => setQuantity(qty)}
+                                        />
                                     </div>
                                 </div>
 
@@ -531,8 +553,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             </button>
                             {expandedSection === 'beneficios' && (
                                 <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
+                                    initial={{ opacity: 0, y: -6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.2 }}
                                     className="px-6 pb-6"
                                 >
                                     <ul className="space-y-3">
@@ -561,8 +584,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             </button>
                             {expandedSection === 'instrucciones' && (
                                 <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
+                                    initial={{ opacity: 0, y: -6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.2 }}
                                     className="px-6 pb-6"
                                 >
                                     <ol className="space-y-4">
@@ -594,8 +618,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </button>
                                 {expandedSection === 'dosificacion' && (
                                     <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
+                                        initial={{ opacity: 0, y: -6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.2 }}
                                         className="p-6 space-y-6"
                                     >
                                         <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-100 text-sm text-blue-900 leading-relaxed">
@@ -708,8 +733,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             </button>
                             {expandedSection === 'ficha' && (
                                 <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
+                                    initial={{ opacity: 0, y: -6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.2 }}
                                     className="px-6 pb-6"
                                 >
                                     <div className="border border-gray-100 rounded-xl overflow-hidden text-sm">
@@ -765,8 +791,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </button>
                                 {expandedSection === 'presentaciones' && (
                                     <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
+                                        initial={{ opacity: 0, y: -6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.2 }}
                                         className="px-6 pb-6"
                                     >
                                         <p className="text-xs text-gray-500 mb-4 leading-relaxed">
@@ -847,8 +874,9 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             </button>
                             {expandedSection === 'faqs' && (
                                 <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
+                                    initial={{ opacity: 0, y: -6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.2 }}
                                     className="px-6 pb-6 divide-y divide-gray-100"
                                 >
                                     {richDetails.faqs.map((faq, idx) => (

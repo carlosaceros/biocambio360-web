@@ -106,14 +106,15 @@ export default function SidebarMenu({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] md:hidden cursor-pointer"
+                        className="fixed inset-0 bg-black/60 z-[80] md:hidden cursor-pointer touch-none"
                     />
                 )}
             </AnimatePresence>
 
             <aside 
-                className={`fixed left-0 top-0 h-full bg-white border-r border-[var(--brand-border)] z-[90] transition-all duration-300 ease-in-out ${
+                className={`fixed left-0 top-0 h-full bg-white border-r border-[var(--brand-border)] z-[90] will-change-transform overscroll-contain transition-all duration-300 ease-in-out ${
                     isOpen 
                         ? 'translate-x-0 w-80 max-w-[85vw] shadow-2xl md:shadow-none md:relative md:w-64 md:shrink-0 md:h-[calc(100vh-80px)] md:sticky md:top-20 md:self-start md:z-10 md:opacity-100 md:block' 
                         : '-translate-x-full w-0 max-w-0 opacity-0 pointer-events-none md:hidden'

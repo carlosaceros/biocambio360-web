@@ -55,13 +55,13 @@ export default function CartDrawer() {
         <AnimatePresence>
             {isCartOpen && (
                 <div className="fixed inset-0 z-[70] flex justify-end">
-                    {/* Backdrop */}
+                    {/* Backdrop - Optimizado para 60 FPS en móviles sin blur costoso */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="absolute inset-0 bg-[var(--brand-dark)]/60 backdrop-blur-sm"
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0 bg-black/60 md:backdrop-blur-sm touch-none"
                         onClick={() => setIsCartOpen(false)}
                     />
 
@@ -72,10 +72,10 @@ export default function CartDrawer() {
                         exit={{ x: '100%' }}
                         transition={{
                             type: "spring",
-                            damping: 25,
-                            stiffness: 300
+                            damping: 28,
+                            stiffness: 320
                         }}
-                        className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden"
+                        className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col overflow-hidden will-change-transform overscroll-contain"
                     >
                         {/* Header */}
                         <div className="p-5 border-b border-[var(--brand-border)] flex justify-between items-center bg-gradient-to-r from-[var(--brand-blue-50)] to-[var(--brand-pink-50)]">
@@ -93,7 +93,7 @@ export default function CartDrawer() {
                         </div>
 
                         {/* Cart Items */}
-                        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                        <div className="flex-1 overflow-y-auto p-5 space-y-4 overscroll-contain">
                             {cart.length === 0 ? (
                                 <motion.div
                                     initial={{ opacity: 0, y: 20 }}
@@ -295,6 +295,23 @@ export default function CartDrawer() {
                                          </motion.span>
                                      </div>
                                  </div>
+
+                                 {/* Indicador de Cuotas Addi */}
+                                 {finalTotal >= 50000 ? (
+                                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-xl px-3 py-2 flex items-center justify-between text-[11px]">
+                                         <span className="text-gray-800 font-bold flex items-center gap-1.5">
+                                             <span className="bg-[#0050FF] text-white text-[9px] font-black px-1.5 py-0.5 rounded">ADDI</span>
+                                             3 cuotas de ~{formatCurrency(Math.ceil(finalTotal / 3))} sin interés
+                                         </span>
+                                         <span className="text-emerald-700 font-extrabold text-[10px]">0% Interés</span>
+                                     </div>
+                                 ) : (
+                                     <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 text-[11px] text-gray-600 flex items-center gap-1.5">
+                                         <span className="bg-[#0050FF] text-white text-[9px] font-black px-1.5 py-0.5 rounded">ADDI</span>
+                                         <span>Paga en 3 cuotas sumando <strong>{formatCurrency(50000 - finalTotal)}</strong> más</span>
+                                     </div>
+                                 )}
+
                                 <Link href="/checkout">
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}

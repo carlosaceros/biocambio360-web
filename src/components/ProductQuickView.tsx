@@ -62,21 +62,23 @@ export default function ProductQuickView({ product, isOpen, onClose, onAddToCart
         <AnimatePresence>
             {isOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6">
-                    {/* Backdrop */}
+                    {/* Backdrop - Optimizado para 60 FPS sin blur pesado en móviles */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
                         onClick={onClose}
-                        className="absolute inset-0 bg-[var(--brand-dark)]/40 backdrop-blur-md"
+                        className="absolute inset-0 bg-black/60 md:backdrop-blur-sm touch-none"
                     />
 
                     {/* Modal Content */}
                     <motion.div
-                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                        initial={{ scale: 0.95, opacity: 0, y: 15 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                        className="relative bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/20"
+                        exit={{ scale: 0.95, opacity: 0, y: 15 }}
+                        transition={{ duration: 0.2 }}
+                        className="relative bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto overscroll-contain will-change-transform rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/20"
                     >
                         {/* Close Button */}
                         <button 
