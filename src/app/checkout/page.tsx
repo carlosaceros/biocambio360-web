@@ -627,9 +627,10 @@ export default function CheckoutPage() {
                 router.push(`/confirmacion/${orderId}`);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating order:', error);
-            alert('Hubo un error al procesar tu pedido. Por favor intenta de nuevo.');
+            const msg = error?.message || 'Hubo un error al procesar tu pedido. Por favor intenta de nuevo.';
+            alert(msg);
             setIsSubmitting(false);
         }
     };
