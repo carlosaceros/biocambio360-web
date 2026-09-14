@@ -168,22 +168,16 @@ export const COMBO_SIZE_LABELS: Record<'3.8L' | '10L' | '20L', string> = {
     '20L': '20 Litros',
 };
 
-// Calculate custom combo price with tiered discounts
+// Calculate custom combo price (Option B: without automatic volume discounts)
 export const calcularPrecioCustomCombo = (
     items: { productId: string; size: '3.8L' | '10L' | '20L'; precio: number; quantity: number }[]
 ): { precioOriginal: number; precioCombo: number; descuento: number; porcentaje: number } => {
     const precioOriginal = items.reduce((sum, item) => sum + item.precio * item.quantity, 0);
-    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
-    // Tiered discounts based on total items in combo
-    let porcentajeDescuento = 0;
-    if (totalItems >= 6) porcentajeDescuento = 15;
-    else if (totalItems >= 4) porcentajeDescuento = 10;
-    else if (totalItems >= 3) porcentajeDescuento = 7;
-    else if (totalItems >= 2) porcentajeDescuento = 5;
-
-    const descuento = Math.round(precioOriginal * (porcentajeDescuento / 100));
-    const precioCombo = precioOriginal - descuento;
+    // Opción B: Sin descuentos automáticos por volumen en combos personalizados
+    const porcentajeDescuento = 0;
+    const descuento = 0;
+    const precioCombo = precioOriginal;
 
     return { precioOriginal, precioCombo, descuento, porcentaje: porcentajeDescuento };
 };

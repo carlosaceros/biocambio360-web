@@ -48,3 +48,7 @@ Fotos_productos/
 resumen_estrategia_y_tienda.html
 fidelizacion/
 
+# internal audit reports and generator scripts
+INFORME_TECNICO_*.pdf
+scripts/
+

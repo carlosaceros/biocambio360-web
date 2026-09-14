@@ -112,29 +112,30 @@ export const PESOS_POR_TALLA: Record<string, number> = {
 };
 
 export const SUBSIDIOS_POR_TALLA: Record<string, number> = {
-    '20L': 12_000,
-    '20KG': 12_000,
-    '10L': 12_000,
-    '10KG': 12_000,
-    '15L': 12_000,
+    '20L': 13_000,
+    '20KG': 13_000,
+    '10L': 13_000,
+    '10KG': 13_000,
+    '15L': 13_000,
     '3.8L': 6_000,
     '4KG': 6_000,
     '1/2G': 3_000,
     '1L': 1_000,
     '1KG': 1_000,
-    '500ML': 500,
-    '60ML': 200,
+    '500ML': 1_000,
+    '250ML': 1_000,
+    '60ML': 1_000,
 };
 
 export const DEFAULT_SUBSIDIOS: Record<number, number> = {
     1: 1000,  2: 2000,  3: 4000,  4: 6000,  5: 6000,
-    6: 8000,  7: 9000,  8: 10000, 9: 11000, 10: 12000,
+    6: 8000,  7: 9000,  8: 10000, 9: 11000, 10: 13000,
     11: 14000, 12: 15000, 13: 16000, 14: 17000, 15: 18000,
-    16: 20000, 17: 21000, 18: 22000, 19: 23000, 20: 12000,
-    21: 13000, 22: 15000, 23: 16000, 24: 18000, 25: 18000,
-    26: 20000, 27: 21000, 28: 22000, 29: 23000, 30: 24000,
-    31: 25000, 32: 30000, 33: 30000, 34: 30000, 35: 30000,
-    36: 32000, 37: 33000, 38: 34000, 39: 35000, 40: 24000,
+    16: 20000, 17: 21000, 18: 22000, 19: 23000, 20: 13000,
+    21: 14000, 22: 15000, 23: 16000, 24: 18000, 25: 18000,
+    26: 20000, 27: 21000, 28: 22000, 29: 23000, 30: 26000,
+    31: 27000, 32: 30000, 33: 30000, 34: 30000, 35: 30000,
+    36: 32000, 37: 33000, 38: 34000, 39: 35000, 40: 26000,
 };
 
 // ─── COMPOSICIÓN EXACTA DE KITS Y COMBOS ────────────────────────────────────
@@ -157,34 +158,34 @@ export const KIT_COMPOSITION_MAP: Record<string, KitSpec> = {
     // 1. Combo Dúo 10L/10L (20L Totales)
     'kit-combo-duo-10-10-detergente-desengrasante': {
         nombre: 'Combo Dúo 10L/10L',
-        components: [{ size: '10L', cantidad: 2, weightKg: 10.0, subsidioUnitario: 12_000 }],
+        components: [{ size: '10L', cantidad: 2, weightKg: 10.0, subsidioUnitario: 13_000 }],
         totalWeightKg: 20.0,
-        totalSubsidio: 24_000,
+        totalSubsidio: 26_000,
         bultosSugeridos: 1,
     },
     // 2. Kit Completo #1 (Detergente 20L + Suavizante Galón + Desengrasante 1/2 Galón + Bactokill 1L)
     'kit-limpieza-completo-1-20l': {
         nombre: 'Kit Completo #1 (20L + Galón + 1/2G + 1L)',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
             { size: '1/2G', cantidad: 1, weightKg: 1.9, subsidioUnitario: 3_000 },
             { size: '1L', cantidad: 1, weightKg: 1.0, subsidioUnitario: 1_000 },
         ],
         totalWeightKg: 26.7,
-        totalSubsidio: 22_000,
+        totalSubsidio: 23_000,
         bultosSugeridos: 2,
     },
     // 3. Combo Lavandería y Cocina (10L + 1/2G + 1/2G + 1L)
     'kit-combo-lavanderia-cocina': {
         nombre: 'Combo Lavandería y Cocina 4 Productos',
         components: [
-            { size: '10L', cantidad: 1, weightKg: 10.0, subsidioUnitario: 12_000 },
+            { size: '10L', cantidad: 1, weightKg: 10.0, subsidioUnitario: 13_000 },
             { size: '1/2G', cantidad: 2, weightKg: 1.9, subsidioUnitario: 3_000 },
             { size: '1L', cantidad: 1, weightKg: 1.0, subsidioUnitario: 1_000 },
         ],
         totalWeightKg: 14.8,
-        totalSubsidio: 19_000,
+        totalSubsidio: 20_000,
         bultosSugeridos: 1,
     },
     // 4. Kit Completo #3 (3 Galones + 1 Litro)
@@ -202,88 +203,88 @@ export const KIT_COMPOSITION_MAP: Record<string, KitSpec> = {
     'kit-combo-detergente-20l-suavizante-galon': {
         nombre: 'Combo Detergente 20L + Suavizante Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-detergente-20l-desengrasante-galon': {
         nombre: 'Combo Detergente 20L + Desengrasante Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-detergente-20l-limpiapisos-galon': {
         nombre: 'Combo Detergente 20L + Limpiapisos Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-detergente-20l-quitamanchas-galon': {
         nombre: 'Combo Detergente 20L + Quitamanchas Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-detergente-20l-bactokill-galon': {
         nombre: 'Combo Detergente 20L + Bactokill Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-detergente-20l-vinagre-galon': {
         nombre: 'Combo Detergente 20L + Vinagre Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-detergente-20l-desengrasante-pro': {
         nombre: 'Combo Pro Detergente 20L + Desengrasante Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-detergente-20l-shampoo-muebles-galon': {
         nombre: 'Combo Detergente 20L + Shampoo Muebles Galón',
         components: [
-            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 12_000 },
+            { size: '20L', cantidad: 1, weightKg: 20.0, subsidioUnitario: 13_000 },
             { size: '3.8L', cantidad: 1, weightKg: 3.8, subsidioUnitario: 6_000 },
         ],
         totalWeightKg: 23.8,
-        totalSubsidio: 18_000,
+        totalSubsidio: 19_000,
         bultosSugeridos: 2,
     },
     'kit-combo-ahorro-pajarito-2-garrafas-10l': {
         nombre: 'Combo Ahorro 2 Garrafas 10L',
-        components: [{ size: '10L', cantidad: 2, weightKg: 10.0, subsidioUnitario: 12_000 }],
+        components: [{ size: '10L', cantidad: 2, weightKg: 10.0, subsidioUnitario: 13_000 }],
         totalWeightKg: 20.0,
-        totalSubsidio: 24_000,
+        totalSubsidio: 26_000,
         bultosSugeridos: 1,
     },
     'kit-matrimonio': {
@@ -295,16 +296,16 @@ export const KIT_COMPOSITION_MAP: Record<string, KitSpec> = {
     },
     'suavidad-aroma': {
         nombre: 'Kit Suavidad & Aroma (4 Garrafas 10L)',
-        components: [{ size: '10L', cantidad: 4, weightKg: 10.0, subsidioUnitario: 12_000 }],
+        components: [{ size: '10L', cantidad: 4, weightKg: 10.0, subsidioUnitario: 13_000 }],
         totalWeightKg: 40.0,
-        totalSubsidio: 48_000,
+        totalSubsidio: 52_000,
         bultosSugeridos: 2,
     },
     'experto-limpieza': {
         nombre: 'Kit Experto en Limpieza (4 Garrafas 20L)',
-        components: [{ size: '20L', cantidad: 4, weightKg: 20.0, subsidioUnitario: 12_000 }],
+        components: [{ size: '20L', cantidad: 4, weightKg: 20.0, subsidioUnitario: 13_000 }],
         totalWeightKg: 80.0,
-        totalSubsidio: 48_000,
+        totalSubsidio: 52_000,
         bultosSugeridos: 4,
     },
 };
@@ -475,11 +476,40 @@ export function calcularSubsidio(totalWeightKg: number): number {
     const num20L = Math.floor(weight / 20);
     const rem = weight % 20;
     let subRem = 0;
-    if (rem >= 10) subRem = 12_000;
+    if (rem >= 10) subRem = 13_000;
     else if (rem >= 4) subRem = 6_000;
     else if (rem >= 2) subRem = 3_000;
     else if (rem >= 1) subRem = 1_000;
 
-    return (num20L * 12_000) + subRem;
+    return (num20L * 13_000) + subRem;
 }
+
+/**
+ * Mínimo de ingreso garantizado al domiciliario por entrega en Bogotá y aledaños.
+ */
+export const MINIMO_DOMICILIARIO_LOCAL = 13_000;
+
+/**
+ * Calcula la liquidación del flete para la zona local (Bogotá y municipios aledaños).
+ * Reglas de negocio:
+ * - El domiciliario cobra un mínimo garantizado de $13.000 COP por entrega.
+ * - Cada producto aporta según su tamaño a ese costo (20L/10L=$13k, 3.8L=$6k, 1/2G=$3k, 1L/500ml/250ml=$1k).
+ * - Si el aporte total es MENOR a $13.000, el cliente asume el faltante.
+ * - Si el aporte total es MAYOR O IGUAL a $13.000, el envío es GRATIS ($0).
+ */
+export function calcularFleteLocal(aporteTotal: number): {
+    fleteCliente: number;
+    esGratis: boolean;
+    subsidioFabrica: number;
+    minimoGarantizado: number;
+} {
+    const fleteCliente = Math.max(0, MINIMO_DOMICILIARIO_LOCAL - aporteTotal);
+    return {
+        fleteCliente,
+        esGratis: fleteCliente === 0,
+        subsidioFabrica: Math.min(aporteTotal, MINIMO_DOMICILIARIO_LOCAL),
+        minimoGarantizado: MINIMO_DOMICILIARIO_LOCAL,
+    };
+}
+
 

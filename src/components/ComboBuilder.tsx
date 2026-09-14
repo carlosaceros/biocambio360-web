@@ -178,12 +178,10 @@ function CustomComboBuilder({ products, onAddToCart }: { products: Product[]; on
 
     const handleAddAllToCart = () => {
         if (!pricing || customItems.length === 0) return;
-        const discountRatio = pricing.precioOriginal > 0 ? pricing.precioCombo / pricing.precioOriginal : 1;
 
         customItems.forEach(item => {
             const regularPrice = item.product.precios[item.size] || 0;
-            const discountedPrice = Math.round(regularPrice * discountRatio);
-            onAddToCart(item.product, item.size, discountedPrice, item.quantity);
+            onAddToCart(item.product, item.size, regularPrice, item.quantity);
         });
     };
 
@@ -214,19 +212,13 @@ function CustomComboBuilder({ products, onAddToCart }: { products: Product[]; on
         <div className="max-w-5xl mx-auto">
             {/* Header */}
             <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[var(--brand-pink)]/10 to-[var(--brand-blue)]/10 px-4 py-2 rounded-full mb-4">
-                    <Zap size={16} className="text-[var(--brand-pink)]" />
-                    <span className="text-sm font-bold text-[var(--brand-dark)]">Mientras más agregas, más ahorras</span>
+                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[var(--brand-pink)]/10 to-[var(--brand-blue)]/10 px-4 py-2 rounded-full mb-2">
+                    <Package size={16} className="text-[var(--brand-blue)]" />
+                    <span className="text-sm font-bold text-[var(--brand-dark)]">Arma tu pedido ideal con tus productos favoritos</span>
                 </div>
-                <div className="flex items-center justify-center gap-4 text-xs text-gray-400 font-semibold">
-                    <span className="flex items-center gap-1">2 items = <span className="text-[var(--brand-blue)] font-extrabold">5%</span></span>
-                    <span className="w-px h-4 bg-gray-200" />
-                    <span className="flex items-center gap-1">3 items = <span className="text-[var(--brand-blue)] font-extrabold">7%</span></span>
-                    <span className="w-px h-4 bg-gray-200" />
-                    <span className="flex items-center gap-1">4 items = <span className="text-[var(--brand-blue)] font-extrabold">10%</span></span>
-                    <span className="w-px h-4 bg-gray-200" />
-                    <span className="flex items-center gap-1">6+ items = <span className="text-[var(--brand-pink)] font-extrabold">15%</span></span>
-                </div>
+                <p className="text-xs text-gray-500 font-medium max-w-md mx-auto">
+                    Selecciona las presentaciones que necesitas para tu hogar o negocio con precio directo de fábrica Biocambio360.
+                </p>
             </div>
 
             {/* Product Selection Grid */}
@@ -340,27 +332,27 @@ function CustomComboBuilder({ products, onAddToCart }: { products: Product[]; on
                 })}
             </div>
 
-            {/* Combo Savings Banner */}
+            {/* Combo Summary Banner */}
             {pricing && (
                 <motion.div
                     layout
                     className="bg-gradient-to-r from-blue-50 to-pink-50 rounded-2xl border border-blue-100 p-5 mb-6 shadow-xs flex items-center justify-between"
                 >
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-white rounded-xl text-[var(--brand-pink)] shadow-xs">
+                        <div className="p-2.5 bg-white rounded-xl text-[var(--brand-blue)] shadow-xs">
                             <Sparkles size={20} />
                         </div>
                         <div>
                             <span className="text-sm font-black text-[var(--brand-dark)] block">
-                                Ahorras {formatCurrency(pricing.descuento)} en este Combo
+                                {totalItems} {totalItems === 1 ? 'producto seleccionado' : 'productos seleccionados'}
                             </span>
                             <span className="text-xs text-gray-500">
-                                Precio directo de fábrica Biocambio360
+                                Precios directos de fábrica Biocambio360
                             </span>
                         </div>
                     </div>
 
-                    {pricing.porcentaje > 0 && (
+                    {pricing.descuento > 0 && pricing.porcentaje > 0 && (
                         <span className="text-xs font-black text-white bg-[var(--brand-pink)] px-3.5 py-1.5 rounded-full shadow-xs">
                             -{pricing.porcentaje}% OFF
                         </span>
@@ -383,14 +375,14 @@ function CustomComboBuilder({ products, onAddToCart }: { products: Product[]; on
                                     <Gift size={18} className="text-[var(--brand-pink)]" />
                                     <span className="text-sm font-bold text-white/60">Tu Combo Personalizado</span>
                                 </div>
-                                <div className="flex items-center gap-3 mb-2">
-                                    <span className="text-xs text-white/40 line-through">{formatCurrency(pricing.precioOriginal)}</span>
-                                    {pricing.descuento > 0 && (
+                                {pricing.descuento > 0 && (
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="text-xs text-white/40 line-through">{formatCurrency(pricing.precioOriginal)}</span>
                                         <span className="text-xs font-extrabold text-[var(--brand-pink)] bg-[var(--brand-pink)]/20 px-2 py-0.5 rounded-full">
                                             Ahorras {formatCurrency(pricing.descuento)}
                                         </span>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-4xl font-extrabold tracking-tight">{formatCurrency(pricing.precioCombo)}</span>
                                     <span className="text-sm text-white/40">({totalItems} {totalItems === 1 ? 'producto' : 'productos'})</span>

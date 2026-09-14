@@ -4,6 +4,8 @@ import { getAdminDB } from '@/lib/firebase-admin';
 import {
     getCartPackagingAnalysis,
     isZonaLocal,
+    calcularFleteLocal,
+    MINIMO_DOMICILIARIO_LOCAL,
     CartItemQuote,
 } from '@/lib/shipping-zones';
 
@@ -45,8 +47,14 @@ export async function POST(request: Request) {
         const bultos = analysis.bultos;
         const subsidioBruto = analysis.subsidioBruto;
 
-        // ── ZONA LOCAL → Flota propia Biocambio360, GRATIS ──────────────────────
+        // ── ZONA LOCAL → Domicilio Bogotá y aledaños (Flota propia / mensajería local) ──
         if (esLocal) {
+            const { fleteCliente, esGratis, subsidioFabrica } = calcularFleteLocal(subsidioBruto);
+
+            const mensaje = esGratis
+                ? '🚚 ¡Envío GRATIS en Bogotá y aledaños asumido por Biocambio360!'
+                : `Domicilio local Bogotá: $${fleteCliente.toLocaleString('es-CO')} COP (Biocambio360 asume $${subsidioFabrica.toLocaleString('es-CO')} del costo mínimo del domiciliario de $13.000).`;
+
             const auditData = {
                 destinoCodigo,
                 destinoNombre,
@@ -54,10 +62,11 @@ export async function POST(request: Request) {
                 totalWeightKg,
                 bultos,
                 subsidioBruto,
-                subsidioEfectivo: subsidioBruto,
-                cotizacionBruta99: 0,
-                fleteCliente: 0,
-                esGratis: true,
+                subsidioEfectivo: subsidioFabrica,
+                cotizacionBruta99: MINIMO_DOMICILIARIO_LOCAL,
+                fleteCliente,
+                precioFinal: fleteCliente,
+                esGratis,
                 esLocal: true,
                 transportadora: 'Flota Propia Biocambio360',
                 dias: '1-2',
@@ -68,18 +77,18 @@ export async function POST(request: Request) {
             await writeAuditLog(auditData);
 
             return NextResponse.json({
-                gratis: true,
-                precio: 0,
-                cotizacionBruta99: 0,
+                gratis: esGratis,
+                precio: fleteCliente,
+                cotizacionBruta99: MINIMO_DOMICILIARIO_LOCAL,
                 subsidioBruto,
-                subsidioEfectivo: subsidioBruto,
+                subsidioEfectivo: subsidioFabrica,
                 totalWeightKg,
                 bultos,
                 transportadora: 'Flota Propia Biocambio360',
                 dias: '1-2',
                 esLocal,
-                source: 'free_shipping',
-                mensaje: '🚚 Entrega gratuita con flota propia Biocambio360.',
+                source: esGratis ? 'free_shipping' : 'local_copay',
+                mensaje,
             });
         }
 
