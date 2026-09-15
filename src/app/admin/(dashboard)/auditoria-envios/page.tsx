@@ -65,6 +65,7 @@ const SOURCE_CONFIG = {
     '99envios': { label: '99 Envíos API', icon: Truck, color: 'green', bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
     'free_shipping': { label: 'Gratis (Local)', icon: Gift, color: 'blue', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
     'free_shipping_local': { label: 'Gratis (Local)', icon: Gift, color: 'blue', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+    'local_copay': { label: 'Copago (Local)', icon: Truck, color: 'indigo', bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700' },
     'fallback': { label: 'Fallback Zonas', icon: AlertTriangle, color: 'amber', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
     'fallback_no_coverage': { label: 'Sin cobertura', icon: XCircle, color: 'red', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
     'error': { label: 'Error', icon: XCircle, color: 'red', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
@@ -114,7 +115,9 @@ export default function ShippingAuditPage() {
 
     const getLogSource = (l: AuditLog) => {
         if (l.source) return l.source;
-        if (l.esLocal || l.esVecino) return 'free_shipping';
+        if (l.esLocal || l.esVecino) {
+            return (l.precioFinal && l.precioFinal > 0) ? 'local_copay' : 'free_shipping';
+        }
         return '99envios';
     };
 
@@ -125,7 +128,8 @@ export default function ShippingAuditPage() {
     const ok99 = logs.filter(l => getLogSource(l) === '99envios').length;
     const fallbacks = logs.filter(l => getLogSource(l) === 'fallback' || getLogSource(l) === 'fallback_no_coverage').length;
     const errors = logs.filter(l => getLogSource(l) === 'error').length;
-    const apiSuccessRate = total > 0 ? Math.round((ok99 / total) * 100) : 0;
+    const cotizacionesNacionales = ok99 + fallbacks + errors;
+    const apiSuccessRate = cotizacionesNacionales > 0 ? Math.round((ok99 / cotizacionesNacionales) * 100) : 100;
 
     if (loading) {
         return (
@@ -195,7 +199,9 @@ export default function ShippingAuditPage() {
                             label: 'API 99 Envíos OK', value: ok99,
                             icon: ok99 > 0 ? Wifi : WifiOff,
                             color: ok99 > 0 ? 'green' : 'red',
-                            sub: `${apiSuccessRate}% tasa de éxito`
+                            sub: cotizacionesNacionales > 0
+                                ? `${apiSuccessRate}% éxito (${ok99}/${cotizacionesNacionales} nac.)`
+                                : 'Sin cotizaciones nac.'
                         },
                         { label: 'Fallbacks usados', value: fallbacks, icon: AlertTriangle, color: 'amber', sub: 'cuando API falló' },
                         { label: 'Errores', value: errors, icon: XCircle, color: 'red', sub: 'errores totales' },
@@ -220,14 +226,13 @@ export default function ShippingAuditPage() {
                 </div>
 
                 {/* API Status Alert */}
-                {apiSuccessRate < 50 && total > 5 && (
+                {cotizacionesNacionales > 3 && (fallbacks > 0 || apiSuccessRate < 80) && (
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
                         <WifiOff className="text-red-500 mt-0.5 flex-shrink-0" size={20} />
                         <div>
-                            <p className="font-semibold text-red-800">⚠️ La API de 99 Envíos no está respondiendo correctamente</p>
+                            <p className="font-semibold text-red-800">⚠️ La API de 99 Envíos presenta incidencias en rutas nacionales</p>
                             <p className="text-sm text-red-600 mt-1">
-                                Solo el {apiSuccessRate}% de las cotizaciones recientes usaron la API de 99 Envíos.
-                                Las demás usaron el sistema de fallback. Revisa las credenciales o el estado del servicio.
+                                De las {cotizacionesNacionales} cotizaciones nacionales recientes, {fallbacks} requirieron el sistema de fallback (Tasa de éxito: {apiSuccessRate}%). Revisa las credenciales o el estado del servicio.
                             </p>
                         </div>
                     </div>
@@ -239,6 +244,7 @@ export default function ShippingAuditPage() {
                         { key: 'all', label: 'Todos' },
                         { key: '99envios', label: '✅ 99 Envíos' },
                         { key: 'free_shipping', label: '🎁 Gratis (Local)' },
+                        { key: 'local_copay', label: '🛵 Copago (Local)' },
                         { key: 'fallback', label: '⚠️ Fallback' },
                         { key: 'fallback_no_coverage', label: '⛔ Sin cobertura' },
                         { key: 'error', label: '❌ Errores' },

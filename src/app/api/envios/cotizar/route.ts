@@ -68,6 +68,7 @@ export async function POST(request: Request) {
                 precioFinal: fleteCliente,
                 esGratis,
                 esLocal: true,
+                source: esGratis ? 'free_shipping' : 'local_copay',
                 transportadora: 'Flota Propia Biocambio360',
                 dias: '1-2',
                 desgloseSubsidio: analysis.desgloseSubsidio,

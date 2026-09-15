@@ -50,5 +50,6 @@ fidelizacion/
 
 # internal audit reports and generator scripts
 INFORME_TECNICO_*.pdf
+MANUAL_*.pdf
 scripts/
 
