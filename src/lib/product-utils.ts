@@ -204,8 +204,20 @@ export function generateProductMetadata(product: Product, size?: string): Metada
     let description = '';
 
     if (product.id.includes('detergente')) {
-        title = `Detergente Líquido Lavadora 20 Litros Bogotá | Biocambio360 Fábrica`;
-        description = `Detergente líquido para lavadora de 20 litros ($86.000 COP) y galón directo de fábrica en Bogotá, Soacha y Colombia. Elimina manchas en ropa blanca y color. Despacho rápido.`;
+        title = `Detergente Líquido Lavadora ${selectedSize} Bogotá | Biocambio360 Fábrica`;
+        description = `Detergente líquido para ropa y lavadora ${selectedSize} a precio directo de fábrica ($${price.toLocaleString('es-CO')}). Elimina manchas difíciles en ropa blanca y de color sin desgastar las fibras. Despacho rápido en Bogotá y Colombia.`;
+    } else if (product.id.includes('suavizante')) {
+        title = `Suavizante de Ropa Concentrado ${selectedSize} | Biocambio360 Fábrica`;
+        description = `Suavizante para ropa concentrado ${selectedSize} con microcápsulas de aroma duradero y efecto antiestático ($${price.toLocaleString('es-CO')}). Venta directa de fábrica con envíos en Bogotá y Colombia.`;
+    } else if (product.id.includes('desengrasante')) {
+        const isIndustrial = product.id.includes('industrial');
+        title = isIndustrial 
+            ? `Desengrasante Industrial Concentrado Heavy Duty ${selectedSize} | Biocambio360 Fábrica`
+            : `Desengrasante Multiusos Cocina y Hogar ${selectedSize} | Biocambio360 Fábrica`;
+        description = `Desengrasante concentrado ${selectedSize} arrancagrasa de alto poder de dilución ($${price.toLocaleString('es-CO')}). Elimina grasa pesada, aceites y suciedad adherida. Venta de fábrica en Bogotá y Colombia.`;
+    } else if (product.id.includes('lavaloza')) {
+        title = `Lavaloza Líquido Concentrado ${selectedSize} Arrancagrasa | Biocambio360 Fábrica`;
+        description = `Jabón lavaloza líquido concentrado ${selectedSize} ($${price.toLocaleString('es-CO')}). Fórmula desengrasante de alto rendimiento para vajillas, ollas y cristalería con pH neutro. Despacho directo de fábrica.`;
     } else if (product.categoria === 'Kits & Combos') {
         title = `${product.nombre} - Oferta Fábrica Bogotá y Colombia | Biocambio360`;
         description = `${product.descripcion} Envíos prioritarios en Bogotá, Soacha, Cundinamarca y toda Colombia. Pago seguro contraentrega.`;
