@@ -340,12 +340,22 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             className="flex flex-col"
                         >
                             <div className="bg-white rounded-2xl p-6 md:p-8 shadow-lg sticky top-4">
-                                <span className="text-xs font-bold text-[var(--brand-blue)] uppercase tracking-wider">
-                                    {product.id === 'desengrasante' || product.id === 'bactokill' 
-                                        ? 'USO MULTISUPERFICIES: HOGAR, NEGOCIOS E INDUSTRIA' 
-                                        : (product.categoria ? `LÍNEA ${product.categoria.toUpperCase()}` : 'LÍNEA DE ASEO Y LIMPIEZA PROFESIONAL')}
-                                </span>
-                                <h1 className="text-3xl md:text-4xl font-black text-gray-900 mt-2 mb-4" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
+                                <div className="mb-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-50 text-[var(--brand-blue)] border border-blue-200/60">
+                                        {product.id.includes('detergente') 
+                                            ? '🧺 Lavadora Automática & Manual · Ropa Blanca y Color'
+                                            : product.id.includes('suavizante')
+                                            ? '🌸 Microcápsulas de Fragancia · Suavizante para Ropa'
+                                            : product.id === 'desengrasante' || product.id === 'desengrasante-industrial'
+                                            ? '⚡ Arrancagrasa Concentrado · Multisuperficies'
+                                            : product.id.includes('lavaloza')
+                                            ? '🍽️ Alto Rendimiento Arrancagrasa · Cuidado de Manos'
+                                            : product.id === 'bactokill'
+                                            ? '🛡️ Desinfección y Bioseguridad Hospitalaria'
+                                            : (product.categoria ? `LÍNEA ${product.categoria.toUpperCase()}` : 'LÍNEA DE ASEO Y LIMPIEZA PROFESIONAL')}
+                                    </span>
+                                </div>
+                                <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-4" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
                                     {product.nombre}
                                 </h1>
                                 <div className="space-y-4 mb-6">

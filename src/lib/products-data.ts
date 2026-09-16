@@ -927,7 +927,7 @@ export const PRODUCTOS: Product[] = [
   },
   {
     "id": "detergente-liquido-multiusos",
-    "nombre": "Detergente Líquido para Lavadora y Ropa",
+    "nombre": "Detergente Líquido para Ropa y Lavadora",
     "precios": {
       "20L": 86000,
       "10L": 57000,
@@ -935,7 +935,7 @@ export const PRODUCTOS: Product[] = [
       "1/2G": 19000
     },
     "slogan": "Detergente Líquido para Lavadora de 20 Litros, 10L y Galón | Ropa Blanca y Color",
-    "descripcion": "Detergente líquido para lavadora de 20 litros, 10 litros y galón con bicarbonato activo. Fórmula concentrada ideal para ropa blanca y de color en Bogotá, Soacha y Colombia. Elimina suciedad pesada y grasa protegiendo las fibras textiles a precio directo de fábrica.",
+    "descripcion": "Detergente líquido concentrado con bicarbonato activo para ropa y lavadora automática. Fórmula de baja espuma que elimina suciedad pesada y manchas difíciles protegiendo las fibras y colores a precio directo de fábrica en Bogotá y Colombia.",
     "imgFile": "label_detergente_ropa_detergente_ropa_galon.webp",
     "imgFileSmall": "PAJARITO_DETERGENTE ROPA Galón.webp",
     "beneficios": [
@@ -2700,15 +2700,15 @@ export const PRODUCTOS: Product[] = [
   },
   {
     "id": "suavizante",
-    "nombre": "Suavizante Floral",
+    "nombre": "Suavizante de Ropa Floral",
     "precios": {
       "1/2G": 19000,
       "3.8L": 34000,
       "10L": 66000,
       "20L": 103000
     },
-    "slogan": "Suavidad que enamora",
-    "descripcion": "Microcápsulas de aroma importado que perduran en las fibras.",
+    "slogan": "Suavidad que Enamora y Fragancia Duradera para tu Ropa",
+    "descripcion": "Suavizante para ropa concentrado con microcápsulas de aroma floral que perduran en las fibras textiles. Suaviza, neutraliza la estática y facilita el planchado protegiendo las prendas en lavadora y lavado manual.",
     "imgFile": "label_suavizante_suavizante_floral_galon.webp",
     "imgFileSmall": "PAJARITO_SUAVIZANTE Galón.webp",
     "beneficios": [
@@ -2738,7 +2738,7 @@ export const PRODUCTOS: Product[] = [
   },
   {
     "id": "suavizante-manzan-verde",
-    "nombre": "Suavizante Manzan Verde",
+    "nombre": "Suavizante de Ropa Manzana Verde",
     "precios": {
       "1/2G": 19000,
       "3.8L": 34000,
@@ -2774,7 +2774,7 @@ export const PRODUCTOS: Product[] = [
   },
   {
     "id": "suavizante-motas-de-algodon",
-    "nombre": "Suavizante Motas de Algodon",
+    "nombre": "Suavizante de Ropa Motas de Algodón",
     "precios": {
       "1/2G": 19000,
       "3.8L": 34000,
@@ -2804,15 +2804,15 @@ export const PRODUCTOS: Product[] = [
   },
   {
     "id": "suavizante-sueno-lavanda",
-    "nombre": "Suavizante Sueño Lavanda",
+    "nombre": "Suavizante de Ropa Sueño Lavanda",
     "precios": {
       "1/2G": 19000,
       "3.8L": 34000,
       "10L": 66000,
       "20L": 103000
     },
-    "slogan": "Calidad Biocambio360",
-    "descripcion": "Producto de alta eficiencia para aseo hogar.",
+    "slogan": "Máxima Suavidad y Fragancia Prolongada de Lavanda para la Ropa",
+    "descripcion": "Suavizante de telas concentrado con aroma a lavanda y microcápsulas de perfume. Deja la ropa suave, esponjosa y fácil de planchar en cada ciclo de lavado.",
     "imgFile": "label_suavizante_suavizante_sueno_lavanda_galon.webp",
     "beneficios": [
       "Calidad Industrial",

@@ -13,6 +13,19 @@ export function generateProductSlug(idOrProduct: string | { id: string; nombre?:
     const id = typeof idOrProduct === 'object' ? idOrProduct.id : idOrProduct;
     const nombre = typeof idOrProduct === 'object' ? (idOrProduct.nombre || idOrProduct.id) : (optionalNombre || id);
 
+    // Mapeo fijo para preservar URLs canónicas existentes y no romper indexación ni Merchant Center
+    const canonicalSlugs: Record<string, string> = {
+        'detergente-liquido-multiusos': 'detergente-liquido-multiusos',
+        'suavizante': 'suavizante-floral-textil-ropa',
+        'suavizante-manzan-verde': 'suavizante-manzan-verde',
+        'suavizante-motas-de-algodon': 'suavizante-motas-de-algodon',
+        'suavizante-sueno-lavanda': 'suavizante-sueno-lavanda',
+    };
+
+    if (canonicalSlugs[id]) {
+        return canonicalSlugs[id];
+    }
+
     // Mapeo de IDs a términos descriptivos adicionales para SEO
     const seoTerms: Record<string, string> = {
         'detergente': 'industrial',
@@ -168,6 +181,7 @@ export async function getAllProductSlugs(): Promise<string[]> {
     slugSet.add('desengrasante-multiusos');
     slugSet.add('desengrasante-hogar');
     slugSet.add('desinfectante-bactokill');
+    slugSet.add('detergente-liquido-para-lavadora-y-ropa');
     return Array.from(slugSet);
 }
 
@@ -200,29 +214,30 @@ export function generateProductMetadata(product: Product, size?: string): Metada
     const pricePerMl = (price / (liters * 1000)).toFixed(2);
 
     // SEO-optimized title with high-intent keywords & local geo-targeting
+    // Notice layout.tsx defines template: "%s | Biocambio360", so we avoid repeating Biocambio360 at the very end
     let title = '';
     let description = '';
 
     if (product.id.includes('detergente')) {
-        title = `Detergente Líquido Lavadora ${selectedSize} Bogotá | Biocambio360 Fábrica`;
-        description = `Detergente líquido para ropa y lavadora ${selectedSize} a precio directo de fábrica ($${price.toLocaleString('es-CO')}). Elimina manchas difíciles en ropa blanca y de color sin desgastar las fibras. Despacho rápido en Bogotá y Colombia.`;
+        title = `Detergente Líquido para Ropa y Lavadora ${selectedSize} - Fábrica Bogotá`;
+        description = `Detergente líquido concentrado con bicarbonato para ropa y lavadora automática ${selectedSize} a precio directo de fábrica ($${price.toLocaleString('es-CO')}). Elimina manchas difíciles en ropa blanca y de color protegiendo las fibras. Despacho rápido en Bogotá y Colombia.`;
     } else if (product.id.includes('suavizante')) {
-        title = `Suavizante de Ropa Concentrado ${selectedSize} | Biocambio360 Fábrica`;
-        description = `Suavizante para ropa concentrado ${selectedSize} con microcápsulas de aroma duradero y efecto antiestático ($${price.toLocaleString('es-CO')}). Venta directa de fábrica con envíos en Bogotá y Colombia.`;
+        title = `${product.nombre} ${selectedSize} - Suavizante para Ropa Concentrado`;
+        description = `${product.nombre} concentrado ${selectedSize} para ropa y telas con microcápsulas de aroma duradero y efecto antiestático ($${price.toLocaleString('es-CO')}). Venta directa de fábrica con envíos en Bogotá y Colombia.`;
     } else if (product.id.includes('desengrasante')) {
         const isIndustrial = product.id.includes('industrial');
         title = isIndustrial 
-            ? `Desengrasante Industrial Concentrado Heavy Duty ${selectedSize} | Biocambio360 Fábrica`
-            : `Desengrasante Multiusos Cocina y Hogar ${selectedSize} | Biocambio360 Fábrica`;
+            ? `Desengrasante Industrial Concentrado Heavy Duty ${selectedSize}`
+            : `Desengrasante Multiusos Cocina y Grasa ${selectedSize}`;
         description = `Desengrasante concentrado ${selectedSize} arrancagrasa de alto poder de dilución ($${price.toLocaleString('es-CO')}). Elimina grasa pesada, aceites y suciedad adherida. Venta de fábrica en Bogotá y Colombia.`;
     } else if (product.id.includes('lavaloza')) {
-        title = `Lavaloza Líquido Concentrado ${selectedSize} Arrancagrasa | Biocambio360 Fábrica`;
-        description = `Jabón lavaloza líquido concentrado ${selectedSize} ($${price.toLocaleString('es-CO')}). Fórmula desengrasante de alto rendimiento para vajillas, ollas y cristalería con pH neutro. Despacho directo de fábrica.`;
+        title = `Lavaloza Líquido Concentrado ${selectedSize} Arrancagrasa`;
+        description = `Jabón lavaloza líquido concentrado ${selectedSize} ($${price.toLocaleString('es-CO')}). Fórmula arrancagrasa de alto rendimiento para vajillas y ollas con pH neutro. Despacho directo de fábrica en Bogotá.`;
     } else if (product.categoria === 'Kits & Combos') {
-        title = `${product.nombre} - Oferta Fábrica Bogotá y Colombia | Biocambio360`;
+        title = `${product.nombre} - Oferta Fábrica Bogotá`;
         description = `${product.descripcion} Envíos prioritarios en Bogotá, Soacha, Cundinamarca y toda Colombia. Pago seguro contraentrega.`;
     } else {
-        title = `${product.nombre} ${selectedSize} Industrial - Fábrica Bogotá | Biocambio360`;
+        title = `${product.nombre} ${selectedSize} Industrial - Fábrica Bogotá`;
         description = `Compra ${product.nombre} ${selectedSize} a precio directo de fábrica ($${price.toLocaleString('es-CO')}). ${product.descripcion} Envíos a Bogotá, Cundinamarca y Colombia.`;
     }
 
@@ -237,11 +252,16 @@ export function generateProductMetadata(product: Product, size?: string): Metada
         title,
         description,
         keywords: [
+            'detergente liquido para lavadora',
+            'detergente para ropa',
             'detergente liquido bogota 20 litros',
-            'detergente liquido para lavadora bogota',
-            'detergente 20 litros bogota',
+            'detergente ropa blanca y color',
+            'jabon liquido lavadora automatica',
+            'suavizante de ropa floral',
+            'suavizante para ropa bogota',
+            'suavizante de telas concentrado',
+            'suavizante 20 litros precio fabrica',
             'detergente liquido industrial bogota',
-            'detergente ropa blanca y color 20 litros',
             'detergente liquido precio fabrica bogota',
             product.nombre.toLowerCase(),
             `${product.nombre.toLowerCase()} industrial`,
@@ -1473,13 +1493,21 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
             citableQuote = `El ${name} de Biocambio360 es un kit integral de higiene para cocina formulado con pH neutro y tensoactivos biodegradables.`;
         }
     }
-    // 12. Laundry Detergents & Fabric Care (Ropa Blanca, Color, Negra, Suavizantes)
-    else if (cat.includes('lavanderia') || sub.includes('detergente') || nameLower.includes('ropa') || nameLower.includes('detergente') || nameLower.includes('suavizante')) {
-        problema = `El lavado frecuente de prendas textiles puede decolorar las telas o dejarlas rígidas si se utilizan detergentes comerciales diluidos de baja concentración.`;
-        solucion = `Utilizar detergentes líquidos concentrados con tensoactivos biodegradables y bicarbonato que remuevan manchas protegiendo los colores y las fibras.`;
-        producto = `El ${name} de Biocambio360 limpia profundamente las prendas textiles, cuidando los colores y dejando un aroma fresco sin residuos de polvo.`;
-        transaccion = `Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá y toda la Sabana.`;
-        citableQuote = `El ${name} de Biocambio360 es un detergente líquido biodegradable fabricado en Colombia para el cuidado y lavado eficiente de ropa.`;
+    // 12a. Suavizantes Textiles (Aromas, Suavidad, Fácil Planchado)
+    else if (nameLower.includes('suavizante') || sub.includes('suavizante')) {
+        problema = `El uso continuo de detergentes y el secado frecuente pueden dejar las prendas rígidas, ásperas al tacto y perdiendo su fragancia rápidamente.`;
+        solucion = `Aplicar suavizante para ropa concentrado con acondicionadores de fibra textil y microcápsulas de perfume que prolongan el aroma durante días.`;
+        producto = `El ${name} de Biocambio360 acondiciona las fibras textiles, facilita el planchado y neutraliza la estática, manteniendo un aroma fresco por más de 48 horas.`;
+        transaccion = `Adquiérelo directamente al fabricante Biocambio360 en presentaciones de 1/2 Galón, Galón, 10 Litros y 20 Litros con despacho en Bogotá y toda Colombia.`;
+        citableQuote = `El ${name} de Biocambio360 es un suavizante textil concentrado formulado con microcápsulas de aroma y acondicionadores para todo tipo de ropa.`;
+    }
+    // 12b. Detergentes para Ropa y Lavadora (Ropa Blanca, Color, Negra, Multiusos)
+    else if (cat.includes('lavanderia') || sub.includes('detergente') || nameLower.includes('ropa') || nameLower.includes('detergente')) {
+        problema = `El lavado constante en lavadora con detergentes comerciales diluidos o en polvo desgasta los colores, deja residuos blancos y encarece el costo por ciclo.`;
+        solucion = `Utilizar detergente líquido para ropa y lavadora formulado con bicarbonato activo y tensoactivos biodegradables de baja espuma que remuevan manchas sin maltratar los tejidos.`;
+        producto = `El ${name} de Biocambio360 protege ropa blanca y de color, rindiendo hasta 280 lavadas en su presentación de 20 litros a precio directo de fábrica.`;
+        transaccion = `Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá y envíos nacionales.`;
+        citableQuote = `El ${name} de Biocambio360 es un detergente líquido para ropa y lavadora formulado con bicarbonato activo y pH neutro para máxima protección textil.`;
     }
 
     // Override with custom Schwartz marketing copy explicitly configured on product
