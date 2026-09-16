@@ -23,6 +23,7 @@ import { createOrder } from '@/lib/orders-service';
 import { processOrderReplenishment, saveReplenishmentRecord } from '@/lib/replenishment-service';
 import { markCartAsRecovered } from '@/lib/abandoned-cart-service';
 import { getStoredTrafficAttribution } from '@/lib/traffic-attribution';
+import { getProductImage } from '@/lib/product-utils';
 import { Order } from '@/types/order';
 import { trackInitiateCheckout, trackAddPaymentInfo } from '@/lib/meta-pixel';
 
@@ -397,7 +398,13 @@ export default function CheckoutPage() {
                     direccion: formData.direccion,
                     notas: formData.notas || undefined
                 },
-                productos: cart,
+                productos: cart.map(item => ({
+                    ...item,
+                    product: {
+                        ...item.product,
+                        imgFile: getProductImage(item.product, item.size)
+                    }
+                })),
                 subtotal,
                 envio: effectiveShippingCost,
                 total,

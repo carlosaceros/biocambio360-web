@@ -49,6 +49,9 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Image from 'next/image';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
+import { Product } from '@/lib/products';
+import { getProductImage } from '@/lib/product-utils';
+import { getAllProducts } from '@/lib/products-service';
 
 /**
  * Safely convert a Firestore Timestamp (or serialized version) to a JS Date.
@@ -75,6 +78,44 @@ function safeToArray<T>(value: any): T[] {
             .map(key => value[key]);
     }
     return [];
+}
+
+/**
+ * Resolves the accurate, size-specific image filename for an order item.
+ * Searches in the real catalog map first (to get updated imgFiles for 20L, 10L, 1/2G, etc.),
+ * falling back to item.product image resolution or placeholder.
+ */
+function resolveOrderItemImage(item: any, catalogMap?: Map<string, Product>): string {
+    if (!item) return 'placeholder.png';
+    const size = item.size || 'DEFAULT';
+    const prodId = item.product?.id || item.id;
+
+    // 1. If we have the live catalog loaded, use it to get the latest custom size images
+    if (prodId && catalogMap && catalogMap.has(prodId)) {
+        const fullProduct = catalogMap.get(prodId)!;
+        const resolved = getProductImage(fullProduct, size);
+        if (resolved && resolved !== 'placeholder.png' && resolved !== 'logo-biocambio360.png') {
+            return resolved;
+        }
+    }
+
+    // 2. If item.product itself contains imgFiles or properties, evaluate with getProductImage
+    if (item.product && typeof item.product === 'object') {
+        const resolved = getProductImage(item.product, size);
+        if (resolved && resolved !== 'placeholder.png' && resolved !== 'logo-biocambio360.png') {
+            return resolved;
+        }
+        if (item.product.imgFile && item.product.imgFile !== 'placeholder.png') {
+            return item.product.imgFile;
+        }
+    }
+
+    // 3. Fallback direct image property if present on item
+    if (item.imgFile && item.imgFile !== 'placeholder.png') {
+        return item.imgFile;
+    }
+
+    return 'placeholder.png';
 }
 
 const ALL_STATUSES: OrderStatus[] = [
@@ -222,6 +263,36 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                     ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
                             💵 Contraentrega
+                        </span>
+                    )}
+                </div>
+
+                {/* Miniaturas de productos con su foto de tamaño exacto */}
+                <div className="flex items-center gap-1.5 py-1 overflow-x-hidden">
+                    {safeToArray(order.productos).slice(0, 3).map((prodItem: any, pIdx: number) => {
+                        const thumbImg = resolveOrderItemImage(prodItem);
+                        const sLabel = prodItem.size || 'STD';
+                        const is20L = sLabel === '20L' || sLabel.includes('20');
+                        return (
+                            <div key={pIdx} className="relative flex items-center gap-1 bg-gray-50 rounded-lg p-1 pr-1.5 border border-gray-100 max-w-[150px]">
+                                <div className="relative w-7 h-7 bg-white rounded border border-gray-200 overflow-hidden shrink-0">
+                                    <Image
+                                        src={`/images/${thumbImg}`}
+                                        alt={prodItem.product?.nombre || 'Producto'}
+                                        fill
+                                        unoptimized
+                                        className="object-contain p-0.5"
+                                    />
+                                </div>
+                                <span className={`text-[10px] font-black px-1 py-0.2 rounded shrink-0 ${is20L ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+                                    {sLabel}
+                                </span>
+                            </div>
+                        );
+                    })}
+                    {safeToArray(order.productos).length > 3 && (
+                        <span className="text-[10px] font-bold text-gray-400">
+                            +{safeToArray(order.productos).length - 3}
                         </span>
                     )}
                 </div>
@@ -391,6 +462,20 @@ export default function PedidosPage() {
             },
         })
     );
+
+    const [catalogMap, setCatalogMap] = useState<Map<string, Product>>(new Map());
+
+    useEffect(() => {
+        getAllProducts({ includeDrafts: true, includeArchived: true })
+            .then(prods => {
+                const map = new Map<string, Product>();
+                prods.forEach(p => {
+                    if (p.id) map.set(p.id, p);
+                });
+                setCatalogMap(map);
+            })
+            .catch(err => console.warn('[Admin/Pedidos] Error fetching catalog for image resolution:', err));
+    }, []);
 
     useEffect(() => {
         const unsubscribe = subscribeToOrders((fetchedOrders) => {
@@ -682,27 +767,56 @@ export default function PedidosPage() {
                                                 Productos
                                             </h3>
                                             <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-                                                {safeToArray(activeOrder.productos).map((item: any, idx: number) => (
-                                                    <div key={idx} className="flex gap-4">
-                                                        <div className="relative w-16 h-16 bg-white rounded-lg border border-gray-200 overflow-hidden flex-shrink-0">
-                                                            <Image
-                                                                src={`/images/${item.product?.imgFile || 'placeholder.png'}`}
-                                                                alt={item.product?.nombre || item.nombre || 'Producto'}
-                                                                fill
-                                                                unoptimized
-                                                                className="object-contain p-1"
-                                                            />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <p className="font-bold text-gray-900 line-clamp-2">{item.product?.nombre || item.nombre || 'Producto'}</p>
-                                                            <p className="text-sm text-gray-500">{item.size || 'Estándar'}</p>
-                                                            <div className="flex justify-between items-center mt-1">
-                                                                <span className="text-sm font-medium">x{item.cantidad || 1}</span>
-                                                                <span className="font-bold">{formatCurrency((item.price || 0) * (item.cantidad || 1))}</span>
+                                                {safeToArray(activeOrder.productos).map((item: any, idx: number) => {
+                                                    const resolvedImg = resolveOrderItemImage(item, catalogMap);
+                                                    const sizeLabel = item.size || 'Estándar';
+                                                    const isLarge = sizeLabel === '20L' || sizeLabel.includes('20');
+                                                    const isMedium = sizeLabel === '10L' || sizeLabel.includes('10');
+                                                    const isGal = sizeLabel === '3.8L' || sizeLabel.includes('Gal') || sizeLabel === '1/2G';
+                                                    
+                                                    const badgeColor = isLarge
+                                                        ? 'bg-red-100 text-red-700 border-red-200'
+                                                        : isMedium
+                                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                                        : isGal
+                                                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                                        : 'bg-gray-100 text-gray-700 border-gray-200';
+
+                                                    return (
+                                                        <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-100 shadow-xs">
+                                                            <div className="relative w-20 h-20 bg-gray-50 rounded-xl border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+                                                                <Image
+                                                                    src={`/images/${resolvedImg}`}
+                                                                    alt={item.product?.nombre || item.nombre || 'Producto'}
+                                                                    fill
+                                                                    unoptimized
+                                                                    className="object-contain p-1.5"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-bold text-gray-900 line-clamp-2 text-sm">
+                                                                    {item.product?.nombre || item.nombre || 'Producto'}
+                                                                </p>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-black border uppercase tracking-wider ${badgeColor}`}>
+                                                                        📦 {sizeLabel}
+                                                                    </span>
+                                                                    <span className="text-xs font-bold text-gray-500">
+                                                                        x{item.cantidad || 1} {item.cantidad > 1 ? 'unidades' : 'unidad'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-gray-50">
+                                                                    <span className="text-xs text-gray-400">
+                                                                        {formatCurrency(item.price || 0)} c/u
+                                                                    </span>
+                                                                    <span className="font-black text-sm text-gray-900">
+                                                                        {formatCurrency((item.price || 0) * (item.cantidad || 1))}
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
 
