@@ -61,6 +61,24 @@ function removeUndefined<T>(obj: T): T {
 }
 
 /**
+ * Crea un Timestamp seguro compatible tanto con el SDK oficial como con entornos de test / Node
+ */
+function createTimestampFromMillis(ms: number): Timestamp {
+    if (typeof Timestamp.fromMillis === 'function') {
+        return Timestamp.fromMillis(ms);
+    }
+    if (typeof Timestamp.fromDate === 'function') {
+        return Timestamp.fromDate(new Date(ms));
+    }
+    return {
+        toDate: () => new Date(ms),
+        toMillis: () => ms,
+        seconds: Math.floor(ms / 1000),
+        nanoseconds: 0
+    } as unknown as Timestamp;
+}
+
+/**
  * Obtener la configuración general del programa de referidos
  */
 export async function getReferralConfig(): Promise<ReferralConfig> {
@@ -98,6 +116,156 @@ export function generateReferralCode(nombre: string, celular: string): string {
 }
 
 /**
+ * Libera las transacciones que estaban en ventana de custodia de 24 horas ('holding_24h')
+ * una vez que su fecha availableAt ha llegado. Transfiere el saldo a balanceAvailable
+ * y renueva el contador de 60 días de vigencia continua (Rolling Expiration).
+ */
+export async function syncReferralReleases(phone: string): Promise<void> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) return;
+
+    try {
+        const qHolding = query(
+            transactionsCollection,
+            where('referralProfileId', '==', cleanPhone),
+            where('releaseStatus', '==', 'holding_24h')
+        );
+        const holdingSnap = await getDocs(qHolding);
+        if (holdingSnap.empty) return;
+
+        const now = Date.now();
+        const readyToRelease: ReferralTransaction[] = [];
+
+        holdingSnap.forEach(d => {
+            const tx = d.data() as ReferralTransaction;
+            const availMillis = tx.availableAt?.toMillis ? tx.availableAt.toMillis() : 0;
+            if (availMillis > 0 && availMillis <= now) {
+                readyToRelease.push(tx);
+            }
+        });
+
+        if (readyToRelease.length === 0) return;
+
+        let totalToRelease = 0;
+        const profileRef = doc(profilesCollection, cleanPhone);
+
+        for (const tx of readyToRelease) {
+            totalToRelease += tx.rewardAmount;
+            const txRef = doc(transactionsCollection, tx.id);
+            await updateDoc(txRef, {
+                releaseStatus: 'released',
+                updatedAt: Timestamp.now()
+            });
+        }
+
+        const expiresAt = createTimestampFromMillis(Date.now() + 60 * 24 * 60 * 60 * 1000);
+        const nowTs = Timestamp.now();
+
+        await updateDoc(profileRef, {
+            balanceInHolding: increment(-totalToRelease),
+            balanceAvailable: increment(totalToRelease),
+            balanceExpiresAt: expiresAt,
+            lastActivityAt: nowTs,
+            updatedAt: nowTs
+        });
+
+        await recordReferralBalanceAuditLog({
+            timestamp: new Date().toISOString(),
+            userEmail: 'sistema@biocambio360.com',
+            userName: 'Liberación Automática 24h',
+            userRole: 'sistema',
+            profileId: cleanPhone,
+            profileName: cleanPhone,
+            profilePhone: cleanPhone,
+            referralCode: readyToRelease[0].referralCode || '',
+            previousBalance: 0,
+            newBalance: totalToRelease,
+            difference: totalToRelease,
+            reason: `Liberación de ${readyToRelease.length} recompensa(s) tras ventana de seguridad de 24h post-entrega. Vigencia renovada por 60 días.`,
+            source: 'holding_release_24h',
+            createdAt: new Date().toISOString()
+        });
+    } catch (err) {
+        console.warn('[Referrals] Error al sincronizar liberación de 24h:', err);
+    }
+}
+
+/**
+ * Verifica si el saldo disponible del embajador ha superado los 60 días de inactividad
+ * sin compras ni nuevos referidos calificados. Si expiró, se da de baja el saldo a 0 y se audita.
+ */
+export async function checkAndExpireReferralBalance(phone: string): Promise<void> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) return;
+
+    try {
+        const profileRef = doc(profilesCollection, cleanPhone);
+        const snap = await getDoc(profileRef);
+        if (!snap.exists()) return;
+
+        const profile = snap.data() as ReferralProfile;
+        const balAvail = profile.balanceAvailable || 0;
+        if (balAvail <= 0) return;
+
+        const expiresMillis = profile.balanceExpiresAt?.toMillis ? profile.balanceExpiresAt.toMillis() : null;
+        if (!expiresMillis) return;
+
+        const now = Date.now();
+        if (now > expiresMillis) {
+            await updateDoc(profileRef, {
+                balanceAvailable: 0,
+                updatedAt: Timestamp.now()
+            });
+
+            await recordReferralBalanceAuditLog({
+                timestamp: new Date().toISOString(),
+                userEmail: 'sistema@biocambio360.com',
+                userName: 'Caducidad de Saldo',
+                userRole: 'sistema',
+                profileId: cleanPhone,
+                profileName: profile.nombre || cleanPhone,
+                profilePhone: cleanPhone,
+                referralCode: profile.code || '',
+                previousBalance: balAvail,
+                newBalance: 0,
+                difference: -balAvail,
+                reason: 'Caducidad de saldo promocional por inactividad de 60 días calendario (Art. 33 Ley 1480/2011)',
+                source: 'balance_expiration',
+                createdAt: new Date().toISOString()
+            });
+        }
+    } catch (err) {
+        console.warn('[Referrals] Error al verificar caducidad de 60 días:', err);
+    }
+}
+
+/**
+ * Renueva el temporizador de 60 días de vigencia continua del embajador
+ * tras realizar una compra calificada o actividad calificada.
+ */
+export async function renewReferralExpiration(phone: string): Promise<void> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) return;
+
+    try {
+        const profileRef = doc(profilesCollection, cleanPhone);
+        const snap = await getDoc(profileRef);
+        if (!snap.exists()) return;
+
+        const expiresAt = createTimestampFromMillis(Date.now() + 60 * 24 * 60 * 60 * 1000);
+        const now = Timestamp.now();
+
+        await updateDoc(profileRef, {
+            balanceExpiresAt: expiresAt,
+            lastActivityAt: now,
+            updatedAt: now
+        });
+    } catch (err) {
+        console.warn('[Referrals] Error al renovar vigencia de 60 días:', err);
+    }
+}
+
+/**
  * Obtiene o crea el perfil de embajador/referidor para un cliente
  */
 export async function getOrCreateReferralProfile(customerData: {
@@ -112,7 +280,10 @@ export async function getOrCreateReferralProfile(customerData: {
     const snap = await getDoc(profileRef);
 
     if (snap.exists()) {
-        return snap.data() as ReferralProfile;
+        await syncReferralReleases(cleanPhone);
+        await checkAndExpireReferralBalance(cleanPhone);
+        const refreshedSnap = await getDoc(profileRef);
+        return (refreshedSnap.data() || snap.data()) as ReferralProfile;
     }
 
     // Generar código único asegurando que no colisione
@@ -123,6 +294,7 @@ export async function getOrCreateReferralProfile(customerData: {
         candidateCode = `${candidateCode}${Math.floor(10 + Math.random() * 89)}`;
     }
 
+    const now = Timestamp.now();
     const newProfile: ReferralProfile = {
         id: cleanPhone,
         code: candidateCode,
@@ -136,11 +308,14 @@ export async function getOrCreateReferralProfile(customerData: {
         totalDeliveredOrders: 0,
         totalSalesGenerated: 0,
         balancePending: 0,
+        balanceInHolding: 0,
         balanceAvailable: 0,
         balanceRedeemed: 0,
+        balanceExpiresAt: createTimestampFromMillis(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        lastActivityAt: now,
         isActive: true,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        createdAt: now,
+        updatedAt: now
     };
 
     await setDoc(profileRef, removeUndefined(newProfile));
@@ -156,7 +331,11 @@ export async function getReferralProfileByCode(code: string): Promise<ReferralPr
     const q = query(profilesCollection, where('code', '==', cleanCode), limit(1));
     const snap = await getDocs(q);
     if (snap.empty) return null;
-    return snap.docs[0].data() as ReferralProfile;
+    const profile = snap.docs[0].data() as ReferralProfile;
+    await syncReferralReleases(profile.id);
+    await checkAndExpireReferralBalance(profile.id);
+    const refreshedSnap = await getDoc(doc(profilesCollection, profile.id));
+    return (refreshedSnap.data() || profile) as ReferralProfile;
 }
 
 /**
@@ -165,6 +344,8 @@ export async function getReferralProfileByCode(code: string): Promise<ReferralPr
 export async function getReferralProfileByPhone(phone: string): Promise<ReferralProfile | null> {
     const cleanPhone = phone.replace(/\D/g, '');
     if (!cleanPhone) return null;
+    await syncReferralReleases(cleanPhone);
+    await checkAndExpireReferralBalance(cleanPhone);
     const snap = await getDoc(doc(profilesCollection, cleanPhone));
     if (!snap.exists()) return null;
     return snap.data() as ReferralProfile;
@@ -230,13 +411,95 @@ export async function checkReferrerQualifiedPurchase(phone: string, minSpend = 5
 }
 
 /**
+ * Verifica si un cliente es estrictamente de PRIMERA COMPRA en Biocambio360
+ * El beneficio de referido y el descuento de amigo aplican EXCLUSIVAMENTE para clientes nuevos.
+ */
+export async function isCustomerFirstPurchase(customer: {
+    celular?: string;
+    cedula?: string;
+    email?: string;
+}): Promise<{ isFirstPurchase: boolean; reason?: string }> {
+    const cleanPhone = (customer.celular || '').replace(/\D/g, '');
+    const cleanCedula = (customer.cedula || '').trim();
+
+    if (!cleanPhone && !cleanCedula) {
+        return { isFirstPurchase: true };
+    }
+
+    try {
+        // 1. Revisar en la colección customers por celular
+        if (cleanPhone) {
+            const custSnap = await getDoc(doc(db, 'customers', cleanPhone));
+            if (custSnap.exists()) {
+                const cData = custSnap.data();
+                if ((cData.ordersCount || 0) > 0) {
+                    return {
+                        isFirstPurchase: false,
+                        reason: 'El beneficio de referido de $10.000 COP es exclusivo para la primera compra de nuevos clientes. Tu celular ya registra compras previas en Biocambio360.'
+                    };
+                }
+            }
+        }
+
+        // 2. Revisar en la colección orders (descartando cancelados)
+        const ordersRef = collection(db, 'orders');
+        if (cleanPhone) {
+            const qOrdersPhone = query(ordersRef, where('cliente.celular', '==', cleanPhone), limit(5));
+            const phoneOrdersSnap = await getDocs(qOrdersPhone);
+            const activeOrders = phoneOrdersSnap.docs.filter(d => d.data().status !== 'cancelado');
+            if (activeOrders.length > 0) {
+                return {
+                    isFirstPurchase: false,
+                    reason: 'El beneficio de referido de $10.000 COP es exclusivo para la primera compra. Tu número ya registra pedidos en la tienda.'
+                };
+            }
+        }
+
+        if (cleanCedula && cleanCedula.length > 4 && cleanCedula !== '000000') {
+            const qOrdersCedula = query(ordersRef, where('cliente.cedula', '==', cleanCedula), limit(5));
+            const cedulaOrdersSnap = await getDocs(qOrdersCedula);
+            const activeCedulaOrders = cedulaOrdersSnap.docs.filter(d => d.data().status !== 'cancelado');
+            if (activeCedulaOrders.length > 0) {
+                return {
+                    isFirstPurchase: false,
+                    reason: 'Tu documento de identidad ya registra pedidos anteriores en Biocambio360.'
+                };
+            }
+        }
+
+        // 3. Revisar si ya usó un beneficio de referido previamente en referral_transactions
+        if (cleanPhone) {
+            const qTx = query(
+                transactionsCollection,
+                where('referredCustomer.celular', '==', cleanPhone),
+                limit(5)
+            );
+            const txSnap = await getDocs(qTx);
+            const validTxs = txSnap.docs.filter(d => d.data().status !== 'rejected');
+            if (validTxs.length > 0) {
+                return {
+                    isFirstPurchase: false,
+                    reason: 'Este número de celular ya utilizó previamente un cupón o enlace de referido.'
+                };
+            }
+        }
+
+        return { isFirstPurchase: true };
+    } catch (err) {
+        console.warn('[Referrals] Error verificando primera compra del cliente:', err);
+        return { isFirstPurchase: true };
+    }
+}
+
+/**
  * Validar si un código de referido puede ser utilizado por un cliente en el checkout
  * Reglas de validación:
  * 1. El programa debe estar activo.
  * 2. El código debe existir y estar activo.
  * 3. REGLA ESTRICTA: El embajador DEBE tener al menos 1 pedido previo calificado (>= minReferrerSpend, ej: $50.000 COP).
  * 4. Antifraude: El cliente comprador no puede ser el mismo embajador (mismo celular o cédula).
- * 5. Subtotal mínimo requerido para la compra del nuevo cliente.
+ * 5. REGLA ESTRICTA DE CLIENTE NUEVO: Solo 1 uso del beneficio por cliente en su primera compra.
+ * 6. Subtotal mínimo requerido para la compra del nuevo cliente.
  */
 export async function validateReferralCodeForOrder(
     code: string,
@@ -310,6 +573,23 @@ export async function validateReferralCodeForOrder(
             discountAmount: 0,
             message: 'No puedes autorreferirte usando el mismo documento de identidad.'
         };
+    }
+
+    // REGLA DE PRIMERA COMPRA EXCLUSIVA (Solo un uso del link por nuevo cliente)
+    if (buyerPhone) {
+        const firstPurchaseCheck = await isCustomerFirstPurchase({
+            celular: customer.celular,
+            cedula: customer.cedula,
+            email: customer.email
+        });
+
+        if (!firstPurchaseCheck.isFirstPurchase) {
+            return {
+                valid: false,
+                discountAmount: 0,
+                message: firstPurchaseCheck.reason || 'El beneficio de referido de $10.000 COP es exclusivo para la primera compra de nuevos clientes.'
+            };
+        }
     }
 
     if (subtotal < config.minOrderSubtotal) {
@@ -396,6 +676,7 @@ export async function recordReferralTransaction(params: {
         rewardAmount: config.rewardAmount,
         friendDiscountAmount: params.discountAmount,
         status: 'pending',
+        releaseStatus: 'pending_delivery',
         isDuplicateAddressAlert,
         createdAt: now,
         updatedAt: now
@@ -441,7 +722,9 @@ export async function recordReferralTransaction(params: {
 }
 
 /**
- * Actualizar el estado de la transacción cuando cambia el estado del pedido (ej. de pendiente a entregado o cancelado)
+ * Actualizar el estado de la transacción cuando cambia el estado del pedido.
+ * REGLA NORMATIVA: Cuando el pedido pasa a 'entregado', la recompensa queda en custodia ('holding_24h')
+ * y se libera a 'balanceAvailable' exactamente 24 HORAS DESPUÉS de confirmada la entrega física.
  */
 export async function updateReferralTransactionOnOrderStatusChange(
     orderId: string,
@@ -461,7 +744,10 @@ export async function updateReferralTransactionOnOrderStatusChange(
     if (tx.status === 'rejected' && newStatus === 'cancelado') return;
 
     if (newStatus === 'entregado') {
-        // Se aprueba la recompensa y se pasa el balance de pendiente a disponible
+        // Se aprueba la recompensa y se coloca en ventana de custodia de 24 horas ('holding_24h')
+        // La recompensa se liberará a balanceAvailable transcurridas 24 horas.
+        const availableAt = createTimestampFromMillis(Date.now() + 24 * 60 * 60 * 1000);
+
         await runTransaction(db, async (t) => {
             const profDoc = await t.get(profileRef);
             if (!profDoc.exists()) return;
@@ -478,6 +764,9 @@ export async function updateReferralTransactionOnOrderStatusChange(
 
             t.update(txRef, {
                 status: 'approved',
+                releaseStatus: 'holding_24h',
+                deliveredAt: now,
+                availableAt,
                 approvedAt: now,
                 updatedAt: now
             });
@@ -485,27 +774,40 @@ export async function updateReferralTransactionOnOrderStatusChange(
             t.update(profileRef, {
                 totalDeliveredOrders: increment(1),
                 balancePending: increment(-tx.rewardAmount),
-                balanceAvailable: increment(tx.rewardAmount),
+                balanceInHolding: increment(tx.rewardAmount),
                 tier: newTier,
                 updatedAt: now
             });
         });
     } else if (newStatus === 'cancelado') {
-        // Se rechaza la transacción y se descuenta el saldo pendiente
+        // Se rechaza la transacción y se descuenta el saldo pendiente o en custodia
         await runTransaction(db, async (t) => {
             const profDoc = await t.get(profileRef);
             if (!profDoc.exists()) return;
 
+            const wasInHolding = tx.releaseStatus === 'holding_24h';
+            const wasReleased = tx.releaseStatus === 'released' || tx.status === 'approved';
+
             t.update(txRef, {
                 status: 'rejected',
+                releaseStatus: 'cancelled',
                 rejectionReason: 'Pedido cancelado o devuelto',
                 updatedAt: now
             });
 
-            t.update(profileRef, {
-                balancePending: increment(-tx.rewardAmount),
+            const profUpdates: Record<string, any> = {
                 updatedAt: now
-            });
+            };
+
+            if (wasInHolding) {
+                profUpdates.balanceInHolding = increment(-tx.rewardAmount);
+            } else if (wasReleased) {
+                profUpdates.balanceAvailable = increment(-tx.rewardAmount);
+            } else {
+                profUpdates.balancePending = increment(-tx.rewardAmount);
+            }
+
+            t.update(profileRef, profUpdates);
         });
     }
 }
@@ -521,6 +823,9 @@ export async function redeemReferralBalanceToCoupon(
     const profileRef = doc(profilesCollection, cleanPhone);
 
     try {
+        await syncReferralReleases(cleanPhone);
+        await checkAndExpireReferralBalance(cleanPhone);
+
         let codeGenerated = '';
         await runTransaction(db, async (t) => {
             const profDoc = await t.get(profileRef);

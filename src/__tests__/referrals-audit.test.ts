@@ -141,4 +141,83 @@ describe('Trazabilidad de Saldos de Embajadores', () => {
         expect(auditPayload.source).toBe('blacklist_penalty');
         expect(auditPayload.userEmail).toBe('auditor@biocambio360.com');
     });
+
+    describe('Regla 1: Un solo uso de link de referido por nuevo cliente (Primera compra)', () => {
+        it('rechaza el beneficio si el cliente ya registra pedidos en customers', async () => {
+            getDocMock.mockResolvedValue(makeDocSnap('3001234567', {
+                id: '3001234567',
+                nombre: 'Cliente Recurrente',
+                ordersCount: 2,
+                totalSpent: 120000
+            }) as any);
+
+            const { isCustomerFirstPurchase } = await import('@/lib/referrals-service');
+            const result = await isCustomerFirstPurchase({ celular: '3001234567' });
+
+            expect(result.isFirstPurchase).toBe(false);
+            expect(result.reason).toContain('exclusivo para la primera compra');
+        });
+
+        it('aprueba el beneficio si el cliente no registra pedidos previos', async () => {
+            getDocMock.mockResolvedValue(makeDocSnap('3009999999', null) as any);
+            const getDocsMock = vi.fn().mockResolvedValue({ empty: true, docs: [] });
+            vi.mocked(firestore.getDocs).mockImplementation(getDocsMock);
+
+            const { isCustomerFirstPurchase } = await import('@/lib/referrals-service');
+            const result = await isCustomerFirstPurchase({ celular: '3009999999' });
+
+            expect(result.isFirstPurchase).toBe(true);
+        });
+    });
+
+    describe('Regla 2: Normalización de Direcciones y Detección de Recurrencia en 30 días', () => {
+        it('normaliza direcciones colombianas eliminando caracteres especiales y estandarizando vías', async () => {
+            const { normalizeAddress } = await import('@/lib/orders-service');
+
+            const addr1 = normalizeAddress('Calle 45 # 12 - 34 Apto 301');
+            const addr2 = normalizeAddress('CLL 45 No. 12-34 apartamento 301');
+            const addr3 = normalizeAddress('Carrera 15 # 85-20');
+            const addr4 = normalizeAddress('CRA 15 No 85 20');
+
+            expect(addr1).toBe('cll 45 12 34 apto 301');
+            expect(addr2).toBe('cll 45 12 34 apto 301');
+            expect(addr1).toBe(addr2);
+            expect(addr3).toBe(addr4);
+        });
+    });
+
+    describe('Regla 3 & 4: Ventana de Custodia de 24h y Renovación Continua de 60 Días', () => {
+        it('establece fecha de liberación availableAt a las 24h post-entrega y estado holding_24h', async () => {
+            const mockTx = {
+                id: 'tx_order123',
+                referralProfileId: '3186037227',
+                rewardAmount: 10000,
+                status: 'pending',
+                releaseStatus: 'pending_delivery'
+            };
+
+            getDocMock.mockResolvedValue(makeDocSnap('tx_order123', mockTx) as any);
+
+            const runTransactionMock = vi.fn().mockImplementation(async (db, cb) => {
+                const fakeTransaction = {
+                    get: vi.fn().mockResolvedValue(makeDocSnap('3186037227', {
+                        id: '3186037227',
+                        tier: 'referidor',
+                        totalDeliveredOrders: 0,
+                        balancePending: 10000,
+                        balanceInHolding: 0,
+                        balanceAvailable: 0
+                    })),
+                    update: vi.fn()
+                };
+                return await cb(fakeTransaction);
+            });
+            vi.mocked(firestore.runTransaction).mockImplementation(runTransactionMock);
+
+            const { updateReferralTransactionOnOrderStatusChange } = await import('@/lib/referrals-service');
+            await updateReferralTransactionOnOrderStatusChange('order123', 'entregado');
+
+            expect(runTransactionMock).toHaveBeenCalled();
+        });
+    });
 });

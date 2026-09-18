@@ -69,13 +69,151 @@ async function autoRecoverMatchingAbandonedCarts(cliente: any, orderId: string):
 }
 
 /**
+ * Normaliza una dirección colombiana para comparación estandarizada
+ * (remueve caracteres especiales, estandariza nomenclatura calle/carrera/etc., números y quita tildes)
+ */
+export function normalizeAddress(raw: string): string {
+    if (!raw) return '';
+    return raw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\bcalle\b/g, 'cll')
+        .replace(/\bcarrera\b/g, 'cra')
+        .replace(/\bdiagonal\b/g, 'dg')
+        .replace(/\btransversal\b/g, 'tv')
+        .replace(/\bavenida\b/g, 'av')
+        .replace(/\bautopista\b/g, 'autop')
+        .replace(/\bapartamento\b/g, 'apto')
+        .replace(/\bnumero\b|\bnum\b|\bno\b|\bn\b/g, '')
+        .replace(/[#.,\-_/\\()]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Detecta si una dirección fue utilizada en otro pedido no cancelado en los últimos 30 días.
+ * NO BLOQUEA LA COMPRA, pero genera metadatos de advertencia para gestores, logística y vendedores.
+ */
+export async function detectRecentAddressOrder(
+    newAddress: string,
+    city?: string,
+    excludeOrderId?: string
+): Promise<{
+    isDuplicate: boolean;
+    match?: {
+        pedidoPrevioId: string;
+        fechaPrevia: string;
+        diasAtras: number;
+        clientePrevio: string;
+        celularPrevio: string;
+        direccionPrevia: string;
+    };
+}> {
+    const normNew = normalizeAddress(newAddress);
+    if (!normNew || normNew.length < 5) {
+        return { isDuplicate: false };
+    }
+
+    try {
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        const cutoffTs = Timestamp.fromMillis(Date.now() - thirtyDaysMs);
+        const q = query(
+            ordersCollection,
+            where('createdAt', '>=', cutoffTs),
+            limit(150)
+        );
+        const snap = await getDocs(q);
+
+        const cleanCity = (city || '').toLowerCase().trim();
+
+        for (const docSnap of snap.docs) {
+            if (excludeOrderId && docSnap.id === excludeOrderId) continue;
+            const data = docSnap.data() as Order;
+            if (data.status === 'cancelado') continue;
+
+            const prevDir = data.cliente?.direccion || '';
+            const prevCity = (data.cliente?.ciudad || '').toLowerCase().trim();
+
+            if (cleanCity && prevCity && cleanCity !== prevCity && !cleanCity.includes(prevCity) && !prevCity.includes(cleanCity)) {
+                continue;
+            }
+
+            const normPrev = normalizeAddress(prevDir);
+            if (!normPrev || normPrev.length < 5) continue;
+
+            const isMatch = normNew === normPrev ||
+                (normNew.length >= 8 && normPrev.length >= 8 && (normNew.includes(normPrev) || normPrev.includes(normNew)));
+
+            if (isMatch) {
+                const prevMs = (data.createdAt as any)?.toMillis ? (data.createdAt as any).toMillis() : Date.now();
+                const diasAtras = Math.max(0, Math.floor((Date.now() - prevMs) / (1000 * 60 * 60 * 24)));
+
+                return {
+                    isDuplicate: true,
+                    match: {
+                        pedidoPrevioId: docSnap.id,
+                        fechaPrevia: new Date(prevMs).toLocaleDateString('es-CO'),
+                        diasAtras,
+                        clientePrevio: data.cliente?.nombre || 'Cliente anterior',
+                        celularPrevio: data.cliente?.celular || '',
+                        direccionPrevia: prevDir
+                    }
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('[OrdersService] Error al auditar dirección recurrente:', e);
+    }
+
+    return { isDuplicate: false };
+}
+
+/**
  * Create a new order in Firestore
  */
 export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'timeline'>): Promise<string> {
     const now = Timestamp.now();
 
+    // Detección Antifraude / Logística: Coincidencia de dirección en los últimos 30 días (NO bloquea)
+    let alertaDireccionReciente = false;
+    let alertaDireccionDetalle: any = undefined;
+    let autoNotes: OrderInternalNote[] = [...(orderData.notasInternas || [])];
+
+    if (orderData.cliente?.direccion) {
+        try {
+            const addrAudit = await detectRecentAddressOrder(
+                orderData.cliente.direccion,
+                orderData.cliente.ciudad
+            );
+            if (addrAudit.isDuplicate && addrAudit.match) {
+                alertaDireccionReciente = true;
+                const m = addrAudit.match;
+                alertaDireccionDetalle = {
+                    ...m,
+                    mensaje: `Esta dirección coincide con el pedido #${m.pedidoPrevioId.slice(-8)} realizado hace ${m.diasAtras} días por ${m.clientePrevio} (${m.celularPrevio}).`
+                };
+
+                // Inyectar nota interna para el equipo logístico y gestores
+                autoNotes.unshift({
+                    id: `note-addr-${Date.now()}`,
+                    text: `⚠️ ALERTA LOGÍSTICA (Dirección recurrente <30d): Coincide con pedido #${m.pedidoPrevioId.slice(-8)} (${m.diasAtras} días atrás, ${m.clientePrevio}, Tel: ${m.celularPrevio}). Verificar antes de despacho para evitar duplicidad accidental.`,
+                    authorEmail: 'sistema@biocambio360.com',
+                    authorName: 'Antifraude / Sistema',
+                    authorRole: 'sistema',
+                    createdAt: new Date().toISOString()
+                });
+            }
+        } catch (auditErr) {
+            console.warn('[OrdersService] Error detectando dirección recurrente:', auditErr);
+        }
+    }
+
     const order = removeUndefined({
         ...orderData,
+        alertaDireccionReciente,
+        alertaDireccionDetalle,
+        notasInternas: autoNotes.length > 0 ? autoNotes : undefined,
         timeline: [{
             status: orderData.status,
             timestamp: now,
@@ -181,8 +319,13 @@ export async function updateOrderStatus(
 
     // Actualizar estado de fidelización / referido si esta orden tenía transacción vinculada
     try {
-        const { updateReferralTransactionOnOrderStatusChange } = await import('./referrals-service');
+        const { updateReferralTransactionOnOrderStatusChange, renewReferralExpiration } = await import('./referrals-service');
         await updateReferralTransactionOnOrderStatusChange(orderId, newStatus);
+
+        // Si la orden se entrega, renovar el contador de 60 días del cliente si es embajador
+        if (newStatus === 'entregado' && order.cliente?.celular) {
+            await renewReferralExpiration(order.cliente.celular);
+        }
     } catch (refErr) {
         console.warn('[Orders] Error al sincronizar recompensa de referido:', refErr);
     }

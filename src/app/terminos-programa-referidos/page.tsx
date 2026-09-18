@@ -106,31 +106,34 @@ export default function TerminosReferidosPage() {
                             <td className="p-3.5 font-bold text-gray-900">Amigo Referido (Nuevo Cliente)</td>
                             <td className="p-3.5 text-emerald-700 font-extrabold">Bono de $10.000 COP de descuento</td>
                             <td className="p-3.5 text-gray-600">Primer pedido con subtotal mínimo de $50.000 COP</td>
-                            <td className="p-3.5 text-gray-600">Válido únicamente en la 1ª compra. No acumulable con otros cupones.</td>
+                            <td className="p-3.5 text-gray-600">Válido exclusivamente en la 1ª compra de clientes nuevos. Límite de 1 solo uso por usuario/número/cédula.</td>
                         </tr>
                         <tr>
                             <td className="p-3.5 font-bold text-gray-900">Embajador (Cliente Referidor)</td>
                             <td className="p-3.5 text-blue-700 font-extrabold">$10.000 COP en saldo acumulable</td>
-                            <td className="p-3.5 text-gray-600">Cuando la compra del referido sea entregada y recaudada</td>
-                            <td className="p-3.5 text-gray-600">Hasta 15 referidos calificados. Redención máx. 50% de su propia compra.</td>
+                            <td className="p-3.5 text-gray-600">Disponible 24 horas después de la entrega física y recaudo exitoso del pedido</td>
+                            <td className="p-3.5 text-gray-600">Hasta 15 referidos calificados. Redención máx. 50% de su propia compra. Contador renovable cada 60 días.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            <h2>7. Condición Suspensiva de Acreditación (Saldo Pendiente vs. Saldo Disponible)</h2>
+            <h2>7. Condición Suspensiva de Acreditación (Saldo Pendiente vs. Saldo en Custodia 24h vs. Saldo Disponible)</h2>
             <p>
-                Para garantizar la viabilidad del programa y proteger el comercio leal contra compras ficticias o desistimientos:
+                Para garantizar la viabilidad del programa y proteger el comercio leal contra compras ficticias, desistimientos o devoluciones inmediatas:
             </p>
             <ul>
                 <li>
-                    <strong>Saldo Pendiente:</strong> Al momento en que el Amigo Referido finaliza exitosamente su orden en el sitio web, el sistema registra una bonificación de $10.000 COP en estado provisional o <em>"Pendiente"</em> en el perfil del Embajador.
+                    <strong>Saldo Pendiente:</strong> Al momento en que el Amigo Referido finaliza exitosamente su orden en el sitio web, el sistema registra una bonificación provisional de $10.000 COP en estado <em>"Pendiente"</em> en el perfil del Embajador.
                 </li>
                 <li>
-                    <strong>Saldo Disponible:</strong> Dicha bonificación pasa a estado <em>"Disponible"</em> exclusivamente cuando la empresa de logística y mensajería aliada certifique la entrega física del paquete a satisfacción y se verifique el recaudo íntegro del dinero (en pagos contraentrega o pasarela Wompi).
+                    <strong>Ventana de Custodia de 24 Horas post-entrega:</strong> Una vez que la transportadora certifica la entrega física del paquete a satisfacción y el recaudo íntegro del dinero, el saldo ingresa en un periodo de custodia preventiva de <strong>veinticuatro (24) horas continuas</strong> antes de su liberación definitiva.
                 </li>
                 <li>
-                    <strong>Anulación por Retracto, Cancelación o Devolución:</strong> Si el pedido del Amigo Referido es cancelado antes de despacho, rechazado en el momento de la entrega, devuelto por dirección errada o es objeto de ejercicio del Derecho de Retracto (Art. 47 Ley 1480 de 2011), el saldo pendiente correlativo se anulará de pleno derecho y sin lugar a indemnización alguna.
+                    <strong>Saldo Disponible:</strong> Transcurrido el término de 24 horas posteriores a la confirmación de la entrega sin novedades, quejas de no recepción ni cancelaciones, el saldo pasa automáticamente a estado <em>"Disponible"</em> para ser redimido en compras.
+                </li>
+                <li>
+                    <strong>Anulación por Retracto, Cancelación o Devolución:</strong> Si el pedido del Amigo Referido es cancelado antes de despacho, rechazado en el momento de la entrega, devuelto por dirección errada o es objeto de ejercicio del Derecho de Retracto (Art. 47 Ley 1480 de 2011), el saldo pendiente o en custodia correlativo se anulará de pleno derecho y sin lugar a indemnización alguna.
                 </li>
             </ul>
 
@@ -153,16 +156,19 @@ export default function TerminosReferidosPage() {
                 </li>
             </ul>
 
-            <h2>9. Término de Vigencia y Caducidad de los Créditos (Art. 33 Ley 1480/2011)</h2>
+            <h2>9. Término de Vigencia y Renovación Continua de los Créditos (Rolling Expiration de 60 Días)</h2>
             <p>
-                En aplicación del principio de certeza en las ofertas promocionales:
+                En aplicación del principio de certeza en las ofertas promocionales (Art. 33 Ley 1480/2011) y con el fin de premiar la lealtad activa de la comunidad:
             </p>
             <ul>
                 <li>
-                    Los saldos en estado <em>"Disponible"</em> tendrán una vigencia máxima e improrrogable de <strong>sesenta (60) días calendario</strong> contados a partir de la fecha exacta de su acreditación efectiva.
+                    Los saldos en estado <em>"Disponible"</em> tendrán una vigencia base de <strong>sesenta (60) días calendario</strong> contados a partir de la fecha exacta de su acreditación efectiva.
                 </li>
                 <li>
-                    Vencido dicho término de 60 días sin que el Embajador haya redimido los créditos en compras en la plataforma, los saldos caducarán automáticamente y serán dados de baja del sistema sin lugar a compensaciones económicas o reintegros.
+                    <strong>Renovación Continua del Contador (Rolling Expiration):</strong> Cada vez que el Embajador registre una nueva compra personal calificada en la plataforma o se acredite una nueva recompensa por entrega efectiva de un referido, <strong>el contador de sesenta (60) días se reiniciará automáticamente desde cero para la totalidad de su saldo acumulado disponible</strong>.
+                </li>
+                <li>
+                    <strong>Caducidad por Inactividad:</strong> Vencido el término de 60 días calendario continuos sin ninguna compra personal ni recomendación entregada nueva, los saldos caducarán automáticamente y serán dados de baja del sistema sin lugar a compensaciones económicas ni reintegros.
                 </li>
             </ul>
 
@@ -187,6 +193,12 @@ export default function TerminosReferidosPage() {
                 BioCambio360 promueve una comunidad de recomendaciones honesta y basada en la buena fe mercantil (Art. 871 del Código de Comercio). Quedan expresamente prohibidas las siguientes conductas, las cuales serán consideradas causales de exclusión inmediata:
             </p>
             <ul>
+                <li>
+                    <strong>Uso Único para Clientes Nuevos:</strong> El código o enlace de recomendación del amigo aplica exclusivamente para la primera compra. No se permite el uso recurrente del beneficio de referido por clientes que ya cuenten con historial de compra en BioCambio360.
+                </li>
+                <li>
+                    <strong>Auditoría de Direcciones de Entrega en Ventana de 30 Días:</strong> Para proteger la transparencia operativa y prevenir acaparamientos o compras ficticias, el sistema audita las direcciones físicas de entrega. Cuando un pedido nuevo coincida con una dirección utilizada en los últimos 30 días, se generará una notificación y alerta interna preventiva para el gestor logístico, vendedores y personal administrativo antes del despacho (sin bloquear de plano la compra del usuario).
+                </li>
                 <li>
                     <strong>Autorreferidos:</strong> Queda prohibido que el Embajador intente utilizar su propio código para sus compras personales mediante la creación de cuentas espejo, uso de cédulas de terceros sin autorización, teléfonos secundarios o simulación de identidad. El sistema audita automáticamente coincidencia de número telefónico, cédula, dirección IP y georreferenciación de entrega.
                 </li>

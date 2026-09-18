@@ -113,6 +113,16 @@ export interface Order {
         rewardAmount: number;
         discountAmount: number;
     };
+    alertaDireccionReciente?: boolean;
+    alertaDireccionDetalle?: {
+        mensaje: string;
+        diasAtras: number;
+        pedidoPrevioId: string;
+        direccionPrevia: string;
+        clientePrevio: string;
+        celularPrevio: string;
+        fechaPrevia?: string;
+    };
     wompiTransaction?: WompiTransactionDetails;
     addiTransaction?: AddiTransactionDetails;
     timeline: TimelineEvent[];

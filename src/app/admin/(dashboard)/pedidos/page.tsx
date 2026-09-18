@@ -305,6 +305,14 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                             {order.cuponAplicado.code} (-{formatCurrency(order.cuponAplicado.discountAmount || 0)})
                         </span>
                     )}
+                    {order.alertaDireccionReciente && (
+                        <span 
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300" 
+                            title={order.alertaDireccionDetalle?.mensaje || "Esta dirección de entrega coincide con un pedido de los últimos 30 días"}
+                        >
+                            ⚠️ Misma dirección (&lt;30d)
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -1030,6 +1038,21 @@ export default function PedidosPage() {
                                                 Envío
                                             </h3>
                                             <div className="bg-white border rounded-xl p-4 space-y-3">
+                                                {activeOrder.alertaDireccionReciente && (
+                                                    <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl text-amber-900 text-xs space-y-1">
+                                                        <p className="font-black flex items-center gap-1.5 text-amber-950">
+                                                            <span className="text-sm">⚠️</span> Alerta de Dirección Recurrente (&lt;30 días)
+                                                        </p>
+                                                        <p className="leading-relaxed font-medium">
+                                                            {activeOrder.alertaDireccionDetalle?.mensaje || "Esta dirección de entrega coincide con otro pedido registrado en los últimos 30 días."}
+                                                        </p>
+                                                        {activeOrder.alertaDireccionDetalle?.pedidoPrevioId && (
+                                                            <p className="text-[11px] text-amber-850 bg-amber-100/70 p-1.5 rounded-lg font-mono">
+                                                                Previo: #{activeOrder.alertaDireccionDetalle.pedidoPrevioId.slice(-8)} • {activeOrder.alertaDireccionDetalle.clientePrevio} ({activeOrder.alertaDireccionDetalle.celularPrevio}) • Hace {activeOrder.alertaDireccionDetalle.diasAtras} días.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <p className="text-xs text-gray-500">Dirección</p>
                                                     <p className="font-bold text-gray-900">{activeOrder.cliente?.direccion || 'N/A'}</p>

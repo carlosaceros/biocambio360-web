@@ -47,8 +47,11 @@ export interface ReferralProfile {
 
     // Balances financieros (en COP)
     balancePending: number; // Por pedidos aún en preparación/camino
+    balanceInHolding?: number; // Saldo de pedidos entregados en ventana de custodia de 24 horas
     balanceAvailable: number; // Saldo disponible para compras
     balanceRedeemed: number; // Saldo ya utilizado en pedidos
+    balanceExpiresAt?: Timestamp; // Fecha de vencimiento rodante (60 días desde última actividad)
+    lastActivityAt?: Timestamp; // Última fecha en que se renovó el contador de 60 días
 
     isActive: boolean;
     createdAt: Timestamp;
@@ -56,6 +59,7 @@ export interface ReferralProfile {
 }
 
 export type ReferralTransactionStatus = 'pending' | 'approved' | 'rejected' | 'redeemed';
+export type ReferralReleaseStatus = 'pending_delivery' | 'holding_24h' | 'released' | 'cancelled';
 
 export interface ReferralTransaction {
     id: string;
@@ -74,10 +78,13 @@ export interface ReferralTransaction {
     rewardAmount: number; // Lo que gana el embajador
     friendDiscountAmount: number; // Lo que se ahorró el amigo
     status: ReferralTransactionStatus;
+    releaseStatus?: ReferralReleaseStatus;
     rejectionReason?: string;
     isDuplicateAddressAlert?: boolean; // Alerta antifraude si la dirección coincide con otros pedidos
     createdAt: Timestamp;
     updatedAt: Timestamp;
+    deliveredAt?: Timestamp;
+    availableAt?: Timestamp; // Momento en que el saldo se libera a disponible (deliveredAt + 24 horas)
     approvedAt?: Timestamp;
 }
 
@@ -95,6 +102,6 @@ export interface ReferralBalanceAuditLog {
     newBalance: number;
     difference: number;
     reason?: string;
-    source: 'admin_modal' | 'blacklist_penalty' | 'manual_adjustment';
+    source: 'admin_modal' | 'blacklist_penalty' | 'manual_adjustment' | 'balance_expiration' | 'holding_release_24h';
     createdAt: string;
 }

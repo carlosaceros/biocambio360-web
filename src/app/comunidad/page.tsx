@@ -348,31 +348,48 @@ function ComunidadContent() {
                             )}
 
                             {/* Tarjetas de Saldos */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-                                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mb-1">
-                                        <Wallet size={15} /> Saldo Disponible
-                                    </span>
-                                    <p className="text-2xl font-black text-emerald-900">{formatCurrency(profile.balanceAvailable)}</p>
-                                    <p className="text-[11px] text-emerald-600 font-medium mt-1">Listo para redimir en compras</p>
-                                </div>
+                            {(() => {
+                                const expSeconds = (profile.balanceExpiresAt as any)?.seconds;
+                                const daysLeft = expSeconds
+                                    ? Math.max(0, Math.ceil((expSeconds * 1000 - Date.now()) / (1000 * 60 * 60 * 24)))
+                                    : 60;
+                                const totalPendingHolding = (profile.balancePending || 0) + (profile.balanceInHolding || 0);
 
-                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                                    <span className="text-xs font-bold text-amber-700 flex items-center gap-1.5 mb-1">
-                                        ⏳ Saldo Pendiente
-                                    </span>
-                                    <p className="text-2xl font-black text-amber-900">{formatCurrency(profile.balancePending)}</p>
-                                    <p className="text-[11px] text-amber-600 font-medium mt-1">Se libera al entregar el pedido</p>
-                                </div>
+                                return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
+                                        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 relative overflow-hidden">
+                                            <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mb-1">
+                                                <Wallet size={15} /> Saldo Disponible
+                                            </span>
+                                            <p className="text-2xl font-black text-emerald-900">{formatCurrency(profile.balanceAvailable)}</p>
+                                            <div className="mt-1 flex items-center justify-between text-[11px]">
+                                                <span className="text-emerald-700 font-bold">Listo para redimir</span>
+                                                <span className="bg-emerald-200/60 text-emerald-900 px-1.5 py-0.5 rounded font-bold" title="Cada nueva compra o recomendación reinicia tus 60 días">
+                                                    ⏳ {daysLeft}d vigencia (renovable)
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
-                                        <ShoppingBag size={15} /> Pedidos Exitosos
-                                    </span>
-                                    <p className="text-2xl font-black text-slate-900">{profile.totalDeliveredOrders}</p>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-1">De {profile.totalReferredOrders} referidos totales</p>
-                                </div>
-                            </div>
+                                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                                            <span className="text-xs font-bold text-amber-700 flex items-center gap-1.5 mb-1">
+                                                ⏳ Saldo en Proceso
+                                            </span>
+                                            <p className="text-2xl font-black text-amber-900">{formatCurrency(totalPendingHolding)}</p>
+                                            <p className="text-[11px] text-amber-700 font-medium mt-1">
+                                                Se libera 24h tras la entrega del pedido
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+                                                <ShoppingBag size={15} /> Pedidos Exitosos
+                                            </span>
+                                            <p className="text-2xl font-black text-slate-900">{profile.totalDeliveredOrders}</p>
+                                            <p className="text-[11px] text-slate-500 font-medium mt-1">De {profile.totalReferredOrders} referidos totales</p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Acciones de Redención */}
                             {profile.balanceAvailable >= 10000 && (
@@ -564,7 +581,7 @@ function ComunidadContent() {
                         <div className="pt-3">
                             <p className="font-bold text-gray-900 mb-1">¿Cuándo se me acredita el saldo?</p>
                             <p className="text-gray-600 leading-relaxed">
-                                El saldo queda en estado &quot;Pendiente&quot; cuando tu amigo hace la compra, y pasa a &quot;Disponible&quot; una vez la transportadora confirma la entrega efectiva y el recaudo del pedido.
+                                El saldo queda en estado &quot;Pendiente&quot; cuando tu amigo hace la compra, y pasa a &quot;Disponible&quot; exactamente <strong>24 horas después</strong> de que la transportadora confirma la entrega efectiva y el recaudo del pedido.
                             </p>
                         </div>
                         <div className="pt-3">
@@ -639,9 +656,9 @@ function ComunidadContent() {
                                     <CheckCircle2 size={16} />
                                     <span>Acreditación Efectiva</span>
                                 </div>
-                                <h4 className="text-sm font-black text-white">Entrega Física y Recaudo</h4>
+                                <h4 className="text-sm font-black text-white">Liberación 24h Post-Entrega</h4>
                                 <p className="text-xs text-slate-300 leading-relaxed">
-                                    El saldo se genera como <em>&quot;Pendiente&quot;</em> al crearse la orden y pasa a <em>&quot;Disponible&quot;</em> únicamente cuando la transportadora certifica la entrega real y el recaudo exitoso del pedido. No aplica para órdenes canceladas o devueltas.
+                                    El saldo se genera como <em>&quot;Pendiente&quot;</em> al crearse la orden y pasa a <em>&quot;Disponible&quot;</em> exactamente <strong>veinticuatro (24) horas después</strong> de que la transportadora certifica la entrega real y el recaudo del pedido. No aplica para órdenes canceladas.
                                 </p>
                             </div>
 
@@ -663,9 +680,9 @@ function ComunidadContent() {
                                     <AlertCircle size={16} />
                                     <span>Vigencia de Bonos</span>
                                 </div>
-                                <h4 className="text-sm font-black text-white">Caducidad a los 60 Días</h4>
+                                <h4 className="text-sm font-black text-white">60 Días Renovables</h4>
                                 <p className="text-xs text-slate-300 leading-relaxed">
-                                    Conforme al Art. 33 de la Ley 1480 de 2011, los saldos en estado Disponible tienen una vigencia de <strong>sesenta (60) días calendario</strong> contados desde su acreditación. Transcurrido este plazo expiran de pleno derecho.
+                                    Los saldos tienen 60 días de vigencia, pero <strong>con cada nuevo pedido entregado o compra propia el contador se reinicia por otros 60 días completos</strong> para todo tu saldo acumulado disponible (Rolling Expiration).
                                 </p>
                             </div>
 

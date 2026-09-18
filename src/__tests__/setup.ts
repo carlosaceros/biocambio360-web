@@ -37,6 +37,18 @@ vi.mock('firebase/firestore', () => ({
             seconds: Math.floor(Date.now() / 1000),
             nanoseconds: 0
         }),
+        fromMillis: (ms: number) => ({
+            toDate: () => new Date(ms),
+            toMillis: () => ms,
+            seconds: Math.floor(ms / 1000),
+            nanoseconds: 0
+        }),
+        fromDate: (d: Date) => ({
+            toDate: () => d,
+            toMillis: () => d.getTime(),
+            seconds: Math.floor(d.getTime() / 1000),
+            nanoseconds: 0
+        }),
     },
 }));
 
