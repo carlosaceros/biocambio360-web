@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { subscribeToOrders } from '@/lib/orders-service';
 import { Order, OrderStatus } from '@/types/order';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
@@ -161,9 +162,13 @@ export default function AdminDashboard() {
             <header className="bg-white border-b shadow-sm sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3 md:gap-4">
-                        <h1 className="text-xl md:text-2xl font-black text-gray-900" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
-                            BIOCAMBIO360
-                        </h1>
+                        <Link href="/admin" className="flex items-center group">
+                            <img
+                                src="/images/logo-biocambio360.png"
+                                alt="Biocambio360 Fábrica"
+                                className="h-9 sm:h-10 w-auto object-contain transition-transform group-hover:scale-105"
+                            />
+                        </Link>
                         {isGestor ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <Shield size={12} className="text-emerald-600" />

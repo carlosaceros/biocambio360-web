@@ -43,16 +43,18 @@ export default function AdminLoginPage() {
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        className="inline-block mb-4"
+                        className="inline-block mb-4 p-3 bg-white/95 rounded-2xl shadow-xl border border-white/20"
                     >
-                        <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-2xl">
-                            <Lock className="text-white" size={40} />
-                        </div>
+                        <img
+                            src="/images/logo-biocambio360.png"
+                            alt="Biocambio360 Fábrica"
+                            className="h-10 sm:h-12 w-auto object-contain mx-auto"
+                        />
                     </motion.div>
-                    <h1 className="text-3xl font-black text-white mb-2" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
-                        BIOCAMBIO360 ADMIN
+                    <h1 className="text-2xl sm:text-3xl font-black text-white mb-2" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
+                        ACCESO ADMINISTRATIVO
                     </h1>
-                    <p className="text-gray-400">Panel de Administración</p>
+                    <p className="text-gray-300 text-xs sm:text-sm font-medium">ERP & CRM Biocambio360 Fábrica</p>
                 </div>
 
                 {/* Login Form */}
