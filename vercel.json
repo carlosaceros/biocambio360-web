@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/process-abandoned-carts",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/recompra-check",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "0 1 * * *"
     }
   ]
 }

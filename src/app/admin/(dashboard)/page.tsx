@@ -19,7 +19,9 @@ import {
     Shield,
     Eye,
     Layers,
-    CheckCircle2
+    CheckCircle2,
+    BarChart3,
+    Target
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -419,6 +421,42 @@ export default function AdminDashboard() {
                                         Gestionar Referidos <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/clientes')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-blue-200 text-left hover:border-blue-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                        <Users size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Clientes & CRM</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Pipeline de etapas, asignación de asesores y SARLAFT.
+                                    </p>
+                                    <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
+                                        Abrir CRM <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/informe-ventas')}
+                                    className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-5 shadow-sm border-2 border-indigo-400 text-left hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-white/10 text-amber-400 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        <BarChart3 size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-white mb-1">Informe Ventas a 2026</h3>
+                                    <p className="text-xs text-indigo-200 mb-2">
+                                        Cumplimiento de metas, asesores y punto de venta (Power BI).
+                                    </p>
+                                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
+                                        Ver BI Comercial <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
                             </div>
                         </div>
                     </>
@@ -609,8 +647,19 @@ export default function AdminDashboard() {
                                     onClick={() => router.push('/admin/clientes')}
                                     className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-blue-200 transition-colors">
                                     <Users className="text-blue-600 mb-3" size={24} />
-                                    <p className="font-black text-gray-900 mb-1">Clientes</p>
-                                    <p className="text-xs text-gray-600">Base de datos completa</p>
+                                    <p className="font-black text-gray-900 mb-1">Clientes & CRM</p>
+                                    <p className="text-xs text-gray-600">Pipeline y seguimiento 360°</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/informe-ventas')}
+                                    className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-xl p-6 shadow-md border-2 border-indigo-400 text-left hover:border-amber-400 transition-colors"
+                                >
+                                    <BarChart3 className="text-amber-400 mb-3" size={24} />
+                                    <p className="font-black text-white mb-1">Informe Ventas a 2026</p>
+                                    <p className="text-xs text-indigo-200">Metas, Asesores y POS (Power BI)</p>
                                 </motion.button>
 
                                 <motion.button
