@@ -24,13 +24,15 @@ import {
     BarChart3,
     ArrowUpRight,
     ArrowDownRight,
-    HelpCircle
+    HelpCircle,
+    Factory
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { subscribeToOrders } from '@/lib/orders-service';
 import { Order, OrderStatus } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
+import { calculateOrderProfitability } from '@/lib/profitability-service';
 import Image from 'next/image';
 
 type PeriodPreset = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'all_time' | 'custom';
@@ -161,6 +163,26 @@ export default function AnalisisFinancieroPage() {
         const isMultiMonth = periodPreset === 'last_3_months' || periodPreset === 'last_6_months' || periodPreset === 'this_year' || periodPreset === 'all_time';
         const timeSeriesMap = new Map<string, { label: string; dateKey: string; revenue: number; ordersCount: number }>();
 
+        // Rentabilidad & Unit Economics
+        let totalCostoQuimico = 0;
+        let totalCostoEmpaques = 0;
+        let totalFleteReal = 0;
+        let totalComisionPasarela = 0;
+
+        const channelProfitability: Record<string, {
+            nombre: string;
+            ventas: number;
+            costosProd: number;
+            fletes: number;
+            pasarelas: number;
+            margenNeto: number;
+            pedidos: number;
+        }> = {
+            tienda_online: { nombre: 'Tienda Online E-Commerce', ventas: 0, costosProd: 0, fletes: 0, pasarelas: 0, margenNeto: 0, pedidos: 0 },
+            mostrador_pos: { nombre: 'Punto Físico Mostrador Soacha', ventas: 0, costosProd: 0, fletes: 0, pasarelas: 0, margenNeto: 0, pedidos: 0 },
+            asesor_whatsapp: { nombre: 'Ventas Asesores WhatsApp', ventas: 0, costosProd: 0, fletes: 0, pasarelas: 0, margenNeto: 0, pedidos: 0 }
+        };
+
         filteredOrders.forEach(order => {
             const st = order.status || 'pendiente';
             statusCounts[st] = (statusCounts[st] || 0) + 1;
@@ -206,6 +228,43 @@ export default function AnalisisFinancieroPage() {
                     existing.revenue += itemRev;
                     productSalesMap.set(prodId, existing);
                 });
+
+                // Canal & Rentabilidad Unitaria
+                let canal: 'mostrador_pos' | 'tienda_online' | 'asesor_whatsapp' = 'tienda_online';
+                if ((order as any).origen === 'pos_soacha' || (order as any).cajeroId || (order.metodoPago as string) === 'efectivo_pos') {
+                    canal = 'mostrador_pos';
+                } else if ((order as any).asesor || (order as any).advisorName) {
+                    canal = 'asesor_whatsapp';
+                }
+
+                const prof = calculateOrderProfitability({
+                    id: order.id,
+                    total: order.total || 0,
+                    envio: order.envio || 0,
+                    metodoPago: order.metodoPago,
+                    canal,
+                    productos: items.map((i: any) => ({
+                        id: i.product?.id || i.id || 'default',
+                        size: i.size || '3.8L',
+                        cantidad: Number(i.cantidad || 1),
+                        price: Number(i.price || 0)
+                    }))
+                });
+
+                totalCostoQuimico += prof.costoMateriaPrimaTotal;
+                totalCostoEmpaques += prof.costoEmpaquesYEtiquetasTotal;
+                totalFleteReal += prof.costoTransporteFleteReal;
+                totalComisionPasarela += prof.costoComisionPasarela;
+
+                const ch = channelProfitability[canal];
+                if (ch) {
+                    ch.ventas += prof.precioVentaTotal;
+                    ch.costosProd += (prof.costoMateriaPrimaTotal + prof.costoEmpaquesYEtiquetasTotal);
+                    ch.fletes += prof.costoTransporteFleteReal;
+                    ch.pasarelas += prof.costoComisionPasarela;
+                    ch.margenNeto += prof.margenContribucionNetoCOP;
+                    ch.pedidos += 1;
+                }
 
                 // Geo breakdown
                 const city = (order.cliente?.ciudad || 'Bogotá').trim();
@@ -257,6 +316,11 @@ export default function AnalisisFinancieroPage() {
 
         const maxTimeSeriesRevenue = Math.max(...timeSeries.map(t => t.revenue), 1);
 
+        const totalCostosOperativos = totalCostoQuimico + totalCostoEmpaques + totalFleteReal + totalComisionPasarela;
+        const margenContribucionTotal = grossSales - totalCostosOperativos;
+        const margenContribucionPorcentaje = grossSales > 0 ? Math.round((margenContribucionTotal / grossSales) * 100) : 0;
+        const subsidioFletes = Math.max(0, totalFleteReal - shippingRevenue);
+
         return {
             totalOrders: filteredOrders.length,
             nonCancelledOrders,
@@ -273,7 +337,15 @@ export default function AnalisisFinancieroPage() {
             topProducts,
             topGeo,
             timeSeries,
-            maxTimeSeriesRevenue
+            maxTimeSeriesRevenue,
+            totalCostoQuimico,
+            totalCostoEmpaques,
+            totalFleteReal,
+            totalComisionPasarela,
+            margenContribucionTotal,
+            margenContribucionPorcentaje,
+            subsidioFletes,
+            channelProfitability: Object.entries(channelProfitability).map(([k, v]) => ({ key: k, ...v }))
         };
     }, [filteredOrders, periodPreset]);
 
@@ -526,6 +598,108 @@ export default function AnalisisFinancieroPage() {
                         <p className="text-[11px] text-amber-700 font-medium">
                             Fletes facturados en órdenes
                         </p>
+                    </div>
+                </div>
+
+                {/* 🏭 P&L y Rentabilidad Real (Sustitución de Excel DIA A DIA - Hoja COSTOS) */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
+                                    <Factory size={20} />
+                                </span>
+                                <h2 className="text-lg font-black text-slate-900 tracking-wide" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
+                                    ESTADO DE RESULTADOS UNITARIO & MARGEN DE CONTRIBUCIÓN
+                                </h2>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Costos de formulación química, envases, fletes reales y pasarelas financieras (Reemplazo Hoja COSTOS)
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className={`px-3.5 py-1.5 rounded-xl font-mono text-xs font-black border ${
+                                financials.margenContribucionPorcentaje >= 40 
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : financials.margenContribucionPorcentaje >= 20 
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                    : 'bg-red-50 text-red-800 border-red-200'
+                            }`}>
+                                Margen Bruto General: {financials.margenContribucionPorcentaje}%
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Tarjetas de Costos Desglosados */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase block">🧪 Materia Prima Química</span>
+                            <p className="text-lg font-black text-slate-900 font-mono mt-1">{formatCurrency(financials.totalCostoQuimico)}</p>
+                            <span className="text-[10px] text-slate-500">Recetas maestras MRP</span>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase block">📦 Envases & Tapas</span>
+                            <p className="text-lg font-black text-slate-900 font-mono mt-1">{formatCurrency(financials.totalCostoEmpaques)}</p>
+                            <span className="text-[10px] text-slate-500">Galones, 10L, 20L</span>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase block">🚚 Fletes Pagados Transportadora</span>
+                            <p className="text-lg font-black text-slate-900 font-mono mt-1">{formatCurrency(financials.totalFleteReal)}</p>
+                            <span className="text-[10px] text-amber-700 font-bold">Subsidio: -{formatCurrency(financials.subsidioFletes)}</span>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase block">💳 Pasarelas & Recaudo</span>
+                            <p className="text-lg font-black text-slate-900 font-mono mt-1">{formatCurrency(financials.totalComisionPasarela)}</p>
+                            <span className="text-[10px] text-slate-500">Wompi, Addi, Efectivo</span>
+                        </div>
+                        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                            <span className="text-[11px] font-bold text-emerald-800 uppercase block">💎 Margen de Contribución</span>
+                            <p className="text-lg font-black text-emerald-900 font-mono mt-1">{formatCurrency(financials.margenContribucionTotal)}</p>
+                            <span className="text-[10px] text-emerald-700 font-black">{financials.margenContribucionPorcentaje}% margen neto</span>
+                        </div>
+                    </div>
+
+                    {/* Tabla comparativa de canales */}
+                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-100 text-slate-700 font-black uppercase text-[10px]">
+                                <tr>
+                                    <th className="py-2.5 px-3">Canal de Comercialización</th>
+                                    <th className="py-2.5 px-3 text-center">Pedidos</th>
+                                    <th className="py-2.5 px-3 text-right">Venta Bruta</th>
+                                    <th className="py-2.5 px-3 text-right">Costo Fabril</th>
+                                    <th className="py-2.5 px-3 text-right">Fletes Reales</th>
+                                    <th className="py-2.5 px-3 text-right">Comisiones</th>
+                                    <th className="py-2.5 px-3 text-right">Margen Neto COP</th>
+                                    <th className="py-2.5 px-3 text-right">% Margen</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-mono">
+                                {financials.channelProfitability.map((ch: any) => {
+                                    const pct = ch.ventas > 0 ? Math.round((ch.margenNeto / ch.ventas) * 100) : 0;
+                                    return (
+                                        <tr key={ch.key} className="hover:bg-slate-50 font-medium">
+                                            <td className="py-2.5 px-3 font-sans font-bold text-slate-900">{ch.nombre}</td>
+                                            <td className="py-2.5 px-3 text-center text-slate-600">{ch.pedidos}</td>
+                                            <td className="py-2.5 px-3 text-right font-bold text-slate-900">{formatCurrency(ch.ventas)}</td>
+                                            <td className="py-2.5 px-3 text-right text-slate-600">-{formatCurrency(ch.costosProd)}</td>
+                                            <td className="py-2.5 px-3 text-right text-slate-600">-{formatCurrency(ch.fletes)}</td>
+                                            <td className="py-2.5 px-3 text-right text-slate-600">-{formatCurrency(ch.pasarelas)}</td>
+                                            <td className={`py-2.5 px-3 text-right font-black ${ch.margenNeto >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                                                {formatCurrency(ch.margenNeto)}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-sans">
+                                                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                                    pct >= 40 ? 'bg-emerald-100 text-emerald-800' : pct >= 20 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                    {pct}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

@@ -51,6 +51,9 @@ fidelizacion/
 # internal audit reports and generator scripts
 INFORME_TECNICO_*.pdf
 MANUAL_*.pdf
-scripts/
+scripts/*
+!scripts/etl_migrate_excels.py
 *.csv
+EXCELS POR INTEGRAR/
+
 

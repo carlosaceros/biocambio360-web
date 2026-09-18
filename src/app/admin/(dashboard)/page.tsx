@@ -21,7 +21,10 @@ import {
     Layers,
     CheckCircle2,
     BarChart3,
-    Target
+    Target,
+    Store,
+    FlaskConical,
+    Award
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -457,6 +460,60 @@ export default function AdminDashboard() {
                                         Ver BI Comercial <ArrowUpRight size={14} />
                                     </span>
                                 </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/pos')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                        <Store size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">TPV Mostrador Soacha</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Cobro táctil rápido, cambio en efectivo y arqueo ciego.
+                                    </p>
+                                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                        Abrir TPV <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/asesores')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-amber-200 text-left hover:border-amber-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                                        <Award size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Cockpit Asesores</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Metas individuales ($30M), comisiones y tareas diarias.
+                                    </p>
+                                    <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
+                                        Abrir Cockpit <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/produccion')}
+                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-teal-200 text-left hover:border-teal-500 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                                        <FlaskConical size={22} />
+                                    </div>
+                                    <h3 className="text-base font-black text-gray-900 mb-1">Producción & MRP</h3>
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Recetas BOM, lotes INVIMA y control de calidad.
+                                    </p>
+                                    <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
+                                        Ver Planta <ArrowUpRight size={14} />
+                                    </span>
+                                </motion.button>
                             </div>
                         </div>
                     </>
@@ -660,6 +717,39 @@ export default function AdminDashboard() {
                                     <BarChart3 className="text-amber-400 mb-3" size={24} />
                                     <p className="font-black text-white mb-1">Informe Ventas a 2026</p>
                                     <p className="text-xs text-indigo-200">Metas, Asesores y POS (Power BI)</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/pos')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-emerald-200 transition-colors"
+                                >
+                                    <Store className="text-emerald-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">TPV Mostrador Soacha</p>
+                                    <p className="text-xs text-gray-600">Punto de venta táctil y arqueo ciego</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/asesores')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-amber-200 transition-colors"
+                                >
+                                    <Award className="text-amber-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Cockpit Asesores</p>
+                                    <p className="text-xs text-gray-600">Gamificación y metas $30M</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/produccion')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-teal-200 transition-colors"
+                                >
+                                    <FlaskConical className="text-teal-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Producción & MRP</p>
+                                    <p className="text-xs text-gray-600">Recetas BOM y trazabilidad INVIMA</p>
                                 </motion.button>
 
                                 <motion.button
