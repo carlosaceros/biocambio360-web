@@ -49,6 +49,10 @@ export interface PosSale {
     observaciones?: string;
     estado: 'completada' | 'anulada';
     lotePrincipal?: string;
+    canal?: 'mostrador_pos' | 'tienda_online' | 'call_center';
+    origen?: string;
+    isOffline?: boolean;
+    syncStatus?: 'synced' | 'pending_sync';
     createdAt: any;
 }
 

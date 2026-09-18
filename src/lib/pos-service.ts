@@ -50,6 +50,68 @@ export function generateTransferConsecutive(): string {
     return `TRF-${datePart}-${randomPart}`;
 }
 
+const POS_OFFLINE_STORAGE_KEY = 'biocambio_pos_offline_sales_queue';
+
+export function isBrowserOnline(): boolean {
+    if (typeof window === 'undefined') return true;
+    return navigator.onLine;
+}
+
+export function getOfflinePendingSales(): PosSale[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = localStorage.getItem(POS_OFFLINE_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error('[POS Offline] Error leyendo cola local:', e);
+        return [];
+    }
+}
+
+export function saveOfflineSale(sale: PosSale): void {
+    if (typeof window === 'undefined') return;
+    try {
+        const current = getOfflinePendingSales();
+        current.push(sale);
+        localStorage.setItem(POS_OFFLINE_STORAGE_KEY, JSON.stringify(current));
+    } catch (e) {
+        console.error('[POS Offline] Error guardando venta local:', e);
+    }
+}
+
+export async function syncOfflinePosSales(): Promise<{ synced: number; failed: number }> {
+    if (typeof window === 'undefined') return { synced: 0, failed: 0 };
+    const pending = getOfflinePendingSales();
+    if (pending.length === 0) return { synced: 0, failed: 0 };
+
+    let synced = 0;
+    let failed = 0;
+    const remaining: PosSale[] = [];
+    const salesCol = collection(db, POS_SALES_REF);
+
+    for (const sale of pending) {
+        try {
+            const { id, ...dataToSave } = sale;
+            await addDoc(salesCol, {
+                ...dataToSave,
+                canal: 'mostrador_pos',
+                origen: 'mostrador_soacha',
+                syncStatus: 'synced',
+                syncedAt: serverTimestamp(),
+                fecha: serverTimestamp(),
+            });
+            synced++;
+        } catch (err) {
+            console.error('[POS Offline Sync] Error sincronizando ticket:', sale.numeroTicket, err);
+            remaining.push(sale);
+            failed++;
+        }
+    }
+
+    localStorage.setItem(POS_OFFLINE_STORAGE_KEY, JSON.stringify(remaining));
+    return { synced, failed };
+}
+
 // ─────────────────────────────────────────────────────────────
 // Ventas de Mostrador (POS)
 // ─────────────────────────────────────────────────────────────
@@ -71,31 +133,57 @@ export async function createPosSale(data: {
     lotePrincipal?: string;
 }): Promise<PosSale> {
     const ticketNumber = generateTicketNumber();
-    const salesCol = collection(db, POS_SALES_REF);
+    const nowIso = new Date().toISOString();
 
-    const newSaleData = {
+    const salePayload: PosSale = {
+        id: `local-${ticketNumber}`,
         ...data,
         numeroTicket: ticketNumber,
-        fecha: serverTimestamp(),
-        estado: 'completada' as const,
-        createdAt: serverTimestamp(),
+        canal: 'mostrador_pos',
+        origen: 'mostrador_soacha',
+        estado: 'completada',
+        fecha: nowIso,
+        createdAt: nowIso,
+        syncStatus: 'synced',
+        isOffline: false,
     };
 
-    const docRef = await addDoc(salesCol, newSaleData);
-
-    // Descontar inventario de mostrador en segundo plano (fire-and-forget seguro)
-    for (const item of data.items) {
-        discountPosStock(item.productId, item.size, item.cantidad).catch(err =>
-            console.warn(`[POS] Error descontando stock para ${item.productId}:`, err)
-        );
+    // Si no hay conexión a internet, guardar directamente en la cola offline local
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+        salePayload.id = `OFFLINE-${ticketNumber}`;
+        salePayload.syncStatus = 'pending_sync';
+        salePayload.isOffline = true;
+        saveOfflineSale(salePayload);
+        return salePayload;
     }
 
-    return {
-        id: docRef.id,
-        ...newSaleData,
-        fecha: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-    } as PosSale;
+    try {
+        const salesCol = collection(db, POS_SALES_REF);
+        const docRef = await addDoc(salesCol, {
+            ...salePayload,
+            fecha: serverTimestamp(),
+            createdAt: serverTimestamp(),
+        });
+
+        // Descontar inventario de mostrador en segundo plano (fire-and-forget seguro)
+        for (const item of data.items) {
+            discountPosStock(item.productId, item.size, item.cantidad).catch(err =>
+                console.warn(`[POS] Error descontando stock para ${item.productId}:`, err)
+            );
+        }
+
+        return {
+            ...salePayload,
+            id: docRef.id,
+        };
+    } catch (networkError) {
+        console.warn('[POS] Falló conexión Firestore. Guardando en cola local offline:', networkError);
+        salePayload.id = `OFFLINE-${ticketNumber}`;
+        salePayload.syncStatus = 'pending_sync';
+        salePayload.isOffline = true;
+        saveOfflineSale(salePayload);
+        return salePayload;
+    }
 }
 
 export async function getPosSales(limitCount: number = 50): Promise<PosSale[]> {

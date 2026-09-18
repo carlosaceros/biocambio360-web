@@ -24,7 +24,9 @@ import {
     Unlock,
     Receipt,
     X,
-    AlertTriangle
+    AlertTriangle,
+    Wifi,
+    WifiOff
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { PRODUCTOS, Product, ProductSize, isDisallowedSize } from '@/lib/products';
@@ -41,7 +43,9 @@ import {
     getActiveCashRegisterSession,
     openCashRegister,
     closeCashRegister,
-    requestWarehouseTransfer
+    requestWarehouseTransfer,
+    getOfflinePendingSales,
+    syncOfflinePosSales
 } from '@/lib/pos-service';
 import { useAuth } from '@/lib/auth-context';
 
@@ -85,10 +89,49 @@ export default function PosPage() {
     const [transferNotes, setTransferNotes] = useState('');
     const [isTransferSubmitting, setIsTransferSubmitting] = useState(false);
 
+    // Network & Offline resilience
+    const [isOnline, setIsOnline] = useState<boolean>(true);
+    const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
+    const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
     useEffect(() => {
+        setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+        setPendingOfflineCount(getOfflinePendingSales().length);
+
+        const handleOnline = async () => {
+            setIsOnline(true);
+            await handleSyncOffline();
+        };
+
+        const handleOffline = () => {
+            setIsOnline(false);
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
         loadSession();
         loadHistory();
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
     }, []);
+
+    const handleSyncOffline = async () => {
+        setIsSyncing(true);
+        try {
+            const res = await syncOfflinePosSales();
+            setPendingOfflineCount(getOfflinePendingSales().length);
+            if (res.synced > 0) {
+                alert(`✅ Conexión recuperada: ${res.synced} venta(s) guardada(s) offline se sincronizaron con éxito en la nube.`);
+                loadHistory();
+            }
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const loadSession = async () => {
         const session = await getActiveCashRegisterSession(user?.uid);
@@ -202,6 +245,10 @@ export default function PosPage() {
             });
 
             setLastCompletedSale(sale);
+            if (sale.isOffline) {
+                setPendingOfflineCount(getOfflinePendingSales().length);
+                alert(`💾 Venta registrada en Modo Offline. El ticket #${sale.numeroTicket} quedó almacenado localmente y se sincronizará automáticamente con Firestore al recuperar conexión.`);
+            }
             setCartItems([]);
             setDiscountAmount(0);
             setCustomerName('');
@@ -273,6 +320,39 @@ export default function PosPage() {
 
                     {/* Estado de Caja & Pestañas */}
                     <div className="flex items-center gap-2 flex-wrap">
+                        {/* Indicador de Conexión & Modo Offline */}
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                            isOnline
+                                ? pendingOfflineCount > 0
+                                    ? 'bg-amber-950/70 border-amber-500/50 text-amber-300'
+                                    : 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                                : 'bg-red-950/80 border-red-500/60 text-red-300 animate-pulse'
+                        }`}>
+                            {isOnline ? (
+                                pendingOfflineCount > 0 ? (
+                                    <button
+                                        onClick={handleSyncOffline}
+                                        disabled={isSyncing}
+                                        className="flex items-center gap-1.5 hover:underline cursor-pointer"
+                                        title="Haz clic para sincronizar las ventas guardadas localmente"
+                                    >
+                                        <RefreshCw size={13} className={isSyncing ? 'animate-spin' : ''} />
+                                        <span>{isSyncing ? 'Sincronizando...' : `${pendingOfflineCount} offline pendientes (Sincronizar)`}</span>
+                                    </button>
+                                ) : (
+                                    <span className="flex items-center gap-1.5">
+                                        <Wifi size={14} className="text-emerald-400" />
+                                        <span>En Línea (Nube)</span>
+                                    </span>
+                                )
+                            ) : (
+                                <span className="flex items-center gap-1.5" title="La red falló pero el POS sigue funcionando localmente">
+                                    <WifiOff size={14} />
+                                    <span>Modo Offline ({pendingOfflineCount} locales)</span>
+                                </span>
+                            )}
+                        </div>
+
                         {/* Indicador de Turno de Caja */}
                         <button
                             onClick={() => setIsCashModalOpen(true)}

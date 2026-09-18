@@ -233,7 +233,7 @@ export default function AnalisisFinancieroPage() {
                 let canal: 'mostrador_pos' | 'tienda_online' | 'asesor_whatsapp' = 'tienda_online';
                 if ((order as any).origen === 'pos_soacha' || (order as any).cajeroId || (order.metodoPago as string) === 'efectivo_pos') {
                     canal = 'mostrador_pos';
-                } else if ((order as any).asesor || (order as any).advisorName) {
+                } else if ((order as any).canal === 'call_center' || (order as any).asesor || (order as any).advisorName) {
                     canal = 'asesor_whatsapp';
                 }
 
