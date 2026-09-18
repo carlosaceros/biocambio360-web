@@ -13,13 +13,26 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
-export type UserRole = 'superadmin' | 'gestor_pedidos' | 'logistico' | 'logistica' | 'user';
+export type UserRole = 
+    | 'superadmin' 
+    | 'director' 
+    | 'gestor' 
+    | 'gestor_pedidos' 
+    | 'logistico' 
+    | 'logistica' 
+    | 'produccion_calidad' 
+    | 'asesor' 
+    | 'cajero' 
+    | 'user';
 
 export interface AdminUserProfile {
     email: string;
     nombre: string;
     role: UserRole;
-    permissions: Record<string, string>;
+    asesorAsignado?: string;
+    estado?: 'activo' | 'inactivo';
+    capacidades?: Record<string, boolean>;
+    permissions?: Record<string, string>;
 }
 
 interface AuthContextType {
@@ -51,10 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (currentUser && currentUser.email) {
                 const email = currentUser.email.toLowerCase().trim();
                 const isSuper = email === 'thinktic.thinktic@gmail.com';
-                const determinedRole: UserRole = isSuper ? 'superadmin' : 'logistico';
+                const determinedRole: UserRole = isSuper ? 'superadmin' : 'gestor';
                 const determinedName = isSuper ? 'Super Administrador THINK TIC' : 'Gestor de Pedidos & Logística';
 
-                // Asignar de inmediato de forma síncrona
                 setRole(determinedRole);
 
                 try {
@@ -62,12 +74,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
                         const data = docSnap.data();
-                        const finalRole = (data.role as UserRole) || determinedRole;
+
+                        // Bloqueo de seguridad si la cuenta fue suspendida/inactivada
+                        if (data.estado === 'inactivo') {
+                            await firebaseSignOut(auth);
+                            setUser(null);
+                            setUserProfile(null);
+                            setRole('user');
+                            setLoading(false);
+                            alert('⚠️ Tu cuenta ha sido suspendida o inactivada por el Administrador.');
+                            return;
+                        }
+
+                        const finalRole = (data.rol || data.role || determinedRole) as UserRole;
                         const profile: AdminUserProfile = {
                             email,
                             nombre: data.nombre || determinedName,
                             role: finalRole,
-                            permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read', carritos_abandonados: 'full' }),
+                            asesorAsignado: data.asesorAsignado || undefined,
+                            estado: data.estado || 'activo',
+                            capacidades: data.capacidades || undefined,
+                            permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' }),
                         };
                         setUserProfile(profile);
                         setRole(finalRole);
@@ -76,17 +103,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             email,
                             nombre: determinedName,
                             role: determinedRole,
-                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read', carritos_abandonados: 'full' },
+                            estado: 'activo',
+                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' },
                         };
                         setUserProfile(profile);
                         setRole(determinedRole);
                     }
-                } catch {
+                } catch (e) {
+                    console.warn('[AuthContext] Error cargando perfil admin_users:', e);
                     const profile: AdminUserProfile = {
                         email,
                         nombre: determinedName,
                         role: determinedRole,
-                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full', 'cotizaciones-b2b': 'full', auditoria_envios: 'read', inventario: 'read', carritos_abandonados: 'full' },
+                        estado: 'activo',
+                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' },
                     };
                     setUserProfile(profile);
                     setRole(determinedRole);
@@ -139,8 +169,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const canAccess = (module: string): boolean => {
         if (role === 'superadmin') return true;
-        if (role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
-            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard', 'carritos-abandonados', 'finanzas', 'productos'].includes(module);
+        if (role === 'director') return true;
+
+        // Comprobación granular si el usuario tiene capacidades explícitas configuradas
+        if (userProfile?.capacidades && typeof userProfile.capacidades[module] === 'boolean') {
+            return userProfile.capacidades[module];
+        }
+
+        if (role === 'gestor' || role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
+            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard', 'carritos-abandonados', 'finanzas', 'productos', 'clientes', 'reabastecimiento'].includes(module);
+        }
+        if (role === 'produccion_calidad') {
+            return ['produccion', 'inventario'].includes(module);
+        }
+        if (role === 'asesor') {
+            return ['asesores', 'clientes', 'reabastecimiento'].includes(module);
+        }
+        if (role === 'cajero') {
+            return ['pos'].includes(module);
         }
         return false;
     };

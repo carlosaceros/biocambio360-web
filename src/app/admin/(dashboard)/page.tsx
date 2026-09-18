@@ -708,6 +708,19 @@ export default function AdminDashboard() {
                                     <p className="text-xs text-gray-600">Pipeline y seguimiento 360°</p>
                                 </motion.button>
 
+                                {role === 'superadmin' && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/usuarios')}
+                                        className="bg-gradient-to-br from-purple-900 to-slate-900 text-white rounded-xl p-6 shadow-md border-2 border-purple-400 text-left hover:border-purple-300 transition-colors"
+                                    >
+                                        <Shield className="text-purple-300 mb-3" size={24} />
+                                        <p className="font-black text-white mb-1">Usuarios & Auditoría ISO</p>
+                                        <p className="text-xs text-purple-200">CRUD roles, permisos y bitácora</p>
+                                    </motion.button>
+                                )}
+
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}

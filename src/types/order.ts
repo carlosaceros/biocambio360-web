@@ -119,6 +119,8 @@ export interface Order {
     notasInternas?: OrderInternalNote[];
     whatsappConversation?: string[];
     notas?: string[];
+    guiaTransportadora?: string;
+    canal?: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }

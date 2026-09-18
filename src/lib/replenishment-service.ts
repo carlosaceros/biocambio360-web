@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, doc, getDocs, getDoc, setDoc, query, where, orderBy, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, query, where, orderBy, limit, addDoc, updateDoc } from 'firebase/firestore';
 import { Order, OrderItem } from '@/types/order';
 
 export interface CustomerReplenishment {
@@ -26,12 +26,16 @@ const replenishmentsRef = collection(db, 'customer_replenishments');
  * B2B is reserved for business/institutional accounts or explicit corporate quote orders.
  */
 export function calculateOrderLifespanDays(
-    orderItems: OrderItem[],
+    orderItems: any,
     isExplicitB2B: boolean = false
 ): { days: number; type: 'b2c' | 'b2b' } {
     let totalVolumeLitres = 0;
 
-    (orderItems || []).forEach((item: OrderItem) => {
+    const itemsList: OrderItem[] = Array.isArray(orderItems)
+        ? orderItems
+        : (orderItems && typeof orderItems === 'object' ? Object.values(orderItems) : []);
+
+    itemsList.forEach((item: OrderItem) => {
         const pres = (item.size || '').toLowerCase();
         const nombre = (item.product?.nombre || (item as any).nombre || '').toLowerCase();
         const qty = item.cantidad || 1;
@@ -72,11 +76,25 @@ export function calculateOrderLifespanDays(
     return { days: estimatedDays, type: customerType };
 }
 
+function safeToDate(val: any): Date {
+    if (!val) return new Date();
+    try {
+        if (typeof val.toDate === 'function') return val.toDate();
+        if (val.seconds) return new Date(val.seconds * 1000);
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) return d;
+    } catch {}
+    return new Date();
+}
+
 /**
  * Records or updates a customer's replenishment timer upon order placement or status update
  */
 export function processOrderReplenishment(order: Order | any): CustomerReplenishment {
-    const orderItems = order.productos || order.items || [];
+    const rawItems = order.productos || order.items || [];
+    const orderItems: any[] = Array.isArray(rawItems)
+        ? rawItems
+        : (rawItems && typeof rawItems === 'object' ? Object.values(rawItems) : []);
     const cliente = order.cliente || order.shippingAddress || {};
     
     // Check if order comes from B2B quote portal or contains corporate data
@@ -90,18 +108,14 @@ export function processOrderReplenishment(order: Order | any): CustomerReplenish
 
     const { days, type } = calculateOrderLifespanDays(orderItems, isExplicitB2B);
     
-    let orderDate = new Date();
-    if (order.createdAt && typeof (order.createdAt as any).toDate === 'function') {
-        orderDate = (order.createdAt as any).toDate();
-    } else if (order.createdAt) {
-        orderDate = new Date(order.createdAt as any);
-    }
-
+    const orderDate = safeToDate(order.createdAt);
     const dueDate = new Date(orderDate.getTime() + days * 24 * 60 * 60 * 1000);
 
-    const itemsSummary = orderItems
-        .map((i: any) => `${i.cantidad}x ${i.product?.nombre || i.nombre || 'Producto'} (${i.size || i.presentacionSeleccionada || '3.8L'})`)
-        .join(', ');
+    const itemsSummary = orderItems.length > 0
+        ? orderItems
+            .map((i: any) => `${i.cantidad || 1}x ${i.product?.nombre || i.nombre || 'Producto'} (${i.size || i.presentacionSeleccionada || '3.8L'})`)
+            .join(', ')
+        : 'Productos de limpieza y aseo';
 
     const customerPhone = cliente.celular || order.customerPhone || order.telefono || '';
     const cleanPhone = customerPhone.replace(/\D/g, '');
@@ -155,9 +169,10 @@ export async function updateCustomerType(id: string, newType: 'b2c' | 'b2b'): Pr
  */
 export async function getAllReplenishmentRecords(): Promise<CustomerReplenishment[]> {
     try {
-        // 1. Fetch all orders from Firestore
+        // 1. Fetch recent confirmed/delivered orders from Firestore with limit to prevent UI freezes
         const ordersRef = collection(db, 'orders');
-        const ordersSnap = await getDocs(ordersRef);
+        const qOrders = query(ordersRef, orderBy('createdAt', 'desc'), limit(1000));
+        const ordersSnap = await getDocs(qOrders);
 
         const VALID_STATUSES: string[] = ['confirmado', 'preparacion', 'enviado', 'en_camino', 'entregado'];
         const customerOrdersMap = new Map<string, any>();
@@ -206,31 +221,35 @@ export async function getAllReplenishmentRecords(): Promise<CustomerReplenishmen
         const now = Date.now();
 
         customerOrdersMap.forEach((order) => {
-            const repl = processOrderReplenishment(order);
-            const customData = customMap.get(repl.id || '') || {};
+            try {
+                const repl = processOrderReplenishment(order);
+                const customData = customMap.get(repl.id || '') || {};
 
-            // Merge custom fields (e.g. manual customerType override, lastReminderSentAt)
-            if (customData.customerType) {
-                repl.customerType = customData.customerType;
+                // Merge custom fields (e.g. manual customerType override, lastReminderSentAt)
+                if (customData.customerType) {
+                    repl.customerType = customData.customerType;
+                }
+                if (customData.lastReminderSentAt) {
+                    repl.lastReminderSentAt = customData.lastReminderSentAt;
+                }
+
+                const dueDate = new Date(repl.nextOrderDueDate).getTime();
+                const daysLeft = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+                let status: CustomerReplenishment['status'] = 'surtido';
+                if (daysLeft < 0) {
+                    status = 'vencido';
+                } else if (daysLeft <= 10) {
+                    status = 'critico_10_dias';
+                } else if (daysLeft <= 25) {
+                    status = 'alerta_temprana';
+                }
+
+                repl.status = status;
+                list.push(repl);
+            } catch (err) {
+                console.warn('[Replenishment] Error procesando pedido individual:', order?.id, err);
             }
-            if (customData.lastReminderSentAt) {
-                repl.lastReminderSentAt = customData.lastReminderSentAt;
-            }
-
-            const dueDate = new Date(repl.nextOrderDueDate).getTime();
-            const daysLeft = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-
-            let status: CustomerReplenishment['status'] = 'surtido';
-            if (daysLeft < 0) {
-                status = 'vencido';
-            } else if (daysLeft <= 10) {
-                status = 'critico_10_dias';
-            } else if (daysLeft <= 25) {
-                status = 'alerta_temprana';
-            }
-
-            repl.status = status;
-            list.push(repl);
         });
 
         // Sort by nextOrderDueDate ascending (most urgent first)

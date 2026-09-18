@@ -6,6 +6,7 @@ import {
     query,
     where,
     orderBy,
+    limit,
     onSnapshot,
     Timestamp,
     getDocs,
@@ -153,6 +154,31 @@ export async function updateOrderStatus(
 
     await updateDoc(orderRef, updatePayload);
 
+    // Registrar en bitácora de auditoría ISO 9001
+    try {
+        const { recordAuditLog } = await import('./audit-service');
+        await recordAuditLog({
+            userId: userContext?.email || 'sistema',
+            userEmail: userContext?.email || 'sistema@biocambio360.com',
+            userName: userContext?.nombre || 'Gestor / Sistema',
+            userRole: userContext?.role || 'logistico',
+            modulo: 'pedidos',
+            accion: 'cambio_estado',
+            entidad: 'pedido',
+            entidadId: orderId,
+            descripcion: `Pedido #${orderId.slice(-8)} cambió de '${previousStatus}' a '${newStatus}'`,
+            detalles: {
+                estadoAnterior: previousStatus,
+                nuevoEstado: newStatus,
+                nota: note || null,
+                cliente: order.cliente?.nombre || 'Desconocido',
+                total: order.total || 0
+            }
+        });
+    } catch (auditErr) {
+        console.warn('[Orders] No se pudo asentar audit log:', auditErr);
+    }
+
     // Actualizar estado de fidelización / referido si esta orden tenía transacción vinculada
     try {
         const { updateReferralTransactionOnOrderStatusChange } = await import('./referrals-service');
@@ -198,18 +224,38 @@ export async function addOrderInternalNote(
     return internalNote;
 }
 
+export interface SubscribeOrdersOptions {
+    statusFilter?: OrderStatus[];
+    limitCount?: number;
+}
+
 /**
- * Subscribe to orders in real-time
+ * Subscribe to orders in real-time with optional status filtering and document limit
  */
 export function subscribeToOrders(
     callback: (orders: (Order & { id: string })[]) => void,
-    statusFilter?: OrderStatus[]
+    optionsOrStatusFilter?: OrderStatus[] | SubscribeOrdersOptions
 ) {
-    let q = query(ordersCollection, orderBy('createdAt', 'desc'));
+    let statusFilter: OrderStatus[] | undefined;
+    let limitCount: number | undefined;
 
-    if (statusFilter && statusFilter.length > 0) {
-        q = query(ordersCollection, where('status', 'in', statusFilter), orderBy('createdAt', 'desc'));
+    if (Array.isArray(optionsOrStatusFilter)) {
+        statusFilter = optionsOrStatusFilter;
+    } else if (optionsOrStatusFilter && typeof optionsOrStatusFilter === 'object') {
+        statusFilter = optionsOrStatusFilter.statusFilter;
+        limitCount = optionsOrStatusFilter.limitCount;
     }
+
+    const constraints: any[] = [];
+    if (statusFilter && statusFilter.length > 0) {
+        constraints.push(where('status', 'in', statusFilter));
+    }
+    constraints.push(orderBy('createdAt', 'desc'));
+    if (limitCount && limitCount > 0) {
+        constraints.push(limit(limitCount));
+    }
+
+    const q = query(ordersCollection, ...constraints);
 
     return onSnapshot(q, (snapshot) => {
         const orders = snapshot.docs.map(doc => ({
@@ -219,6 +265,37 @@ export function subscribeToOrders(
 
         callback(orders);
     });
+}
+
+/**
+ * Search orders remotely by ID, customer phone, or customer name in Firestore
+ */
+export async function searchOrdersRemotely(term: string): Promise<(Order & { id: string })[]> {
+    const cleanTerm = term.trim();
+    if (!cleanTerm) return [];
+
+    const resultsMap = new Map<string, Order & { id: string }>();
+
+    // 1. Direct document ID lookup
+    try {
+        const docRef = doc(db, 'orders', cleanTerm);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            resultsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as any);
+        }
+    } catch {}
+
+    // 2. Search by exact phone digits
+    const cleanPhone = cleanTerm.replace(/\D/g, '');
+    if (cleanPhone.length >= 7) {
+        try {
+            const qPhone = query(ordersCollection, where('cliente.celular', '==', cleanPhone), limit(25));
+            const snap = await getDocs(qPhone);
+            snap.forEach(d => resultsMap.set(d.id, { id: d.id, ...d.data() } as any));
+        } catch {}
+    }
+
+    return Array.from(resultsMap.values());
 }
 
 /**

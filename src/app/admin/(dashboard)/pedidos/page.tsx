@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { subscribeToOrders, updateOrderStatus, addOrderInternalNote } from '@/lib/orders-service';
+import { subscribeToOrders, updateOrderStatus, addOrderInternalNote, searchOrdersRemotely } from '@/lib/orders-service';
 import { Order, OrderStatus, ORDER_STATUS_CONFIG, TimelineEvent, OrderInternalNote } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -347,6 +347,15 @@ function KanbanColumn({ status, orders, onOrderClick }: KanbanColumnProps) {
     const { setNodeRef, isOver } = useDroppable({
         id: status
     });
+    const [displayLimit, setDisplayLimit] = useState(25);
+
+    // Visible orders sliced for high-performance rendering (keeps DOM lean)
+    const visibleOrders = orders.slice(0, displayLimit);
+    const remainingCount = orders.length - visibleOrders.length;
+
+    const handleLoadMore = () => {
+        setDisplayLimit(prev => prev + 25);
+    };
 
     return (
         <div className="flex-shrink-0 w-80 flex flex-col h-full bg-gray-50/50 rounded-xl border border-gray-100">
@@ -357,7 +366,14 @@ function KanbanColumn({ status, orders, onOrderClick }: KanbanColumnProps) {
                         <span className="text-2xl">{config.icon}</span>
                         <div>
                             <h3 className={`font-black ${config.color}`}>{config.label}</h3>
-                            <p className="text-xs text-gray-600">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</p>
+                            <p className="text-xs text-gray-600">
+                                {orders.length} pedido{orders.length !== 1 ? 's' : ''}
+                                {orders.length > 25 && (
+                                    <span className="text-[10px] font-bold text-gray-500 ml-1">
+                                        (viendo {visibleOrders.length})
+                                    </span>
+                                )}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -369,13 +385,28 @@ function KanbanColumn({ status, orders, onOrderClick }: KanbanColumnProps) {
                 className={`flex-1 p-3 space-y-3 overflow-y-auto transition-colors ${isOver ? 'bg-red-50/50' : ''}`}
                 style={{ maxHeight: 'calc(100vh - 220px)', minHeight: '200px' }}
             >
-                {orders.map((order) => (
+                {visibleOrders.map((order) => (
                     <OrderCard
                         key={order.id}
                         order={order}
                         onClick={() => onOrderClick(order)}
                     />
                 ))}
+
+                {remainingCount > 0 && (
+                    <div className="pt-2 pb-1 text-center">
+                        <button
+                            onClick={handleLoadMore}
+                            className="w-full py-2 px-3 bg-white hover:bg-gray-100 border border-gray-200 text-xs font-bold text-gray-700 rounded-xl transition-all shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                            <span>Cargar más (+25)</span>
+                            <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-[10px] font-mono">
+                                Restan {remainingCount}
+                            </span>
+                        </button>
+                    </div>
+                )}
+
                 {orders.length === 0 && (
                     <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
                         Arrastra pedidos aquí
@@ -397,6 +428,12 @@ export default function PedidosPage() {
     const [isCheckingWompi, setIsCheckingWompi] = useState(false);
     const [wompiStatusFeedback, setWompiStatusFeedback] = useState<string | null>(null);
 
+    // Filtro de ventana de tiempo para aligerar la carga del tablero
+    type TimeWindow = '5_dias' | '15_dias' | '30_dias' | 'activos' | 'todos';
+    const [timeWindow, setTimeWindow] = useState<TimeWindow>('5_dias');
+    const [isSearchingRemote, setIsSearchingRemote] = useState(false);
+    const [remoteSearchMessage, setRemoteSearchMessage] = useState<string | null>(null);
+
     // Modal de Cambio de Etapa con Comentario Logístico
     const [stageChangePrompt, setStageChangePrompt] = useState<{
         isOpen: boolean;
@@ -411,6 +448,30 @@ export default function PedidosPage() {
     // Estado para nueva nota interna en modal de detalle
     const [newInternalNoteText, setNewInternalNoteText] = useState('');
     const [isAddingInternalNote, setIsAddingInternalNote] = useState(false);
+
+    const handleRemoteSearch = async () => {
+        const term = searchQuery.trim();
+        if (!term) return;
+        setIsSearchingRemote(true);
+        setRemoteSearchMessage(null);
+        try {
+            const found = await searchOrdersRemotely(term);
+            if (found.length > 0) {
+                setOrders(prev => {
+                    const existing = new Set(prev.map(o => o.id));
+                    const newOrders = found.filter(o => !existing.has(o.id));
+                    return [...newOrders, ...prev];
+                });
+                setRemoteSearchMessage(`✅ ${found.length} pedido(s) encontrado(s) en histórico`);
+            } else {
+                setRemoteSearchMessage('ℹ️ No se encontraron pedidos con ese ID o teléfono');
+            }
+        } catch (e: any) {
+            setRemoteSearchMessage(`❌ Error en búsqueda remota: ${e.message}`);
+        } finally {
+            setIsSearchingRemote(false);
+        }
+    };
 
     const handleCheckWompi = async (orderId: string) => {
         setIsCheckingWompi(true);
@@ -478,12 +539,15 @@ export default function PedidosPage() {
     }, []);
 
     useEffect(() => {
+        // Carga ligera: Por defecto trae los pedidos más recientes (~350).
+        // Si el usuario elige "Histórico Completo", consulta sin límite.
+        const limitCount = timeWindow === 'todos' ? undefined : 350;
         const unsubscribe = subscribeToOrders((fetchedOrders) => {
             setOrders(fetchedOrders);
-        });
+        }, { limitCount });
 
         return unsubscribe;
-    }, []);
+    }, [timeWindow]);
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveDragId(event.active.id as string);
@@ -597,14 +661,34 @@ export default function PedidosPage() {
         }),
     };
 
+    const isOrderInWindow = (order: Order & { id: string }) => {
+        const ACTIVE_STATUSES: OrderStatus[] = ['pendiente', 'confirmado', 'preparacion', 'enviado', 'en_camino'];
+        // Regla Innegociable: Las órdenes activas SIEMPRE se muestran para no perder despachos
+        if (ACTIVE_STATUSES.includes(order.status)) return true;
+
+        if (timeWindow === 'activos') return false;
+        if (timeWindow === 'todos') return true;
+
+        const days = timeWindow === '5_dias' ? 5 : timeWindow === '15_dias' ? 15 : 30;
+        const orderDate = safeToDate(order.createdAt);
+        const cutoffMs = Date.now() - (days * 24 * 60 * 60 * 1000);
+        return orderDate.getTime() >= cutoffMs;
+    };
+
     const filteredOrders = orders.filter(order => {
+        // When searching, bypass window filter so loaded orders match immediately
+        if (!searchQuery && !isOrderInWindow(order)) {
+            return false;
+        }
+
         if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
         return (
             order.id.toLowerCase().includes(query) ||
-            order.cliente.nombre.toLowerCase().includes(query) ||
-            order.cliente.celular.includes(query) ||
-            order.cliente.ciudad.toLowerCase().includes(query) ||
+            (order.cliente?.nombre && order.cliente.nombre.toLowerCase().includes(query)) ||
+            (order.cliente?.celular && order.cliente.celular.includes(query)) ||
+            (order.cliente?.ciudad && order.cliente.ciudad.toLowerCase().includes(query)) ||
+            (order.guiaTransportadora && order.guiaTransportadora.toLowerCase().includes(query)) ||
             (order.metodoPago && order.metodoPago.toLowerCase().includes(query)) ||
             (order.addiTransaction?.status && order.addiTransaction.status.toLowerCase().includes(query)) ||
             (order.wompiTransaction?.status && order.wompiTransaction.status.toLowerCase().includes(query))
@@ -634,7 +718,7 @@ export default function PedidosPage() {
             {/* Top Bar */}
             <header className="bg-white border-b shadow-sm sticky top-0 z-20">
                 <div className="max-w-full px-4 md:px-6 py-4">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-4">
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
@@ -656,7 +740,9 @@ export default function PedidosPage() {
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-sm text-gray-500">{orders.length} pedidos totales</p>
+                                <p className="text-xs text-gray-500 font-medium">
+                                    {filteredOrders.length} pedido{filteredOrders.length !== 1 ? 's' : ''} en vista · {orders.length} cargados en memoria
+                                </p>
                             </div>
                         </div>
 
@@ -673,17 +759,68 @@ export default function PedidosPage() {
                         </div>
                     </div>
 
-                    {/* Search */}
+                    {/* Selector de Ventana de Tiempo (Optimización de Carga) */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                        <span className="text-[10px] font-black uppercase text-gray-400 mr-1 flex items-center gap-1">
+                            <Clock size={12} /> Ventana:
+                        </span>
+                        {[
+                            { id: '5_dias', label: '⚡ Últimos 5 Días (Rápido)' },
+                            { id: '15_dias', label: '15 Días' },
+                            { id: '30_dias', label: '30 Días' },
+                            { id: 'activos', label: '🎯 Solo Activos / En Tránsito' },
+                            { id: 'todos', label: '📦 Histórico Completo' },
+                        ].map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setTimeWindow(tab.id as any)}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    timeWindow === tab.id
+                                        ? 'bg-red-600 text-white shadow-xs'
+                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Search Bar con Soporte Remoto */}
                     <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                             type="text"
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Buscar por ID, nombre, teléfono o ciudad..."
-                            className="w-full pl-12 pr-4 py-3 bg-gray-100 border-2 border-transparent rounded-xl focus:bg-white focus:border-red-500 focus:outline-none transition-colors"
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setRemoteSearchMessage(null);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRemoteSearch();
+                            }}
+                            placeholder="Buscar por ID, cliente, teléfono, ciudad o guía (Enter para buscar en todo el histórico)..."
+                            className="w-full pl-11 pr-28 py-2.5 bg-gray-100 border-2 border-transparent rounded-xl focus:bg-white focus:border-red-500 focus:outline-none transition-colors text-xs font-medium"
                         />
+                        {searchQuery && (
+                            <button
+                                onClick={handleRemoteSearch}
+                                disabled={isSearchingRemote}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            >
+                                {isSearchingRemote ? (
+                                    <RefreshCw size={12} className="animate-spin" />
+                                ) : (
+                                    <Search size={12} />
+                                )}
+                                <span>{isSearchingRemote ? 'Buscando...' : 'Buscar Histórico'}</span>
+                            </button>
+                        )}
                     </div>
+                    {remoteSearchMessage && (
+                        <p className="mt-1.5 text-xs font-bold text-indigo-700">
+                            {remoteSearchMessage}
+                        </p>
+                    )}
                 </div>
             </header>
 
