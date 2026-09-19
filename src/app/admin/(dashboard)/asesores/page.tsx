@@ -23,7 +23,9 @@ import {
     Layers,
     Clock,
     FileSpreadsheet,
-    Shield
+    Shield,
+    Bookmark,
+    Trash2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/checkout-utils';
@@ -36,8 +38,9 @@ import { CustomerCRM } from '@/types/crm';
 import { addCRMActivity } from '@/lib/crm-service';
 import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
-import { ORDER_STATUS_CONFIG, OrderStatus } from '@/types/order';
+import { ORDER_STATUS_CONFIG, OrderStatus, Order } from '@/types/order';
 import { subscribeToAdminUsers } from '@/lib/users-service';
+import { getDraftOrdersByAdvisor, discardDraftOrder } from '@/lib/orders-service';
 
 const DEFAULT_ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
 
@@ -55,13 +58,16 @@ export default function AsesoresCockpitPage() {
     const [selectedAdvisor, setSelectedAdvisor] = useState<string>(initialAdvisor);
     const [advisorsList, setAdvisorsList] = useState<string[]>(DEFAULT_ADVISORS);
     const [portfolio, setPortfolio] = useState<AdvisorPortfolioSummary | null>(null);
+    const [draftOrders, setDraftOrders] = useState<(Order & { id: string })[]>([]);
+    const [selectedDraftForModal, setSelectedDraftForModal] = useState<(Order & { id: string }) | null>(null);
+    const [isDiscardingDraft, setIsDiscardingDraft] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [quickNoteText, setQuickNoteText] = useState<{ [key: string]: string }>({});
 
     // Fast order modal & tab state
     const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
     const [preloadedClientForOrder, setPreloadedClientForOrder] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos'>('tareas');
+    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores'>('tareas');
 
     // Cargar asesores dinámicamente desde admin_users
     useEffect(() => {
@@ -111,8 +117,12 @@ export default function AsesoresCockpitPage() {
     const loadData = async (advName: string) => {
         setIsLoading(true);
         try {
-            const data = await getAdvisorPortfolio(advName);
+            const [data, drafts] = await Promise.all([
+                getAdvisorPortfolio(advName),
+                getDraftOrdersByAdvisor(advName)
+            ]);
             setPortfolio(data);
+            setDraftOrders(drafts);
         } finally {
             setIsLoading(false);
         }
@@ -138,6 +148,7 @@ export default function AsesoresCockpitPage() {
     };
 
     const handleOpenOrderForClient = (client: CustomerCRM) => {
+        setSelectedDraftForModal(null);
         setPreloadedClientForOrder({
             nombre: client.nombre,
             celular: client.celular,
@@ -147,6 +158,33 @@ export default function AsesoresCockpitPage() {
             departamento: client.departamento
         });
         setIsFastOrderOpen(true);
+    };
+
+    const handleResumeDraft = (draft: Order & { id: string }) => {
+        setPreloadedClientForOrder(null);
+        setSelectedDraftForModal(draft);
+        setIsFastOrderOpen(true);
+    };
+
+    const handleDiscardDraft = async (draftId: string) => {
+        if (!window.confirm('¿Deseas descartar este borrador? Se registrará como cancelado en la auditoría sin alterar inventario.')) {
+            return;
+        }
+
+        setIsDiscardingDraft(draftId);
+        try {
+            await discardDraftOrder(draftId, {
+                email: user?.email || undefined,
+                nombre: selectedAdvisor,
+                role: role || 'asesor'
+            });
+            await loadData(selectedAdvisor);
+        } catch (err) {
+            console.error('Error al descartar borrador:', err);
+            alert('Error al descartar el borrador. Intenta nuevamente.');
+        } finally {
+            setIsDiscardingDraft(null);
+        }
     };
 
     return (
@@ -341,6 +379,25 @@ export default function AsesoresCockpitPage() {
                         >
                             <ShoppingBag size={14} />
                             <span>Mis Pedidos del Mes ({portfolio?.pedidosMesCount || 0})</span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('borradores')}
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                                activeTab === 'borradores'
+                                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                        >
+                            <Bookmark size={14} className={activeTab === 'borradores' ? 'text-slate-950' : 'text-amber-500'} />
+                            <span>Borradores & Cotizaciones ({draftOrders.length})</span>
+                            {draftOrders.length > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    activeTab === 'borradores' ? 'bg-slate-950 text-amber-300' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                    {draftOrders.length}
+                                </span>
+                            )}
                         </button>
                     </div>
 
@@ -570,6 +627,163 @@ export default function AsesoresCockpitPage() {
                         </div>
                     </div>
                 )}
+
+                {/* TAB 3: Borradores & Cotizaciones Pendientes */}
+                {activeTab === 'borradores' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-base font-black text-slate-900">
+                                        Borradores & Cotizaciones de {selectedAdvisor}
+                                    </h2>
+                                    <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300">
+                                        Stock Reservado: NO
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Cotizaciones en caliente guardadas durante llamadas o chats. No comprometen inventario hasta que el cliente confirme.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setSelectedDraftForModal(null);
+                                    setPreloadedClientForOrder(null);
+                                    setIsFastOrderOpen(true);
+                                }}
+                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <Plus size={14} />
+                                <span>Nueva Cotización</span>
+                            </button>
+                        </div>
+
+                        {/* Grid de Tarjetas de Borradores */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                            {draftOrders.map(draft => {
+                                const cleanPhone = (draft.cliente?.celular || '').replace(/\D/g, '');
+                                const totalFormatted = formatCurrency(draft.total || 0);
+                                const dateStr = draft.createdAt?.toMillis?.()
+                                    ? new Date(draft.createdAt.toMillis()).toLocaleString('es-CO', {
+                                          day: '2-digit',
+                                          month: 'short',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                      })
+                                    : 'Reciente';
+
+                                const itemsSummary = (draft.productos || [])
+                                    .map(p => `${p.cantidad}x ${p.product?.nombre || 'Producto'} (${p.size})`)
+                                    .join('\n• ');
+
+                                const whatsappFollowupMsg = encodeURIComponent(
+                                    `Hola ${draft.cliente?.nombre || ''}, te saluda ${selectedAdvisor} de Biocambio360. Te escribo para retomar la cotización #${draft.id.slice(-8)} de los productos de limpieza:\n• ${itemsSummary}\n\nTotal con envío: ${totalFormatted}. ¿Confirmamos el despacho para que te llegue pronto?`
+                                );
+
+                                return (
+                                    <div
+                                        key={draft.id}
+                                        className="bg-slate-50 rounded-xl border border-amber-200/80 p-4 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden"
+                                    >
+                                        <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none overflow-hidden">
+                                            <div className="bg-amber-400 text-slate-950 font-black text-[9px] py-0.5 text-center transform rotate-45 translate-x-4 translate-y-2 uppercase shadow-2xs">
+                                                Draft
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-start justify-between pr-8">
+                                                <div>
+                                                    <h3 className="font-bold text-sm text-slate-900">
+                                                        {draft.cliente?.nombre || 'Cliente sin nombre'}
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500">
+                                                        📞 {draft.cliente?.celular || 'Sin celular'} · {draft.cliente?.ciudad || 'Colombia'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Motivo del borrador */}
+                                            <div className="bg-white border border-amber-200 rounded-lg p-2 text-xs">
+                                                <span className="text-[10px] uppercase font-bold text-amber-800 block">
+                                                    Motivo de pausa:
+                                                </span>
+                                                <p className="text-xs text-slate-700 font-medium">
+                                                    {draft.motivoBorrador || 'Cotización en llamada / Espera confirmación'}
+                                                </p>
+                                            </div>
+
+                                            {/* Productos */}
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] uppercase font-bold text-slate-400">
+                                                    Productos ({draft.productos?.length || 0}):
+                                                </span>
+                                                <div className="max-h-24 overflow-y-auto space-y-1 text-xs text-slate-700 bg-white/70 p-2 rounded-lg border border-slate-200/60">
+                                                    {draft.productos?.map((p, pIdx) => (
+                                                        <div key={pIdx} className="flex justify-between items-baseline gap-2">
+                                                            <span className="truncate">
+                                                                {p.cantidad}x {p.product?.nombre || 'Producto'} ({p.size})
+                                                            </span>
+                                                            <span className="font-bold text-slate-900 shrink-0">
+                                                                {formatCurrency(p.price * p.cantidad)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-xs">
+                                                <span className="text-slate-400 font-mono text-[11px]">{dateStr}</span>
+                                                <div className="text-right">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Total Cotizado</span>
+                                                    <span className="text-base font-black text-slate-900">{totalFormatted}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Botones de Acción */}
+                                        <div className="flex items-center gap-2 pt-4 mt-2 border-t border-slate-200">
+                                            <button
+                                                onClick={() => handleResumeDraft(draft)}
+                                                className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                                title="Cargar pedido en modal para cerrar la venta"
+                                            >
+                                                <Zap size={14} className="text-amber-300" />
+                                                <span>Retomar & Cerrar</span>
+                                            </button>
+
+                                            <a
+                                                href={`https://wa.me/57${cleanPhone}?text=${whatsappFollowupMsg}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition-colors cursor-pointer"
+                                                title="Enviar seguimiento por WhatsApp"
+                                            >
+                                                <MessageCircle size={16} />
+                                            </a>
+
+                                            <button
+                                                disabled={isDiscardingDraft === draft.id}
+                                                onClick={() => handleDiscardDraft(draft.id)}
+                                                className="p-2 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                                title="Descartar borrador"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {draftOrders.length === 0 && (
+                            <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                No tienes borradores o cotizaciones pendientes de cierre. ¡Todas tus oportunidades están al día!
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
             {/* BOTÓN FLOTANTE PERMANENTE (FAB) PARA ASESORES COMERCIALES */}
@@ -577,6 +791,7 @@ export default function AsesoresCockpitPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                    setSelectedDraftForModal(null);
                     setPreloadedClientForOrder(null);
                     setIsFastOrderOpen(true);
                 }}
@@ -595,11 +810,15 @@ export default function AsesoresCockpitPage() {
             {/* MODAL DE ENTRADA RÁPIDA DE PEDIDOS */}
             <FastOrderModal
                 isOpen={isFastOrderOpen}
-                onClose={() => setIsFastOrderOpen(false)}
+                onClose={() => {
+                    setIsFastOrderOpen(false);
+                    setSelectedDraftForModal(null);
+                }}
                 initialAdvisorName={selectedAdvisor}
+                draftOrder={selectedDraftForModal}
                 preloadedCustomer={preloadedClientForOrder}
                 onOrderCreated={() => {
-                    // Recargar datos inmediatamente al crear la orden
+                    // Recargar datos inmediatamente al crear o cerrar la orden
                     loadData(selectedAdvisor);
                 }}
             />

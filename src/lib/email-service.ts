@@ -11,6 +11,9 @@ const SMTP_PASS = process.env.SMTP_PASS || 'z@8IL?=N/CZ';
 const FROM_EMAIL = process.env.SMTP_FROM || 'tiendavirtual@biocambio360.com';
 const FROM_NAME = 'Biocambio360';
 
+import { OrderStatus } from '@/types/order';
+import { getCarrierDisplayName, getTrackingUrl } from '@/lib/shipping-tracking';
+
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
 export const ADMIN_RECIPIENTS = [
@@ -103,6 +106,10 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
 
     return { success: false, error: smtpError || 'No email transport succeeded' };
 }
+
+export const emailTransport = {
+    send: (payload: EmailPayload) => sendEmail(payload),
+};
 
 function formatCOP(amount: number): string {
     return new Intl.NumberFormat('es-CO', {
@@ -296,6 +303,148 @@ export async function sendOrderStatusUpdateEmailToAdmin(data: {
         sender: { name: FROM_NAME, email: FROM_EMAIL },
         to: ADMIN_RECIPIENTS,
         subject: `📌 [${data.nuevoEstado.toUpperCase()}] Pedido #${data.orderId.slice(-8).toUpperCase()} — ${data.cliente}`,
+        htmlContent: baseTemplate(content),
+    });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Email: Order Status Change → Customer Notification (With Carrier Tracking)
+// ─────────────────────────────────────────────────────────────
+export async function sendOrderStatusCustomerEmail(data: {
+    orderId: string;
+    customerName: string;
+    customerEmail: string;
+    status: OrderStatus;
+    total: number;
+    shippingCarrier?: string;
+    trackingNumber?: string;
+    items?: { nombre: string; cantidad: number }[];
+}): Promise<void> {
+    if (!data.customerEmail || data.status === 'borrador') return;
+
+    const carrierName = getCarrierDisplayName(data.shippingCarrier);
+    const trackingUrl = getTrackingUrl(data.shippingCarrier, data.trackingNumber, data.orderId);
+    const orderShort = data.orderId.slice(-8).toUpperCase();
+
+    let title = '';
+    let headline = '';
+    let description = '';
+    let badgeBg = '#dbeafe';
+    let badgeText = '#1e40af';
+    let badgeLabel = '';
+    let showTrackingBtn = false;
+
+    switch (data.status) {
+        case 'confirmado':
+            title = '¡Tu pedido fue confirmado con éxito! 🎉';
+            headline = 'estamos procesando tu orden';
+            description = 'Hemos validado y confirmado tu pedido. En breve pasará a nuestro equipo de bodega para su correcto empaque y alistamiento con el estándar de Biocambio360.';
+            badgeBg = '#dbeafe';
+            badgeText = '#1e40af';
+            badgeLabel = 'CONFIRMADO';
+            break;
+        case 'preparacion':
+            title = '¡Tu pedido está en preparación! 📦';
+            headline = 'alistando productos en bodega';
+            description = 'Nuestro equipo logístico está empacando cuidadosamente tus productos químicos biodegradables y asegurando el embalaje antiderrames de alta resistencia.';
+            badgeBg = '#fef3c7';
+            badgeText = '#92400e';
+            badgeLabel = 'EN PREPARACIÓN';
+            break;
+        case 'enviado':
+        case 'en_camino':
+            title = '¡Tu pedido va en camino! 🚚';
+            headline = `despachado con ${carrierName}`;
+            description = data.trackingNumber 
+                ? `Tu paquete ya fue entregado a la transportadora con la guía <strong>${data.trackingNumber}</strong> (${carrierName}). Ya puedes realizar el seguimiento en vivo.`
+                : `Tu paquete ha sido despachado a través de <strong>${carrierName}</strong> y se encuentra en ruta hacia tu dirección de entrega.`;
+            badgeBg = '#e0e7ff';
+            badgeText = '#3730a3';
+            badgeLabel = 'EN CAMINO';
+            showTrackingBtn = true;
+            break;
+        case 'entregado':
+            title = '¡Tu pedido ha sido entregado! 🌿';
+            headline = 'entrega completada exitosamente';
+            description = 'Confirmamos la entrega de tus productos de limpieza industrial Biocambio360. Esperamos que disfrutes de su máxima concentración, rendimiento y poder biodegradable.';
+            badgeBg = '#dcfce7';
+            badgeText = '#15803d';
+            badgeLabel = 'ENTREGADO';
+            break;
+        case 'cancelado':
+            title = 'Tu pedido ha sido cancelado ⚠️';
+            headline = 'actualización sobre tu orden';
+            description = 'Tu pedido ha sido marcado como cancelado en nuestro sistema. Si esto fue un error o necesitas ayuda personalizada, nuestro equipo comercial está listo para asistirte.';
+            badgeBg = '#fee2e2';
+            badgeText = '#b91c1c';
+            badgeLabel = 'CANCELADO';
+            break;
+        default:
+            return;
+    }
+
+    const itemsSummary = (data.items && data.items.length > 0)
+        ? `<div style="margin-bottom:20px;padding:14px;background:#f8fafc;border-radius:10px;font-size:13px;color:#475569;">
+            <strong style="color:#0f172a;">Productos incluidos:</strong>
+            <ul style="margin:8px 0 0 16px;padding:0;">
+                ${data.items.map(it => `<li style="margin-bottom:4px;">${it.cantidad}x ${it.nombre}</li>`).join('')}
+            </ul>
+           </div>`
+        : '';
+
+    const content = `
+        <div style="text-align:center;margin-bottom:24px;">
+          <span style="display:inline-block;padding:6px 14px;background:${badgeBg};color:${badgeText};border-radius:100px;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;">
+            ${badgeLabel}
+          </span>
+          <h1 style="margin:12px 0 6px;color:#0f172a;font-size:22px;font-weight:900;">${title}</h1>
+          <p style="margin:0;color:#64748b;font-size:14px;">Hola <strong>${data.customerName}</strong>, ${headline}.</p>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+          <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.6;">
+            ${description}
+          </p>
+
+          ${itemsSummary}
+
+          <div style="border-top:1px solid #f1f5f9;padding-top:16px;margin-top:16px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <span style="font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;">N° Pedido</span>
+                  <p style="margin:2px 0 0;font-size:15px;font-weight:800;color:#0f172a;">#${orderShort}</p>
+                </td>
+                <td align="right">
+                  <span style="font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Total</span>
+                  <p style="margin:2px 0 0;font-size:16px;font-weight:900;color:#059669;">${formatCOP(data.total)}</p>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          ${data.trackingNumber ? `
+          <div style="margin-top:16px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;">
+            <p style="margin:0;font-size:12px;color:#166534;"><strong>Transportadora:</strong> ${carrierName} · <strong>N° de Guía:</strong> <span style="font-family:monospace;font-weight:800;">${data.trackingNumber}</span></p>
+          </div>` : ''}
+        </div>
+
+        <div style="text-align:center;margin-top:28px;">
+          ${showTrackingBtn ? `
+            <a href="${trackingUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:100px;font-weight:800;font-size:14px;box-shadow:0 4px 12px rgba(37,99,235,0.25);margin-right:8px;margin-bottom:8px;">
+              🔍 Rastrear Envío en Vivo
+            </a>
+          ` : ''}
+          <a href="https://biocambio360.com/confirmacion/${data.orderId}" target="_blank" style="display:inline-block;background:#f1f5f9;color:#334155;text-decoration:none;padding:14px 24px;border-radius:100px;font-weight:700;font-size:13px;margin-bottom:8px;">
+            Ver Estado de mi Pedido
+          </a>
+        </div>
+    `;
+
+    await emailTransport.send({
+        sender: { name: FROM_NAME, email: FROM_EMAIL },
+        to: [{ email: data.customerEmail, name: data.customerName }],
+        subject: `${badgeLabel === 'EN CAMINO' ? '🚚' : '📦'} [${badgeLabel}] Pedido #${orderShort} — Biocambio360`,
         htmlContent: baseTemplate(content),
     });
 }

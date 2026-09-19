@@ -20,12 +20,15 @@ import {
     MessageCircle,
     Zap,
     AlertCircle,
-    Package
+    Package,
+    Bookmark
 } from 'lucide-react';
 import { PRODUCTOS, Product, isDisallowedSize } from '@/lib/products';
 import { formatCurrency, DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, calculateShipping } from '@/lib/checkout-utils';
 import { OrderCustomer, OrderItem, Order } from '@/types/order';
-import { createOrder, lookupCustomerByPhone } from '@/lib/orders-service';
+import { createOrder, lookupCustomerByPhone, updateOrderStatus } from '@/lib/orders-service';
+import { doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import citiesData from '@/lib/cities-99envios.json';
 import { subscribeToAdminUsers } from '@/lib/users-service';
@@ -66,6 +69,7 @@ interface FastOrderModalProps {
     onClose: () => void;
     onOrderCreated?: (orderId: string) => void;
     initialAdvisorName?: string;
+    draftOrder?: (Order & { id: string }) | null;
     preloadedCustomer?: {
         nombre?: string;
         celular?: string;
@@ -82,6 +86,7 @@ export default function FastOrderModal({
     onClose,
     onOrderCreated,
     initialAdvisorName,
+    draftOrder,
     preloadedCustomer
 }: FastOrderModalProps) {
     const { user, userProfile, role } = useAuth();
@@ -129,6 +134,8 @@ export default function FastOrderModal({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [motivoBorrador, setMotivoBorrador] = useState<string>('Consulta con socio o familia');
+    const [isDraftSaved, setIsDraftSaved] = useState<boolean>(false);
 
     // Cargar asesores desde Firestore en tiempo real
     useEffect(() => {
@@ -169,6 +176,33 @@ export default function FastOrderModal({
             setCustomerFound(true);
         }
     }, [preloadedCustomer]);
+
+    // Handle draft order preload if editing or resuming
+    useEffect(() => {
+        if (draftOrder) {
+            if (draftOrder.cliente?.celular) setCelular(draftOrder.cliente.celular);
+            if (draftOrder.cliente?.nombre) setNombre(draftOrder.cliente.nombre);
+            if (draftOrder.cliente?.cedula) setCedula(draftOrder.cliente.cedula);
+            if (draftOrder.cliente?.email) setEmail(draftOrder.cliente.email);
+            if (draftOrder.cliente?.direccion) setDireccion(draftOrder.cliente.direccion);
+            if (draftOrder.cliente?.barrio) setBarrio(draftOrder.cliente.barrio);
+            if (draftOrder.cliente?.departamento) setDepartamento(draftOrder.cliente.departamento);
+            if (draftOrder.cliente?.ciudad) setCiudad(draftOrder.cliente.ciudad);
+            if (draftOrder.cliente?.notas) setNotas(draftOrder.cliente.notas);
+            if (draftOrder.productos && draftOrder.productos.length > 0) {
+                setCartItems(draftOrder.productos);
+            }
+            if (typeof draftOrder.envio === 'number') {
+                setFlete(draftOrder.envio);
+                setFleteManual(true);
+            }
+            if (draftOrder.metodoPago) setMetodoPago(draftOrder.metodoPago);
+            if (draftOrder.asesorNombre) setSelectedAdvisor(draftOrder.asesorNombre);
+            if (draftOrder.canal) setSalesChannel(draftOrder.canal as any);
+            if (draftOrder.motivoBorrador) setMotivoBorrador(draftOrder.motivoBorrador);
+            setCustomerFound(true);
+        }
+    }, [draftOrder]);
 
     // Available cities based on department
     const availableCities = useMemo(() => {
@@ -344,7 +378,87 @@ export default function FastOrderModal({
         }
     };
 
-    // Submit order
+    // Submit draft order (cotización caliente sin descontar inventario)
+    const handleSaveDraft = async () => {
+        setErrorMsg(null);
+
+        if (cartItems.length === 0) {
+            setErrorMsg('Debes agregar al menos un producto a la cotización.');
+            return;
+        }
+
+        if (!nombre.trim() || !celular.trim()) {
+            setErrorMsg('Ingresa al menos el nombre y teléfono del cliente para guardar el borrador.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const customerData: OrderCustomer = {
+                nombre: nombre.trim(),
+                cedula: cedula.trim() || 'No registrada',
+                celular: celular.trim(),
+                email: email.trim() || undefined,
+                departamento,
+                ciudad,
+                direccion: direccion.trim() || 'Dirección por confirmar',
+                barrio: barrio.trim() || undefined,
+                notas: notas.trim() || undefined
+            };
+
+            let orderId = '';
+            if (draftOrder?.id) {
+                // Actualizar borrador existente
+                const orderRef = doc(db, 'orders', draftOrder.id);
+                await updateDoc(orderRef, {
+                    cliente: customerData,
+                    productos: cartItems,
+                    subtotal,
+                    envio: flete,
+                    total,
+                    metodoPago,
+                    canal: salesChannel,
+                    asesorNombre: selectedAdvisor,
+                    asesorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                    motivoBorrador,
+                    updatedAt: Timestamp.now()
+                });
+                orderId = draftOrder.id;
+            } else {
+                // Crear nuevo borrador
+                const orderPayload: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'timeline'> = {
+                    cliente: customerData,
+                    productos: cartItems,
+                    subtotal,
+                    envio: flete,
+                    total,
+                    metodoPago,
+                    status: 'borrador', // NO descuenta inventario
+                    canal: salesChannel,
+                    asesorNombre: selectedAdvisor,
+                    asesorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                    asesorId: user?.uid || selectedAdvisor,
+                    motivoBorrador,
+                    notas: notas ? [notas] : []
+                };
+
+                orderId = await createOrder(orderPayload);
+            }
+
+            setCompletedOrderId(orderId);
+            setIsDraftSaved(true);
+            if (onOrderCreated) {
+                onOrderCreated(orderId);
+            }
+        } catch (err: any) {
+            console.error('Error guardando borrador:', err);
+            setErrorMsg(err.message || 'Error al guardar la cotización. Intenta nuevamente.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Submit order (cierre activo y confirmado con descuento de inventario)
     const handleSubmitOrder = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg(null);
@@ -355,7 +469,7 @@ export default function FastOrderModal({
         }
 
         if (!nombre.trim() || !celular.trim() || !direccion.trim()) {
-            setErrorMsg('Por favor completa el nombre, teléfono y dirección del cliente.');
+            setErrorMsg('Por favor completa el nombre, teléfono y dirección del cliente para confirmar el despacho.');
             return;
         }
 
@@ -373,23 +487,54 @@ export default function FastOrderModal({
                 notas: notas.trim() || undefined
             };
 
-            const orderPayload: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'timeline'> = {
-                cliente: customerData,
-                productos: cartItems,
-                subtotal,
-                envio: flete,
-                total,
-                metodoPago,
-                status: 'confirmado', // Pedidos directos de llamada entran confirmados listos para bodega
-                canal: salesChannel,
-                asesorNombre: selectedAdvisor,
-                asesorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
-                asesorId: user?.uid || selectedAdvisor,
-                notas: notas ? [notas] : []
-            };
+            let orderId = '';
+            if (draftOrder?.id) {
+                // Actualizar y activar borrador a confirmado
+                const orderRef = doc(db, 'orders', draftOrder.id);
+                await updateDoc(orderRef, {
+                    cliente: customerData,
+                    productos: cartItems,
+                    subtotal,
+                    envio: flete,
+                    total,
+                    metodoPago,
+                    canal: salesChannel,
+                    asesorNombre: selectedAdvisor,
+                    asesorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                    updatedAt: Timestamp.now()
+                });
+                await updateOrderStatus(
+                    draftOrder.id,
+                    'confirmado',
+                    'Borrador/Cotización cerrado exitosamente por asesor comercial',
+                    {
+                        email: userProfile?.email || user?.email || undefined,
+                        nombre: selectedAdvisor,
+                        role: role || 'asesor'
+                    }
+                );
+                orderId = draftOrder.id;
+            } else {
+                const orderPayload: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'timeline'> = {
+                    cliente: customerData,
+                    productos: cartItems,
+                    subtotal,
+                    envio: flete,
+                    total,
+                    metodoPago,
+                    status: 'confirmado', // Pedidos directos de llamada entran confirmados listos para bodega
+                    canal: salesChannel,
+                    asesorNombre: selectedAdvisor,
+                    asesorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                    asesorId: user?.uid || selectedAdvisor,
+                    notas: notas ? [notas] : []
+                };
 
-            const orderId = await createOrder(orderPayload);
+                orderId = await createOrder(orderPayload);
+            }
+
             setCompletedOrderId(orderId);
+            setIsDraftSaved(false);
             if (onOrderCreated) {
                 onOrderCreated(orderId);
             }
@@ -409,6 +554,11 @@ export default function FastOrderModal({
             .map(it => `• ${it.cantidad}x ${it.product.nombre} (${it.size}) - ${formatCurrency(it.price * it.cantidad)}`)
             .join('\n');
 
+        if (isDraftSaved) {
+            const text = `Hola *${nombre}*, te saluda *${selectedAdvisor}* de *Biocambio360* 🌿\n\nTe comparto la cotización que preparamos para ti:\n\n*Cotización N°:* #${completedOrderId.slice(-8)}\n${itemsList}\n\n*Envío:* ${flete === 0 ? '¡GRATIS!' : formatCurrency(flete)}\n*Total Cotización:* ${formatCurrency(total)}\n*Método de Pago sugerido:* ${metodoPago.toUpperCase()}\n*Destino:* ${ciudad} (${departamento})\n\n¿Te gustaría que te lo despachemos hoy mismo? Quedo muy atento(a) para confirmar la entrega.`;
+            return `https://wa.me/57${cleanPhone}?text=${encodeURIComponent(text)}`;
+        }
+
         const text = `Hola *${nombre}*, te saluda *${selectedAdvisor}* de *Biocambio360* 🌿\n\nConfirmamos tu pedido *#${completedOrderId.slice(-8)}*:\n${itemsList}\n\n*Envío:* ${flete === 0 ? '¡GRATIS!' : formatCurrency(flete)}\n*Total a Pagar:* ${formatCurrency(total)}\n*Método de Pago:* ${metodoPago.toUpperCase()}\n*Dirección de Entrega:* ${direccion}, ${barrio ? barrio + ', ' : ''}${ciudad} (${departamento}).\n\nTu pedido ya entró a alistamiento en bodega. ¡Muchas gracias por preferir la química sostenible!`;
 
         return `https://wa.me/57${cleanPhone}?text=${encodeURIComponent(text)}`;
@@ -425,6 +575,7 @@ export default function FastOrderModal({
         setNotas('');
         setCustomerFound(null);
         setCompletedOrderId(null);
+        setIsDraftSaved(false);
         setErrorMsg(null);
         setProductSearch('');
         setSelectedProduct(null);
@@ -450,10 +601,14 @@ export default function FastOrderModal({
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-lg font-black tracking-wide">
-                                        Nuevo Pedido Rápido
+                                        {draftOrder?.id ? 'Retomar & Cerrar Cotización' : 'Nuevo Pedido Rápido'}
                                     </h2>
-                                    <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-500/30">
-                                        Fast Entry
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                        draftOrder?.id 
+                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
+                                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                    }`}>
+                                        {draftOrder?.id ? 'Modo Cotización' : 'Fast Entry'}
                                     </span>
                                 </div>
                                 <p className="text-xs text-slate-400">
@@ -475,20 +630,30 @@ export default function FastOrderModal({
                         {completedOrderId ? (
                             /* Success View */
                             <div className="py-10 text-center space-y-5 max-w-md mx-auto">
-                                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-                                    <CheckCircle2 size={36} />
+                                <div className={`w-16 h-16 ${isDraftSaved ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'} rounded-2xl flex items-center justify-center mx-auto shadow-inner`}>
+                                    {isDraftSaved ? <Bookmark size={36} /> : <CheckCircle2 size={36} />}
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-black text-slate-900">
-                                        ¡Pedido Registrado con Éxito!
+                                        {isDraftSaved ? '¡Cotización Guardada como Borrador!' : '¡Pedido Registrado con Éxito!'}
                                     </h3>
                                     <p className="text-xs text-slate-500 mt-1">
-                                        Orden <span className="font-mono font-bold text-slate-800">#{completedOrderId}</span> asignada a <span className="font-bold text-indigo-600">{selectedAdvisor}</span>
+                                        {isDraftSaved ? 'Cotización' : 'Orden'} <span className="font-mono font-bold text-slate-800">#{completedOrderId}</span> asignada a <span className="font-bold text-indigo-600">{selectedAdvisor}</span>
                                     </p>
-                                    <div className="mt-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
-                                        ✓ Inventario descontado automáticamente<br />
-                                        ✓ Métricas de venta y comisiones actualizadas al instante
-                                    </div>
+                                    {isDraftSaved ? (
+                                        <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 text-left">
+                                            <strong>📌 Estado Operativo:</strong><br />
+                                            • El inventario en bodega <strong>NO</strong> ha sido descontado.<br />
+                                            • Motivo registrado: <em>"{motivoBorrador}"</em>.<br />
+                                            • Esta cotización está disponible en tu Cockpit para retomarla y cerrarla en 1 clic.
+                                        </div>
+                                    ) : (
+                                        <div className="mt-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
+                                            ✓ Inventario descontado automáticamente en bodega<br />
+                                            ✓ Notificación de seguimiento y tracking enviada al cliente<br />
+                                            ✓ Métricas de venta y comisiones actualizadas al instante
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex flex-col gap-3 pt-2">
@@ -496,10 +661,10 @@ export default function FastOrderModal({
                                         href={getWhatsAppUrl()}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+                                        className={`w-full py-3 px-4 ${isDraftSaved ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white rounded-xl text-sm font-black flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all`}
                                     >
                                         <MessageCircle size={18} />
-                                        <span>📱 Enviar Resumen al WhatsApp del Cliente</span>
+                                        <span>{isDraftSaved ? '📱 Enviar Cotización Formal al WhatsApp' : '📱 Enviar Resumen al WhatsApp del Cliente'}</span>
                                     </a>
 
                                     <div className="flex items-center gap-2">
@@ -507,7 +672,7 @@ export default function FastOrderModal({
                                             onClick={handleResetAndNew}
                                             className="flex-1 py-2.5 px-4 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all"
                                         >
-                                            + Crear Otro Pedido
+                                            + Nuevo Registro
                                         </button>
                                         <button
                                             onClick={onClose}
@@ -916,7 +1081,40 @@ export default function FastOrderModal({
                                     </div>
                                 </div>
 
-                                {/* Resumen Financiero y Botón de Acción */}
+                                {/* Franja para Borradores / Cotizaciones en Frío o Dudas del Cliente */}
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
+                                            <Bookmark size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-amber-900">
+                                                ¿El cliente aún no decide comprar o solicitó cotización para luego?
+                                            </p>
+                                            <p className="text-[11px] text-amber-700">
+                                                Guarda los datos sin descontar stock para retomar y cerrar la venta después.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            value={motivoBorrador}
+                                            onChange={(e) => setMotivoBorrador(e.target.value)}
+                                            className="px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-medium text-slate-800 focus:outline-hidden"
+                                        >
+                                            <option value="Consulta con socio o familia">Consulta con socio / pareja</option>
+                                            <option value="Esperando quincena o pago">Espera fecha de pago / quincena</option>
+                                            <option value="Pidió cotización formal por WhatsApp">Pidió cotización WhatsApp</option>
+                                            <option value="Comparando precios en mercado">Comparando con competencia</option>
+                                            <option value="Faltan datos de dirección">Faltan datos de entrega</option>
+                                            <option value="Llamará más tarde">Llamará más tarde</option>
+                                            <option value="Otro motivo comercial">Otro motivo</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Resumen Financiero y Botones de Acción */}
                                 <div className="bg-slate-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div className="flex items-center gap-6">
                                         <div>
@@ -932,7 +1130,7 @@ export default function FastOrderModal({
                                                     <span className="text-[10px] text-slate-400 uppercase font-bold">Flete 99 Envíos</span>
                                                     {isQuotingShipping && (
                                                         <span className="text-[10px] text-amber-300 animate-pulse font-mono font-bold">
-                                                            ⚡ Cotizando...
+                                                             ⚡ Cotizando...
                                                         </span>
                                                     )}
                                                 </div>
@@ -977,26 +1175,37 @@ export default function FastOrderModal({
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2.5 flex-wrap justify-end">
                                         <button
                                             type="button"
                                             onClick={onClose}
-                                            className="px-4 py-2.5 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"
+                                            className="px-3 py-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
                                         >
                                             Cancelar
                                         </button>
 
                                         <button
+                                            type="button"
+                                            disabled={isSubmitting || cartItems.length === 0}
+                                            onClick={handleSaveDraft}
+                                            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                                            title="Guardar como cotización/borrador sin descontar inventario"
+                                        >
+                                            <Bookmark size={14} />
+                                            <span>{draftOrder?.id ? 'Actualizar Borrador' : 'Guardar Borrador'}</span>
+                                        </button>
+
+                                        <button
                                             type="submit"
                                             disabled={isSubmitting || cartItems.length === 0}
-                                            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2 cursor-pointer"
+                                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2 cursor-pointer"
                                         >
                                             {isSubmitting ? (
                                                 <span>Guardando...</span>
                                             ) : (
                                                 <>
                                                     <CheckCircle2 size={16} />
-                                                    <span>Guardar Pedido</span>
+                                                    <span>{draftOrder?.id ? 'Confirmar y Despachar' : 'Guardar Pedido'}</span>
                                                 </>
                                             )}
                                         </button>

@@ -121,6 +121,7 @@ export default function AdminDashboard() {
         let monthOrdersCount = 0;
         
         const statusCounts: Record<OrderStatus, number> = {
+            borrador: 0,
             pendiente: 0,
             confirmado: 0,
             enviado: 0,
@@ -133,8 +134,8 @@ export default function AdminDashboard() {
         orders.forEach(order => {
             const orderDate = safeToDate(order.createdAt);
             
-            // Only count non-cancelled orders for sales metrics
-            if (order.status !== 'cancelado') {
+            // Only count non-cancelled and non-draft orders for sales metrics
+            if (order.status !== 'cancelado' && order.status !== 'borrador') {
                 if (isToday(orderDate)) {
                     todaySales += order.total;
                     todayOrdersCount++;

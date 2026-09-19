@@ -140,6 +140,7 @@ export default function AnalisisFinancieroPage() {
         let couponDiscounts = 0;
 
         let statusCounts: Record<OrderStatus, number> = {
+            borrador: 0,
             pendiente: 0,
             confirmado: 0,
             preparacion: 0,
@@ -187,7 +188,7 @@ export default function AnalisisFinancieroPage() {
             const st = order.status || 'pendiente';
             statusCounts[st] = (statusCounts[st] || 0) + 1;
 
-            if (st !== 'cancelado') {
+            if (st !== 'cancelado' && st !== 'borrador') {
                 grossSales += (order.total || 0);
                 shippingRevenue += (order.envio || 0);
 

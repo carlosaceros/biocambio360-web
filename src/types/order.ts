@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 export type OrderStatus =
+    | 'borrador'
     | 'pendiente'
     | 'confirmado'
     | 'preparacion'
@@ -135,6 +136,8 @@ export interface Order {
     asesorId?: string;
     asesorNombre?: string;
     asesorEmail?: string;
+    motivoBorrador?: string;
+    fechaSeguimiento?: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
@@ -145,6 +148,12 @@ export const ORDER_STATUS_CONFIG: Record<OrderStatus, {
     bgColor: string;
     icon: string;
 }> = {
+    borrador: {
+        label: 'Borrador / Cotización',
+        color: 'text-amber-800',
+        bgColor: 'bg-amber-100',
+        icon: '📝'
+    },
     pendiente: {
         label: 'Pendiente',
         color: 'text-yellow-700',

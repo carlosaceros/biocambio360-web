@@ -24,8 +24,10 @@ import {
     RefreshCw,
     MessageCircle,
     ChevronRight,
-    HelpCircle
+    HelpCircle,
+    MapPin
 } from 'lucide-react';
+import GeographicHeatMap from '@/components/admin/GeographicHeatMap';
 import {
     HISTORICAL_SALES_DATA,
     ADVISORS_PERFORMANCE_DATA,
@@ -35,7 +37,7 @@ import {
 import { MonthlySalesData, AdvisorPerformance } from '@/types/commercial-reports';
 import { formatCurrency } from '@/lib/checkout-utils';
 
-type ReportTab = 'ventas' | 'clientes' | 'metas' | 'asesores' | 'pos' | 'gaps';
+type ReportTab = 'ventas' | 'clientes' | 'metas' | 'asesores' | 'pos' | 'gaps' | 'geografia';
 
 export default function InformeVentasPage() {
     const [selectedTab, setSelectedTab] = useState<ReportTab>('metas');
@@ -131,6 +133,7 @@ export default function InformeVentasPage() {
                             { id: 'ventas', label: 'Evolución Ventas', icon: TrendingUp },
                             { id: 'clientes', label: 'Nuevos vs Recompra', icon: Users },
                             { id: 'pos', label: 'Punto de Venta (Físico)', icon: Store },
+                            { id: 'geografia', label: 'Distribución Geográfica', icon: MapPin, badge: 'Bogotá & Nal' },
                             { id: 'gaps', label: 'Gaps & Oportunidades', icon: Lightbulb, badge: 'IA / BI' },
                         ].map(tab => {
                             const Icon = tab.icon;
@@ -936,6 +939,18 @@ export default function InformeVentasPage() {
                                 </a>
                             </div>
                         </div>
+                    </motion.div>
+                )}
+
+                {/* PESTAÑA: DISTRIBUCIÓN GEOGRÁFICA & MAPAS DE CALOR */}
+                {selectedTab === 'geografia' && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <GeographicHeatMap />
                     </motion.div>
                 )}
 

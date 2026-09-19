@@ -227,8 +227,8 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
 
     const docRef = await addDoc(ordersCollection, order);
 
-    // Descontar inventario automáticamente si la orden está activa (no cancelada)
-    if (orderData.status !== 'cancelado' && orderData.productos?.length > 0) {
+    // Descontar inventario automáticamente si la orden está activa (no cancelada y no borrador)
+    if (orderData.status !== 'cancelado' && orderData.status !== 'borrador' && orderData.productos?.length > 0) {
         decrementStockForOrderItems(orderData.productos).catch(err =>
             console.warn('[OrdersService] Error al descontar inventario de la orden:', err)
         );
@@ -346,6 +346,35 @@ export async function updateOrderStatus(
         });
     } catch (auditErr) {
         console.warn('[Orders] No se pudo asentar audit log:', auditErr);
+    }
+
+    // Descontar inventario si un borrador se convierte en pedido activo
+    if (previousStatus === 'borrador' && newStatus !== 'cancelado' && newStatus !== 'borrador' && order.productos?.length > 0) {
+        decrementStockForOrderItems(order.productos).catch(err =>
+            console.warn('[OrdersService] Error al descontar inventario tras reactivar borrador:', err)
+        );
+    }
+
+    // Notificar al cliente y administradores por correo a través de la API del servidor (evita importar nodemailer en el cliente)
+    if (typeof fetch !== 'undefined') {
+        fetch('/api/notifications/order-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                orderId,
+                cliente: order.cliente?.nombre || 'Cliente',
+                customerEmail: order.cliente?.email,
+                estadoAnterior: previousStatus,
+                nuevoEstado: newStatus,
+                total: order.total || 0,
+                shippingCarrier: (order as any).shippingInfo?.carrier || (order as any).guiaEnvio?.transportadora,
+                trackingNumber: (order as any).shippingInfo?.trackingNumber || (order as any).guiaEnvio?.numeroGuia,
+                items: order.productos?.map(p => ({
+                    nombre: p.product?.nombre || 'Producto Biocambio360',
+                    cantidad: p.cantidad || 1
+                }))
+            })
+        }).catch(err => console.warn('[OrdersService] Error llamando a /api/notifications/order-status:', err));
     }
 
     // Actualizar estado de fidelización / referido si esta orden tenía transacción vinculada
@@ -642,4 +671,51 @@ export async function getOrdersByAdvisor(
         console.warn(`[OrdersService] Error obteniendo órdenes del asesor ${advisorName}:`, e);
         return [];
     }
+}
+
+/**
+ * Obtiene las órdenes en estado 'borrador' (cotizaciones calientes pendientes)
+ */
+export async function getDraftOrdersByAdvisor(advisorName?: string): Promise<(Order & { id: string })[]> {
+    try {
+        const q = query(
+            ordersCollection,
+            where('status', '==', 'borrador'),
+            limit(100)
+        );
+        const snapshot = await getDocs(q);
+        const drafts = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as (Order & { id: string })[];
+
+        const sorted = drafts.sort((a, b) => {
+            const ta = (a.createdAt as any)?.toMillis ? (a.createdAt as any).toMillis() : 0;
+            const tb = (b.createdAt as any)?.toMillis ? (b.createdAt as any).toMillis() : 0;
+            return tb - ta;
+        });
+
+        if (!advisorName || advisorName === 'superadmin' || advisorName === 'admin') {
+            return sorted;
+        }
+
+        const cleanAdv = advisorName.toLowerCase().trim();
+        return sorted.filter(d => 
+            (d.asesorNombre && d.asesorNombre.toLowerCase().includes(cleanAdv)) ||
+            (d.asesorId && d.asesorId.toLowerCase() === cleanAdv)
+        );
+    } catch (e) {
+        console.warn('[OrdersService] Error al obtener borradores:', e);
+        return [];
+    }
+}
+
+/**
+ * Descarta un borrador marcándolo como cancelado con nota de auditoría
+ */
+export async function discardDraftOrder(
+    orderId: string,
+    userContext?: { email?: string; nombre?: string; role?: string }
+): Promise<void> {
+    return updateOrderStatus(orderId, 'cancelado', 'Cotización/Borrador descartado por el asesor comercial', userContext);
 }
