@@ -38,6 +38,7 @@ import {
     AdvisorPortfolioSummary,
     DEFAULT_ADVISOR_GOALS,
     getAdvisorAlertsData,
+    markOrderDeliveryAlertSent,
     AdvisorAlertsData
 } from '@/lib/advisors-service';
 import { CustomerCRM } from '@/types/crm';
@@ -188,6 +189,21 @@ export default function AsesoresCockpitPage() {
             alert('Alerta registrada en el CRM y marcada como enviada exitosamente.');
         } catch (err) {
             console.error('Error marcando alerta:', err);
+        } finally {
+            setAlertProcessingId(null);
+        }
+    };
+
+    const handleMarkDeliveryAlertSent = async (ord: Order) => {
+        setAlertProcessingId(`ent_${ord.id}`);
+        try {
+            const author = userProfile?.nombre || selectedAdvisor || 'Asesor Comercial';
+            await markOrderDeliveryAlertSent(ord.id, author, user?.email || undefined);
+            const updatedAlerts = await getAdvisorAlertsData(selectedAdvisor);
+            setAlertsData(updatedAlerts);
+            alert(`Alerta de entrega para ${ord.cliente?.nombre || 'Cliente'} registrada como enviada por ${author}.`);
+        } catch (err) {
+            console.error('Error marcando alerta de entrega:', err);
         } finally {
             setAlertProcessingId(null);
         }
@@ -1204,85 +1220,243 @@ export default function AsesoresCockpitPage() {
                             </div>
                         )}
 
-                        {/* SUBTAB 2: ENTREGAS DÍA SIGUIENTE */}
-                        {alertsSubTab === 'entregas' && (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {alertsData?.entregasDiaSiguiente.map(ord => {
-                                        const cleanPhone = (ord.cliente?.celular || '').replace(/\D/g, '');
-                                        const totalFormatted = formatCurrency(ord.total || 0);
-                                        const scriptEntrega = `👉 ¡Hola ${ord.cliente?.nombre || 'Cliente'}! Te informo que tu pedido de Biocambio360 será entregado el día *MAÑANA* 🚗🛵 por nuestro domiciliario en el transcurso del día. Por favor estar muy atentos a tu celular. 💵 Total a pagar contraentrega en efectivo: *${totalFormatted}* (o si prefieres pagar por transferencia, avísanos para validar el soporte con anticipación). 🙏 ¿Eres tan amable de confirmarnos si mañana te encuentras en tu dirección (${ord.cliente?.direccion || ''}) para recibir sin contratiempos? Si puedes, compártenos tu ubicación actual para que el repartidor llegue más rápido. ¡Muchas gracias por tu compra!`;
+                        {/* SUBTAB 2: ENTREGAS DÍA SIGUIENTE - CONSOLIDADO GENERAL Y ASESORES */}
+                        {alertsSubTab === 'entregas' && (() => {
+                            const entregas = alertsData?.entregasDiaSiguiente || [];
+                            const totalScheduled = entregas.length;
+                            const alertedCount = entregas.filter(o => o.alertaEntregaEnviada).length;
+                            const pendingCount = totalScheduled - alertedCount;
 
-                                        const isCopied = copiedAlertId === `ent_${ord.id}`;
+                            // Agrupar conteo por asesor
+                            const advisorBreakdown: Record<string, { total: number; alertados: number }> = {};
+                            entregas.forEach(ord => {
+                                const adv = ord.asesorNombre || (ord as any).asesor || 'Sin Asignar';
+                                if (!advisorBreakdown[adv]) {
+                                    advisorBreakdown[adv] = { total: 0, alertados: 0 };
+                                }
+                                advisorBreakdown[adv].total++;
+                                if (ord.alertaEntregaEnviada) {
+                                    advisorBreakdown[adv].alertados++;
+                                }
+                            });
 
-                                        return (
-                                            <div key={ord.id} className="bg-slate-50/70 rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
-                                                            <Truck size={11} /> En Ruta Mañana
-                                                        </span>
-                                                        <span className="text-[10px] font-mono text-slate-400">
-                                                            #{ord.id.slice(-6).toUpperCase()}
-                                                        </span>
-                                                    </div>
+                            return (
+                                <div className="space-y-5">
+                                    {/* CONSOLIDADO GENERAL PARA COORDINADORES Y EQUIPO */}
+                                    <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xs space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                                            <div>
+                                                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                                                    <Truck size={16} className="text-indigo-400" />
+                                                    <span>Consolidado General de Alertas (Entregas de Mañana)</span>
+                                                </h3>
+                                                <p className="text-xs text-slate-400">
+                                                    Protocolo oficial Word 2025: confirmación de recepción, ubicación GPS y monto contraentrega.
+                                                </p>
+                                            </div>
 
-                                                    <div>
-                                                        <h3 className="font-bold text-slate-900 text-sm">
-                                                            {ord.cliente?.nombre || 'Cliente'}
-                                                        </h3>
-                                                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                                                            <MapPin size={12} className="text-slate-400" />
-                                                            {ord.cliente?.ciudad}, {ord.cliente?.direccion}
-                                                        </p>
-                                                        <div className="mt-2 bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">A Cobrar Efectivo:</span>
-                                                            <span className="font-black text-emerald-700 text-sm">{totalFormatted}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-bold text-slate-400">
+                                                    Avance de Alertas:
+                                                </span>
+                                                <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                    {alertedCount} de {totalScheduled} listos
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                                <div className="pt-4 mt-3 border-t border-slate-200 flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => handleCopyAlertText(`ent_${ord.id}`, scriptEntrega)}
-                                                        className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                                                            isCopied ? 'bg-emerald-600 text-white' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
-                                                        }`}
-                                                    >
-                                                        {isCopied ? <Check size={12} /> : <Copy size={12} />}
-                                                        <span>{isCopied ? '¡Copiado!' : 'Copiar Alerta'}</span>
-                                                    </button>
+                                        {/* 3 METRICAS MACRO */}
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 text-center">
+                                                <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Programados</span>
+                                                <span className="text-xl font-black text-white">{totalScheduled}</span>
+                                            </div>
 
-                                                    <a
-                                                        href={`https://wa.me/57${cleanPhone}?text=${encodeURIComponent(scriptEntrega)}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors cursor-pointer"
-                                                        title="Enviar confirmación de entrega por WhatsApp"
-                                                    >
-                                                        <MessageCircle size={16} />
-                                                    </a>
+                                            <div className="bg-emerald-950/40 p-3 rounded-xl border border-emerald-700/40 text-center">
+                                                <span className="text-[10px] uppercase font-black text-emerald-400 block">Ya Alertados ✓</span>
+                                                <span className="text-xl font-black text-emerald-400">{alertedCount}</span>
+                                            </div>
 
-                                                    <button
-                                                        onClick={() => handleOpenCopilotForClient(ord.cliente?.nombre || 'Cliente', ord.cliente?.celular || '')}
-                                                        className="p-1.5 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-lg transition-colors cursor-pointer"
-                                                        title="Abrir Copilot IA"
-                                                    >
-                                                        <Sparkles size={16} />
-                                                    </button>
+                                            <div className="bg-amber-950/40 p-3 rounded-xl border border-amber-700/40 text-center">
+                                                <span className="text-[10px] uppercase font-black text-amber-400 block">Pendientes por Alertar</span>
+                                                <span className="text-xl font-black text-amber-400">{pendingCount}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* DESGLOSE POR ASESOR (CARTERA) */}
+                                        {Object.keys(advisorBreakdown).length > 0 && (
+                                            <div className="pt-2 border-t border-slate-800">
+                                                <span className="text-[10px] font-bold uppercase text-slate-400 block mb-2">
+                                                    Estado por Cartera de Asesor:
+                                                </span>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {Object.entries(advisorBreakdown).map(([advName, stats]) => {
+                                                        const isComplete = stats.alertados === stats.total;
+                                                        return (
+                                                            <div
+                                                                key={advName}
+                                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+                                                                    isComplete
+                                                                        ? 'bg-emerald-900/30 text-emerald-300 border-emerald-700/40'
+                                                                        : 'bg-slate-800 text-slate-200 border-slate-700'
+                                                                }`}
+                                                            >
+                                                                <span>{advName}:</span>
+                                                                <span className="font-mono font-black">
+                                                                    {stats.alertados}/{stats.total}
+                                                                </span>
+                                                                {isComplete ? (
+                                                                    <Check size={12} className="text-emerald-400" />
+                                                                ) : (
+                                                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {(!alertsData?.entregasDiaSiguiente || alertsData.entregasDiaSiguiente.length === 0) && (
-                                    <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                                        📦 No hay pedidos programados para entrega mañana en este momento.
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        )}
+
+                                    {/* GRID DE TARJETAS DE PEDIDOS POR ALERTAR */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {entregas.map(ord => {
+                                            const cleanPhone = (ord.cliente?.celular || '').replace(/\D/g, '');
+                                            const totalFormatted = formatCurrency(ord.total || 0);
+                                            const advisorName = ord.asesorNombre || (ord as any).asesor || 'Asesor';
+                                            const isAlerted = ord.alertaEntregaEnviada;
+
+                                            const scriptEntrega = `👉 ¡Hola ${ord.cliente?.nombre || 'Cliente'}! Te informo que tu pedido de Biocambio360 será entregado el día *MAÑANA* 🚗🛵 por nuestro domiciliario en el transcurso del día. Por favor estar muy atentos a tu celular. 💵 Total a pagar contraentrega en efectivo: *${totalFormatted}* (o si prefieres pagar por transferencia, avísanos para validar el soporte con anticipación). 🙏 ¿Eres tan amable de confirmarnos si mañana te encuentras en tu dirección (${ord.cliente?.direccion || ''}) para recibir sin contratiempos? Si puedes, compártenos tu ubicación actual para que el repartidor llegue más rápido. ¡Muchas gracias por tu compra!`;
+
+                                            const isCopied = copiedAlertId === `ent_${ord.id}`;
+                                            const isProcessing = alertProcessingId === `ent_${ord.id}`;
+
+                                            return (
+                                                <div
+                                                    key={ord.id}
+                                                    className={`rounded-2xl border p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
+                                                        isAlerted
+                                                            ? 'bg-emerald-50/40 border-emerald-200'
+                                                            : 'bg-slate-50/70 border-slate-200'
+                                                    }`}
+                                                >
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
+                                                                    <Truck size={11} /> Entrega Mañana
+                                                                </span>
+                                                                {isAlerted ? (
+                                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
+                                                                        <Check size={10} /> Alertado
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-200">
+                                                                        Por alertar
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[10px] font-mono text-slate-400">
+                                                                #{ord.id.slice(-6).toUpperCase()}
+                                                            </span>
+                                                        </div>
+
+                                                        <div>
+                                                            <h3 className="font-bold text-slate-900 text-sm">
+                                                                {ord.cliente?.nombre || 'Cliente'}
+                                                            </h3>
+                                                            <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                                                                <MapPin size={12} className="text-slate-400" />
+                                                                {ord.cliente?.ciudad}, {ord.cliente?.direccion}
+                                                            </p>
+                                                            <div className="mt-2 bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase">A Cobrar Efectivo:</span>
+                                                                <span className="font-black text-emerald-700 text-sm">{totalFormatted}</span>
+                                                            </div>
+                                                            <div className="mt-1 text-[11px] text-slate-500 flex justify-between">
+                                                                <span>Asesor: <strong>{advisorName}</strong></span>
+                                                                {ord.mensajeroNombre && <span>Mensajero: <strong>{ord.mensajeroNombre}</strong></span>}
+                                                            </div>
+
+                                                            {/* INFORMACIÓN DE QUIÉN ALERTÓ */}
+                                                            {isAlerted && (
+                                                                <div className="mt-2 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg font-bold flex items-center gap-1">
+                                                                    <CheckCircle2 size={12} />
+                                                                    <span>
+                                                                        Alertado por {ord.alertaEntregaEnviadaPor || 'Asesor'}
+                                                                        {ord.alertaEntregaEnviadaAt ? ` a las ${new Date(ord.alertaEntregaEnviadaAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="pt-4 mt-3 border-t border-slate-200 space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => handleCopyAlertText(`ent_${ord.id}`, scriptEntrega)}
+                                                                className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                                                    isCopied ? 'bg-emerald-600 text-white' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                                                                }`}
+                                                            >
+                                                                {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                                                                <span>{isCopied ? '¡Copiado!' : 'Copiar Alerta'}</span>
+                                                            </button>
+
+                                                            <a
+                                                                href={`https://wa.me/57${cleanPhone}?text=${encodeURIComponent(scriptEntrega)}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors cursor-pointer"
+                                                                title="Enviar confirmación de entrega por WhatsApp"
+                                                            >
+                                                                <MessageCircle size={16} />
+                                                            </a>
+
+                                                            <button
+                                                                onClick={() => handleOpenCopilotForClient(ord.cliente?.nombre || 'Cliente', ord.cliente?.celular || '')}
+                                                                className="p-1.5 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-lg transition-colors cursor-pointer"
+                                                                title="Abrir Copilot IA"
+                                                            >
+                                                                <Sparkles size={16} />
+                                                            </button>
+                                                        </div>
+
+                                                        {/* BOTÓN PARA REGISTRAR QUE SE ALERTÓ AL CLIENTE */}
+                                                        <button
+                                                            onClick={() => handleMarkDeliveryAlertSent(ord)}
+                                                            disabled={isProcessing}
+                                                            className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                                                                isAlerted
+                                                                    ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
+                                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
+                                                            }`}
+                                                        >
+                                                            <CheckCircle2 size={12} />
+                                                            <span>
+                                                                {isProcessing
+                                                                    ? 'Guardando...'
+                                                                    : isAlerted
+                                                                    ? 'Re-enviar / Actualizar Alerta ✓'
+                                                                    : advisorName !== selectedAdvisor
+                                                                    ? `Alertar por ${advisorName} ✓`
+                                                                    : 'Marcar Alertado ✓'}
+                                                            </span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {entregas.length === 0 && (
+                                        <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                            📦 No hay pedidos programados para entrega mañana en este momento.
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 

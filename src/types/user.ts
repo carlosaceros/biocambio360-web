@@ -4,7 +4,8 @@ export type SystemRole =
     | 'gestor' 
     | 'produccion_calidad' 
     | 'asesor' 
-    | 'cajero';
+    | 'cajero'
+    | 'mensajero';
 
 export interface UserModuleCapabilities {
     pedidos: boolean;
@@ -18,6 +19,7 @@ export interface UserModuleCapabilities {
     envios: boolean;
     auditoria: boolean;
     usuarios: boolean;
+    mensajeria?: boolean;
 }
 
 export interface AdminUserRecord {
@@ -152,6 +154,27 @@ export const ROLE_DEFINITIONS: Record<SystemRole, {
             envios: false,
             auditoria: false,
             usuarios: false,
+            mensajeria: false,
+        }
+    },
+    mensajero: {
+        label: 'Mensajero Flota Propia',
+        badgeColor: 'bg-orange-100 text-orange-800 border-orange-200',
+        description: 'Última milla Bogotá y Sabana: entrega de pedidos, recaudo contraentrega (COD) y reporte de novedades.',
+        defaultPath: '/mensajero',
+        defaultCapabilities: {
+            pedidos: true,
+            pos: false,
+            asesores: false,
+            produccion: false,
+            finanzas: false,
+            clientes: false,
+            reabastecimiento: false,
+            cupones: false,
+            envios: false,
+            auditoria: false,
+            usuarios: false,
+            mensajeria: true,
         }
     }
 };

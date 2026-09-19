@@ -62,7 +62,7 @@ describe("Inteligencia Industrial Big Data (2025 - 2026) & BOM Universal", () =>
 
     describe("3. Desglose Universal de BOM para Cualquier Lote", () => {
         it("debe reconstruir el BOM completo del lote 300926115 con insumos y empaque", () => {
-            const bom = getLotBOMBreakdown("300926115");
+            const bom = getLotBOMBreakdown("300926115")!;
             expect(bom).not.toBeNull();
             expect(bom.lote).toBe("300926115");
             expect(bom.volumenLitros).toBeGreaterThan(0);
@@ -75,7 +75,7 @@ describe("Inteligencia Industrial Big Data (2025 - 2026) & BOM Universal", () =>
         });
 
         it("debe calcular correctamente porcentajes de insumos y rendimientos", () => {
-            const bom = getLotBOMBreakdown("300926115");
+            const bom = getLotBOMBreakdown("300926115")!;
             expect(bom).not.toBeNull();
             const sumPorcentaje = bom.insumosQuimicos.reduce((acc, i) => acc + i.porcentaje, 0);
             expect(sumPorcentaje).toBeGreaterThan(90);
@@ -85,10 +85,10 @@ describe("Inteligencia Industrial Big Data (2025 - 2026) & BOM Universal", () =>
 
         it("debe generar BOM para lotes de 2025 sin error", () => {
             const index = getCompactBatchesIndex();
-            const batch2025 = index.find(b => b.anio === 2025);
+            const batch2025 = index.find(b => b.anio === 2025)!;
             expect(batch2025).toBeDefined();
 
-            const bom = getLotBOMBreakdown(batch2025.lote);
+            const bom = getLotBOMBreakdown(batch2025.lote)!;
             expect(bom).not.toBeNull();
             expect(bom.anio).toBe(2025);
             expect(bom.costoTotalIndustrialCOP).toBeGreaterThan(0);

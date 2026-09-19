@@ -170,8 +170,34 @@ export interface Order {
     asesorNombre?: string;
     asesorEmail?: string;
     motivoBorrador?: string;
-    fechaSeguimiento?: string;
     novedadEntrega?: OrderDeliveryException;
+    // ── Logística de Flota Propia, Mensajería y Alertas ──
+    tipoEnvio?: 'flota_propia' | '99envios' | 'recogida_mostrador';
+    fechaProgramadaEntrega?: string; // YYYY-MM-DD
+    franjaHorariaEntrega?: 'manana' | 'tarde' | 'todo_el_dia' | string;
+    mensajeroId?: string;
+    mensajeroNombre?: string;
+    mensajeroTelefono?: string;
+    mensajeroPlaca?: string;
+    mensajeroAsignadoAt?: string;
+    estadoMensajeria?: 'asignado' | 'en_ruta' | 'entregado' | 'novedad';
+    tarifaFleteMensajero?: number;
+    mensajeroLiquidado?: boolean;
+    fechaLiquidacionMensajero?: string;
+    recaudoEfectivoRecibido?: number;
+    alertaEntregaEnviada?: boolean;
+    alertaEntregaEnviadaAt?: string;
+    alertaEntregaEnviadaPor?: string;
+    pruebaEntrega?: {
+        recibidoPor: string;
+        documentoRecibido?: string;
+        parentesco?: string;
+        fecha: string;
+        recaudadoEfectivo?: number;
+        firmaUrl?: string;
+        fotoUrl?: string;
+        origen?: string;
+    };
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }

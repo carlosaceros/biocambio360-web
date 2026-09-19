@@ -62,6 +62,8 @@ export const ZONA_LOCAL_CIUDADES = [
  *  El subsidio NUNCA puede dejar el flete nacional en $0.
  *  Si el pedido es grande, la fábrica aporta máximo $15.000 al flete. */
 export const SUBSIDIO_MAX_NACIONAL_COP = 15_000;
+export const TOPE_SUBSIDIO_NACIONAL = 15_000;
+export const PISO_FLETE_NACIONAL = 13_000;
 
 /**
  * Verifica si el destino cae dentro de la zona local (flota propia, envío gratis).
@@ -509,6 +511,43 @@ export function calcularFleteLocal(aporteTotal: number): {
         esGratis: fleteCliente === 0,
         subsidioFabrica: Math.min(aporteTotal, MINIMO_DOMICILIARIO_LOCAL),
         minimoGarantizado: MINIMO_DOMICILIARIO_LOCAL,
+    };
+}
+
+/**
+ * Calcula la liquidación del flete para rutas NACIONALES (fuera de Bogotá y Sabana).
+ * Regla de negocio oficial aprobada (Informe de Auditoría THINK TIC / Biocambio360):
+ * - Opción recomendada: Piso mínimo de $13.000 COP + Tope de subsidio de $15.000 COP.
+ * - Subsidio máximo de fábrica: Math.min(subsidioBruto, 15.000).
+ * - Flete tentativo: costoBrutoTotal - subsidioMaximo.
+ * - Flete cliente: Math.max(Math.min(13.000, costoBrutoTotal), fleteTentativo).
+ *   (Garantiza que el cliente pague al menos $13.000, pero nunca más del costo real total).
+ * - Subsidio efectivo de fábrica: Math.max(0, costoBrutoTotal - fleteCliente).
+ */
+export function calcularFleteNacional(
+    costoBrutoTotal: number,
+    subsidioBruto: number
+): {
+    fleteCliente: number;
+    subsidioEfectivo: number;
+    costoBrutoTotal: number;
+    topeSubsidioAplicado: boolean;
+    pisoMinimoAplicado: boolean;
+    ahorroCliente: number;
+} {
+    const costo = Math.max(0, Math.round(costoBrutoTotal));
+    const subsidioMaximo = Math.min(Math.max(0, subsidioBruto), TOPE_SUBSIDIO_NACIONAL);
+    const fleteTentativo = Math.max(0, costo - subsidioMaximo);
+    const fleteCliente = Math.max(Math.min(PISO_FLETE_NACIONAL, costo), fleteTentativo);
+    const subsidioEfectivo = Math.max(0, costo - fleteCliente);
+
+    return {
+        fleteCliente,
+        subsidioEfectivo,
+        costoBrutoTotal: costo,
+        topeSubsidioAplicado: subsidioBruto > TOPE_SUBSIDIO_NACIONAL,
+        pisoMinimoAplicado: fleteCliente === PISO_FLETE_NACIONAL && fleteTentativo < PISO_FLETE_NACIONAL,
+        ahorroCliente: subsidioEfectivo,
     };
 }
 

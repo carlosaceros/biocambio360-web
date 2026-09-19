@@ -46,7 +46,7 @@ describe('Big Data Customers Ingestion & Consolidation (31,270 clientes)', () =>
         const res = await getCustomersWithPagination({ activeOnly: true, limit: 50 });
         expect(res.customers.length).toBeGreaterThan(0);
         res.customers.forEach(c => {
-            expect(c.activo).toBe(true);
+            expect((c as any).activo).toBe(true);
         });
     });
 

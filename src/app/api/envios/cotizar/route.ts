@@ -5,7 +5,10 @@ import {
     getCartPackagingAnalysis,
     isZonaLocal,
     calcularFleteLocal,
+    calcularFleteNacional,
     MINIMO_DOMICILIARIO_LOCAL,
+    PISO_FLETE_NACIONAL,
+    TOPE_SUBSIDIO_NACIONAL,
     CartItemQuote,
 } from '@/lib/shipping-zones';
 
@@ -121,11 +124,15 @@ export async function POST(request: Request) {
         const valorContrapago = aplicaContrapago ? (quote99.cheapest.valor_contrapago || 0) : 0;
         const costoBrutoTotal = cotizacionBruta99 + valorContrapago;
 
-        // ── SUBSIDIO NACIONAL ────────────────────────────────────────────────────
-        // El subsidio de fábrica cubre según los productos adquiridos ($12k 20L/10L, $6k 3.8L, $3k 1/2G, $1k 1L).
-        // Para rutas nacionales se aplica hasta cubrir el flete bruto total.
-        const subsidioEfectivo = Math.min(subsidioBruto, costoBrutoTotal);
-        const fleteCliente = Math.max(0, costoBrutoTotal - subsidioEfectivo);
+        // ── SUBSIDIO NACIONAL (PISO $13.000 + TOPE $15.000) ───────────────────────
+        // Regla aprobada: Piso mínimo nacional de $13.000 COP y tope de subsidio de fábrica de $15.000 COP.
+        const {
+            fleteCliente,
+            subsidioEfectivo,
+            pisoMinimoAplicado,
+            topeSubsidioAplicado,
+            ahorroCliente,
+        } = calcularFleteNacional(costoBrutoTotal, subsidioBruto);
         const esGratis = fleteCliente === 0;
 
         // ── AUDITORÍA ─────────────────────────────────────────────────────────────
@@ -137,6 +144,9 @@ export async function POST(request: Request) {
             bultos,
             subsidioBruto,
             subsidioEfectivo,
+            pisoMinimoAplicado,
+            topeSubsidioAplicado,
+            ahorroCliente,
             cotizacionBruta99,
             valorContrapago,
             costoBrutoTotal,
@@ -162,6 +172,9 @@ export async function POST(request: Request) {
             costoBrutoTotal,
             subsidioBruto,
             subsidioEfectivo,
+            pisoMinimoAplicado,
+            topeSubsidioAplicado,
+            ahorroCliente,
             totalWeightKg,
             bultos,
             transportadora: quote99.cheapest.transportadora,
@@ -170,7 +183,7 @@ export async function POST(request: Request) {
             source: '99envios',
             mensaje: esGratis
                 ? '¡Envío GRATIS asumido por Biocambio360!'
-                : `Flete $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora?.toUpperCase()} · ${bultos} bulto${bultos > 1 ? 's' : ''}). Biocambio360 subsidia $${subsidioEfectivo.toLocaleString('es-CO')}.`,
+                : `Flete $${fleteCliente.toLocaleString('es-CO')} (${quote99.cheapest.transportadora?.toUpperCase()} · ${bultos} bulto${bultos > 1 ? 's' : ''}). Biocambio360 subsidia $${subsidioEfectivo.toLocaleString('es-CO')} de fábrica (Ahorro garantizado).`,
         });
     } catch (e: any) {
         console.error('[Cotizar API] Error:', e);

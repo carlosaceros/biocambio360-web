@@ -851,30 +851,38 @@ export default function CheckoutPage() {
                                                 {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === 'free_shipping' && '🎁'}
                                                 {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === '99envios' && '🚚'}
                                                 {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === 'fallback' && '📦'}
-                                                <div className="w-full flex items-center justify-between gap-2">
-                                                    {shippingInfo.loading && <span>Cotizando envío...</span>}
-                                                    {!shippingInfo.loading && shippingInfo.sinCobertura && <span>{shippingInfo.mensaje}</span>}
-                                                    {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === 'free_shipping' && (
-                                                        <span>{shippingInfo.mensaje}</span>
-                                                    )}
-                                                    {!shippingInfo.loading && !shippingInfo.sinCobertura && (shippingInfo.source === '99envios' || !shippingInfo.source) && (
-                                                        <>
-                                                            <span>
-                                                                Envío con {shippingInfo.transportadora || 'Transportadora'}
-                                                                {shippingInfo.dias ? ` · ${shippingInfo.dias} días hábiles` : ''}
-                                                            </span>
-                                                            <span className="font-bold ml-auto flex-shrink-0">
-                                                                {(shippingCost === 0 && (subtotal >= 100000 || shippingInfo.source === 'free_shipping')) ? 'GRATIS' : shippingCost > 0 ? `$${shippingCost.toLocaleString('es-CO')}` : 'Por calcular'}
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                    {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === 'fallback' && (
-                                                        <>
-                                                            <span>Envío estimado{shippingInfo.mensaje ? ` · ${shippingInfo.mensaje}` : ''}</span>
-                                                            <span className="font-bold ml-auto flex-shrink-0">
-                                                                {(shippingCost === 0 && subtotal >= 100000) ? 'GRATIS' : shippingCost > 0 ? `$${shippingCost.toLocaleString('es-CO')}` : 'Por calcular'}
-                                                            </span>
-                                                        </>
+                                                <div className="w-full flex flex-col gap-1">
+                                                    <div className="w-full flex items-center justify-between gap-2">
+                                                        {shippingInfo.loading && <span>Cotizando envío...</span>}
+                                                        {!shippingInfo.loading && shippingInfo.sinCobertura && <span>{shippingInfo.mensaje}</span>}
+                                                        {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === 'free_shipping' && (
+                                                            <span>{shippingInfo.mensaje}</span>
+                                                        )}
+                                                        {!shippingInfo.loading && !shippingInfo.sinCobertura && (shippingInfo.source === '99envios' || !shippingInfo.source) && (
+                                                            <>
+                                                                <span>
+                                                                    Envío con {shippingInfo.transportadora || 'Transportadora'}
+                                                                    {shippingInfo.dias ? ` · ${shippingInfo.dias} días hábiles` : ''}
+                                                                </span>
+                                                                <span className="font-bold ml-auto flex-shrink-0">
+                                                                    {(shippingCost === 0 && (subtotal >= 100000 || shippingInfo.source === 'free_shipping')) ? 'GRATIS' : shippingCost > 0 ? `$${shippingCost.toLocaleString('es-CO')}` : 'Por calcular'}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                        {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === 'fallback' && (
+                                                            <>
+                                                                <span>Envío estimado{shippingInfo.mensaje ? ` · ${shippingInfo.mensaje}` : ''}</span>
+                                                                <span className="font-bold ml-auto flex-shrink-0">
+                                                                    {(shippingCost === 0 && subtotal >= 100000) ? 'GRATIS' : shippingCost > 0 ? `$${shippingCost.toLocaleString('es-CO')}` : 'Por calcular'}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    {!shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === '99envios' && (
+                                                        <p className="text-[11px] text-blue-800 bg-blue-100/70 rounded px-2 py-0.5 mt-0.5 flex items-center gap-1 font-semibold">
+                                                            <span>🏭</span>
+                                                            <span>Envío nacional preferencial Biocambio360: Tarifa subsidiada de fábrica (Ahorras hasta $15.000 en flete)</span>
+                                                        </p>
                                                     )}
                                                 </div>
                                             </div>
@@ -1198,6 +1206,11 @@ export default function CheckoutPage() {
                                 {(!formData.ciudad || !destinoCodigo) && (
                                     <p className="text-[11px] text-gray-400">
                                         * Selecciona tu ciudad para calcular el costo de envío
+                                    </p>
+                                )}
+                                {formData.ciudad && destinoCodigo && !shippingInfo.loading && !shippingInfo.sinCobertura && shippingInfo.source === '99envios' && (
+                                    <p className="text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1 font-medium mt-1">
+                                        🏭 <b>Tarifa subsidiada:</b> Ahorras hasta $15.000 en flete nacional asumido por fábrica.
                                     </p>
                                 )}
                             </div>

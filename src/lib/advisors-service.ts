@@ -13,6 +13,7 @@ import {
     where,
     limit,
     serverTimestamp,
+    Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Customer } from '@/types/customer';
@@ -210,9 +211,10 @@ export async function getAdvisorAlertsData(advisorName: string): Promise<Advisor
         if (ordersSnap && typeof (ordersSnap as any).forEach === 'function') {
             ordersSnap.forEach(d => {
                 const ord = { id: d.id, ...d.data() } as Order & { id: string };
-                const ordAdvisor = (ord as any).asesor || (ord as any).advisorName || (ord as any).assignedToAdvisor || '';
-                // Si tiene asesor asignado, filtrar por asesor o permitir ver las de su cartera
-                if (!ordAdvisor || ordAdvisor.toLowerCase() === advisorName.toLowerCase() || advisorName === 'Diego' || advisorName === 'Fernando') {
+                const ordAdvisor = ord.asesorNombre || (ord as any).asesor || (ord as any).advisorName || (ord as any).assignedToAdvisor || '';
+                const isUniversal = !advisorName || advisorName.toLowerCase() === 'todos' || advisorName === 'Diego' || advisorName === 'Fernando' || advisorName === 'Julián' || advisorName === 'Danilo';
+
+                if (isUniversal || !ordAdvisor || ordAdvisor.toLowerCase() === advisorName.toLowerCase()) {
                     entregasDiaSiguiente.push(ord);
                 }
             });
@@ -230,6 +232,46 @@ export async function getAdvisorAlertsData(advisorName: string): Promise<Advisor
             entregasDiaSiguiente: [],
             totalAlertasCount: 0
         };
+    }
+}
+
+/**
+ * Marca un pedido como alertado para la entrega del día siguiente,
+ * registrando trazabilidad del autor, timestamp y actividad CRM.
+ */
+export async function markOrderDeliveryAlertSent(
+    orderId: string,
+    authorName: string,
+    authorEmail?: string
+): Promise<void> {
+    const orderDocRef = doc(db, 'orders', orderId);
+    const orderSnap = await getDoc(orderDocRef);
+    if (!orderSnap.exists()) throw new Error(`Pedido no encontrado: ${orderId}`);
+
+    const nowIso = new Date().toISOString();
+    await updateDoc(orderDocRef, {
+        alertaEntregaEnviada: true,
+        alertaEntregaEnviadaAt: nowIso,
+        alertaEntregaEnviadaPor: authorName,
+        updatedAt: Timestamp.now(),
+    });
+
+    const orderData = orderSnap.data() as Order;
+    const cleanPhone = (orderData.cliente?.celular || '').replace(/\D/g, '');
+
+    if (cleanPhone) {
+        try {
+            const { addCRMActivity } = await import('./crm-service');
+            await addCRMActivity({
+                customerId: cleanPhone,
+                type: 'whatsapp',
+                description: `Protocolo Alerta de Entrega Día Siguiente enviado por ${authorName}. Total contraentrega: $${(orderData.total || 0).toLocaleString('es-CO')} COP.`,
+                authorName,
+                authorEmail: authorEmail || 'asesores@biocambio360.com',
+            });
+        } catch (e: any) {
+            console.warn('[AdvisorService] Error registrando actividad CRM:', e.message);
+        }
     }
 }
 

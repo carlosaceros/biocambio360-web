@@ -36,6 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     '/admin/reabastecimiento': 'reabastecimiento',
                     '/admin/cupones': 'cupones',
                     '/admin/envios': 'envios',
+                    '/admin/mensajeros': 'envios',
                     '/admin/auditoria-envios': 'auditoria',
                 };
 

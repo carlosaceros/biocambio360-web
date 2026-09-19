@@ -520,6 +520,30 @@ export default function AdminDashboard() {
                                     </motion.button>
                                 )}
 
+                                {/* Mensajeros & Flota Propia */}
+                                {(hasCap('envios') || hasCap('pedidos')) && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/mensajeros')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-orange-200 text-left hover:border-orange-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center mb-3 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                            <Truck size={22} />
+                                        </div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <h3 className="text-base font-black text-gray-900">Mensajeros & Flota</h3>
+                                            <span className="text-[10px] font-black bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded-full">Bogotá/Sabana</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Rutas locales, control de recaudo COD y liquidación de fletes.
+                                        </p>
+                                        <span className="text-xs font-bold text-orange-700 flex items-center gap-1">
+                                            Gestionar Flota <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
+
                                 {/* Clientes & CRM */}
                                 {hasCap('clientes') && (
                                     <motion.button
