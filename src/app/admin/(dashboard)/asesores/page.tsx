@@ -146,9 +146,8 @@ export default function AsesoresCockpitPage() {
                                     <Zap size={10} /> Fast Sales System
                                 </span>
                             </div>
-                            <h1 className="text-xl font-black text-slate-900 mt-0.5 flex items-center gap-2">
-                                <span>Cockpit del Asesor Comercial</span>
-                                <span className="text-xs font-normal text-slate-400">· Cero Excel</span>
+                            <h1 className="text-xl font-black text-slate-900 mt-0.5">
+                                Cockpit del Asesor Comercial
                             </h1>
                         </div>
                     </div>
