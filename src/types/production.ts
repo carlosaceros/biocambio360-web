@@ -52,6 +52,8 @@ export interface ProductFormula {
     viscosidadTeorica?: string;
     colorTeorico?: string;
     aromaTeorico?: string;
+    categoria?: string;
+    gramera?: string;
     version: number;
     activo: boolean;
     updatedAt: any;
@@ -84,6 +86,12 @@ export interface ProductionBatch {
     fechaFinalizacion?: any;
     fechaVencimiento: any;
     responsablePlanta: string;
+    pesadoPor?: string;
+    empacadoPor?: string;
+    revisadoPor?: string;
+    observaciones?: string;
+    imagenLote?: string;
+    imagenEtiqueta?: string;
     materiasPrimasConsumidas: {
         rawMaterialId: string;
         nombre: string;
@@ -99,6 +107,6 @@ export interface ProductionBatch {
     estado: 'planeado' | 'en_mezclado' | 'en_empaque' | 'cuarentena' | 'aprobado' | 'rechazado';
     costoTotalLote: number;
     costoUnitarioPorLitro: number;
-    createdAt: any;
-    updatedAt: any;
+    createdAt?: any;
+    updatedAt?: any;
 }
