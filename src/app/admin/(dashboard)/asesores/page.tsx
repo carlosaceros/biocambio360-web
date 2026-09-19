@@ -47,6 +47,7 @@ import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
 import DeliveryExceptionModal from '@/components/admin/DeliveryExceptionModal';
 import SalesScriptsCopilotModal from '@/components/admin/SalesScriptsCopilotModal';
+import OrderTimingAnalyticsPanel from '@/components/admin/OrderTimingAnalyticsPanel';
 import { ORDER_STATUS_CONFIG, OrderStatus, Order } from '@/types/order';
 import { subscribeToAdminUsers } from '@/lib/users-service';
 import { getDraftOrdersByAdvisor, discardDraftOrder, getFailedDeliveryOrders } from '@/lib/orders-service';
@@ -78,7 +79,7 @@ export default function AsesoresCockpitPage() {
     // Fast order modal & tab state
     const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
     const [preloadedClientForOrder, setPreloadedClientForOrder] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores' | 'novedades' | 'alertas'>('tareas');
+    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores' | 'novedades' | 'alertas' | 'tiempos'>('tareas');
 
     // Protocolo de Alertas y Copilot IA
     const [alertsData, setAlertsData] = useState<AdvisorAlertsData | null>(null);
@@ -512,6 +513,18 @@ export default function AsesoresCockpitPage() {
                                     {alertsData?.totalAlertasCount}
                                 </span>
                             )}
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('tiempos')}
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                                activeTab === 'tiempos'
+                                    ? 'bg-slate-900 text-white shadow-xs'
+                                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                        >
+                            <Clock size={14} className={activeTab === 'tiempos' ? 'text-amber-400' : 'text-slate-600'} />
+                            <span>⏱️ Tiempos de Toma</span>
                         </button>
                     </div>
 
@@ -1242,6 +1255,11 @@ export default function AsesoresCockpitPage() {
                             </div>
                         )}
                     </div>
+                )}
+
+                {/* TAB: Telemetría y Medición de Tiempos de Toma de Pedidos */}
+                {activeTab === 'tiempos' && (
+                    <OrderTimingAnalyticsPanel />
                 )}
             </main>
 

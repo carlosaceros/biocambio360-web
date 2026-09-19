@@ -207,6 +207,70 @@ Devuelve respuesta estrictamente en JSON:
             return NextResponse.json({ success: true, ...parsedData });
         }
 
+        // ACCIÓN 4: CONSOLIDACIÓN MACRO ESTRATÉGICA (TRIMESTRE / SEMESTRE / AÑO)
+        if (action === 'consolidar_macro') {
+            const { macroData } = body;
+
+            const periodLabel = macroData?.periodLabel || 'Consolidado Periódico';
+            const ventasTotal = macroData?.ventasTotalesMillones || 0;
+            const pctCumplimiento = macroData?.porcentajeCumplimiento || 0;
+            const nuevosTotal = macroData?.clientesNuevosTotales || 0;
+            const ticketPonderado = macroData?.ticketPromedioPonderado || 0;
+            const topAsesores = macroData?.macroHallazgos?.concentracion?.topAsesores?.join(' y ') || 'Karen y Katherine';
+            const shareConcentracion = macroData?.macroHallazgos?.concentracion?.shareTotal || 54;
+            const hunter = macroData?.macroHallazgos?.cazadorPeriodo?.asesor || 'Laura';
+            const hunterNuevos = macroData?.macroHallazgos?.cazadorPeriodo?.clientesNuevos || 0;
+            const critico = macroData?.macroHallazgos?.asesorCriticoPeriodo?.asesor || 'Camilo';
+            const criticoPct = macroData?.macroHallazgos?.asesorCriticoPeriodo?.cumplimiento || 0;
+
+            const prompt = `Actúa como Director Comercial Ejecutivo y Asesor Estratégico de los Fundadores de Biocambio360 (Julián y Danilo).
+Analiza el siguiente informe comercial consolidado para el período: "${periodLabel}".
+
+MÉTRICAS MACRO ACUMULADAS:
+- Ventas Totales: $${ventasTotal} Millones COP (${pctCumplimiento}% de la meta del período).
+- Clientes Nuevos Captados: ${nuevosTotal}.
+- Ticket Promedio Ponderado: $${ticketPonderado.toLocaleString('es-CO')} COP.
+- Concentración de Cartera: ${topAsesores} generan el ${shareConcentracion}% de las ventas totales.
+- Líder de Prospección (Hunter): ${hunter} con ${hunterNuevos} clientes nuevos.
+- Asesor en Riesgo Operativo: ${critico} con ${criticoPct}% de cumplimiento.
+
+Genera una respuesta en formato JSON estrictamente válido con los siguientes campos:
+{
+  "diagnostico_gerencial": "Diagnóstico conciso de 3 a 4 oraciones analizando la salud comercial del período, balance entre recompra y nuevos clientes, y sostenibilidad.",
+  "riesgo_estructural": "Análisis del riesgo de concentración en ${topAsesores} y cómo blindar la cartera institucional.",
+  "palanca_crecimiento": "La principal palanca comercial a activar en el próximo período (ej. cross-selling, combos 20L, HORECA).",
+  "plan_accion_directores": [
+    "Acción directiva 1 específica con métrica y responsable",
+    "Acción directiva 2 específica con métrica y responsable",
+    "Acción directiva 3 específica con métrica y responsable"
+  ],
+  "mensaje_motivacional_equipo": "Párrafo inspirador y honesto para transmitir a los asesores comerciales en el comité mensual."
+}`;
+
+            const fallback = JSON.stringify({
+                diagnostico_gerencial: `Durante ${periodLabel}, la fábrica alcanzó $${ventasTotal}M COP (${pctCumplimiento}% de cumplimiento) demostrando una lealtad excepcional en recompra de la cartera histórica. Sin embargo, se evidencia una alta disparidad entre asesores farmers y hunters que debe equilibrarse.`,
+                riesgo_estructural: `La concentración del ${shareConcentracion}% en ${topAsesores} requiere un protocolo de co-asignación de cuentas para evitar vulnerabilidad operativa si una asesora se incapacita o rota.`,
+                palanca_crecimiento: `Impulsar el combo Dúo 10+10 y garrafas de 20L con flete nacional subsidiado para clientes que compran presentaciones individuales de supermercado.`,
+                plan_accion_directores: [
+                    `1. Reasignar 25 cuentas de recompra semestral a ${critico} bajo supervisión directa para elevar su cuota por encima del 50%.`,
+                    `2. Capacitar a ${hunter} en técnicas de cross-selling con Desengrasante 4L para subir su ticket promedio a más de $120.000 COP.`,
+                    `3. Fortalecer el protocolo de alertas de recompra a 45 días con envíos de prueba de Bactokil para fidelización institucional.`
+                ],
+                mensaje_motivacional_equipo: `¡Equipo Biocambio360! Cada litro que despachamos lleva bienestar, ahorro real y dignidad a los hogares colombianos. Tenemos una base de clientes que nos ama y un mercado inmenso por conquistar con nuestras fórmulas de fábrica.`
+            });
+
+            const rawAiResponse = await callGemini(prompt, fallback);
+            let parsedData;
+            try {
+                const cleaned = rawAiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+                parsedData = JSON.parse(cleaned);
+            } catch (e) {
+                parsedData = JSON.parse(fallback);
+            }
+
+            return NextResponse.json({ success: true, ...parsedData });
+        }
+
         return NextResponse.json({ error: 'Acción no reconocida' }, { status: 400 });
 
     } catch (error: any) {

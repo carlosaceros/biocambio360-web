@@ -32,6 +32,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import citiesData from '@/lib/cities-99envios.json';
 import { subscribeToAdminUsers } from '@/lib/users-service';
+import { recordOrderTimingSession } from '@/lib/order-timing-service';
 
 const ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
 
@@ -136,6 +137,39 @@ export default function FastOrderModal({
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [motivoBorrador, setMotivoBorrador] = useState<string>('Consulta con socio o familia');
     const [isDraftSaved, setIsDraftSaved] = useState<boolean>(false);
+
+    // Telemetría de tiempos de toma de pedidos
+    const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+    const [currentSessionId, setCurrentSessionId] = useState<string>('');
+    const [sessionTimingLogged, setSessionTimingLogged] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            const start = Date.now();
+            setSessionStartTime(start);
+            setCurrentSessionId(`${start}_${Math.random().toString(36).substring(2, 7)}`);
+            setSessionTimingLogged(false);
+        }
+    }, [isOpen]);
+
+    const handleSafeClose = () => {
+        if (sessionStartTime && !sessionTimingLogged && !completedOrderId) {
+            recordOrderTimingSession({
+                sessionId: currentSessionId,
+                advisorName: selectedAdvisor,
+                advisorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                startTime: sessionStartTime,
+                endTime: Date.now(),
+                status: 'descartado',
+                orderTotal: 0,
+                itemsCount: cartItems.length,
+                customerName: nombre || 'Consulta Descartada',
+                channel: salesChannel
+            });
+            setSessionTimingLogged(true);
+        }
+        onClose();
+    };
 
     // Cargar asesores desde Firestore en tiempo real
     useEffect(() => {
@@ -445,6 +479,24 @@ export default function FastOrderModal({
                 orderId = await createOrder(orderPayload);
             }
 
+            // Registrar telemetría de tiempo de toma de pedido
+            if (sessionStartTime && !sessionTimingLogged) {
+                recordOrderTimingSession({
+                    sessionId: currentSessionId,
+                    advisorName: selectedAdvisor,
+                    advisorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                    startTime: sessionStartTime,
+                    endTime: Date.now(),
+                    status: 'borrador',
+                    orderId,
+                    orderTotal: total,
+                    itemsCount: cartItems.length,
+                    customerName: nombre || 'Cliente',
+                    channel: salesChannel
+                });
+                setSessionTimingLogged(true);
+            }
+
             setCompletedOrderId(orderId);
             setIsDraftSaved(true);
             if (onOrderCreated) {
@@ -533,6 +585,24 @@ export default function FastOrderModal({
                 orderId = await createOrder(orderPayload);
             }
 
+            // Registrar telemetría de tiempo de toma de pedido
+            if (sessionStartTime && !sessionTimingLogged) {
+                recordOrderTimingSession({
+                    sessionId: currentSessionId,
+                    advisorName: selectedAdvisor,
+                    advisorEmail: userProfile?.email || user?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                    startTime: sessionStartTime,
+                    endTime: Date.now(),
+                    status: 'guardado',
+                    orderId,
+                    orderTotal: total,
+                    itemsCount: cartItems.length,
+                    customerName: nombre || 'Cliente',
+                    channel: salesChannel
+                });
+                setSessionTimingLogged(true);
+            }
+
             setCompletedOrderId(orderId);
             setIsDraftSaved(false);
             if (onOrderCreated) {
@@ -618,7 +688,7 @@ export default function FastOrderModal({
                         </div>
 
                         <button
-                            onClick={onClose}
+                            onClick={handleSafeClose}
                             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
                         >
                             <X size={20} />
@@ -675,8 +745,8 @@ export default function FastOrderModal({
                                             + Nuevo Registro
                                         </button>
                                         <button
-                                            onClick={onClose}
-                                            className="flex-1 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                                            onClick={handleSafeClose}
+                                            className="flex-1 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
                                         >
                                             Cerrar
                                         </button>
@@ -1178,7 +1248,7 @@ export default function FastOrderModal({
                                     <div className="flex items-center gap-2.5 flex-wrap justify-end">
                                         <button
                                             type="button"
-                                            onClick={onClose}
+                                            onClick={handleSafeClose}
                                             className="px-3 py-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
                                         >
                                             Cancelar

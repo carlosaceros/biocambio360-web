@@ -28,6 +28,8 @@ import {
     MapPin
 } from 'lucide-react';
 import GeographicHeatMap from '@/components/admin/GeographicHeatMap';
+import MacroRecommendationsModal from '@/components/admin/MacroRecommendationsModal';
+import { generateDynamicFindings, saveMonthlyInsight } from '@/lib/monthly-insights-service';
 import {
     HISTORICAL_SALES_DATA,
     ADVISORS_PERFORMANCE_DATA,
@@ -45,6 +47,9 @@ export default function InformeVentasPage() {
     const [selectedYear, setSelectedYear] = useState<number>(2026);
     const [selectedMonth, setSelectedMonth] = useState<number>(8); // Por defecto Agosto
     const [selectedPosMonth, setSelectedPosMonth] = useState<number>(8); // Para POS
+    const [isMacroModalOpen, setIsMacroModalOpen] = useState<boolean>(false);
+    const [isSavingInsight, setIsSavingInsight] = useState<boolean>(false);
+    const [saveInsightToast, setSaveInsightToast] = useState<string | null>(null);
 
     // Meses disponibles para el año seleccionado
     const availableMonthsForYear = useMemo(() => {
@@ -102,6 +107,24 @@ export default function InformeVentasPage() {
         };
     }, [yearSalesData]);
 
+    // Hallazgos clave dinámicos según el mes y año seleccionados
+    const dynamicFindings = useMemo(() => {
+        return generateDynamicFindings(selectedMonth, selectedYear, advisorsPerformance, currentMonthData);
+    }, [selectedMonth, selectedYear, advisorsPerformance, currentMonthData]);
+
+    const handleSaveCurrentInsight = async () => {
+        setIsSavingInsight(true);
+        try {
+            await saveMonthlyInsight(selectedMonth, selectedYear, advisorsPerformance);
+            setSaveInsightToast(`✅ Hallazgos de ${currentMonthData?.mes || selectedMonth} ${selectedYear} guardados en el historial`);
+            setTimeout(() => setSaveInsightToast(null), 3000);
+        } catch (e) {
+            console.error('Error guardando hallazgos:', e);
+        } finally {
+            setIsSavingInsight(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
             {/* Header / Topbar */}
@@ -142,8 +165,16 @@ export default function InformeVentasPage() {
                             </div>
 
                             <button
+                                onClick={() => setIsMacroModalOpen(true)}
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-xs font-black text-white shadow-xs hover:shadow-md transition-all cursor-pointer"
+                            >
+                                <BarChart3 className="w-3.5 h-3.5" />
+                                <span>📈 Historial & Consolidado Macro</span>
+                            </button>
+
+                            <button
                                 onClick={() => window.print()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-xs transition-colors"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-xs transition-colors cursor-pointer"
                             >
                                 <Download className="w-3.5 h-3.5" />
                                 Exportar
@@ -442,44 +473,72 @@ export default function InformeVentasPage() {
                                 </div>
                             </div>
 
-                            {/* Insights Rápidos */}
+                            {/* Insights Rápidos Dinámicos */}
                             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col justify-between">
                                 <div>
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <Sparkles className="w-4 h-4 text-indigo-600" />
-                                        Hallazgos Clave
-                                    </h3>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                                            Hallazgos Clave ({currentMonthData?.mes || 'Mes'} {selectedYear})
+                                        </h3>
+                                        <button
+                                            onClick={handleSaveCurrentInsight}
+                                            disabled={isSavingInsight}
+                                            title="Guardar hallazgos en historial persistente"
+                                            className="px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <RefreshCw className={`w-3 h-3 ${isSavingInsight ? 'animate-spin' : ''}`} />
+                                            <span>{isSavingInsight ? 'Guardando...' : '💾 Guardar'}</span>
+                                        </button>
+                                    </div>
+
+                                    {saveInsightToast && (
+                                        <div className="mb-3 p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-medium">
+                                            {saveInsightToast}
+                                        </div>
+                                    )}
+
                                     <div className="space-y-3 text-xs text-slate-600">
                                         <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                                            <p className="font-bold text-amber-900">Concentración de Ventas</p>
+                                            <p className="font-bold text-amber-900">{dynamicFindings.concentracion.titulo}</p>
                                             <p className="mt-1 text-[11px] text-amber-800">
-                                                Karen y Katherine generan <strong>$85 Millones (54%)</strong> del total de la fábrica. Su fuerte es la fidelización (recompra &gt;89%).
+                                                {dynamicFindings.concentracion.descripcion}
                                             </p>
                                         </div>
 
                                         <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                                            <p className="font-bold text-blue-900">Cazadora de Nuevos (Hunter)</p>
+                                            <p className="font-bold text-blue-900">{dynamicFindings.hunter.titulo}</p>
                                             <p className="mt-1 text-[11px] text-blue-800">
-                                                <strong>Laura</strong> trajo 49 clientes nuevos (37% de sus ventas), la cifra más alta del equipo. Requiere apoyo para aumentar su ticket promedio.
+                                                {dynamicFindings.hunter.descripcion}
                                             </p>
                                         </div>
 
                                         <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl">
-                                            <p className="font-bold text-rose-900">Alerta: Camilo al 9%</p>
+                                            <p className="font-bold text-rose-900">{dynamicFindings.alerta.titulo}</p>
                                             <p className="mt-1 text-[11px] text-rose-800">
-                                                Solo facturó $3M con ticket de $65k y 1.89 prod/orden. Necesita plan de reactivación urgente y combos sugeridos.
+                                                {dynamicFindings.alerta.descripcion}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={() => setSelectedTab('gaps')}
-                                    className="mt-4 w-full py-2.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-                                >
-                                    Ver Estrategias de Mejora
-                                    <ChevronRight className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="mt-4 space-y-2">
+                                    <button
+                                        onClick={() => setIsMacroModalOpen(true)}
+                                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                    >
+                                        <BarChart3 className="w-3.5 h-3.5" />
+                                        📈 Historial & Consolidado Macro (Q/S/Año)
+                                    </button>
+
+                                    <button
+                                        onClick={() => setSelectedTab('gaps')}
+                                        className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                    >
+                                        Ver Estrategias de Mejora
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </motion.div>
@@ -1020,6 +1079,14 @@ export default function InformeVentasPage() {
                 )}
 
             </div>
+
+            {/* Modal de Historial & Consolidación Macro Estratégica */}
+            <MacroRecommendationsModal
+                isOpen={isMacroModalOpen}
+                onClose={() => setIsMacroModalOpen(false)}
+                initialYear={selectedYear}
+                initialMonth={selectedMonth}
+            />
         </div>
     );
 }
