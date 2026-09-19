@@ -18,10 +18,13 @@ export interface PosItem {
     size: string;
     cantidad: number;
     price: number;
+    precioUnitario?: number;
     subtotal: number;
     lote?: string;
     imgFile?: string;
+    imagen?: string;
 }
+
 
 export interface PosSaleCustomer {
     nombre?: string;

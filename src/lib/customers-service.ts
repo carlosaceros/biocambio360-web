@@ -10,8 +10,10 @@ import {
     orderBy,
     getDocs,
     limit,
+    where,
     serverTimestamp // Import serverTimestamp
 } from 'firebase/firestore';
+
 import { db } from './firebase'; // Adjust import path if needed
 import { Customer } from '@/types/customer';
 import { OrderCustomer } from '@/types/order';
@@ -252,3 +254,108 @@ export async function searchCustomers(
 
     return [];
 }
+
+export interface CustomerPurchaseHistoryItem {
+    id: string;
+    fecha: any;
+    tipo: 'POS Mostrador' | 'Pedido Online / Asesor';
+    numeroComprobante: string;
+    total: number;
+    subtotal?: number;
+    descuento?: number;
+    metodoPago?: string;
+    estado?: string;
+    items: {
+        productId: string;
+        nombre: string;
+        size: string;
+        cantidad: number;
+        precioUnitario: number;
+        subtotal: number;
+        imagen?: string;
+    }[];
+}
+
+/**
+ * Obtiene el historial unificado de compras previas del cliente (Pedidos y Ventas POS Mostrador)
+ */
+export async function getCustomerPurchaseHistory(
+    phone: string
+): Promise<CustomerPurchaseHistoryItem[]> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) return [];
+
+    const history: CustomerPurchaseHistoryItem[] = [];
+
+    // 1. Consultar ventas de Mostrador POS ('pos_sales')
+    try {
+        const posCol = collection(db, 'pos_sales');
+        const qPos = query(posCol, where('cliente.celular', '==', cleanPhone), limit(25));
+        const posSnap = await getDocs(qPos);
+        posSnap.docs.forEach(doc => {
+            const data = doc.data() as any;
+            history.push({
+                id: doc.id,
+                fecha: data.createdAt || data.fecha || null,
+                tipo: 'POS Mostrador',
+                numeroComprobante: data.numeroTicket || doc.id,
+                total: Number(data.total || 0),
+                subtotal: Number(data.subtotal || data.total || 0),
+                descuento: Number(data.descuento || 0),
+                metodoPago: data.metodoPago || 'efectivo',
+                estado: 'entregado',
+                items: (data.items || []).map((it: any) => ({
+                    productId: it.productId || 'item',
+                    nombre: it.nombre || 'Producto',
+                    size: it.size || 'Unidad',
+                    cantidad: Number(it.cantidad || 1),
+                    precioUnitario: Number(it.precioUnitario || 0),
+                    subtotal: Number(it.subtotal || (it.precioUnitario || 0) * (it.cantidad || 1)),
+                    imagen: it.imagen
+                }))
+            });
+        });
+    } catch (e) {
+        console.warn('[getCustomerPurchaseHistory] Error consultando pos_sales:', e);
+    }
+
+    // 2. Consultar pedidos ('orders')
+    try {
+        const ordersCol = collection(db, 'orders');
+        const qOrders = query(ordersCol, where('cliente.celular', '==', cleanPhone), limit(25));
+        const ordersSnap = await getDocs(qOrders);
+        ordersSnap.docs.forEach(doc => {
+            const data = doc.data() as any;
+            history.push({
+                id: doc.id,
+                fecha: data.createdAt || null,
+                tipo: 'Pedido Online / Asesor',
+                numeroComprobante: doc.id,
+                total: Number(data.total || 0),
+                subtotal: Number(data.subtotal || data.total || 0),
+                descuento: Number(data.discountAmount || 0),
+                metodoPago: data.paymentMethod || 'contraentrega',
+                estado: data.status || 'confirmado',
+                items: (data.items || []).map((it: any) => ({
+                    productId: it.product?.id || it.productId || 'item',
+                    nombre: it.product?.nombre || it.nombre || 'Producto',
+                    size: it.size || 'Unidad',
+                    cantidad: Number(it.cantidad || 1),
+                    precioUnitario: Number(it.price || it.precioUnitario || 0),
+                    subtotal: Number(it.price || it.precioUnitario || 0) * Number(it.cantidad || 1),
+                    imagen: it.product?.imgFile || it.imagen
+                }))
+            });
+        });
+    } catch (e) {
+        console.warn('[getCustomerPurchaseHistory] Error consultando orders:', e);
+    }
+
+    // Ordenar cronológicamente descendente (más reciente primero)
+    return history.sort((a, b) => {
+        const timeA = a.fecha?.toMillis ? a.fecha.toMillis() : a.fecha?.seconds ? a.fecha.seconds * 1000 : 0;
+        const timeB = b.fecha?.toMillis ? b.fecha.toMillis() : b.fecha?.seconds ? b.fecha.seconds * 1000 : 0;
+        return timeB - timeA;
+    });
+}
+

@@ -14,10 +14,18 @@ export interface Customer {
     // Stats
     totalSpent: number;
     ordersCount: number;
-    lastOrderDate: Timestamp;
-    firstOrderDate: Timestamp;
+    lastOrderDate: Timestamp | any;
+    firstOrderDate: Timestamp | any;
+
+    // Optional CRM / Referrals
+    isReferrer?: boolean;
+    referralCode?: string;
+    stage?: string;
+    sarlaftStatus?: string;
+    notas?: string;
 
     // Metadata
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
+    createdAt: Timestamp | any;
+    updatedAt: Timestamp | any;
 }
+

@@ -34,10 +34,13 @@ import {
     Mail,
     Phone,
     Check,
-    Sparkles
+    Sparkles,
+    Eye
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import PosCustomerDetailsSidebar from '@/components/admin/PosCustomerDetailsSidebar';
 import { PRODUCTOS, Product, ProductSize, isDisallowedSize } from '@/lib/products';
+
 import { formatCurrency } from '@/lib/checkout-utils';
 import { Customer } from '@/types/customer';
 import { getCustomers, searchCustomers, quickCreateCustomer } from '@/lib/customers-service';
@@ -88,6 +91,11 @@ export default function PosPage() {
     const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
     const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
     const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+
+    // Customer Details Sidebar Modal
+    const [isCustomerDetailsOpen, setIsCustomerDetailsOpen] = useState(false);
+    const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
+
 
     // Quick Customer Creation Form
     const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
@@ -214,6 +222,37 @@ export default function PosPage() {
         setCustomerCity('Soacha');
         setCustomerSearchQuery('');
     };
+
+    const handleOpenCustomerDetails = (cust?: Customer) => {
+        const target = cust || selectedCustomer;
+        if (target) {
+            setViewingCustomer(target);
+            setIsCustomerDetailsOpen(true);
+        }
+    };
+
+    const handleReorderItems = (items: PosItem[]) => {
+        setCartItems(prev => {
+            const updated = [...prev];
+            for (const newItem of items) {
+                const idx = updated.findIndex(it => it.productId === newItem.productId && it.size === newItem.size);
+                if (idx >= 0) {
+                    updated[idx] = {
+                        ...updated[idx],
+                        cantidad: updated[idx].cantidad + newItem.cantidad,
+                        subtotal: (updated[idx].cantidad + newItem.cantidad) * (updated[idx].price || updated[idx].precioUnitario || 0)
+                    };
+
+                } else {
+                    updated.push(newItem);
+                }
+            }
+            return updated;
+        });
+        setCustomerToast(`✓ ${items.length} producto(s) cargados al ticket de venta`);
+        setTimeout(() => setCustomerToast(null), 3500);
+    };
+
 
     const handleOpenQuickCreate = (initialPhone?: string) => {
         const digits = (initialPhone || customerSearchQuery).replace(/\D/g, '');
@@ -670,13 +709,17 @@ export default function PosPage() {
                                 /* Tarjeta de Cliente Reconocido y Vinculado */
                                 <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-xl p-2.5 relative shadow-xs">
                                     <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-center gap-2.5 min-w-0">
+                                        <div 
+                                            onClick={() => handleOpenCustomerDetails()}
+                                            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer hover:opacity-90 transition-opacity"
+                                            title="Clic para ver ficha completa e historial del cliente"
+                                        >
                                             <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
                                                 <User size={16} />
                                             </div>
-                                            <div className="min-w-0">
+                                            <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="font-black text-xs text-emerald-950 truncate max-w-[170px]">
+                                                    <span className="font-black text-xs text-emerald-950 truncate max-w-[170px] hover:underline">
                                                         {selectedCustomer.nombre}
                                                     </span>
                                                     <span className="bg-emerald-200/80 text-emerald-900 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
@@ -700,14 +743,25 @@ export default function PosPage() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            onClick={handleClearSelectedCustomer}
-                                            className="p-1 text-emerald-700 hover:text-red-600 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer shrink-0"
-                                            title="Cambiar o desvincular cliente"
-                                        >
-                                            <X size={14} />
-                                        </button>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenCustomerDetails()}
+                                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                                                title="Ver detalles, historial de compras y notas CRM"
+                                            >
+                                                <Eye size={12} />
+                                                <span>Ficha</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleClearSelectedCustomer}
+                                                className="p-1 text-emerald-700 hover:text-red-600 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer shrink-0"
+                                                title="Cambiar o desvincular cliente"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
@@ -766,10 +820,12 @@ export default function PosPage() {
                                                     {customerSuggestions.map((cust) => (
                                                         <div
                                                             key={cust.id}
-                                                            onClick={() => handleSelectCustomer(cust)}
-                                                            className="p-2.5 hover:bg-indigo-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                                                            className="p-2.5 hover:bg-indigo-50/80 transition-colors flex items-center justify-between gap-2"
                                                         >
-                                                            <div className="min-w-0">
+                                                            <div 
+                                                                onClick={() => handleSelectCustomer(cust)}
+                                                                className="min-w-0 flex-1 cursor-pointer"
+                                                            >
                                                                 <div className="flex items-center gap-1.5">
                                                                     <p className="font-bold text-xs text-slate-900 truncate">{cust.nombre}</p>
                                                                     {cust.ordersCount > 1 && (
@@ -782,9 +838,26 @@ export default function PosPage() {
                                                                     {cust.celular} {cust.cedula && `· CC: ${cust.cedula}`} · {cust.ciudad || 'Soacha'}
                                                                 </p>
                                                             </div>
-                                                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md shrink-0">
-                                                                Vincular
-                                                            </span>
+                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleOpenCustomerDetails(cust);
+                                                                    }}
+                                                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors cursor-pointer border border-transparent hover:border-slate-200"
+                                                                    title="Ver detalles e historial del cliente"
+                                                                >
+                                                                    <Eye size={13} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSelectCustomer(cust)}
+                                                                    className="text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-md transition-colors cursor-pointer"
+                                                                >
+                                                                    Vincular
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     ))}
                                                     <div
@@ -795,6 +868,7 @@ export default function PosPage() {
                                                         ¿No es ninguno de ellos? Registrar cliente nuevo
                                                     </div>
                                                 </>
+
                                             ) : (
                                                 <div className="p-3 text-center space-y-2">
                                                     <p className="text-xs text-slate-500">
@@ -1355,7 +1429,21 @@ export default function PosPage() {
                 )}
             </AnimatePresence>
 
+            {/* SIDEBAR MODAL DE DETALLES DEL CLIENTE */}
+            <PosCustomerDetailsSidebar
+                isOpen={isCustomerDetailsOpen}
+                onClose={() => setIsCustomerDetailsOpen(false)}
+                customer={viewingCustomer || selectedCustomer}
+                onReorderItems={handleReorderItems}
+                onAssignToTicket={(cust) => {
+                    handleSelectCustomer(cust);
+                    setIsCustomerDetailsOpen(false);
+                }}
+                isTicketCustomer={Boolean(selectedCustomer && viewingCustomer && selectedCustomer.id === viewingCustomer.id)}
+            />
+
             {/* NOTIFICACIÓN TOAST CLIENTE VINCULADO */}
+
             {customerToast && (
                 <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-500/50">
                     <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
