@@ -37,8 +37,9 @@ import { addCRMActivity } from '@/lib/crm-service';
 import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
 import { ORDER_STATUS_CONFIG, OrderStatus } from '@/types/order';
+import { subscribeToAdminUsers } from '@/lib/users-service';
 
-const ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
+const DEFAULT_ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
 
 export default function AsesoresCockpitPage() {
     const router = useRouter();
@@ -46,11 +47,13 @@ export default function AsesoresCockpitPage() {
 
     // Si el usuario tiene rol asesor, fijar su nombre automáticamente
     const isRestrictedAdvisor = role === 'asesor';
+    const profileAdvisorName = userProfile?.asesorAsignado || userProfile?.nombre || user?.displayName;
     const initialAdvisor = isRestrictedAdvisor
-        ? (userProfile?.asesorAsignado || userProfile?.nombre || 'Karen')
-        : 'Karen';
+        ? (profileAdvisorName || 'Karen')
+        : (profileAdvisorName || 'Karen');
 
     const [selectedAdvisor, setSelectedAdvisor] = useState<string>(initialAdvisor);
+    const [advisorsList, setAdvisorsList] = useState<string[]>(DEFAULT_ADVISORS);
     const [portfolio, setPortfolio] = useState<AdvisorPortfolioSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [quickNoteText, setQuickNoteText] = useState<{ [key: string]: string }>({});
@@ -60,12 +63,33 @@ export default function AsesoresCockpitPage() {
     const [preloadedClientForOrder, setPreloadedClientForOrder] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos'>('tareas');
 
+    // Cargar asesores dinámicamente desde admin_users
+    useEffect(() => {
+        const unsubscribe = subscribeToAdminUsers((users) => {
+            const advisorNames = users
+                .map(u => (u.asesorAsignado || u.nombre)?.trim())
+                .filter(Boolean) as string[];
+
+            setAdvisorsList(prev => {
+                const combined = Array.from(new Set([...DEFAULT_ADVISORS, ...advisorNames]));
+                return combined;
+            });
+        });
+        return () => {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        };
+    }, []);
+
     // Sincronizar asesor asignado si carga el perfil después
     useEffect(() => {
-        if (isRestrictedAdvisor && userProfile?.asesorAsignado) {
-            setSelectedAdvisor(userProfile.asesorAsignado);
+        const activeName = userProfile?.asesorAsignado || userProfile?.nombre || user?.displayName;
+        if (activeName) {
+            setAdvisorsList(prev => Array.from(new Set([...prev, activeName.trim()])));
+            if (isRestrictedAdvisor || selectedAdvisor === 'Karen') {
+                setSelectedAdvisor(activeName.trim());
+            }
         }
-    }, [isRestrictedAdvisor, userProfile]);
+    }, [isRestrictedAdvisor, userProfile, user]);
 
     useEffect(() => {
         loadData(selectedAdvisor);
@@ -162,7 +186,7 @@ export default function AsesoresCockpitPage() {
                                 </span>
                             ) : (
                                 <div className="flex gap-1 overflow-x-auto no-scrollbar">
-                                    {ADVISORS.map(adv => (
+                                    {advisorsList.map(adv => (
                                         <button
                                             key={adv}
                                             onClick={() => setSelectedAdvisor(adv)}

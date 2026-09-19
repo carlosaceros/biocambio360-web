@@ -27,8 +27,39 @@ import { formatCurrency, DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, calculateShip
 import { OrderCustomer, OrderItem, Order } from '@/types/order';
 import { createOrder, lookupCustomerByPhone } from '@/lib/orders-service';
 import { useAuth } from '@/lib/auth-context';
+import citiesData from '@/lib/cities-99envios.json';
+import { subscribeToAdminUsers } from '@/lib/users-service';
 
 const ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
+
+function findDaneCode(dept: string, city: string): { codigo: string; nombre: string } {
+    const cleanCity = (city || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    const cleanDept = (dept || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+    if (cleanCity.includes('BOGOTA')) {
+        return { codigo: '11001000', nombre: 'BOGOTA, DISTRITO CAPITAL' };
+    }
+    if (cleanCity.includes('SOACHA')) {
+        return { codigo: '25754000', nombre: 'SOACHA' };
+    }
+
+    const entries = Object.values(citiesData as Record<string, { codigo: string; ciudad: string; departamento: string }>);
+    
+    const exact = entries.find(e => {
+        const c = e.ciudad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        const d = e.departamento.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        return c === cleanCity && (d.includes(cleanDept) || cleanDept.includes(d));
+    });
+    if (exact) return { codigo: exact.codigo, nombre: exact.ciudad };
+
+    const partial = entries.find(e => {
+        const c = e.ciudad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        return c.includes(cleanCity) || cleanCity.includes(c);
+    });
+    if (partial) return { codigo: partial.codigo, nombre: partial.ciudad };
+
+    return { codigo: '11001000', nombre: cleanCity || 'BOGOTA, DISTRITO CAPITAL' };
+}
 
 interface FastOrderModalProps {
     isOpen: boolean;
@@ -55,13 +86,13 @@ export default function FastOrderModal({
 }: FastOrderModalProps) {
     const { user, userProfile, role } = useAuth();
 
-    // Advisor attribution
+    // Advisor attribution & dynamic advisor list
     const isRestrictedAdvisor = role === 'asesor';
-    const activeAdvisor = isRestrictedAdvisor
-        ? (userProfile?.asesorAsignado || userProfile?.nombre || initialAdvisorName || 'Karen')
-        : (initialAdvisorName || 'Karen');
+    const profileAdvisorName = userProfile?.asesorAsignado || userProfile?.nombre || initialAdvisorName || user?.displayName;
+    const activeAdvisor = profileAdvisorName ? profileAdvisorName.trim() : 'Karen';
 
     const [selectedAdvisor, setSelectedAdvisor] = useState<string>(activeAdvisor);
+    const [advisorsList, setAdvisorsList] = useState<string[]>(ADVISORS);
     const [salesChannel, setSalesChannel] = useState<'call_center' | 'whatsapp' | 'pos'>('call_center');
 
     // Customer fields
@@ -88,8 +119,10 @@ export default function FastOrderModal({
     const [itemQty, setItemQty] = useState<number>(1);
 
     // Logistics & Payment
-    const [flete, setFlete] = useState<number>(9000);
+    const [flete, setFlete] = useState<number>(0);
     const [fleteManual, setFleteManual] = useState<boolean>(false);
+    const [isQuotingShipping, setIsQuotingShipping] = useState<boolean>(false);
+    const [shippingCarrier, setShippingCarrier] = useState<string>('');
     const [metodoPago, setMetodoPago] = useState<string>('contraentrega');
 
     // Submission states
@@ -97,14 +130,31 @@ export default function FastOrderModal({
     const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    // Sync advisor when opened
+    // Cargar asesores desde Firestore en tiempo real
     useEffect(() => {
-        if (initialAdvisorName) {
-            setSelectedAdvisor(initialAdvisorName);
-        } else if (isRestrictedAdvisor && userProfile?.asesorAsignado) {
-            setSelectedAdvisor(userProfile.asesorAsignado);
+        const unsubscribe = subscribeToAdminUsers((users) => {
+            const advisorNames = users
+                .map(u => (u.asesorAsignado || u.nombre)?.trim())
+                .filter(Boolean) as string[];
+
+            setAdvisorsList(prev => Array.from(new Set([...ADVISORS, ...advisorNames])));
+        });
+        return () => {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        };
+    }, []);
+
+    // Sincronizar asesor activo
+    useEffect(() => {
+        const activeName = userProfile?.asesorAsignado || userProfile?.nombre || initialAdvisorName || user?.displayName;
+        if (activeName) {
+            const clean = activeName.trim();
+            setAdvisorsList(prev => Array.from(new Set([...prev, clean])));
+            if (isRestrictedAdvisor || selectedAdvisor === 'Karen' || !selectedAdvisor) {
+                setSelectedAdvisor(clean);
+            }
         }
-    }, [initialAdvisorName, isRestrictedAdvisor, userProfile]);
+    }, [initialAdvisorName, isRestrictedAdvisor, userProfile, user]);
 
     // Handle preloaded customer if passed
     useEffect(() => {
@@ -125,20 +175,72 @@ export default function FastOrderModal({
         return CIUDADES_POR_DEPARTAMENTO[departamento] || ['Bogotá D.C.'];
     }, [departamento]);
 
-    // Auto-update shipping when department/city changes
+    // Cotizar flete en vivo con 99 Envíos cada vez que cambia ciudad, departamento o carrito
     useEffect(() => {
-        if (!fleteManual) {
-            const calculated = calculateShipping(departamento, ciudad);
-            // Si subtotal >= 80000 y es Bogotá o Cundinamarca local, flete gratis
-            const subtotal = cartItems.reduce((acc, it) => acc + (it.price * it.cantidad), 0);
-            const isLocal = departamento === 'Cundinamarca' && ['Bogotá D.C.', 'Soacha', 'Chía', 'Mosquera', 'Funza', 'Madrid'].includes(ciudad);
-            if (subtotal >= 80000 && isLocal) {
-                setFlete(0);
-            } else {
-                setFlete(calculated);
-            }
+        if (fleteManual) return;
+
+        if (cartItems.length === 0) {
+            setFlete(0);
+            setShippingCarrier('');
+            return;
         }
-    }, [departamento, ciudad, cartItems, fleteManual]);
+
+        let cancelled = false;
+        setIsQuotingShipping(true);
+
+        const timer = setTimeout(() => {
+            const dane = findDaneCode(departamento, ciudad);
+            const currentSubtotal = cartItems.reduce((acc, it) => acc + (it.price * it.cantidad), 0);
+
+            fetch('/api/envios/cotizar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    destinoCodigo: dane.codigo,
+                    destinoNombre: dane.nombre,
+                    subtotal: currentSubtotal,
+                    aplicaContrapago: metodoPago === 'contraentrega',
+                    items: cartItems.map(it => ({
+                        productId: it.product.id,
+                        nombre: it.product.nombre,
+                        size: it.size,
+                        cantidad: it.cantidad,
+                    })),
+                    itemsSizes: cartItems.map(it => ({ size: it.size, cantidad: it.cantidad }))
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (cancelled) return;
+                    if (data.gratis) {
+                        setFlete(0);
+                        setShippingCarrier(data.transportadora || 'Biocambio360 (Local)');
+                    } else if (typeof data.precio === 'number') {
+                        setFlete(data.precio);
+                        setShippingCarrier(data.transportadora || '99 Envíos');
+                    } else {
+                        const fallbackCost = calculateShipping(departamento, ciudad);
+                        setFlete(fallbackCost);
+                        setShippingCarrier('99 Envíos');
+                    }
+                })
+                .catch(err => {
+                    if (cancelled) return;
+                    console.warn('[FastOrderModal] Fallback flete 99 Envíos:', err);
+                    const fallbackCost = calculateShipping(departamento, ciudad);
+                    setFlete(fallbackCost);
+                    setShippingCarrier('Tarifa Estándar');
+                })
+                .finally(() => {
+                    if (!cancelled) setIsQuotingShipping(false);
+                });
+        }, 300);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [departamento, ciudad, cartItems, metodoPago, fleteManual]);
 
     // Fast customer lookup by phone
     const handlePhoneChange = async (val: string) => {
@@ -226,6 +328,21 @@ export default function FastOrderModal({
     }, [cartItems]);
 
     const total = subtotal + flete;
+
+    const handleManualFleteEdit = () => {
+        const input = window.prompt(
+            'Ingresa el valor del flete en COP (Escribe 0 para flete gratis):',
+            flete.toString()
+        );
+        if (input !== null) {
+            const cleanNum = parseInt(input.replace(/\D/g, ''), 10);
+            if (!isNaN(cleanNum)) {
+                setFlete(cleanNum);
+                setFleteManual(true);
+                setShippingCarrier('Manual');
+            }
+        }
+    };
 
     // Submit order
     const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -424,7 +541,7 @@ export default function FastOrderModal({
                                             onChange={(e) => setSelectedAdvisor(e.target.value)}
                                             className="mt-1 w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 disabled:opacity-75"
                                         >
-                                            {ADVISORS.map(adv => (
+                                            {advisorsList.map(adv => (
                                                 <option key={adv} value={adv}>{adv}</option>
                                             ))}
                                         </select>
@@ -809,24 +926,47 @@ export default function FastOrderModal({
                                             </p>
                                         </div>
 
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-2">
                                             <div>
-                                                <span className="text-[10px] text-slate-400 uppercase font-bold">Flete Envío</span>
-                                                <p className="text-base font-black text-amber-400">
-                                                    {flete === 0 ? '¡GRATIS!' : formatCurrency(flete)}
-                                                </p>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Flete 99 Envíos</span>
+                                                    {isQuotingShipping && (
+                                                        <span className="text-[10px] text-amber-300 animate-pulse font-mono font-bold">
+                                                            ⚡ Cotizando...
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <p className="text-base font-black text-amber-400">
+                                                        {flete === 0 ? '¡GRATIS!' : formatCurrency(flete)}
+                                                    </p>
+                                                    {shippingCarrier && !isQuotingShipping && (
+                                                        <span className="text-[10px] text-slate-400 font-medium truncate max-w-[130px]" title={shippingCarrier}>
+                                                            ({shippingCarrier})
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setFleteManual(true);
-                                                    setFlete(flete === 0 ? 9000 : 0);
-                                                }}
-                                                className="text-[10px] text-slate-400 underline hover:text-white pl-1"
-                                                title="Alternar flete"
-                                            >
-                                                Editar
-                                            </button>
+                                            <div className="flex flex-col gap-0.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleManualFleteEdit}
+                                                    className="text-[10px] text-indigo-300 underline hover:text-white cursor-pointer"
+                                                    title="Editar valor manual de flete"
+                                                >
+                                                    Editar
+                                                </button>
+                                                {fleteManual && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFleteManual(false)}
+                                                        className="text-[9px] text-emerald-400 hover:underline cursor-pointer font-bold"
+                                                        title="Volver a cotización automática con 99 Envíos"
+                                                    >
+                                                        Auto
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="border-l border-slate-700 pl-6">

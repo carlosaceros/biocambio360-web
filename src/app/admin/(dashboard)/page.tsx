@@ -25,7 +25,8 @@ import {
     Store,
     FlaskConical,
     Award,
-    Mail
+    Mail,
+    Zap
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -35,6 +36,7 @@ import { Order, OrderStatus } from '@/types/order';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import NotificationBell from '@/components/NotificationBell';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
+import { UserModuleCapabilities, SystemRole, ROLE_DEFINITIONS } from '@/types/user';
 
 export default function AdminDashboard() {
     const { user, userProfile, role, signOut } = useAuth();
@@ -190,6 +192,39 @@ export default function AdminDashboard() {
     const isSuperAdmin = (role === 'superadmin' || email === 'thinktic.thinktic@gmail.com') && email !== 'infobiocambio360@gmail.com';
     const isGestor = !isSuperAdmin;
 
+    // Verificador de capacidades específicas asignadas al usuario
+    const hasCap = (capKey: keyof UserModuleCapabilities) => {
+        if (isSuperAdmin) return true;
+        if (userProfile?.capacidades) {
+            return !!userProfile.capacidades[capKey];
+        }
+        const roleDef = ROLE_DEFINITIONS[role as SystemRole];
+        if (roleDef?.defaultCapabilities?.[capKey]) return true;
+        if (role === 'asesor') {
+            return ['asesores', 'clientes', 'reabastecimiento'].includes(capKey);
+        }
+        if (role === 'cajero') {
+            return ['pos'].includes(capKey);
+        }
+        if (role === 'produccion_calidad') {
+            return ['produccion'].includes(capKey);
+        }
+        if (role === 'gestor' || role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
+            return ['pedidos', 'clientes', 'reabastecimiento', 'envios'].includes(capKey);
+        }
+        return false;
+    };
+
+    const roleDisplayName = isSuperAdmin
+        ? 'Super Administrador'
+        : role === 'asesor'
+        ? 'Asesor Comercial'
+        : role === 'cajero'
+        ? 'Cajero Mostrador'
+        : role === 'produccion_calidad'
+        ? 'Jefe de Planta'
+        : 'Gestor Operativo';
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
             {/* Top Bar */}
@@ -203,15 +238,30 @@ export default function AdminDashboard() {
                                 className="h-9 sm:h-10 w-auto object-contain transition-transform group-hover:scale-105"
                             />
                         </Link>
-                        {isGestor ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <Shield size={12} className="text-emerald-600" />
-                                {role === 'logistico' || role === 'logistica' ? 'ROL LOGÍSTICO' : 'GESTOR & LOGÍSTICA'}
-                            </span>
-                        ) : (
+                        {isSuperAdmin ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
                                 <Shield size={12} className="text-indigo-600" />
                                 SUPER ADMIN
+                            </span>
+                        ) : role === 'asesor' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-50 text-amber-800 border border-amber-200">
+                                <Award size={12} className="text-amber-600" />
+                                ASESOR COMERCIAL
+                            </span>
+                        ) : role === 'cajero' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-teal-50 text-teal-800 border border-teal-200">
+                                <Store size={12} className="text-teal-600" />
+                                CAJERO MOSTRADOR
+                            </span>
+                        ) : role === 'produccion_calidad' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <FlaskConical size={12} className="text-emerald-600" />
+                                PLANTA & CALIDAD
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-blue-50 text-blue-800 border border-blue-200">
+                                <Shield size={12} className="text-blue-600" />
+                                GESTOR OPERATIVO
                             </span>
                         )}
                     </div>
@@ -252,7 +302,7 @@ export default function AdminDashboard() {
 
                         <div className="text-right hidden lg:block">
                             <p className="text-xs font-bold text-gray-900 truncate max-w-[200px]">{user?.email}</p>
-                            <p className="text-[10px] text-gray-500 font-medium">{isGestor ? 'Gestor Logístico' : 'Super Administrador'}</p>
+                            <p className="text-[10px] text-gray-500 font-medium">{roleDisplayName}</p>
                         </div>
 
                         <motion.button
@@ -281,25 +331,64 @@ export default function AdminDashboard() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-8">
-                {/* ─── VISTA ESPECIAL GESTOR DE PEDIDOS ────────────────────────── */}
+                {/* ─── VISTA ESPECIAL GESTOR / ASESOR / OPERATIVO ─────────────────── */}
                 {isGestor ? (
                     <>
-                        {/* Welcome Banner */}
-                        <div className="bg-gradient-to-r from-emerald-700 via-teal-800 to-indigo-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-2xl font-black mb-1">Módulo de Despachos & Logística</h2>
-                                <p className="text-sm text-emerald-100">
-                                    Gestión de pedidos, generación de guías 99 Envíos, auditoría de fletes e inventario operativo.
-                                </p>
+                        {/* Contextual Welcome Banner */}
+                        {role === 'asesor' ? (
+                            <div className="bg-gradient-to-r from-indigo-800 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <Award size={12} /> ESTACIÓN COMERCIAL
+                                        </span>
+                                    </div>
+                                    <h2 className="text-2xl font-black mb-1">Cockpit de Ventas & Cierre</h2>
+                                    <p className="text-sm text-indigo-100">
+                                        Registro ágil de pedidos por llamada o WhatsApp, CRM de clientes y seguimiento de comisiones en tiempo real.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => router.push('/admin/asesores')}
+                                    className="px-5 py-2.5 bg-amber-400 text-slate-950 rounded-xl text-sm font-black hover:bg-amber-300 transition-all shadow flex items-center gap-2 cursor-pointer"
+                                >
+                                    <Zap size={16} />
+                                    Ir al Cockpit de Ventas
+                                </button>
                             </div>
-                            <button
-                                onClick={() => router.push('/admin/pedidos')}
-                                className="px-5 py-2.5 bg-white text-emerald-900 rounded-xl text-sm font-black hover:bg-emerald-50 transition-all shadow flex items-center gap-2"
-                            >
-                                <Package size={16} />
-                                Ir a Pedidos Pendientes ({stats.pipeline.pendiente + stats.pipeline.confirmado + stats.pipeline.preparacion})
-                            </button>
-                        </div>
+                        ) : role === 'cajero' ? (
+                            <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-black mb-1">Terminal Punto de Venta POS</h2>
+                                    <p className="text-sm text-teal-100">
+                                        Facturación rápida en mostrador, arqueo de caja y cobros directos.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => router.push('/admin/pos')}
+                                    className="px-5 py-2.5 bg-white text-teal-900 rounded-xl text-sm font-black hover:bg-teal-50 transition-all shadow flex items-center gap-2 cursor-pointer"
+                                >
+                                    <Store size={16} />
+                                    Abrir TPV Mostrador
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="bg-gradient-to-r from-emerald-700 via-teal-800 to-indigo-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-black mb-1">Módulo de Despachos & Logística</h2>
+                                    <p className="text-sm text-emerald-100">
+                                        Gestión de pedidos, generación de guías 99 Envíos, auditoría de fletes e inventario operativo.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => router.push('/admin/pedidos')}
+                                    className="px-5 py-2.5 bg-white text-emerald-900 rounded-xl text-sm font-black hover:bg-emerald-50 transition-all shadow flex items-center gap-2 cursor-pointer"
+                                >
+                                    <Package size={16} />
+                                    Ir a Pedidos Pendientes ({stats.pipeline.pendiente + stats.pipeline.confirmado + stats.pipeline.preparacion})
+                                </button>
+                            </div>
+                        )}
 
                         {/* Operational Stats */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -358,225 +447,261 @@ export default function AdminDashboard() {
                             </div>
                         </div>
 
-                        {/* Gestor Quick Actions */}
+                        {/* Quick Actions / Capacidades Habilitadas */}
                         <div>
-                            <h2 className="text-lg font-black text-gray-900 mb-4">MÓDULOS HABILITADOS</h2>
+                            <h2 className="text-lg font-black text-gray-900 mb-4">MÓDULOS HABILITADOS PARA TU PERFIL</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/pedidos')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                        <Package size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Pedidos & Guías</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Kanban de órdenes y emisión de guías 99 Envíos.
-                                    </p>
-                                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                                        Acceso Total <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Cockpit Asesores */}
+                                {hasCap('asesores') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/asesores')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-amber-300 text-left hover:border-amber-500 hover:shadow-md transition-all group ring-1 ring-amber-100"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                                            <Award size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Cockpit Asesores</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Toma de pedidos ágil, metas $30M, llamadas y comisiones.
+                                        </p>
+                                        <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
+                                            Abrir Cockpit <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/cotizaciones-b2b')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-teal-200 text-left hover:border-teal-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3 group-hover:bg-teal-600 group-hover:text-white transition-colors">
-                                        <Building2 size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Cotizador & Tarifas B2B</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Gestión de cotizaciones, tarifas de sectores y edición.
-                                    </p>
-                                    <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
-                                        Editar Tarifas & CRM <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Pedidos & Guías */}
+                                {hasCap('pedidos') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/pedidos')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                            <Package size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Pedidos & Guías</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Kanban de órdenes y emisión de guías 99 Envíos.
+                                        </p>
+                                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                            Acceso Total <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/auditoria-envios')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-indigo-200 text-left hover:border-indigo-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                        <Activity size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Auditoría Envíos</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Trazabilidad de cotizaciones y tarifas de fletes.
-                                    </p>
-                                    <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
-                                        Solo Consulta <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Clientes & CRM */}
+                                {hasCap('clientes') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/clientes')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-blue-200 text-left hover:border-blue-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                            <Users size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Clientes & CRM</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Pipeline de etapas, asignación de cartera y SARLAFT.
+                                        </p>
+                                        <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
+                                            Abrir CRM <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/productos')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                                        <Layers size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Productos & Precios</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Gestión de catálogo, stock y edición de precios auditada.
-                                    </p>
-                                    <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
-                                        Editar Precios & Auditoría <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Reabastecimiento & Recompra */}
+                                {hasCap('reabastecimiento') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/reabastecimiento')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-rose-200 text-left hover:border-rose-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                            <Clock size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Reabastecimiento BI</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Timers de consumo de clientes, recompra y fidelización.
+                                        </p>
+                                        <span className="text-xs font-bold text-rose-700 flex items-center gap-1">
+                                            Ver Alertas <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/carritos-abandonados')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-rose-200 text-left hover:border-rose-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors">
-                                        <ShoppingCart size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Carritos Abandonados</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Recuperación WhatsApp 1-clic y correos SMTP.
-                                    </p>
-                                    <span className="text-xs font-bold text-rose-700 flex items-center gap-1">
-                                        Recuperar Clientes <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* TPV Mostrador Soacha */}
+                                {hasCap('pos') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/pos')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                            <Store size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">TPV Mostrador Soacha</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Cobro táctil rápido, cambio en efectivo y arqueo ciego.
+                                        </p>
+                                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                            Abrir TPV <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/finanzas')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                        <TrendingUp size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Análisis Financiero</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Histórico por meses, ticket promedio y exportación CSV.
-                                    </p>
-                                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                                        Ver Finanzas & Balance <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Cotizador & Tarifas B2B */}
+                                {hasCap('pedidos') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/cotizaciones-b2b')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-teal-200 text-left hover:border-teal-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                                            <Building2 size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Cotizador & Tarifas B2B</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Gestión de cotizaciones, tarifas institucionales y leads.
+                                        </p>
+                                        <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
+                                            Editar Tarifas & CRM <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/referidos')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                                        <Users size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Comunidad & Referidos</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Red de embajadores, ventas recomendadas y auditoría de saldos.
-                                    </p>
-                                    <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
-                                        Gestionar Referidos <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Producción & MRP */}
+                                {hasCap('produccion') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/produccion')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-teal-200 text-left hover:border-teal-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                                            <FlaskConical size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Producción & MRP</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Recetas BOM, lotes INVIMA y control de calidad.
+                                        </p>
+                                        <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
+                                            Ver Planta <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/clientes')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-blue-200 text-left hover:border-blue-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                        <Users size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Clientes & CRM</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Pipeline de etapas, asignación de asesores y SARLAFT.
-                                    </p>
-                                    <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
-                                        Abrir CRM <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Auditoría Envíos */}
+                                {hasCap('envios') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/auditoria-envios')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-indigo-200 text-left hover:border-indigo-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                            <Activity size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Auditoría Envíos</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Trazabilidad de cotizaciones y tarifas de fletes 99 Envíos.
+                                        </p>
+                                        <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
+                                            Consultar Envíos <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/informe-ventas')}
-                                    className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-5 shadow-sm border-2 border-indigo-400 text-left hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-white/10 text-amber-400 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                        <BarChart3 size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-white mb-1">Informe Ventas a 2026</h3>
-                                    <p className="text-xs text-indigo-200 mb-2">
-                                        Cumplimiento de metas, asesores y punto de venta (Power BI).
-                                    </p>
-                                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                                        Ver BI Comercial <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Productos & Precios */}
+                                {hasCap('pedidos') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/productos')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                            <Layers size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Productos & Precios</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Gestión de catálogo, stock y precios de venta.
+                                        </p>
+                                        <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
+                                            Ver Catálogo <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/pos')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                        <Store size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">TPV Mostrador Soacha</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Cobro táctil rápido, cambio en efectivo y arqueo ciego.
-                                    </p>
-                                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                                        Abrir TPV <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Carritos Abandonados */}
+                                {hasCap('pedidos') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/carritos-abandonados')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-rose-200 text-left hover:border-rose-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                            <ShoppingCart size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Carritos Abandonados</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Recuperación WhatsApp 1-clic y correos automáticos.
+                                        </p>
+                                        <span className="text-xs font-bold text-rose-700 flex items-center gap-1">
+                                            Recuperar Clientes <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/asesores')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-amber-200 text-left hover:border-amber-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                                        <Award size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Cockpit Asesores</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Metas individuales ($30M), comisiones y tareas diarias.
-                                    </p>
-                                    <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
-                                        Abrir Cockpit <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Análisis Financiero */}
+                                {hasCap('finanzas') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/finanzas')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                            <TrendingUp size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Análisis Financiero</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Histórico por meses, ticket promedio y balances.
+                                        </p>
+                                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                            Ver Finanzas <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
 
-                                <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => router.push('/admin/produccion')}
-                                    className="bg-white rounded-2xl p-5 shadow-sm border-2 border-teal-200 text-left hover:border-teal-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3 group-hover:bg-teal-600 group-hover:text-white transition-colors">
-                                        <FlaskConical size={22} />
-                                    </div>
-                                    <h3 className="text-base font-black text-gray-900 mb-1">Producción & MRP</h3>
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        Recetas BOM, lotes INVIMA y control de calidad.
-                                    </p>
-                                    <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
-                                        Ver Planta <ArrowUpRight size={14} />
-                                    </span>
-                                </motion.button>
+                                {/* Comunidad & Referidos / Cupones */}
+                                {hasCap('cupones') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/referidos')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 text-left hover:border-purple-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                            <Users size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Comunidad & Referidos</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Red de embajadores, cupones y saldos a favor.
+                                        </p>
+                                        <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
+                                            Gestionar Referidos <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
                             </div>
                         </div>
                     </>

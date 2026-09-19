@@ -4,26 +4,10 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 
-const GESTOR_ALLOWED_PREFIXES = [
-    '/admin/pedidos',
-    '/admin/productos',
-    '/admin/cotizaciones-b2b',
-    '/admin/auditoria-envios',
-    '/admin/inventario',
-    '/admin/carritos-abandonados',
-    '/admin/finanzas',
-    '/admin/referidos',
-    '/admin/clientes',
-    '/admin/informe-ventas',
-    '/admin/pos',
-    '/admin/asesores',
-    '/admin/produccion',
-];
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const { user, role, loading } = useAuth();
+    const { user, userProfile, role, loading } = useAuth();
 
     useEffect(() => {
         if (!loading && !user) {
@@ -37,38 +21,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             return;
         }
 
-        // 2. Redirección automática de roles operativos si caen en la raíz del dashboard
-        const isRootAdmin = pathname === '/admin' || pathname === '/admin/';
-        if (!loading && user && isRootAdmin) {
-            if (role === 'cajero') {
-                router.replace('/admin/pos');
-                return;
-            }
-            if (role === 'asesor') {
-                router.replace('/admin/asesores');
-                return;
-            }
-            if (role === 'produccion_calidad') {
-                router.replace('/admin/produccion');
-                return;
-            }
-        }
+        // 2. Control de acceso por capacidades asignadas al usuario (si no es superadmin)
+        if (!loading && user && role !== 'superadmin' && pathname !== '/admin' && pathname !== '/admin/') {
+            const capacidades = userProfile?.capacidades;
+            if (capacidades) {
+                const routeCapabilityMap: Record<string, keyof typeof capacidades> = {
+                    '/admin/pedidos': 'pedidos',
+                    '/admin/pos': 'pos',
+                    '/admin/asesores': 'asesores',
+                    '/admin/produccion': 'produccion',
+                    '/admin/finanzas': 'finanzas',
+                    '/admin/clientes': 'clientes',
+                    '/admin/reabastecimiento': 'reabastecimiento',
+                    '/admin/cupones': 'cupones',
+                    '/admin/envios': 'envios',
+                    '/admin/auditoria-envios': 'auditoria',
+                };
 
-        // 3. Validación de permisos para gestores y logísticos
-        const isLogisticoOrGestor = role === 'gestor_pedidos' || role === 'gestor' || role === 'logistico' || role === 'logistica';
-
-        if (!loading && user && isLogisticoOrGestor) {
-            const isAllowed = isRootAdmin || GESTOR_ALLOWED_PREFIXES.some(prefix => pathname.startsWith(prefix));
-
-            if (!isAllowed) {
-                if (pathname.startsWith('/admin/productos')) {
-                    router.replace('/admin/inventario');
-                } else {
-                    router.replace('/admin/pedidos');
+                for (const [prefix, capKey] of Object.entries(routeCapabilityMap)) {
+                    if (pathname.startsWith(prefix) && capacidades[capKey] === false) {
+                        router.replace('/admin');
+                        return;
+                    }
                 }
             }
         }
-    }, [user, role, loading, router, pathname]);
+    }, [user, userProfile, role, loading, router, pathname]);
 
     // Show loading while checking auth
     if (loading) {
