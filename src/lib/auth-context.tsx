@@ -64,11 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(currentUser);
             if (currentUser && currentUser.email) {
                 const email = currentUser.email.toLowerCase().trim();
-                const isSuper = email === 'thinktic.thinktic@gmail.com';
-                const determinedRole: UserRole = isSuper ? 'superadmin' : 'gestor';
-                const determinedName = isSuper ? 'Super Administrador THINK TIC' : 'Gestor de Pedidos & Logística';
-
-                setRole(determinedRole);
+                // Email hardcodeado como fallback de emergencia para la cuenta raíz
+                const isRootAccount = email === 'thinktic.thinktic@gmail.com';
 
                 try {
                     const docRef = doc(db, 'admin_users', email);
@@ -87,10 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             return;
                         }
 
-                        const finalRole = (data.rol || data.role || determinedRole) as UserRole;
+                        // Rol viene SIEMPRE de Firestore. El email raíz es solo un fallback
+                        // para cuando el documento aún no existe.
+                        const finalRole = (data.rol || data.role || (isRootAccount ? 'superadmin' : 'gestor')) as UserRole;
                         const profile: AdminUserProfile = {
                             email,
-                            nombre: data.nombre || determinedName,
+                            nombre: data.nombre || (isRootAccount ? 'Super Administrador THINK TIC' : 'Gestor de Pedidos & Logística'),
                             role: finalRole,
                             asesorAsignado: data.asesorAsignado || undefined,
                             estado: data.estado || 'activo',
@@ -100,27 +99,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         setUserProfile(profile);
                         setRole(finalRole);
                     } else {
+                        // Documento no existe aún: usar email raíz como fallback, si no → gestor
+                        const fallbackRole: UserRole = isRootAccount ? 'superadmin' : 'gestor';
                         const profile: AdminUserProfile = {
                             email,
-                            nombre: determinedName,
-                            role: determinedRole,
+                            nombre: isRootAccount ? 'Super Administrador THINK TIC' : 'Gestor de Pedidos & Logística',
+                            role: fallbackRole,
                             estado: 'activo',
-                            permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' },
+                            permissions: fallbackRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' },
                         };
                         setUserProfile(profile);
-                        setRole(determinedRole);
+                        setRole(fallbackRole);
                     }
                 } catch (e) {
                     console.warn('[AuthContext] Error cargando perfil admin_users:', e);
+                    const fallbackRole: UserRole = isRootAccount ? 'superadmin' : 'gestor';
                     const profile: AdminUserProfile = {
                         email,
-                        nombre: determinedName,
-                        role: determinedRole,
+                        nombre: isRootAccount ? 'Super Administrador THINK TIC' : 'Gestor de Pedidos & Logística',
+                        role: fallbackRole,
                         estado: 'activo',
-                        permissions: determinedRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' },
+                        permissions: fallbackRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' },
                     };
                     setUserProfile(profile);
-                    setRole(determinedRole);
+                    setRole(fallbackRole);
                 }
             } else {
                 setUserProfile(null);

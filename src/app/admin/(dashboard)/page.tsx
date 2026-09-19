@@ -192,7 +192,7 @@ export default function AdminDashboard() {
     };
 
     const email = user?.email?.toLowerCase().trim();
-    const isSuperAdmin = (role === 'superadmin' || email === 'thinktic.thinktic@gmail.com') && email !== 'infobiocambio360@gmail.com';
+    const isSuperAdmin = role === 'superadmin';
     const isGestor = !isSuperAdmin;
 
     // Verificador de capacidades específicas asignadas al usuario
