@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  compress: true,
+  poweredByHeader: false,
   images: {
     contentDispositionType: 'inline',
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 31536000,
   },
   /* config options here */
   async redirects() {

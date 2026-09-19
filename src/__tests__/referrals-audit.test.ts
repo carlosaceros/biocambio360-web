@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as firestore from 'firebase/firestore';
+import { normalizeAddress } from '@/lib/orders-service';
 
 function makeDocSnap(id: string, data: Record<string, unknown> | null) {
     return {
@@ -171,9 +172,7 @@ describe('Trazabilidad de Saldos de Embajadores', () => {
     });
 
     describe('Regla 2: Normalización de Direcciones y Detección de Recurrencia en 30 días', () => {
-        it('normaliza direcciones colombianas eliminando caracteres especiales y estandarizando vías', async () => {
-            const { normalizeAddress } = await import('@/lib/orders-service');
-
+        it('normaliza direcciones colombianas eliminando caracteres especiales y estandarizando vías', () => {
             const addr1 = normalizeAddress('Calle 45 # 12 - 34 Apto 301');
             const addr2 = normalizeAddress('CLL 45 No. 12-34 apartamento 301');
             const addr3 = normalizeAddress('Carrera 15 # 85-20');

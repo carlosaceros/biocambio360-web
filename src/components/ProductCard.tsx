@@ -114,6 +114,9 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
                         src={imgSrc}
                         alt={product.nombre}
                         loading="lazy"
+                        decoding="async"
+                        width={240}
+                        height={240}
                         className="max-h-full max-w-full object-contain drop-shadow-2xl z-10 transition-transform duration-500 md:group-hover/img:scale-105"
                         onError={() => setImgError(true)}
                     />
