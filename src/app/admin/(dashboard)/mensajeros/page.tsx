@@ -24,6 +24,11 @@ import {
     UserCheck,
     UserX,
     ExternalLink,
+    Printer,
+    Info,
+    CalendarDays,
+    Bike,
+    Car,
 } from 'lucide-react';
 import {
     Messenger,
@@ -38,6 +43,9 @@ import {
     getMessengerSettlementSummary,
     saveMessengerSettlement,
     getMessengerSettlements,
+    recommendVehicleAndZone,
+    getWeeklySettlementsConsolidated,
+    WeeklySettlementConsolidated,
 } from '@/lib/messengers-service';
 import { subscribeToOrders } from '@/lib/orders-service';
 import { Order } from '@/types/order';
@@ -62,6 +70,15 @@ export default function MensajerosAdminPage() {
         return tomorrow.toISOString().split('T')[0];
     });
 
+    // Modal de comprobantes de venta impresos y hoja de ruta
+    const [printModalOpen, setPrintModalOpen] = useState<boolean>(false);
+    const [printMessengerId, setPrintMessengerId] = useState<string>('');
+    const [printDate, setPrintDate] = useState<string>(() => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+    });
+
     // Modal de edición / creación de mensajero
     const [editingMessenger, setEditingMessenger] = useState<Partial<Messenger> | null>(null);
     const [isSavingMessenger, setIsSavingMessenger] = useState<boolean>(false);
@@ -78,11 +95,20 @@ export default function MensajerosAdminPage() {
     const [isAssigning, setIsAssigning] = useState<boolean>(false);
 
     // Estado para módulo de liquidación
+    const [settlementSubTab, setSettlementSubTab] = useState<'diaria' | 'semanal'>('diaria');
     const [settlementMessengerId, setSettlementMessengerId] = useState<string>('');
     const [settlementDate, setSettlementDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
     const [settlementSummary, setSettlementSummary] = useState<any>(null);
     const [isCalculatingSettlement, setIsCalculatingSettlement] = useState<boolean>(false);
     const [isSavingSettlement, setIsSavingSettlement] = useState<boolean>(false);
+
+    // Fechas para corte semanal
+    const [weeklyStartDate, setWeeklyStartDate] = useState<string>(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().split('T')[0];
+    });
+    const [weeklyEndDate, setWeeklyEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
     // Formulario de edición de tarifas
     const [formRates, setFormRates] = useState({
@@ -320,6 +346,18 @@ export default function MensajerosAdminPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            setPrintMessengerId(messengers[0]?.id || '');
+                            setPrintDate(filterDate);
+                            setPrintModalOpen(true);
+                        }}
+                        className="px-4 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200 rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    >
+                        <Printer size={15} className="text-orange-600" />
+                        <span>🖨️ Imprimir Comprobantes & Ruta</span>
+                    </button>
+
                     <Link
                         href="/mensajero"
                         target="_blank"
@@ -393,6 +431,48 @@ export default function MensajerosAdminPage() {
             {/* TAB 1: ASIGNACIÓN DE DESPACHOS */}
             {activeTab === 'asignacion' && (
                 <div className="space-y-4">
+                    {/* DIRECTRICES OPERATIVAS DE FLOTA (7 DOMICILIARIOS) */}
+                    <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border border-orange-200/80 p-4 rounded-3xl space-y-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-orange-950 font-black text-xs uppercase tracking-wider">
+                                <Info size={16} className="text-orange-600" />
+                                <span>Directrices de Distribución y Alistamiento en Bodega (7 Domiciliarios)</span>
+                            </div>
+                            <span className="text-[10px] font-black uppercase bg-orange-200/60 text-orange-900 px-2 py-0.5 rounded-full">
+                                Flota Oficial Biocambio360
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
+                            <div className="bg-white/80 p-3 rounded-2xl border border-orange-100/80 shadow-2xs">
+                                <span className="font-black text-slate-900 flex items-center gap-1.5 mb-1">
+                                    <Bike size={14} className="text-orange-600" />
+                                    Motos (Edilberto & Sandro)
+                                </span>
+                                <p className="text-slate-600 text-[11px] leading-relaxed">
+                                    Zonas urbanas y localidades cercanas de Bogotá y Soacha. Cobertura día de por medio procurando visitar las distintas localidades.
+                                </p>
+                            </div>
+                            <div className="bg-white/80 p-3 rounded-2xl border border-orange-100/80 shadow-2xs">
+                                <span className="font-black text-slate-900 flex items-center gap-1.5 mb-1">
+                                    <Car size={14} className="text-orange-600" />
+                                    Carros (Deivy, Daniel, Heiler, Álex, José)
+                                </span>
+                                <p className="text-slate-600 text-[11px] leading-relaxed">
+                                    Zonas lejanas de Bogotá y municipios aledaños de la Sabana (salidas 2 veces por semana en 2 zonas diferentes).
+                                </p>
+                            </div>
+                            <div className="bg-white/80 p-3 rounded-2xl border border-orange-100/80 shadow-2xs">
+                                <span className="font-black text-slate-900 flex items-center gap-1.5 mb-1">
+                                    <Printer size={14} className="text-orange-600" />
+                                    Alistamiento Físico & Apoyo
+                                </span>
+                                <p className="text-slate-600 text-[11px] leading-relaxed">
+                                    Alistamiento matutino con entrega de productos físicos y comprobantes impresos para verificar carga. Si hay sobrecupo en una zona, otros domiciliarios apoyan.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* BARRA DE BÚSQUEDA Y FILTROS */}
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
                         <div className="relative w-full sm:w-80">
@@ -430,7 +510,7 @@ export default function MensajerosAdminPage() {
                                 <thead>
                                     <tr className="bg-slate-50 text-slate-400 font-bold border-b border-slate-200">
                                         <th className="p-3">Pedido</th>
-                                        <th className="p-3">Cliente & Destino</th>
+                                        <th className="p-3">Cliente, Destino & Sugerencia</th>
                                         <th className="p-3">Cobro Contraentrega</th>
                                         <th className="p-3">Estado</th>
                                         <th className="p-3">Mensajero Asignado</th>
@@ -441,6 +521,7 @@ export default function MensajerosAdminPage() {
                                     {candidatesForDispatch.map((ord) => {
                                         const isCod = ord.metodoPago === 'contraentrega';
                                         const hasMessenger = !!ord.mensajeroId;
+                                        const rec = recommendVehicleAndZone(ord.cliente?.direccion || '', ord.cliente?.ciudad || '');
                                         return (
                                             <tr key={ord.id} className="hover:bg-slate-50/80 transition-colors">
                                                 <td className="p-3 font-mono font-bold text-slate-900">
@@ -453,9 +534,23 @@ export default function MensajerosAdminPage() {
                                                 <td className="p-3">
                                                     <strong className="text-slate-900 block">{ord.cliente?.nombre}</strong>
                                                     <span className="text-slate-600 block">{ord.cliente?.direccion}</span>
-                                                    <span className="text-[10px] text-slate-400">
+                                                    <span className="text-[10px] text-slate-400 block">
                                                         {ord.cliente?.ciudad}{ord.cliente?.barrio ? ` (${ord.cliente.barrio})` : ''} · {ord.cliente?.celular}
                                                     </span>
+                                                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                        {rec.recommendedType === 'moto' ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md" title={rec.reason}>
+                                                                <Bike size={11} className="text-amber-600" />
+                                                                <span>Moto: {rec.zoneLabel}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md" title={rec.reason}>
+                                                                <Car size={11} className="text-blue-600" />
+                                                                <span>Carro: {rec.zoneLabel}</span>
+                                                            </span>
+                                                        )}
+                                                        <span className="text-[9px] text-slate-400">({rec.frequencyLabel})</span>
+                                                    </div>
                                                 </td>
 
                                                 <td className="p-3">
@@ -601,141 +696,298 @@ export default function MensajerosAdminPage() {
             {/* TAB 3: LIQUIDACIÓN DE FLETES */}
             {activeTab === 'liquidacion' && (
                 <div className="space-y-6">
-                    {/* PANEL DE CONTROL DE LA LIQUIDACIÓN */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-                        <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                            <DollarSign size={20} className="text-orange-600" />
-                            <span>Arqueo y Liquidación Diaria de Flota Propia</span>
-                        </h2>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
-                                    Selecciona Mensajero:
-                                </label>
-                                <select
-                                    value={settlementMessengerId}
-                                    onChange={(e) => setSettlementMessengerId(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                >
-                                    {messengers.map(m => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.nombre} ({m.placaVehiculo})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
-                                    Fecha de la Jornada:
-                                </label>
-                                <input
-                                    type="date"
-                                    value={settlementDate}
-                                    onChange={(e) => setSettlementDate(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                />
-                            </div>
+                    {/* CONMUTADOR SUB-TAB: DIARIA VS SEMANAL */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+                        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                            <button
+                                onClick={() => setSettlementSubTab('diaria')}
+                                className={`px-4 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                    settlementSubTab === 'diaria'
+                                        ? 'bg-white text-orange-700 shadow-2xs'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                📅 Arqueo Diario de Jornada
+                            </button>
+                            <button
+                                onClick={() => setSettlementSubTab('semanal')}
+                                className={`px-4 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                    settlementSubTab === 'semanal'
+                                        ? 'bg-white text-orange-700 shadow-2xs'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                📊 Corte de Pago Semanal Consolidado
+                            </button>
                         </div>
 
-                        {/* RESUMEN FINANCIERO DE LA JORNADA */}
-                        {settlementSummary && (
-                            <div className="pt-4 border-t border-slate-100 space-y-4">
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-center">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Entregas Exitosas</span>
-                                        <span className="text-xl font-black text-emerald-700">
-                                            {settlementSummary.pedidosEntregados} / {settlementSummary.pedidosTotales}
-                                        </span>
-                                    </div>
-
-                                    <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-center">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Novedades</span>
-                                        <span className="text-xl font-black text-rose-700">
-                                            {settlementSummary.pedidosNovedad}
-                                        </span>
-                                    </div>
-
-                                    <div className="bg-orange-50/50 p-3.5 rounded-2xl border border-orange-200 text-center">
-                                        <span className="text-[10px] font-black text-orange-800 uppercase block">Fletes a Pagar Mensajero</span>
-                                        <span className="text-xl font-black text-orange-700">
-                                            {formatMoney(settlementSummary.totalFletesDevengados)}
-                                        </span>
-                                    </div>
-
-                                    <div className="bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-200 text-center">
-                                        <span className="text-[10px] font-black text-emerald-800 uppercase block">Total Efectivo Recaudado (COD)</span>
-                                        <span className="text-xl font-black text-emerald-700">
-                                            {formatMoney(settlementSummary.totalRecaudadoEfectivo)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* BALANCE FINAL NETO */}
-                                <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                                    <div>
-                                        <span className="text-xs font-bold text-slate-400 uppercase block">
-                                            Balance Neto a Consignar en Tesorería:
-                                        </span>
-                                        <span className="text-2xl font-black text-emerald-400">
-                                            {formatMoney(settlementSummary.balanceNetoEntregar)}
-                                        </span>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">
-                                            Fórmula: Recaudo Efectivo ({formatMoney(settlementSummary.totalRecaudadoEfectivo)}) - Fletes Devengados ({formatMoney(settlementSummary.totalFletesDevengados)})
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        onClick={handleExecuteSettlement}
-                                        disabled={isSavingSettlement || settlementSummary.pedidosTotales === 0}
-                                        className="w-full sm:w-auto px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                                    >
-                                        <ShieldCheck size={18} />
-                                        <span>{isSavingSettlement ? 'Guardando...' : 'Cerrar y Liquidar Jornada'}</span>
-                                    </button>
-                                </div>
+                        {settlementSubTab === 'semanal' && (
+                            <div className="flex items-center gap-2 text-xs">
+                                <span className="font-bold text-slate-500">Rango Semana:</span>
+                                <input
+                                    type="date"
+                                    value={weeklyStartDate}
+                                    onChange={(e) => setWeeklyStartDate(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                />
+                                <span className="text-slate-400">a</span>
+                                <input
+                                    type="date"
+                                    value={weeklyEndDate}
+                                    onChange={(e) => setWeeklyEndDate(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                />
                             </div>
                         )}
                     </div>
 
-                    {/* HISTORIAL DE LIQUIDACIONES GUARDADAS */}
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                            <FileText size={16} className="text-slate-500" />
-                            <span>Historial de Liquidaciones Archivadas ({settlements.length})</span>
-                        </h3>
+                    {/* VISTA 1: ARQUEO DIARIO */}
+                    {settlementSubTab === 'diaria' && (
+                        <>
+                            {/* PANEL DE CONTROL DE LA LIQUIDACIÓN */}
+                            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                                <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                                    <DollarSign size={20} className="text-orange-600" />
+                                    <span>Arqueo y Liquidación Diaria de Flota Propia</span>
+                                </h2>
 
-                        {settlements.length === 0 ? (
-                            <p className="text-xs text-slate-400 italic text-center py-6">
-                                Aún no se han registrado liquidaciones de jornada.
-                            </p>
-                        ) : (
-                            <div className="divide-y divide-slate-100">
-                                {settlements.map(st => (
-                                    <div key={st.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                                        <div>
-                                            <strong className="text-slate-900 block">{st.messengerNombre}</strong>
-                                            <span className="text-slate-500">
-                                                Fecha: {st.fecha} · {st.pedidosEntregados} entregas · Liquidado por: {st.liquidadoPor}
-                                            </span>
-                                        </div>
-                                        <div className="text-right flex items-center gap-4">
-                                            <div>
-                                                <span className="text-[10px] text-slate-400 block uppercase">Efectivo a tesorería:</span>
-                                                <span className="font-black text-emerald-700 text-sm">
-                                                    {formatMoney(st.balanceNetoEntregar)}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
+                                            Selecciona Mensajero:
+                                        </label>
+                                        <select
+                                            value={settlementMessengerId}
+                                            onChange={(e) => setSettlementMessengerId(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        >
+                                            {messengers.map(m => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.nombre} ({m.placaVehiculo})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
+                                            Fecha de la Jornada:
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={settlementDate}
+                                            onChange={(e) => setSettlementDate(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* RESUMEN FINANCIERO DE LA JORNADA */}
+                                {settlementSummary && (
+                                    <div className="pt-4 border-t border-slate-100 space-y-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-center">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase block">Entregas Exitosas</span>
+                                                <span className="text-xl font-black text-emerald-700">
+                                                    {settlementSummary.pedidosEntregados} / {settlementSummary.pedidosTotales}
                                                 </span>
                                             </div>
-                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                                                {st.estado}
-                                            </span>
+
+                                            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-center">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase block">Novedades</span>
+                                                <span className="text-xl font-black text-rose-700">
+                                                    {settlementSummary.pedidosNovedad}
+                                                </span>
+                                            </div>
+
+                                            <div className="bg-orange-50/50 p-3.5 rounded-2xl border border-orange-200 text-center">
+                                                <span className="text-[10px] font-black text-orange-800 uppercase block">Fletes a Pagar Mensajero</span>
+                                                <span className="text-xl font-black text-orange-700">
+                                                    {formatMoney(settlementSummary.totalFletesDevengados)}
+                                                </span>
+                                            </div>
+
+                                            <div className="bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-200 text-center">
+                                                <span className="text-[10px] font-black text-emerald-800 uppercase block">Total Efectivo Recaudado (COD)</span>
+                                                <span className="text-xl font-black text-emerald-700">
+                                                    {formatMoney(settlementSummary.totalRecaudadoEfectivo)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* BALANCE FINAL NETO */}
+                                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-400 uppercase block">
+                                                    Balance Neto a Consignar en Tesorería:
+                                                </span>
+                                                <span className="text-2xl font-black text-emerald-400">
+                                                    {formatMoney(settlementSummary.balanceNetoEntregar)}
+                                                </span>
+                                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                                    Fórmula: Recaudo Efectivo ({formatMoney(settlementSummary.totalRecaudadoEfectivo)}) - Fletes Devengados ({formatMoney(settlementSummary.totalFletesDevengados)})
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                onClick={handleExecuteSettlement}
+                                                disabled={isSavingSettlement || settlementSummary.pedidosTotales === 0}
+                                                className="w-full sm:w-auto px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                                            >
+                                                <ShieldCheck size={18} />
+                                                <span>{isSavingSettlement ? 'Guardando...' : 'Cerrar y Liquidar Jornada'}</span>
+                                            </button>
                                         </div>
                                     </div>
-                                ))}
+                                )}
                             </div>
-                        )}
-                    </div>
+
+                            {/* HISTORIAL DE LIQUIDACIONES GUARDADAS */}
+                            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                    <FileText size={16} className="text-slate-500" />
+                                    <span>Historial de Liquidaciones Archivadas ({settlements.length})</span>
+                                </h3>
+
+                                {settlements.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic text-center py-6">
+                                        Aún no se han registrado liquidaciones de jornada.
+                                    </p>
+                                ) : (
+                                    <div className="divide-y divide-slate-100">
+                                        {settlements.map(st => (
+                                            <div key={st.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                                <div>
+                                                    <strong className="text-slate-900 block">{st.messengerNombre}</strong>
+                                                    <span className="text-slate-500">
+                                                        Fecha: {st.fecha} · {st.pedidosEntregados} entregas · Liquidado por: {st.liquidadoPor}
+                                                    </span>
+                                                </div>
+                                                <div className="text-right flex items-center gap-4">
+                                                    <div>
+                                                        <span className="text-[10px] text-slate-400 block uppercase">Efectivo a tesorería:</span>
+                                                        <span className="font-black text-emerald-700 text-sm">
+                                                            {formatMoney(st.balanceNetoEntregar)}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                                        {st.estado}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+
+                    {/* VISTA 2: CORTE SEMANAL ACUMULADO */}
+                    {settlementSubTab === 'semanal' && (() => {
+                        const weeklyConsolidated = getWeeklySettlementsConsolidated(settlements, weeklyStartDate, weeklyEndDate);
+                        const totalFletesSemana = weeklyConsolidated.reduce((acc, w) => acc + w.totalFletesDevengados, 0);
+                        const totalRecaudoSemana = weeklyConsolidated.reduce((acc, w) => acc + w.totalRecaudadoEfectivo, 0);
+                        const totalBalanceSemana = weeklyConsolidated.reduce((acc, w) => acc + w.balanceNetoEntregar, 0);
+                        const totalEntregasSemana = weeklyConsolidated.reduce((acc, w) => acc + w.totalPedidosEntregados, 0);
+
+                        return (
+                            <div className="space-y-4">
+                                {/* TARJETAS RESUMEN DE LA SEMANA */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-2xs">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 block">Total Entregas</span>
+                                        <span className="text-2xl font-black text-slate-900">{totalEntregasSemana}</span>
+                                        <span className="text-[10px] text-slate-500 block">En la semana seleccionada</span>
+                                    </div>
+                                    <div className="bg-orange-50/60 p-4 rounded-3xl border border-orange-200 shadow-2xs">
+                                        <span className="text-[10px] font-black uppercase text-orange-800 block">Fletes a Pagar (Semana)</span>
+                                        <span className="text-2xl font-black text-orange-700">{formatMoney(totalFletesSemana)}</span>
+                                        <span className="text-[10px] text-orange-600 block">Honorarios de flota</span>
+                                    </div>
+                                    <div className="bg-emerald-50/60 p-4 rounded-3xl border border-emerald-200 shadow-2xs">
+                                        <span className="text-[10px] font-black uppercase text-emerald-800 block">Recaudo Efectivo COD</span>
+                                        <span className="text-2xl font-black text-emerald-700">{formatMoney(totalRecaudoSemana)}</span>
+                                        <span className="text-[10px] text-emerald-600 block">Dinero recibido en calle</span>
+                                    </div>
+                                    <div className="bg-slate-900 text-white p-4 rounded-3xl border border-slate-800 shadow-2xs">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 block">Neto a Tesorería</span>
+                                        <span className="text-2xl font-black text-emerald-400">{formatMoney(totalBalanceSemana)}</span>
+                                        <span className="text-[10px] text-slate-400 block">Recaudo menos fletes</span>
+                                    </div>
+                                </div>
+
+                                {/* TABLA CONSOLIDADA POR DOMICILIARIO */}
+                                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+                                    <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                        <h3 className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                                            Liquidación Acumulada Semanal por Domiciliario ({weeklyConsolidated.length})
+                                        </h3>
+                                        <span className="text-[11px] text-slate-500 font-medium">
+                                            Periodo: {weeklyStartDate} al {weeklyEndDate}
+                                        </span>
+                                    </div>
+
+                                    {weeklyConsolidated.length === 0 ? (
+                                        <div className="p-8 text-center text-slate-400 text-xs italic">
+                                            No se registran jornadas liquidadas en el rango de fechas seleccionado.
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-xs">
+                                                <thead>
+                                                    <tr className="bg-slate-50 text-slate-400 font-bold border-b border-slate-200">
+                                                        <th className="p-3">Domiciliario</th>
+                                                        <th className="p-3 text-center">Días Liquidados</th>
+                                                        <th className="p-3 text-center">Entregados</th>
+                                                        <th className="p-3 text-center">Novedades</th>
+                                                        <th className="p-3 text-right">Fletes a Pagar</th>
+                                                        <th className="p-3 text-right">Efectivo Recaudado</th>
+                                                        <th className="p-3 text-right">Balance a Entregar</th>
+                                                        <th className="p-3 text-center">Corte</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 font-medium">
+                                                    {weeklyConsolidated.map((w) => (
+                                                        <tr key={w.messengerId} className="hover:bg-slate-50/80 transition-colors">
+                                                            <td className="p-3">
+                                                                <strong className="text-slate-900 block">{w.messengerNombre}</strong>
+                                                                <span className="text-[10px] text-slate-500 uppercase">
+                                                                    {w.tipoVehiculo} · {w.placaVehiculo}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3 text-center font-bold text-slate-700">
+                                                                {w.totalDiasLiquidados} día(s)
+                                                            </td>
+                                                            <td className="p-3 text-center font-black text-emerald-700">
+                                                                {w.totalPedidosEntregados}
+                                                            </td>
+                                                            <td className="p-3 text-center font-black text-rose-700">
+                                                                {w.totalPedidosNovedad}
+                                                            </td>
+                                                            <td className="p-3 text-right font-black text-orange-700">
+                                                                {formatMoney(w.totalFletesDevengados)}
+                                                            </td>
+                                                            <td className="p-3 text-right font-black text-emerald-700">
+                                                                {formatMoney(w.totalRecaudadoEfectivo)}
+                                                            </td>
+                                                            <td className="p-3 text-right font-black text-slate-900">
+                                                                {formatMoney(w.balanceNetoEntregar)}
+                                                            </td>
+                                                            <td className="p-3 text-center">
+                                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                                                    Corte Listo
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 
@@ -1010,6 +1262,248 @@ export default function MensajerosAdminPage() {
                     </div>
                 </div>
             )}
+            {/* MODAL DE IMPRESIÓN DE COMPROBANTES Y HOJA DE RUTA */}
+            {printModalOpen && (() => {
+                const currentPrintMessenger = messengers.find(m => m.id === printMessengerId) || messengers[0];
+                const printOrders = orders.filter(o => {
+                    if (o.status === 'cancelado' || o.status === 'borrador') return false;
+                    const matchesMsg = !currentPrintMessenger || o.mensajeroId === currentPrintMessenger.id;
+                    const matchesDate = !printDate || o.fechaProgramadaEntrega === printDate;
+                    return matchesMsg && matchesDate;
+                });
+
+                const totalCod = printOrders.filter(o => o.metodoPago === 'contraentrega').reduce((acc, o) => acc + (o.total || 0), 0);
+                const totalPagadosOnline = printOrders.filter(o => o.metodoPago !== 'contraentrega').length;
+                const totalArticulos = printOrders.reduce((acc, o) => acc + (o.productos?.reduce((pacc, p) => pacc + (p.cantidad || 1), 0) || 1), 0);
+
+                return (
+                    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+                        <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+                            {/* BARRA DE CONTROLES (NO SE IMPRIME) */}
+                            <div className="p-4 bg-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-3 no-print">
+                                <div className="flex items-center gap-2">
+                                    <Printer size={18} className="text-orange-400" />
+                                    <h3 className="text-sm font-black uppercase tracking-wide">
+                                        Alistamiento Matutino & Hoja de Ruta
+                                    </h3>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <select
+                                        value={printMessengerId}
+                                        onChange={(e) => setPrintMessengerId(e.target.value)}
+                                        className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                    >
+                                        {messengers.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.nombre} ({m.tipoVehiculo.toUpperCase()} - {m.placaVehiculo})
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    <input
+                                        type="date"
+                                        value={printDate}
+                                        onChange={(e) => setPrintDate(e.target.value)}
+                                        className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                    />
+
+                                    <button
+                                        onClick={() => window.print()}
+                                        className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                                    >
+                                        <Printer size={14} />
+                                        <span>Imprimir (Ctrl+P)</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setPrintModalOpen(false)}
+                                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all cursor-pointer"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* MANIFIESTO IMPRIMIBLE */}
+                            <div id="print-route-manifest" className="p-8 bg-white text-slate-900 space-y-6">
+                                {/* ENCABEZADO OFICIAL */}
+                                <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-slate-900 pb-4 gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xl font-black tracking-tight text-slate-900 uppercase">
+                                                BIOCAMBIO 360 S.A.S.
+                                            </span>
+                                            <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-300">
+                                                Logística Oficial
+                                            </span>
+                                        </div>
+                                        <h2 className="text-sm font-black uppercase text-orange-600 tracking-wider mt-1">
+                                            Manifiesto de Carga, Alistamiento en Bodega & Hoja de Ruta
+                                        </h2>
+                                        <p className="text-[11px] text-slate-500">
+                                            Verificación física de producto en bodega antes de salida a ruta · Soporte ventas: +57 302 750 4568
+                                        </p>
+                                    </div>
+
+                                    <div className="text-right text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200 min-w-[220px]">
+                                        <div className="text-slate-500 font-bold uppercase text-[10px]">Fecha de Reparto:</div>
+                                        <div className="text-sm font-black text-slate-900">{printDate}</div>
+                                        <div className="mt-1 text-slate-500 font-bold uppercase text-[10px]">Domiciliario Asignado:</div>
+                                        <div className="font-black text-slate-900">
+                                            {currentPrintMessenger?.nombre} ({currentPrintMessenger?.tipoVehiculo?.toUpperCase()} · {currentPrintMessenger?.placaVehiculo})
+                                        </div>
+                                        <div className="text-[10px] text-slate-500">Tel: {currentPrintMessenger?.telefono}</div>
+                                    </div>
+                                </div>
+
+                                {/* RESUMEN DE CARGA PARA BODEGA */}
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                                        <span className="text-[10px] font-black uppercase text-slate-500 block">Total Pedidos</span>
+                                        <span className="text-lg font-black text-slate-900">{printOrders.length}</span>
+                                    </div>
+                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                                        <span className="text-[10px] font-black uppercase text-amber-800 block">Artículos Físicos a Cargar</span>
+                                        <span className="text-lg font-black text-amber-900">{totalArticulos} u.</span>
+                                    </div>
+                                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                                        <span className="text-[10px] font-black uppercase text-emerald-800 block">Total a Recaudar (COD)</span>
+                                        <span className="text-lg font-black text-emerald-900">{formatMoney(totalCod)}</span>
+                                    </div>
+                                </div>
+
+                                {/* TABLA DETALLADA DE PEDIDOS & COMPROBANTES */}
+                                {printOrders.length === 0 ? (
+                                    <div className="p-8 text-center text-slate-400 text-xs italic border-2 border-dashed border-slate-200 rounded-2xl">
+                                        No hay pedidos asignados a {currentPrintMessenger?.nombre} para la fecha {printDate}. Asigna pedidos en la pestaña de Despachos.
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto border border-slate-300 rounded-xl">
+                                        <table className="w-full text-left text-xs border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-100 text-slate-800 font-black border-b border-slate-300 text-[11px]">
+                                                    <th className="p-2.5 border-r border-slate-300 text-center w-12">Bodega</th>
+                                                    <th className="p-2.5 border-r border-slate-300 w-24">Pedido</th>
+                                                    <th className="p-2.5 border-r border-slate-300">Cliente, Dirección & Celular</th>
+                                                    <th className="p-2.5 border-r border-slate-300">Productos Físicos</th>
+                                                    <th className="p-2.5 border-r border-slate-300 text-right w-28">Cobro en Calle</th>
+                                                    <th className="p-2.5 text-center w-36">Firma de Recibido</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200">
+                                                {printOrders.map((ord, idx) => {
+                                                    const isCod = ord.metodoPago === 'contraentrega';
+                                                    return (
+                                                        <tr key={ord.id} className="align-top">
+                                                            <td className="p-2.5 border-r border-slate-300 text-center">
+                                                                <div className="w-5 h-5 border-2 border-slate-400 rounded-md mx-auto my-1"></div>
+                                                                <span className="text-[9px] text-slate-400 font-mono">#{idx + 1}</span>
+                                                            </td>
+                                                            <td className="p-2.5 border-r border-slate-300 font-mono font-black text-slate-900">
+                                                                #{ord.id.slice(-6).toUpperCase()}
+                                                                <span className="block text-[9px] font-sans font-bold text-slate-400">
+                                                                    {ord.franjaHorariaEntrega === 'manana' ? 'Mañana' : ord.franjaHorariaEntrega === 'tarde' ? 'Tarde' : 'Todo el día'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2.5 border-r border-slate-300">
+                                                                <strong className="text-slate-900 block">{ord.cliente?.nombre}</strong>
+                                                                <span className="text-slate-700 block font-medium">{ord.cliente?.direccion}</span>
+                                                                <span className="text-[10px] text-slate-500 block">
+                                                                    {ord.cliente?.ciudad}{ord.cliente?.barrio ? ` (${ord.cliente.barrio})` : ''} · Cel: <strong className="text-slate-800">{ord.cliente?.celular}</strong>
+                                                                </span>
+                                                                {ord.notas && (
+                                                                    <span className="text-[10px] text-amber-800 italic block mt-0.5 bg-amber-50 px-1 rounded">
+                                                                        Nota: {ord.notas}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-2.5 border-r border-slate-300">
+                                                                <ul className="space-y-0.5 text-[11px]">
+                                                                    {ord.productos && ord.productos.length > 0 ? (
+                                                                        ord.productos.map((prod, pIdx) => (
+                                                                            <li key={pIdx} className="text-slate-800">
+                                                                                <span className="font-black text-orange-600">[{prod.cantidad}x]</span> {prod.product?.nombre || (prod as any).nombre || 'Producto'} {prod.size ? `(${prod.size})` : ''}
+                                                                            </li>
+                                                                        ))
+                                                                    ) : (
+                                                                        <li className="text-slate-500 italic">1x Paquete según orden</li>
+                                                                    )}
+                                                                </ul>
+                                                            </td>
+                                                            <td className="p-2.5 border-r border-slate-300 text-right">
+                                                                {isCod ? (
+                                                                    <div>
+                                                                        <span className="font-black text-emerald-800 text-xs block">
+                                                                            {formatMoney(ord.total)}
+                                                                        </span>
+                                                                        <span className="text-[9px] font-black uppercase text-emerald-600 block bg-emerald-50 px-1 py-0.5 rounded">
+                                                                            CONTRAENTREGA
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div>
+                                                                        <span className="font-black text-blue-800 text-xs block">$0</span>
+                                                                        <span className="text-[9px] font-black uppercase text-blue-600 block bg-blue-50 px-1 py-0.5 rounded">
+                                                                            PAGADO ONLINE
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-2.5 text-center">
+                                                                <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
+                                                                <span className="text-[9px] text-slate-400 block">Firma y C.C.</span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {/* FIRMAS DE CONFORMIDAD */}
+                                <div className="grid grid-cols-2 gap-8 pt-8 border-t border-slate-300 text-xs">
+                                    <div className="space-y-1">
+                                        <div className="border-b border-slate-400 h-8"></div>
+                                        <strong className="block text-slate-900">Firma Domiciliario: {currentPrintMessenger?.nombre}</strong>
+                                        <span className="text-[10px] text-slate-500">C.C. {currentPrintMessenger?.cedula} · He recibido a conformidad los productos físicos y comprobantes.</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="border-b border-slate-400 h-8"></div>
+                                        <strong className="block text-slate-900">Firma Supervisor de Bodega & Despacho</strong>
+                                        <span className="text-[10px] text-slate-500">Biocambio360 S.A.S. · Carga y comprobantes validados antes de salida a ruta.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ESTILOS DE IMPRESIÓN */}
+                        <style jsx global>{`
+                            @media print {
+                                body * {
+                                    visibility: hidden !important;
+                                }
+                                #print-route-manifest, #print-route-manifest * {
+                                    visibility: visible !important;
+                                }
+                                #print-route-manifest {
+                                    position: absolute !important;
+                                    left: 0 !important;
+                                    top: 0 !important;
+                                    width: 100% !important;
+                                    margin: 0 !important;
+                                    padding: 20px !important;
+                                    background: white !important;
+                                }
+                                .no-print {
+                                    display: none !important;
+                                }
+                            }
+                        `}</style>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

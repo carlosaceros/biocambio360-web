@@ -123,6 +123,121 @@ describe('2. Directorio y Servicio de Mensajeros de Flota Propia', () => {
         expect(rates.tarifaSabanaAledanos).toBe(15_000);
         expect(rates.tarifaReintentoNovedad).toBe(5_000);
     });
+
+    it('verifica la flota oficial de 7 domiciliarios (2 motos y 5 carros)', () => {
+        expect(INITIAL_MESSENGERS_SEED.length).toBe(7);
+
+        const motos = INITIAL_MESSENGERS_SEED.filter(m => m.tipoVehiculo === 'moto');
+        const carros = INITIAL_MESSENGERS_SEED.filter(m => m.tipoVehiculo === 'carro');
+
+        expect(motos.length).toBe(2);
+        expect(carros.length).toBe(5);
+
+        const motoNombres = motos.map(m => m.nombre);
+        expect(motoNombres).toContain('Edilberto');
+        expect(motoNombres).toContain('Sandro');
+
+        const carroNombres = carros.map(m => m.nombre);
+        expect(carroNombres).toContain('Deivy');
+        expect(carroNombres).toContain('Daniel');
+        expect(carroNombres).toContain('Heiler');
+        expect(carroNombres).toContain('Álex');
+        expect(carroNombres).toContain('José');
+    });
+
+    it('recomienda vehículo y frecuencia de forma inteligente según la zona y localidad', async () => {
+        const { recommendVehicleAndZone } = await import('@/lib/messengers-service');
+
+        // Municipios aledaños (Sabana) -> Carro (2 veces por semana)
+        const chia = recommendVehicleAndZone('Vereda La Balsa sector Los Puentes', 'Chía');
+        expect(chia.recommendedType).toBe('carro');
+        expect(chia.zoneLabel).toBe('Municipios Aledaños (Sabana)');
+
+        const mosquera = recommendVehicleAndZone('Calle 3 # 12-40', 'Mosquera');
+        expect(mosquera.recommendedType).toBe('carro');
+
+        // Localidades lejanas / periféricas de Bogotá -> Carro
+        const suba = recommendVehicleAndZone('Carrera 92 # 145-20', 'Bogotá Suba');
+        expect(suba.recommendedType).toBe('carro');
+        expect(suba.zoneLabel).toBe('Bogotá Zonas Lejanas');
+
+        // Localidades céntricas / cercanas -> Moto (Edilberto o Sandro)
+        const chapinero = recommendVehicleAndZone('Carrera 13 # 54-10', 'Bogotá Chapinero');
+        expect(chapinero.recommendedType).toBe('moto');
+        expect(chapinero.zoneLabel).toBe('Bogotá Cercana / Zonas Urbanas');
+    });
+
+    it('consolida correctamente las liquidaciones diarias en corte de pago semanal', async () => {
+        const { getWeeklySettlementsConsolidated } = await import('@/lib/messengers-service');
+
+        const sampleSettlements = [
+            {
+                id: 'st-01',
+                messengerId: 'msg-edilberto',
+                messengerNombre: 'Edilberto',
+                fecha: '2026-09-15',
+                pedidosTotales: 10,
+                pedidosEntregados: 9,
+                pedidosNovedad: 1,
+                totalRecaudadoEfectivo: 450_000,
+                totalFletesDevengados: 95_000,
+                balanceNetoEntregar: 355_000,
+                pedidosIds: ['ord-1', 'ord-2'],
+                estado: 'liquidado' as const,
+                liquidadoPor: 'Admin',
+                liquidadoAt: '2026-09-15T18:00:00Z',
+            },
+            {
+                id: 'st-02',
+                messengerId: 'msg-edilberto',
+                fecha: '2026-09-17',
+                messengerNombre: 'Edilberto',
+                pedidosTotales: 8,
+                pedidosEntregados: 8,
+                pedidosNovedad: 0,
+                totalRecaudadoEfectivo: 380_000,
+                totalFletesDevengados: 80_000,
+                balanceNetoEntregar: 300_000,
+                pedidosIds: ['ord-3', 'ord-4'],
+                estado: 'liquidado' as const,
+                liquidadoPor: 'Admin',
+                liquidadoAt: '2026-09-17T18:00:00Z',
+            },
+            {
+                id: 'st-03',
+                messengerId: 'msg-deivy',
+                messengerNombre: 'Deivy',
+                fecha: '2026-09-16',
+                pedidosTotales: 6,
+                pedidosEntregados: 5,
+                pedidosNovedad: 1,
+                totalRecaudadoEfectivo: 290_000,
+                totalFletesDevengados: 80_000,
+                balanceNetoEntregar: 210_000,
+                pedidosIds: ['ord-5'],
+                estado: 'liquidado' as const,
+                liquidadoPor: 'Admin',
+                liquidadoAt: '2026-09-16T18:00:00Z',
+            },
+        ];
+
+        const weekly = getWeeklySettlementsConsolidated(sampleSettlements, '2026-09-15', '2026-09-21');
+        expect(weekly.length).toBe(2);
+
+        const edilbertoConsolidado = weekly.find(w => w.messengerId === 'msg-edilberto');
+        expect(edilbertoConsolidado).toBeDefined();
+        expect(edilbertoConsolidado?.totalDiasLiquidados).toBe(2);
+        expect(edilbertoConsolidado?.totalPedidosEntregados).toBe(17);
+        expect(edilbertoConsolidado?.totalPedidosNovedad).toBe(1);
+        expect(edilbertoConsolidado?.totalFletesDevengados).toBe(175_000);
+        expect(edilbertoConsolidado?.totalRecaudadoEfectivo).toBe(830_000);
+        expect(edilbertoConsolidado?.balanceNetoEntregar).toBe(655_000);
+
+        const deivyConsolidado = weekly.find(w => w.messengerId === 'msg-deivy');
+        expect(deivyConsolidado).toBeDefined();
+        expect(deivyConsolidado?.totalDiasLiquidados).toBe(1);
+        expect(deivyConsolidado?.totalFletesDevengados).toBe(80_000);
+    });
 });
 
 describe('3. Webhook de 99 Envíos - Validación de Protección de Flota Propia', () => {

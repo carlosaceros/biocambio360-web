@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { recordUserLogin, recordUserHeartbeat, recordUserLogout } from './user-sessions-service';
 
 export type UserRole = 
     | 'superadmin' 
@@ -98,6 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         };
                         setUserProfile(profile);
                         setRole(finalRole);
+
+                        // Registrar sesión / login en user_sessions si es usuario administrativo
+                        recordUserLogin(email, profile.nombre, finalRole).catch(() => {});
                     } else {
                         // Documento no existe aún: usar email raíz como fallback, si no → gestor
                         const fallbackRole: UserRole = isRootAccount ? 'superadmin' : 'gestor';
@@ -110,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         };
                         setUserProfile(profile);
                         setRole(fallbackRole);
+
+                        recordUserLogin(email, profile.nombre, fallbackRole).catch(() => {});
                     }
                 } catch (e) {
                     console.warn('[AuthContext] Error cargando perfil admin_users:', e);
@@ -123,6 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     };
                     setUserProfile(profile);
                     setRole(fallbackRole);
+
+                    recordUserLogin(email, profile.nombre, fallbackRole).catch(() => {});
                 }
             } else {
                 setUserProfile(null);
@@ -134,6 +142,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return unsubscribe;
     }, []);
 
+    // Heartbeat de presencia cada 90 segundos para actualizar lastActiveAt y isOnline
+    useEffect(() => {
+        if (!user || !user.email) return;
+        const email = user.email.toLowerCase().trim();
+
+        const heartbeatInterval = setInterval(() => {
+            recordUserHeartbeat(email).catch(() => {});
+        }, 90 * 1000);
+
+        const handleBeforeUnload = () => {
+            recordUserLogout(email).catch(() => {});
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            clearInterval(heartbeatInterval);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [user]);
+
     const signIn = async (email: string, password: string) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
@@ -144,6 +173,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signOut = async () => {
         try {
+            if (user && user.email) {
+                await recordUserLogout(user.email).catch(() => {});
+            }
             await firebaseSignOut(auth);
             setUser(null);
             setUserProfile(null);

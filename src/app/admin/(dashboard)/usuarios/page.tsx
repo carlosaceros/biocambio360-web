@@ -24,7 +24,12 @@ import {
     FlaskConical,
     Activity,
     Check,
-    X
+    X,
+    Globe,
+    Laptop,
+    LogIn,
+    LogOut,
+    Radio
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -36,17 +41,31 @@ import {
     resetUserPassword
 } from '@/lib/users-service';
 import { subscribeToAuditLogs, AuditLogEntry } from '@/lib/audit-service';
+import {
+    subscribeToOnlineUsers,
+    subscribeToSessionLogs,
+    UserSessionRecord,
+    OnlineUserInfo
+} from '@/lib/user-sessions-service';
 import { AdminUserRecord, SystemRole, ROLE_DEFINITIONS, UserModuleCapabilities } from '@/types/user';
 
 export default function AdminUsuariosPage() {
     const router = useRouter();
     const { user: currentAuthUser, role: currentRole } = useAuth();
 
-    const [activeTab, setActiveTab] = useState<'usuarios' | 'auditoria'>('usuarios');
+    const [activeTab, setActiveTab] = useState<'usuarios' | 'auditoria' | 'sesiones'>('usuarios');
     const [users, setUsers] = useState<AdminUserRecord[]>([]);
     const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+    const [onlineUsers, setOnlineUsers] = useState<OnlineUserInfo[]>([]);
+    const [sessionLogs, setSessionLogs] = useState<UserSessionRecord[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState(true);
     const [isLoadingAudit, setIsLoadingAudit] = useState(true);
+    const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+
+    // Filtros de sesiones
+    const [sessionSearch, setSessionSearch] = useState('');
+    const [sessionRoleFilter, setSessionRoleFilter] = useState('');
+    const [sessionStatusFilter, setSessionStatusFilter] = useState('');
 
     // Filtros de usuarios
     const [userSearch, setUserSearch] = useState('');
@@ -98,9 +117,20 @@ export default function AdminUsuariosPage() {
             setIsLoadingAudit(false);
         });
 
+        const unsubOnline = subscribeToOnlineUsers((data) => {
+            setOnlineUsers(data);
+        });
+
+        const unsubSessions = subscribeToSessionLogs((data) => {
+            setSessionLogs(data);
+            setIsLoadingSessions(false);
+        });
+
         return () => {
             unsubUsers();
             unsubAudit();
+            unsubOnline();
+            unsubSessions();
         };
     }, []);
 
@@ -261,11 +291,26 @@ export default function AdminUsuariosPage() {
         return true;
     });
 
+    // Filtrar sesiones
+    const filteredSessions = sessionLogs.filter(s => {
+        if (sessionSearch) {
+            const q = sessionSearch.toLowerCase();
+            const matchUser = (s.email || '').toLowerCase().includes(q) || (s.nombre || '').toLowerCase().includes(q);
+            const matchDevice = (s.browser || '').toLowerCase().includes(q) || (s.device || '').toLowerCase().includes(q);
+            if (!matchUser && !matchDevice) return false;
+        }
+        if (sessionRoleFilter && s.rol !== sessionRoleFilter) return false;
+        if (sessionStatusFilter === 'online' && !s.isOnline) return false;
+        if (sessionStatusFilter === 'closed' && s.isOnline) return false;
+        return true;
+    });
+
     // KPIs
     const totalUsers = users.length;
     const activeUsers = users.filter(u => u.estado === 'activo').length;
     const asesorCount = users.filter(u => u.rol === 'asesor').length;
     const directorsCount = users.filter(u => u.rol === 'superadmin' || u.rol === 'director').length;
+    const onlineCount = onlineUsers.filter(u => u.isOnline).length;
 
     const ALL_CAPABILITIES_KEYS: (keyof UserModuleCapabilities)[] = [
         'pedidos', 'pos', 'asesores', 'produccion', 'finanzas', 'clientes', 'reabastecimiento', 'cupones', 'envios', 'mensajeria', 'auditoria'
@@ -298,18 +343,30 @@ export default function AdminUsuariosPage() {
 
                         <div className="flex items-center gap-3">
                             {/* Pestañas */}
-                            <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-bold">
+                            <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-bold overflow-x-auto">
                                 <button
                                     onClick={() => setActiveTab('usuarios')}
-                                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === 'usuarios' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${activeTab === 'usuarios' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                                 >
                                     👥 Usuarios ({totalUsers})
                                 </button>
                                 <button
-                                    onClick={() => setActiveTab('auditoria')}
-                                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === 'auditoria' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                    onClick={() => setActiveTab('sesiones')}
+                                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'sesiones' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                                 >
-                                    📋 Bitácora Auditoría ({auditLogs.length})
+                                    <span className="relative flex h-2 w-2">
+                                        {onlineCount > 0 && (
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        )}
+                                        <span className={`relative inline-flex rounded-full h-2 w-2 ${onlineCount > 0 ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
+                                    </span>
+                                    En Línea & Sesiones ({onlineCount})
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('auditoria')}
+                                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${activeTab === 'auditoria' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                >
+                                    📋 Auditoría ISO ({auditLogs.length})
                                 </button>
                             </div>
 
@@ -336,7 +393,7 @@ export default function AdminUsuariosPage() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6 w-full flex-1">
-                {activeTab === 'usuarios' ? (
+                {activeTab === 'usuarios' && (
                     <>
                         {/* KPI Grid */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -512,7 +569,231 @@ export default function AdminUsuariosPage() {
                             </div>
                         </div>
                     </>
-                ) : (
+                )}
+
+                {activeTab === 'sesiones' && (
+                    <div className="space-y-6">
+                        {/* Monitor de Usuarios en Línea */}
+                        <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-xs">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                                        <Radio size={18} className="animate-pulse" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                                            Usuarios Conectados en Tiempo Real
+                                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black">
+                                                {onlineUsers.filter(u => u.isOnline).length} en línea
+                                            </span>
+                                        </h2>
+                                        <p className="text-[11px] text-gray-500">
+                                            Monitor de presencia con latido cada 90s. Muestra colaboradores con actividad en los últimos 5 minutos.
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
+                                    <Clock size={12} /> Auto-actualizable
+                                </span>
+                            </div>
+
+                            {onlineUsers.filter(u => u.isOnline).length === 0 ? (
+                                <div className="p-6 bg-gray-50 rounded-xl text-center text-gray-400 text-xs">
+                                    No hay otros colaboradores conectados en este instante.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {onlineUsers.filter(u => u.isOnline).map((u) => {
+                                        const roleBadge = ROLE_DEFINITIONS[u.rol as SystemRole]?.badgeColor || 'bg-gray-100 text-gray-800';
+                                        const roleLabel = ROLE_DEFINITIONS[u.rol as SystemRole]?.label || u.rol;
+                                        return (
+                                            <div key={u.email} className="p-3.5 bg-emerald-50/40 border border-emerald-200/70 rounded-xl flex items-start justify-between gap-3 shadow-2xs">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative">
+                                                        <div className="w-10 h-10 rounded-full bg-purple-600 text-white font-black text-sm flex items-center justify-center">
+                                                            {u.nombre.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-black text-gray-900">{u.nombre}</p>
+                                                        <p className="text-[10px] text-gray-500 truncate max-w-[150px]">{u.email}</p>
+                                                        <span className={`inline-block px-1.5 py-0.5 mt-1 rounded text-[9px] font-black uppercase ${roleBadge}`}>
+                                                            {roleLabel}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                                        Activo ahora
+                                                    </span>
+                                                    {u.device && (
+                                                        <p className="text-[9px] text-gray-400 mt-1 flex items-center justify-end gap-1">
+                                                            <Laptop size={10} /> {u.device}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Search & Filters para Historial de Sesiones */}
+                        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input
+                                    type="text"
+                                    value={sessionSearch}
+                                    onChange={(e) => setSessionSearch(e.target.value)}
+                                    placeholder="Buscar por usuario, correo o navegador..."
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-purple-500 focus:outline-none"
+                                />
+                            </div>
+
+                            <select
+                                value={sessionRoleFilter}
+                                onChange={(e) => setSessionRoleFilter(e.target.value)}
+                                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700"
+                            >
+                                <option value="">Todos los Roles</option>
+                                <option value="superadmin">Super Administrador</option>
+                                <option value="director">Director Estratégico</option>
+                                <option value="gestor">Gestor Logístico</option>
+                                <option value="asesor">Asesor Comercial</option>
+                                <option value="cajero">Cajero Mostrador</option>
+                                <option value="mensajero">Mensajero</option>
+                            </select>
+
+                            <select
+                                value={sessionStatusFilter}
+                                onChange={(e) => setSessionStatusFilter(e.target.value)}
+                                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700"
+                            >
+                                <option value="">Todas las Sesiones</option>
+                                <option value="online">🟢 Sesiones Activas / En Línea</option>
+                                <option value="closed">⚪ Sesiones Cerradas / Salidas</option>
+                            </select>
+                        </div>
+
+                        {/* Tabla de Logs de Ingreso y Salida */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+                            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                                    <LogIn size={16} className="text-purple-600" />
+                                    Bitácora Cronológica de Ingresos y Salidas
+                                </h3>
+                                <span className="text-[11px] text-gray-500 font-bold">
+                                    {filteredSessions.length} registros
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-black uppercase text-[10px] tracking-wider">
+                                            <th className="p-3.5">Usuario</th>
+                                            <th className="p-3.5">Rol</th>
+                                            <th className="p-3.5">Estado Sesión</th>
+                                            <th className="p-3.5">Ingreso</th>
+                                            <th className="p-3.5">Salida</th>
+                                            <th className="p-3.5">Duración</th>
+                                            <th className="p-3.5">Dispositivo / Navegador</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+                                        {isLoadingSessions ? (
+                                            <tr>
+                                                <td colSpan={7} className="p-8 text-center text-gray-400">
+                                                    Cargando bitácora de accesos...
+                                                </td>
+                                            </tr>
+                                        ) : filteredSessions.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="p-8 text-center text-gray-400">
+                                                    No hay registros de sesiones para el filtro actual.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredSessions.map((sess) => {
+                                                const loginDate = sess.loginAt?.toMillis ? new Date(sess.loginAt.toMillis()) : null;
+                                                const logoutDate = sess.logoutAt?.toMillis ? new Date(sess.logoutAt.toMillis()) : null;
+                                                const roleBadge = ROLE_DEFINITIONS[sess.rol as SystemRole]?.badgeColor || 'bg-gray-100 text-gray-800';
+                                                const roleLabel = ROLE_DEFINITIONS[sess.rol as SystemRole]?.label || sess.rol;
+
+                                                return (
+                                                    <tr key={sess.id} className="hover:bg-gray-50/60 transition-colors">
+                                                        <td className="p-3.5">
+                                                            <p className="font-black text-gray-900">{sess.nombre}</p>
+                                                            <p className="text-[10px] text-gray-400 font-mono">{sess.email}</p>
+                                                        </td>
+                                                        <td className="p-3.5">
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${roleBadge}`}>
+                                                                {roleLabel}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3.5">
+                                                            {sess.isOnline ? (
+                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                    En Línea
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                                                    Cerrada
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap font-mono text-[11px] text-gray-600">
+                                                            {loginDate ? (
+                                                                <span>
+                                                                    {loginDate.toLocaleDateString('es-CO')} {loginDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                            ) : '—'}
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap font-mono text-[11px] text-gray-600">
+                                                            {logoutDate ? (
+                                                                <span>
+                                                                    {logoutDate.toLocaleDateString('es-CO')} {logoutDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                            ) : sess.isOnline ? (
+                                                                <span className="text-emerald-600 font-bold">Activa ahora</span>
+                                                            ) : (
+                                                                <span className="text-gray-400">Cierre automático</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3.5 whitespace-nowrap text-xs font-bold text-gray-800">
+                                                            {sess.durationMinutes ? (
+                                                                sess.durationMinutes >= 60
+                                                                    ? `${Math.floor(sess.durationMinutes / 60)}h ${sess.durationMinutes % 60}m`
+                                                                    : `${sess.durationMinutes} min`
+                                                            ) : sess.isOnline ? (
+                                                                <span className="text-emerald-600 text-[11px]">En curso...</span>
+                                                            ) : '—'}
+                                                        </td>
+                                                        <td className="p-3.5">
+                                                            <div className="flex items-center gap-1.5 text-gray-600 text-xs">
+                                                                <Laptop size={13} className="text-gray-400 shrink-0" />
+                                                                <span>{sess.browser || 'Navegador Web'}</span>
+                                                                <span className="text-gray-400 text-[10px]">({sess.device || 'Escritorio'})</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'auditoria' && (
                     /* Tab Bitácora de Auditoría en Vivo */
                     <div className="space-y-4">
                         {/* Search & Filter Auditoría */}

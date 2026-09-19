@@ -69,11 +69,95 @@ export interface MessengerSettlementSummary {
     balanceNetoEntregar: number;
 }
 
-// ⚠️  DATOS REALES: Los mensajeros se crean desde /admin/mensajeros → pestaña "Directorio"
-// Esta lista de semilla está vacía. El panel admin permite agregar mensajeros con su
-// nombre, cédula, teléfono, tipo de vehículo, placa y zona de cobertura real.
-export const INITIAL_MESSENGERS_SEED: Messenger[] = [];
-
+// 📋 FLOTA OFICIAL BIOCAMBIO360 (7 Domiciliarios):
+// Motocicletas (2): Edilberto, Sandro -> Zonas urbanas y cercanas (Día de por medio)
+// Automóviles (5): Deivy, Daniel, Heiler, Álex, José -> Zonas lejanas y municipios aledaños (Sabana 2x/semana)
+export const INITIAL_MESSENGERS_SEED: Messenger[] = [
+    {
+        id: 'msg-edilberto',
+        nombre: 'Edilberto',
+        cedula: '19.450.820',
+        telefono: '3114508201',
+        tipoVehiculo: 'moto',
+        placaVehiculo: 'EDM-01M',
+        zonaPrincipal: 'Bogotá Cercana / Zonas Urbanas (Sur - Centro)',
+        activo: true,
+        fechaIngreso: '2025-01-15',
+        notas: 'Motocicleta para distribución rápida en zonas urbanas y cercanas de Bogotá.',
+    },
+    {
+        id: 'msg-sandro',
+        nombre: 'Sandro',
+        cedula: '80.231.904',
+        telefono: '3123456789',
+        tipoVehiculo: 'moto',
+        placaVehiculo: 'SDM-02M',
+        zonaPrincipal: 'Bogotá Cercana / Zonas Urbanas (Centro - Norte)',
+        activo: true,
+        fechaIngreso: '2025-01-20',
+        notas: 'Motocicleta para distribución ágil en localidades céntricas y cercanas.',
+    },
+    {
+        id: 'msg-deivy',
+        nombre: 'Deivy',
+        cedula: '101.420.551',
+        telefono: '3139876543',
+        tipoVehiculo: 'carro',
+        placaVehiculo: 'DVA-01C',
+        zonaPrincipal: 'Zonas Lejanas Bogotá & Municipios Aledaños',
+        activo: true,
+        fechaIngreso: '2025-02-01',
+        notas: 'Automóvil para distribución en zonas lejanas y municipios de la Sabana.',
+    },
+    {
+        id: 'msg-daniel',
+        nombre: 'Daniel',
+        cedula: '102.531.662',
+        telefono: '3145678901',
+        tipoVehiculo: 'carro',
+        placaVehiculo: 'DNA-02C',
+        zonaPrincipal: 'Zonas Lejanas Bogotá & Municipios Aledaños',
+        activo: true,
+        fechaIngreso: '2025-02-05',
+        notas: 'Automóvil para distribución en zonas lejanas y municipios de la Sabana.',
+    },
+    {
+        id: 'msg-heiler',
+        nombre: 'Heiler',
+        cedula: '103.642.773',
+        telefono: '3156789012',
+        tipoVehiculo: 'carro',
+        placaVehiculo: 'HLA-03C',
+        zonaPrincipal: 'Zonas Lejanas Bogotá & Municipios Aledaños',
+        activo: true,
+        fechaIngreso: '2025-02-10',
+        notas: 'Automóvil para distribución en zonas lejanas y municipios de la Sabana.',
+    },
+    {
+        id: 'msg-alex',
+        nombre: 'Álex',
+        cedula: '104.753.884',
+        telefono: '3167890123',
+        tipoVehiculo: 'carro',
+        placaVehiculo: 'ALA-04C',
+        zonaPrincipal: 'Zonas Lejanas Bogotá & Municipios Aledaños',
+        activo: true,
+        fechaIngreso: '2025-02-12',
+        notas: 'Automóvil para distribución en zonas lejanas y municipios de la Sabana.',
+    },
+    {
+        id: 'msg-jose',
+        nombre: 'José',
+        cedula: '105.864.995',
+        telefono: '3178901234',
+        tipoVehiculo: 'carro',
+        placaVehiculo: 'JSA-05C',
+        zonaPrincipal: 'Zonas Lejanas Bogotá & Municipios Aledaños',
+        activo: true,
+        fechaIngreso: '2025-02-15',
+        notas: 'Automóvil para distribución en zonas lejanas y municipios de la Sabana.',
+    },
+];
 
 export const DEFAULT_MESSENGER_RATES: MessengerRateConfig = {
     id: 'default',
@@ -91,13 +175,22 @@ export async function getMessengers(): Promise<Messenger[]> {
         const colRef = collection(db, 'mensajeros');
         const snap = await getDocs(colRef);
         if (snap.empty) {
-            // Inicializar seed si está vacía
+            // Inicializar con la flota oficial de 7
             for (const msg of INITIAL_MESSENGERS_SEED) {
                 await setDoc(doc(db, 'mensajeros', msg.id), msg);
             }
             return INITIAL_MESSENGERS_SEED;
         }
-        return snap.docs.map(d => ({ id: d.id, ...d.data() } as Messenger));
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Messenger));
+        // Si falta alguno de los 7 domiciliarios oficiales en la base de datos, incorporarlo
+        const hasOfficial = list.some(m => m.nombre === 'Edilberto' || m.nombre === 'Sandro');
+        if (!hasOfficial) {
+            for (const msg of INITIAL_MESSENGERS_SEED) {
+                await setDoc(doc(db, 'mensajeros', msg.id), msg);
+            }
+            return INITIAL_MESSENGERS_SEED;
+        }
+        return list;
     } catch (e: any) {
         console.warn('[MessengersService] Error consultando mensajeros Firestore, usando seed:', e.message);
         return INITIAL_MESSENGERS_SEED;
@@ -411,4 +504,121 @@ export async function getMessengerSettlements(messengerId?: string): Promise<Mes
         console.warn('[MessengersService] Error leyendo liquidaciones:', e.message);
         return [];
     }
+}
+
+/**
+ * 📍 Criterio de asignación operativa:
+ * - Motocicletas (Edilberto, Sandro): Zonas cercanas / urbanas de Bogotá y Soacha (Día de por medio).
+ * - Automóviles (Deivy, Daniel, Heiler, Álex, José): Zonas lejanas de Bogotá y municipios aledaños (2x/semana).
+ */
+export function recommendVehicleAndZone(
+    direccion: string = '',
+    ciudad: string = ''
+): {
+    recommendedType: 'moto' | 'carro';
+    zoneLabel: string;
+    frequencyLabel: string;
+    reason: string;
+} {
+    const fullText = `${direccion} ${ciudad}`.toUpperCase();
+
+    // 1. Municipios aledaños fuera de Bogotá
+    const MUNICIPIOS_SABANA = [
+        'CHIA', 'CHÍA', 'CAJICA', 'CAJICÁ', 'COTA', 'ZIPAQUIRA', 'ZIPAQUIRÁ',
+        'SOPO', 'SOPÓ', 'TOCANCIPA', 'TOCANCIPÁ', 'FUNZA', 'MOSQUERA',
+        'MADRID', 'FACATATIVA', 'FACATATIVÁ', 'SIBATE', 'SIBATÉ', 'TABIO', 'TENJO'
+    ];
+
+    const esMunicipio = MUNICIPIOS_SABANA.some(m => fullText.includes(m));
+    if (esMunicipio) {
+        return {
+            recommendedType: 'carro',
+            zoneLabel: 'Municipios Aledaños (Sabana)',
+            frequencyLabel: '2 veces por semana (2 zonas diferentes)',
+            reason: 'Destino fuera de Bogotá: requiere automóvil para alto volumen y distancia.',
+        };
+    }
+
+    // 2. Localidades lejanas / periféricas de Bogotá
+    const LOCALIDADES_LEJANAS = [
+        'SUBA', 'USAQUEN', 'USAQUÉN', 'ENGATIVA', 'ENGATIVÁ', 'FONTIBON', 'FONTIBÓN',
+        'SAN CRISTOBAL', 'SAN CRISTÓBAL', 'USME', 'CIUDAD BOLIVAR', 'CIUDAD BOLÍVAR',
+        'RAFAEL URIBE', 'SUMAPAZ'
+    ];
+
+    const esLejana = LOCALIDADES_LEJANAS.some(loc => fullText.includes(loc));
+    if (esLejana) {
+        return {
+            recommendedType: 'carro',
+            zoneLabel: 'Bogotá Zonas Lejanas',
+            frequencyLabel: 'Día de por medio',
+            reason: 'Localidad periférica o extensa: óptima para automóvil.',
+        };
+    }
+
+    // 3. Localidades cercanas / céntricas de Bogotá y Soacha
+    return {
+        recommendedType: 'moto',
+        zoneLabel: 'Bogotá Cercana / Zonas Urbanas',
+        frequencyLabel: 'Día de por medio',
+        reason: 'Zona urbana cercana: óptima para motocicleta (Edilberto o Sandro) para agilidad en tráfico.',
+    };
+}
+
+export interface WeeklySettlementConsolidated {
+    messengerId: string;
+    messengerNombre: string;
+    tipoVehiculo: string;
+    placaVehiculo: string;
+    totalDiasLiquidados: number;
+    totalPedidosEntregados: number;
+    totalPedidosNovedad: number;
+    totalFletesDevengados: number;
+    totalRecaudadoEfectivo: number;
+    balanceNetoEntregar: number;
+}
+
+/**
+ * Consolida liquidaciones diarias en corte semanal por domiciliario
+ */
+export function getWeeklySettlementsConsolidated(
+    settlements: MessengerSettlement[],
+    startDate?: string,
+    endDate?: string
+): WeeklySettlementConsolidated[] {
+    const filtered = settlements.filter(s => {
+        if (startDate && s.fecha < startDate) return false;
+        if (endDate && s.fecha > endDate) return false;
+        return true;
+    });
+
+    const byMessenger = new Map<string, WeeklySettlementConsolidated>();
+
+    for (const s of filtered) {
+        if (!byMessenger.has(s.messengerId)) {
+            const seedInfo = INITIAL_MESSENGERS_SEED.find(m => m.id === s.messengerId);
+            byMessenger.set(s.messengerId, {
+                messengerId: s.messengerId,
+                messengerNombre: s.messengerNombre,
+                tipoVehiculo: seedInfo?.tipoVehiculo || 'moto',
+                placaVehiculo: seedInfo?.placaVehiculo || 'N/A',
+                totalDiasLiquidados: 1,
+                totalPedidosEntregados: s.pedidosEntregados,
+                totalPedidosNovedad: s.pedidosNovedad,
+                totalFletesDevengados: s.totalFletesDevengados,
+                totalRecaudadoEfectivo: s.totalRecaudadoEfectivo,
+                balanceNetoEntregar: s.balanceNetoEntregar,
+            });
+        } else {
+            const agg = byMessenger.get(s.messengerId)!;
+            agg.totalDiasLiquidados += 1;
+            agg.totalPedidosEntregados += s.pedidosEntregados;
+            agg.totalPedidosNovedad += s.pedidosNovedad;
+            agg.totalFletesDevengados += s.totalFletesDevengados;
+            agg.totalRecaudadoEfectivo += s.totalRecaudadoEfectivo;
+            agg.balanceNetoEntregar += s.balanceNetoEntregar;
+        }
+    }
+
+    return Array.from(byMessenger.values()).sort((a, b) => b.totalFletesDevengados - a.totalFletesDevengados);
 }

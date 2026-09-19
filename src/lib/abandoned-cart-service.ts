@@ -3,6 +3,10 @@ import {
     doc, 
     setDoc, 
     getDoc, 
+    getDocs,
+    collection,
+    query,
+    where,
     updateDoc, 
     serverTimestamp 
 } from 'firebase/firestore';
@@ -114,17 +118,61 @@ export async function getAbandonedCartByToken(cartToken: string): Promise<Abando
 }
 
 /**
- * Mark an abandoned cart as successfully recovered after checkout
+ * Mark an abandoned cart as successfully recovered after checkout.
+ * Also cleans up and marks any previous attempts by the same customer (matching email or phone)
+ * so that completed purchases never appear as pending abandoned carts or duplicate in metrics.
  */
-export async function markCartAsRecovered(cartToken: string): Promise<void> {
-    if (!cartToken) return;
-    const cartRef = doc(db, COLLECTION_NAME, cartToken);
+export async function markCartAsRecovered(
+    cartToken: string,
+    orderId?: string,
+    customerEmail?: string,
+    customerPhone?: string
+): Promise<void> {
+    if (!cartToken && !customerEmail && !customerPhone) return;
+
+    if (cartToken) {
+        const cartRef = doc(db, COLLECTION_NAME, cartToken);
+        try {
+            await updateDoc(cartRef, {
+                status: 'recovered',
+                recoveredOrderId: orderId || undefined,
+                updatedAt: serverTimestamp(),
+            });
+        } catch (err) {
+            console.warn('[AbandonedCart] Error marking cart recovered by token:', err);
+        }
+    }
+
+    // Buscar y marcar otros carritos pendientes del mismo cliente para evitar duplicados
     try {
-        await updateDoc(cartRef, {
-            status: 'recovered',
-            updatedAt: serverTimestamp(),
-        });
-    } catch (err) {
-        console.warn('[AbandonedCart] Error marking cart recovered:', err);
+        const colRef = collection(db, COLLECTION_NAME);
+        const qPending = query(colRef, where('status', '==', 'abandoned'));
+        const snap = await getDocs(qPending);
+
+        const cleanEmail = (customerEmail || '').trim().toLowerCase();
+        const cleanPhone = (customerPhone || '').replace(/\D/g, '');
+
+        for (const d of snap.docs) {
+            const data = d.data();
+            const dEmail = (data.customerEmail || '').trim().toLowerCase();
+            const dPhone = (data.customerPhone || '').replace(/\D/g, '');
+
+            const matchEmail = cleanEmail && dEmail && cleanEmail === dEmail;
+            const matchPhone = cleanPhone && dPhone && (
+                cleanPhone === dPhone ||
+                cleanPhone.endsWith(dPhone) ||
+                dPhone.endsWith(cleanPhone)
+            );
+
+            if (matchEmail || matchPhone) {
+                await updateDoc(d.ref, {
+                    status: 'recovered',
+                    recoveredOrderId: orderId || undefined,
+                    updatedAt: serverTimestamp(),
+                }).catch(() => {});
+            }
+        }
+    } catch (e) {
+        console.warn('[AbandonedCart] Error auto-marking customer carts as recovered:', e);
     }
 }

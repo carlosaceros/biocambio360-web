@@ -51,7 +51,7 @@ export default function CarritosAbandonadosPage() {
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'all' | 'abandoned' | 'recovered'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'abandoned' | 'recovered'>('abandoned');
     const [selectedCart, setSelectedCart] = useState<AbandonedCartRecord | null>(null);
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
     const [sendingEmailToken, setSendingEmailToken] = useState<string | null>(null);
@@ -94,8 +94,8 @@ export default function CarritosAbandonadosPage() {
         };
     }, []);
 
-    // Cross-reference carts with all orders to prevent ANY false positives (even if order was canceled)
-    const enrichedCarts = useMemo(() => {
+    // 1. Cruzar carritos con pedidos para resolver estado recuperado
+    const enrichedRawCarts = useMemo(() => {
         return carts.map(cart => {
             const cartEmail = (cart.customerEmail || '').trim().toLowerCase();
             const cartPhone = (cart.customerPhone || '').replace(/\D/g, '');
@@ -128,17 +128,103 @@ export default function CarritosAbandonadosPage() {
             return {
                 ...cart,
                 status: (isRecovered ? 'recovered' : 'abandoned') as 'abandoned' | 'recovered' | 'expired',
-                linkedOrder: matchingOrder || (cart.recoveredOrderId ? { id: cart.recoveredOrderId, status: (cart as any).recoveredStatus || 'procesado' } : null),
+                linkedOrder: matchingOrder || (cart.recoveredOrderId ? { id: cart.recoveredOrderId, status: (cart as any).recoveredStatus || 'procesado', total: cart.total } : null),
             };
         });
     }, [carts, orders]);
 
-    // Filter carts
-    const filteredCarts = enrichedCarts.filter((c) => {
-        // Status filter
-        if (statusFilter === 'abandoned' && c.status !== 'abandoned') return false;
-        if (statusFilter === 'recovered' && c.status !== 'recovered') return false;
+    // 2. DEDUPLICACIÓN INTELIGENTE Y MÉTRICAS CONFIABLES
+    const { deduplicatedAbandoned, deduplicatedRecovered, deduplicatedAll } = useMemo(() => {
+        // A. Carritos Recuperados: Deduplicar 1 a 1 por cada ID de pedido real
+        const recoveredByOrderId = new Map<string, any>();
+        // B. Carritos Abandonados Reales: Deduplicar por cliente (teléfono o email)
+        const abandonedByCustomer = new Map<string, any>();
 
+        // Ordenar primero los más recientes
+        const sortedCarts = [...enrichedRawCarts].sort((a, b) => {
+            const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return bTime - aTime;
+        });
+
+        for (const cart of sortedCarts) {
+            if (cart.status === 'recovered' && cart.linkedOrder) {
+                const orderKey = cart.linkedOrder.id;
+                if (!recoveredByOrderId.has(orderKey)) {
+                    recoveredByOrderId.set(orderKey, {
+                        ...cart,
+                        total: cart.linkedOrder.total ?? cart.total,
+                        attemptsCount: 1,
+                    });
+                } else {
+                    const existing = recoveredByOrderId.get(orderKey);
+                    existing.attemptsCount = (existing.attemptsCount || 1) + 1;
+                }
+            } else if (cart.status === 'abandoned') {
+                const cartEmail = (cart.customerEmail || '').trim().toLowerCase();
+                const cartPhone = (cart.customerPhone || '').replace(/\D/g, '');
+
+                // Verificar si este cliente ya tiene un pedido completado en las órdenes
+                const hasCompletedOrder = orders.some(o => {
+                    const oEmail = (o.cliente?.email || '').trim().toLowerCase();
+                    const oPhone = (o.cliente?.celular || o.cliente?.telefono || '').replace(/\D/g, '');
+                    return (cartEmail && oEmail && cartEmail === oEmail) ||
+                           (cartPhone && oPhone && (cartPhone === oPhone || cartPhone.endsWith(oPhone) || oPhone.endsWith(cartPhone)));
+                });
+
+                if (hasCompletedOrder) {
+                    // Si ya tiene un pedido completado, no es un carrito abandonado pendiente!
+                    continue;
+                }
+
+                // Clave única del cliente (priorizar teléfono o email)
+                const customerKey = cartPhone && cartPhone.length >= 7 ? `tel_${cartPhone}` : (cartEmail ? `email_${cartEmail}` : `tok_${cart.cartToken}`);
+
+                if (!abandonedByCustomer.has(customerKey)) {
+                    abandonedByCustomer.set(customerKey, {
+                        ...cart,
+                        attemptsCount: 1,
+                    });
+                } else {
+                    const existing = abandonedByCustomer.get(customerKey);
+                    existing.attemptsCount = (existing.attemptsCount || 1) + 1;
+                }
+            }
+        }
+
+        const dedupAbandoned = Array.from(abandonedByCustomer.values());
+        const dedupRecovered = Array.from(recoveredByOrderId.values());
+        const dedupAll = [...dedupAbandoned, ...dedupRecovered].sort((a, b) => {
+            const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+            const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+            return bTime - aTime;
+        });
+
+        return {
+            deduplicatedAbandoned: dedupAbandoned,
+            deduplicatedRecovered: dedupRecovered,
+            deduplicatedAll: dedupAll,
+        };
+    }, [enrichedRawCarts, orders]);
+
+    // Métricas Reales y Confiables
+    const abandonedCarts = deduplicatedAbandoned;
+    const recoveredCarts = deduplicatedRecovered;
+    const enrichedCarts = deduplicatedAll;
+    const totalCartsCount = deduplicatedAll.length;
+
+    const totalLostValue = abandonedCarts.reduce((sum, c) => sum + (c.total || 0), 0);
+    const totalRecoveredValue = recoveredCarts.reduce((sum, c) => sum + (c.total || 0), 0);
+    const recoveryRate = totalCartsCount > 0 ? Math.round((recoveredCarts.length / totalCartsCount) * 100) : 0;
+
+    // Filter carts según pestaña y búsqueda
+    const currentBaseList = statusFilter === 'abandoned'
+        ? abandonedCarts
+        : statusFilter === 'recovered'
+        ? recoveredCarts
+        : enrichedCarts;
+
+    const filteredCarts = currentBaseList.filter((c) => {
         // Search term
         if (!searchTerm.trim()) return true;
         const term = searchTerm.toLowerCase();
@@ -146,19 +232,10 @@ export default function CarritosAbandonadosPage() {
         const emailMatch = (c.customerEmail || '').toLowerCase().includes(term);
         const phoneMatch = (c.customerPhone || '').toLowerCase().includes(term);
         const cityMatch = (c.ciudad || '').toLowerCase().includes(term);
-        const productMatch = c.items?.some((i) => (i.nombre || '').toLowerCase().includes(term));
+        const productMatch = c.items?.some((i: any) => (i.nombre || '').toLowerCase().includes(term));
 
         return nameMatch || emailMatch || phoneMatch || cityMatch || productMatch;
     });
-
-    // Metrics
-    const totalCartsCount = enrichedCarts.length;
-    const abandonedCarts = enrichedCarts.filter((c) => c.status === 'abandoned');
-    const recoveredCarts = enrichedCarts.filter((c) => c.status === 'recovered');
-
-    const totalLostValue = abandonedCarts.reduce((sum, c) => sum + (c.total || 0), 0);
-    const totalRecoveredValue = recoveredCarts.reduce((sum, c) => sum + (c.total || 0), 0);
-    const recoveryRate = totalCartsCount > 0 ? Math.round((recoveredCarts.length / totalCartsCount) * 100) : 0;
 
     // Tracking Metrics
     const notifiedCarts = enrichedCarts.filter((c) => (c.notificationCount || 0) > 0);
@@ -384,34 +461,34 @@ export default function CarritosAbandonadosPage() {
                     {/* Status Tabs */}
                     <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
                         <button
-                            onClick={() => setStatusFilter('all')}
-                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                statusFilter === 'all'
-                                    ? 'bg-[var(--brand-dark)] text-white shadow-sm'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                        >
-                            Todos ({enrichedCarts.length})
-                        </button>
-                        <button
                             onClick={() => setStatusFilter('abandoned')}
-                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                                 statusFilter === 'abandoned'
                                     ? 'bg-rose-600 text-white shadow-sm'
                                     : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
                             }`}
                         >
-                            Pendientes ({abandonedCarts.length})
+                            🚨 Abandonados Reales ({abandonedCarts.length})
                         </button>
                         <button
                             onClick={() => setStatusFilter('recovered')}
-                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                                 statusFilter === 'recovered'
                                     ? 'bg-emerald-600 text-white shadow-sm'
                                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                             }`}
                         >
-                            Recuperados / Pedidos ({recoveredCarts.length})
+                            🎉 Con Pedido / Recuperados ({recoveredCarts.length})
+                        </button>
+                        <button
+                            onClick={() => setStatusFilter('all')}
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                                statusFilter === 'all'
+                                    ? 'bg-[var(--brand-dark)] text-white shadow-sm'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                        >
+                            Todos Auditados ({totalCartsCount})
                         </button>
                     </div>
                 </div>
@@ -428,11 +505,17 @@ export default function CarritosAbandonadosPage() {
                             <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <CheckCheck size={28} />
                             </div>
-                            <h3 className="text-lg font-black text-gray-900 mb-1">Sin carritos abandonados pendientes</h3>
+                            <h3 className="text-lg font-black text-gray-900 mb-1">
+                                {statusFilter === 'abandoned'
+                                    ? '¡Excelente! Cero carritos abandonados pendientes'
+                                    : 'Sin registros para este filtro'}
+                            </h3>
                             <p className="text-sm text-gray-500 max-w-sm mx-auto">
                                 {searchTerm
                                     ? 'No hay registros que coincidan con la búsqueda ingresada.'
-                                    : 'Todos los pedidos recientes han sido procesados y completados con éxito.'}
+                                    : statusFilter === 'abandoned'
+                                    ? 'Todos los clientes recientes han completado su pedido o han sido atendidos.'
+                                    : 'No hay carritos en esta vista.'}
                             </p>
                         </div>
                     ) : (
@@ -464,7 +547,7 @@ export default function CarritosAbandonadosPage() {
                                                 {/* Cliente & Contacto */}
                                                 <td className="py-4 px-4 align-top">
                                                     <div className="flex flex-col">
-                                                        <span className="font-extrabold text-gray-900 flex items-center gap-1.5">
+                                                        <span className="font-extrabold text-gray-900 flex items-center gap-1.5 flex-wrap">
                                                             {cart.customerName || 'Cliente sin nombre'}
                                                             {isRecovered && (
                                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
@@ -475,6 +558,11 @@ export default function CarritosAbandonadosPage() {
                                                                     {linkedOrder?.status === 'cancelado'
                                                                         ? `Pedido Cancelado #${linkedOrder.id.slice(0, 6)}`
                                                                         : (linkedOrder ? `Pedido #${linkedOrder.id.slice(0, 6)}` : 'Recuperado')}
+                                                                </span>
+                                                            )}
+                                                            {cart.attemptsCount > 1 && (
+                                                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                                                                    {cart.attemptsCount} intentos consolidados
                                                                 </span>
                                                             )}
                                                         </span>

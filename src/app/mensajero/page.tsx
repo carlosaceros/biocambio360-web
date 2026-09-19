@@ -19,6 +19,7 @@ import {
     Clock,
     Check,
     X,
+    PhoneCall,
 } from 'lucide-react';
 import {
     Messenger,
@@ -359,6 +360,10 @@ export default function MensajeroAppPage() {
 
                             const whatsappText = `¡Hola ${ord.cliente?.nombre || 'Cliente'}! Te saluda ${selectedMessenger?.nombre || 'el mensajero'} de Biocambio360 🚚. Voy en camino a entregarte tu pedido de aseo y llego en aproximadamente 15 a 20 minutos a tu dirección: *${ord.cliente?.direccion || ''}*. ${isCod ? `Total a cobrar en efectivo: *${formatMoney(ord.total)}*.` : 'Tu pedido ya está pagado.'} Por favor confirma si estás atento/a para recibir. ¡Muchas gracias!`;
 
+                            const ventasPhone = '573027504568';
+                            const ventasNoContestaText = `Hola equipo de ventas Biocambio360 👋, les saluda el domiciliario ${selectedMessenger?.nombre || 'de ruta'}. Me encuentro en la dirección ${ord.cliente?.direccion || ''} para entregar el pedido #${ord.id.slice(-6).toUpperCase()} a ${ord.cliente?.nombre || 'cliente'} (${ord.cliente?.celular || ''}) pero no responde al llamado ni timbres. ¿Me ayudan a contactarlo para culminar la entrega y no devolver el pedido?`;
+                            const ventasVerificarPagoText = `Hola equipo de ventas Biocambio360 👋, el cliente ${ord.cliente?.nombre || 'cliente'} del pedido #${ord.id.slice(-6).toUpperCase()} indica que realizó pago por transferencia bancaria por valor de ${formatMoney(ord.total)}. ¿Me confirman si el pago fue verificado y aprobado para entregar los productos?`;
+
                             return (
                                 <div
                                     key={ord.id}
@@ -483,6 +488,38 @@ export default function MensajeroAppPage() {
                                                 <span>WhatsApp</span>
                                             </a>
                                         </div>
+
+                                        {/* CANALES DE ASISTENCIA CON VENTAS EN CALLE */}
+                                        {!isDelivered && (
+                                            <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                                                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                    <span>Canales de Asistencia en Calle:</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <a
+                                                        href={`https://wa.me/${ventasPhone}?text=${encodeURIComponent(ventasNoContestaText)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="py-2.5 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                                        title="Pedir apoyo a ventas si el cliente no contesta el teléfono o timbre"
+                                                    >
+                                                        <PhoneCall size={14} className="text-rose-600 shrink-0" />
+                                                        <span className="truncate">Ventas: No Contesta</span>
+                                                    </a>
+
+                                                    <a
+                                                        href={`https://wa.me/${ventasPhone}?text=${encodeURIComponent(ventasVerificarPagoText)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="py-2.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                                        title="Pedir a ventas verificación de pago por transferencia"
+                                                    >
+                                                        <ShieldCheck size={14} className="text-blue-600 shrink-0" />
+                                                        <span className="truncate">Verificar Pago</span>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* BOTONES DE RESOLUCIÓN DE ENTREGA */}
                                         {!isDelivered && (

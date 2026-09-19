@@ -424,8 +424,8 @@ export default function CheckoutPage() {
             const orderId = await createOrder(orderData as any);
 
             // Mark abandoned cart session as recovered immediately to prevent false positives
-            if (cartToken) {
-                markCartAsRecovered(cartToken).catch(err =>
+            if (cartToken || formData.email || formData.celular) {
+                markCartAsRecovered(cartToken, orderId, formData.email, formData.celular).catch(err =>
                     console.warn('[Checkout] Error marking cart as recovered:', err)
                 );
                 try {
