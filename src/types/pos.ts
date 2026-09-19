@@ -28,6 +28,9 @@ export interface PosSaleCustomer {
     cedula?: string;
     celular?: string;
     email?: string;
+    direccion?: string;
+    ciudad?: string;
+    departamento?: string;
 }
 
 export interface PosSale {

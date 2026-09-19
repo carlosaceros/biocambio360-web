@@ -161,3 +161,94 @@ export async function syncCustomersFromOrders(): Promise<{ processed: number, up
 
     return { processed, updated };
 }
+
+/**
+ * Create or update a customer quickly from POS or fast entry
+ */
+export async function quickCreateCustomer(data: {
+    nombre: string;
+    celular: string;
+    cedula?: string;
+    email?: string;
+    direccion?: string;
+    ciudad?: string;
+    departamento?: string;
+    asesorAsignado?: string;
+}): Promise<Customer> {
+    const cleanPhone = data.celular.replace(/\D/g, '');
+    if (!cleanPhone) throw new Error('El número celular es obligatorio.');
+
+    const customerRef = doc(customersCollection, cleanPhone);
+    const snap = await getDoc(customerRef);
+    const now = Timestamp.now();
+
+    const existing = snap.exists() ? snap.data() : null;
+
+    const customerData: Customer = {
+        id: cleanPhone,
+        nombre: data.nombre.trim(),
+        celular: cleanPhone,
+        cedula: data.cedula?.trim() || existing?.cedula || '222222222222',
+        email: data.email?.trim() || existing?.email || undefined,
+        direccion: data.direccion?.trim() || existing?.direccion || 'Venta Mostrador Soacha',
+        ciudad: data.ciudad?.trim() || existing?.ciudad || 'Soacha',
+        departamento: data.departamento?.trim() || existing?.departamento || 'Cundinamarca',
+        totalSpent: existing?.totalSpent || 0,
+        ordersCount: existing?.ordersCount || 0,
+        lastOrderDate: existing?.lastOrderDate || now,
+        firstOrderDate: existing?.firstOrderDate || now,
+        createdAt: existing?.createdAt || now,
+        updatedAt: now,
+        ...(data.asesorAsignado ? { asesorAsignado: data.asesorAsignado } : existing?.asesorAsignado ? { asesorAsignado: existing.asesorAsignado } : {})
+    };
+
+    await setDoc(customerRef, customerData, { merge: true });
+    return customerData;
+}
+
+/**
+ * Search customers in memory cache or fallback to Firestore by term (name, phone, cédula)
+ */
+export async function searchCustomers(
+    term: string,
+    cachedCustomers: Customer[] = []
+): Promise<Customer[]> {
+    const cleanTerm = term.trim().toLowerCase();
+    if (!cleanTerm) return [];
+
+    const cleanDigits = term.replace(/\D/g, '');
+
+    // 1. Filter local cache for instant zero-latency feedback
+    const localMatches = cachedCustomers.filter(c => {
+        const nameMatch = (c.nombre || '').toLowerCase().includes(cleanTerm);
+        const phoneMatch = cleanDigits.length >= 3 && (c.celular || c.id || '').includes(cleanDigits);
+        const cedulaMatch = cleanDigits.length >= 4 && (c.cedula || '').includes(cleanDigits);
+        const emailMatch = (c.email || '').toLowerCase().includes(cleanTerm);
+        return nameMatch || phoneMatch || cedulaMatch || emailMatch;
+    });
+
+    if (localMatches.length > 0) {
+        return localMatches.slice(0, 8);
+    }
+
+    // 2. Direct remote lookup if query has 7+ digits (phone)
+    if (cleanDigits.length >= 7) {
+        try {
+            const customerSnap = await getDoc(doc(customersCollection, cleanDigits));
+            if (customerSnap.exists()) {
+                const data = customerSnap.data();
+                return [{
+                    id: customerSnap.id,
+                    ...data,
+                    nombre: data.nombre || 'Cliente',
+                    celular: data.celular || customerSnap.id,
+                    cedula: data.cedula || '',
+                } as Customer];
+            }
+        } catch (e) {
+            console.warn('[searchCustomers] Remote search fallback error:', e);
+        }
+    }
+
+    return [];
+}

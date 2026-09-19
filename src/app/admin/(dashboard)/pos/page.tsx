@@ -26,11 +26,21 @@ import {
     X,
     AlertTriangle,
     Wifi,
-    WifiOff
+    WifiOff,
+    UserPlus,
+    Building2,
+    MapPin,
+    User,
+    Mail,
+    Phone,
+    Check,
+    Sparkles
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { PRODUCTOS, Product, ProductSize, isDisallowedSize } from '@/lib/products';
 import { formatCurrency } from '@/lib/checkout-utils';
+import { Customer } from '@/types/customer';
+import { getCustomers, searchCustomers, quickCreateCustomer } from '@/lib/customers-service';
 import {
     PosItem,
     PosPaymentMethod,
@@ -67,7 +77,29 @@ export default function PosPage() {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerCedula, setCustomerCedula] = useState('');
+    const [customerAddress, setCustomerAddress] = useState('');
+    const [customerCity, setCustomerCity] = useState('Soacha');
     const [discountAmount, setDiscountAmount] = useState<number>(0);
+
+    // Customer Autocomplete & Selection
+    const [cachedCustomers, setCachedCustomers] = useState<Customer[]>([]);
+    const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+    const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
+    const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+
+    // Quick Customer Creation Form
+    const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
+    const [quickName, setQuickName] = useState('');
+    const [quickPhone, setQuickPhone] = useState('');
+    const [quickCedula, setQuickCedula] = useState('');
+    const [quickCiudad, setQuickCiudad] = useState('Soacha');
+    const [quickDireccion, setQuickDireccion] = useState('');
+    const [quickEmail, setQuickEmail] = useState('');
+    const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+    const [quickCustomerError, setQuickCustomerError] = useState<string | null>(null);
+    const [customerToast, setCustomerToast] = useState<string | null>(null);
 
     // Payment Modal
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -112,12 +144,136 @@ export default function PosPage() {
 
         loadSession();
         loadHistory();
+        loadCustomersList();
 
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
+
+    const loadCustomersList = async () => {
+        try {
+            const list = await getCustomers();
+            setCachedCustomers(list);
+        } catch (e) {
+            console.warn('[POS] Error cargando directorio de clientes:', e);
+        }
+    };
+
+    // Customer Autocomplete Search Effect
+    useEffect(() => {
+        const query = customerSearchQuery.trim();
+        if (!query) {
+            setCustomerSuggestions([]);
+            return;
+        }
+
+        let active = true;
+        setIsSearchingCustomers(true);
+
+        const timer = setTimeout(async () => {
+            try {
+                const results = await searchCustomers(query, cachedCustomers);
+                if (active) {
+                    setCustomerSuggestions(results);
+                }
+            } catch (err) {
+                console.warn('[POS] Error buscando clientes:', err);
+            } finally {
+                if (active) setIsSearchingCustomers(false);
+            }
+        }, 150);
+
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [customerSearchQuery, cachedCustomers]);
+
+    const handleSelectCustomer = (customer: Customer) => {
+        setSelectedCustomer(customer);
+        setCustomerName(customer.nombre);
+        setCustomerPhone(customer.celular);
+        setCustomerCedula(customer.cedula || '222222222222');
+        setCustomerAddress(customer.direccion || 'Venta Mostrador Soacha');
+        setCustomerCity(customer.ciudad || 'Soacha');
+        if (customer.asesorAsignado && ADVISORS.includes(customer.asesorAsignado)) {
+            setSelectedAdvisor(customer.asesorAsignado);
+        }
+        setIsCustomerDropdownOpen(false);
+        setCustomerSearchQuery('');
+    };
+
+    const handleClearSelectedCustomer = () => {
+        setSelectedCustomer(null);
+        setCustomerName('');
+        setCustomerPhone('');
+        setCustomerCedula('');
+        setCustomerAddress('');
+        setCustomerCity('Soacha');
+        setCustomerSearchQuery('');
+    };
+
+    const handleOpenQuickCreate = (initialPhone?: string) => {
+        const digits = (initialPhone || customerSearchQuery).replace(/\D/g, '');
+        const isName = !digits && customerSearchQuery.trim().length > 0;
+        setQuickName(isName ? customerSearchQuery.trim() : '');
+        setQuickPhone(digits);
+        setQuickCedula('222222222222');
+        setQuickCiudad('Soacha');
+        setQuickDireccion('Venta Mostrador Soacha');
+        setQuickEmail('');
+        setQuickCustomerError(null);
+        setIsQuickCreateOpen(true);
+        setIsCustomerDropdownOpen(false);
+    };
+
+    const handleSaveQuickCustomer = async () => {
+        if (!quickName.trim()) {
+            setQuickCustomerError('El nombre del cliente es obligatorio');
+            return;
+        }
+        const clean = quickPhone.replace(/\D/g, '');
+        if (!clean || clean.length < 7) {
+            setQuickCustomerError('Ingresa un número celular válido (mínimo 7 dígitos, ideal 10 dígitos)');
+            return;
+        }
+        setIsSavingCustomer(true);
+        setQuickCustomerError(null);
+        try {
+            const newCust = await quickCreateCustomer({
+                nombre: quickName.trim(),
+                celular: clean,
+                cedula: quickCedula.trim() || '222222222222',
+                email: quickEmail.trim() || undefined,
+                ciudad: quickCiudad.trim() || 'Soacha',
+                direccion: quickDireccion.trim() || 'Venta Mostrador Soacha',
+                departamento: 'Cundinamarca',
+                asesorAsignado: selectedAdvisor,
+            });
+
+            setCachedCustomers(prev => {
+                const idx = prev.findIndex(c => c.celular === newCust.celular);
+                if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = newCust;
+                    return copy;
+                }
+                return [newCust, ...prev];
+            });
+
+            handleSelectCustomer(newCust);
+            setIsQuickCreateOpen(false);
+            setCustomerToast(`¡Cliente ${newCust.nombre} creado y vinculado al ticket!`);
+            setTimeout(() => setCustomerToast(null), 4000);
+        } catch (err: any) {
+            console.error('Error creando cliente:', err);
+            setQuickCustomerError(err?.message || 'Error al guardar cliente en la base de datos');
+        } finally {
+            setIsSavingCustomer(false);
+        }
+    };
 
     const handleSyncOffline = async () => {
         setIsSyncing(true);
@@ -233,7 +389,9 @@ export default function PosPage() {
                 cliente: customerPhone ? {
                     nombre: customerName || 'Cliente Mostrador',
                     celular: customerPhone,
-                    cedula: customerCedula,
+                    cedula: customerCedula || '222222222222',
+                    direccion: customerAddress || 'Venta Mostrador Soacha',
+                    ciudad: customerCity || 'Soacha',
                 } : undefined,
                 items: cartItems,
                 subtotal,
@@ -251,9 +409,13 @@ export default function PosPage() {
             }
             setCartItems([]);
             setDiscountAmount(0);
+            setSelectedCustomer(null);
             setCustomerName('');
             setCustomerPhone('');
             setCustomerCedula('');
+            setCustomerAddress('');
+            setCustomerCity('Soacha');
+            setCustomerSearchQuery('');
             setIsPaymentModalOpen(false);
             loadHistory();
         } catch (error) {
@@ -503,23 +665,173 @@ export default function PosPage() {
                                 </div>
                             </div>
 
-                            {/* Datos rápidos del cliente */}
-                            <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[11px]">
-                                <input
-                                    type="text"
-                                    placeholder="Nombre cliente..."
-                                    value={customerName}
-                                    onChange={(e) => setCustomerName(e.target.value)}
-                                    className="px-2 py-1 bg-white border border-slate-200 rounded-lg focus:outline-hidden"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Celular (10 dígitos)..."
-                                    value={customerPhone}
-                                    onChange={(e) => setCustomerPhone(e.target.value)}
-                                    className="px-2 py-1 bg-white border border-slate-200 rounded-lg focus:outline-hidden font-mono"
-                                />
-                            </div>
+                            {/* SECCIÓN CLIENTE EN TICKET */}
+                            {selectedCustomer ? (
+                                /* Tarjeta de Cliente Reconocido y Vinculado */
+                                <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-xl p-2.5 relative shadow-xs">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                                                <User size={16} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="font-black text-xs text-emerald-950 truncate max-w-[170px]">
+                                                        {selectedCustomer.nombre}
+                                                    </span>
+                                                    <span className="bg-emerald-200/80 text-emerald-900 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+                                                        <Sparkles size={9} /> CRM
+                                                    </span>
+                                                    {selectedCustomer.ordersCount > 1 && (
+                                                        <span className="bg-amber-100 text-amber-900 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                                                            ★ {selectedCustomer.ordersCount} compras
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[10px] text-emerald-800 font-medium mt-0.5 truncate">
+                                                    <span className="flex items-center gap-0.5 font-mono font-bold">
+                                                        <Phone size={10} /> {selectedCustomer.celular}
+                                                    </span>
+                                                    {selectedCustomer.cedula && (
+                                                        <span>· CC: {selectedCustomer.cedula}</span>
+                                                    )}
+                                                    <span className="truncate text-emerald-700">· {selectedCustomer.ciudad || 'Soacha'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleClearSelectedCustomer}
+                                            className="p-1 text-emerald-700 hover:text-red-600 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer shrink-0"
+                                            title="Cambiar o desvincular cliente"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* Buscador Reactivo + Autocompletado + Creación Rápida */
+                                <div className="relative space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="relative flex-1">
+                                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar cliente (celular, nombre o cédula)..."
+                                                value={customerSearchQuery}
+                                                onChange={(e) => {
+                                                    setCustomerSearchQuery(e.target.value);
+                                                    setIsCustomerDropdownOpen(true);
+                                                }}
+                                                onFocus={() => setIsCustomerDropdownOpen(true)}
+                                                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white"
+                                            />
+                                            {customerSearchQuery && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setCustomerSearchQuery('');
+                                                        setIsCustomerDropdownOpen(false);
+                                                    }}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Botón rápido "+ Nuevo Cliente" */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenQuickCreate()}
+                                            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer"
+                                            title="Crear y registrar cliente nuevo en mostrador"
+                                        >
+                                            <UserPlus size={13} />
+                                            <span className="hidden sm:inline">+ Nuevo</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Dropdown flotante de sugerencias */}
+                                    {isCustomerDropdownOpen && customerSearchQuery.trim().length > 0 && (
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                            {isSearchingCustomers ? (
+                                                <div className="p-3 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
+                                                    <RefreshCw size={12} className="animate-spin" />
+                                                    <span>Buscando en directorio...</span>
+                                                </div>
+                                            ) : customerSuggestions.length > 0 ? (
+                                                <>
+                                                    {customerSuggestions.map((cust) => (
+                                                        <div
+                                                            key={cust.id}
+                                                            onClick={() => handleSelectCustomer(cust)}
+                                                            className="p-2.5 hover:bg-indigo-50/80 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <p className="font-bold text-xs text-slate-900 truncate">{cust.nombre}</p>
+                                                                    {cust.ordersCount > 1 && (
+                                                                        <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0">
+                                                                            ★ {cust.ordersCount}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                                                    {cust.celular} {cust.cedula && `· CC: ${cust.cedula}`} · {cust.ciudad || 'Soacha'}
+                                                                </p>
+                                                            </div>
+                                                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md shrink-0">
+                                                                Vincular
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    <div
+                                                        onClick={() => handleOpenQuickCreate()}
+                                                        className="p-2 bg-slate-50 hover:bg-indigo-50 transition-colors cursor-pointer text-center text-[11px] font-bold text-indigo-700 flex items-center justify-center gap-1.5 border-t border-slate-100"
+                                                    >
+                                                        <UserPlus size={13} />
+                                                        ¿No es ninguno de ellos? Registrar cliente nuevo
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="p-3 text-center space-y-2">
+                                                    <p className="text-xs text-slate-500">
+                                                        No se encontró cliente con &ldquo;<span className="font-semibold text-slate-800">{customerSearchQuery}</span>&rdquo;
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenQuickCreate()}
+                                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                                                    >
+                                                        <UserPlus size={14} />
+                                                        Registrar &ldquo;{customerSearchQuery}&rdquo; como Cliente
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Entradas rápidas inline (para ventas anónimas de mostrador o edición manual rápida) */}
+                                    <div className="grid grid-cols-2 gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-100 text-[11px]">
+                                        <input
+                                            type="text"
+                                            placeholder="Nombre (opcional / mostrador)..."
+                                            value={customerName}
+                                            onChange={(e) => setCustomerName(e.target.value)}
+                                            className="px-2 py-1 bg-white border border-slate-200 rounded-lg focus:outline-hidden text-[11px]"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Celular (10 dígitos)..."
+                                            value={customerPhone}
+                                            onChange={(e) => setCustomerPhone(e.target.value)}
+                                            className="px-2 py-1 bg-white border border-slate-200 rounded-lg focus:outline-hidden font-mono text-[11px]"
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Lista de Ítems en el Carrito */}
                             <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[300px]">
@@ -874,6 +1186,187 @@ export default function PosPage() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* MODAL DE CREACIÓN RÁPIDA DE CLIENTE */}
+            <AnimatePresence>
+                {isQuickCreateOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4"
+                        >
+                            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                                        <UserPlus size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-sm text-slate-900">Registrar Nuevo Cliente</h3>
+                                        <p className="text-[10px] text-slate-400">Guarda en CRM y asigna de inmediato al ticket</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickCreateOpen(false)}
+                                    className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            {quickCustomerError && (
+                                <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-1.5">
+                                    <AlertTriangle size={14} className="shrink-0" />
+                                    <span>{quickCustomerError}</span>
+                                </div>
+                            )}
+
+                            <div className="space-y-3 text-xs">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                        Nombre Completo *
+                                    </label>
+                                    <div className="relative">
+                                        <User size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            autoFocus
+                                            placeholder="Ej: Juan Pérez / Ferretería El Sol"
+                                            value={quickName}
+                                            onChange={(e) => setQuickName(e.target.value)}
+                                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-hidden focus:border-indigo-500 focus:bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Celular (10 dígitos) *
+                                        </label>
+                                        <div className="relative">
+                                            <Phone size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="tel"
+                                                placeholder="3142733410"
+                                                value={quickPhone}
+                                                onChange={(e) => setQuickPhone(e.target.value)}
+                                                className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:outline-hidden focus:border-indigo-500 focus:bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Cédula / NIT
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="222222222222"
+                                            value={quickCedula}
+                                            onChange={(e) => setQuickCedula(e.target.value)}
+                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Ciudad
+                                        </label>
+                                        <div className="relative">
+                                            <Building2 size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Soacha"
+                                                value={quickCiudad}
+                                                onChange={(e) => setQuickCiudad(e.target.value)}
+                                                className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-hidden focus:border-indigo-500 focus:bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Dirección Despacho
+                                        </label>
+                                        <div className="relative">
+                                            <MapPin size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Cra. 7C #44-17 Sur"
+                                                value={quickDireccion}
+                                                onChange={(e) => setQuickDireccion(e.target.value)}
+                                                className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                        Correo Electrónico (Opcional)
+                                    </label>
+                                    <div className="relative">
+                                        <Mail size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="email"
+                                            placeholder="cliente@correo.com"
+                                            value={quickEmail}
+                                            onChange={(e) => setQuickEmail(e.target.value)}
+                                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-indigo-500 focus:bg-white"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickCreateOpen(false)}
+                                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveQuickCustomer}
+                                    disabled={isSavingCustomer}
+                                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSavingCustomer ? (
+                                        <>
+                                            <RefreshCw size={13} className="animate-spin" />
+                                            <span>Guardando...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check size={14} />
+                                            <span>Guardar y Vincular</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* NOTIFICACIÓN TOAST CLIENTE VINCULADO */}
+            {customerToast && (
+                <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-500/50">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                        <Check size={16} />
+                    </div>
+                    <div>
+                        <p className="text-xs font-black text-white">{customerToast}</p>
+                        <p className="text-[10px] text-emerald-300">Cliente asignado al ticket actual del mostrador</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

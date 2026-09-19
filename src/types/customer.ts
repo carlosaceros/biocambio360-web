@@ -9,6 +9,7 @@ export interface Customer {
     direccion: string;
     ciudad: string;
     departamento: string;
+    asesorAsignado?: string;
 
     // Stats
     totalSpent: number;

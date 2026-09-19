@@ -27,7 +27,9 @@ import {
     PosInventoryItem,
     PosWarehouseTransfer,
     PosCashRegisterSession,
+    PosSaleCustomer,
 } from '@/types/pos';
+import { upsertCustomerFromOrder } from './customers-service';
 
 const POS_SALES_REF = 'pos_sales';
 const POS_INVENTORY_REF = 'pos_inventory';
@@ -120,7 +122,7 @@ export async function createPosSale(data: {
     cajeroId: string;
     cajeroNombre: string;
     asesor?: string;
-    cliente?: { nombre?: string; cedula?: string; celular?: string; email?: string };
+    cliente?: PosSaleCustomer;
     items: PosItem[];
     subtotal: number;
     descuento: number;
@@ -170,6 +172,19 @@ export async function createPosSale(data: {
             discountPosStock(item.productId, item.size, item.cantidad).catch(err =>
                 console.warn(`[POS] Error descontando stock para ${item.productId}:`, err)
             );
+        }
+
+        // Sincronizar o actualizar datos del cliente en la colección 'customers'
+        if (data.cliente?.celular) {
+            upsertCustomerFromOrder({
+                nombre: data.cliente.nombre || 'Cliente Mostrador',
+                cedula: data.cliente.cedula || '222222222222',
+                celular: data.cliente.celular,
+                email: data.cliente.email,
+                direccion: data.cliente.direccion || 'Venta Mostrador Soacha',
+                ciudad: data.cliente.ciudad || 'Soacha',
+                departamento: data.cliente.departamento || 'Cundinamarca'
+            }, data.total).catch(err => console.warn('[POS] Error sincronizando cliente desde POS:', err));
         }
 
         return {
