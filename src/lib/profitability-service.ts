@@ -58,8 +58,11 @@ export function calculateOrderProfitability(order: {
 }): OrderProfitabilityMetrics {
     let costoQuimico = 0;
     let costoEmpaques = 0;
+    const prods = Array.isArray(order.productos)
+        ? order.productos
+        : (order.productos && typeof order.productos === 'object' ? Object.values(order.productos) : []);
 
-    order.productos.forEach(p => {
+    prods.forEach((p: any) => {
         const costPerLiter = ESTIMATED_COST_PER_LITER[p.id] || ESTIMATED_COST_PER_LITER['default'];
         const packCost = PACKAGING_COST[p.size] || PACKAGING_COST['default'];
 

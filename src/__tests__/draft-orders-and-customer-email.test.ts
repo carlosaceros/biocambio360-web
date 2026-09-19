@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as firestore from 'firebase/firestore';
 import { getCarrierDisplayName, getTrackingUrl } from '@/lib/shipping-tracking';
 import { ORDER_STATUS_CONFIG } from '@/types/order';
-import { createOrder, updateOrderStatus } from '@/lib/orders-service';
+import { createOrder, updateOrderStatus, safeToArray, getDraftOrdersByAdvisor } from '@/lib/orders-service';
 import { decrementStockForOrderItems } from '@/lib/products-service';
 import { sendOrderStatusCustomerEmail, emailTransport } from '@/lib/email-service';
 
@@ -229,6 +229,86 @@ describe('Borradores Comerciales, Tracking 99 Envíos & Notificaciones de Estado
             expect(callArgs.htmlContent).toContain('Interrapidísimo');
             expect(callArgs.htmlContent).toContain('Rastrear Envío en Vivo');
             expect(callArgs.htmlContent).toContain('https://www.interrapidisimo.com/sigue-tu-envio/?guia=700998877665');
+        });
+    });
+
+    describe('5. Resiliencia de Productos de Borradores (safeToArray y compatibilidad con objetos de Firestore)', () => {
+        it('safeToArray debe convertir arrays, objetos numéricos, null y valores indefinidos de forma segura', () => {
+            // Caso array normal
+            const arr = [{ id: 1 }, { id: 2 }];
+            expect(safeToArray(arr)).toEqual(arr);
+
+            // Caso objeto con llaves numéricas serializado por Firestore
+            const firestoreObj = {
+                '0': { id: 'prod-1', cantidad: 2 },
+                '1': { id: 'prod-2', cantidad: 1 }
+            };
+            const converted = safeToArray(firestoreObj);
+            expect(Array.isArray(converted)).toBe(true);
+            expect(converted.length).toBe(2);
+            expect(converted[0].id).toBe('prod-1');
+            expect(converted[1].id).toBe('prod-2');
+
+            // Casos null, undefined y primitivos
+            expect(safeToArray(null)).toEqual([]);
+            expect(safeToArray(undefined)).toEqual([]);
+            expect(safeToArray('string')).toEqual([]);
+            expect(safeToArray(123)).toEqual([]);
+        });
+
+        it('getDraftOrdersByAdvisor debe normalizar órdenes con productos como objeto a un Array válido', async () => {
+            // Simular Firestore con productos guardados como objeto en lugar de array
+            vi.mocked(firestore.getDocs).mockResolvedValueOnce({
+                docs: [
+                    {
+                        id: 'draft-order-obj-123',
+                        data: () => ({
+                            status: 'borrador',
+                            total: 180000,
+                            asesorNombre: 'Karen',
+                            cliente: {
+                                nombre: 'Detergentes SAS',
+                                celular: '3109998877',
+                                ciudad: 'Bogotá D.C.'
+                            },
+                            // Objeto simulado de Firestore
+                            productos: {
+                                '0': {
+                                    cantidad: 2,
+                                    product: { nombre: 'Detergente Industrial 20L' },
+                                    size: '20L',
+                                    price: 65000
+                                },
+                                '1': {
+                                    cantidad: 1,
+                                    product: { nombre: 'Desengrasante 20L' },
+                                    size: '20L',
+                                    price: 50000
+                                }
+                            },
+                            createdAt: { toMillis: () => 1726000000000 }
+                        })
+                    }
+                ],
+                empty: false
+            } as any);
+
+            const drafts = await getDraftOrdersByAdvisor('Karen');
+            expect(drafts.length).toBe(1);
+            const draft = drafts[0];
+
+            // Debe ser un Array
+            expect(Array.isArray(draft.productos)).toBe(true);
+            expect(draft.productos.length).toBe(2);
+
+            // Debe poder mapearse directamente sin lanzar '(e.productos || []).map is not a function'
+            expect(() => {
+                const itemsSummary = (draft.productos || [])
+                    .map((p: any) => `${p.cantidad}x ${p.product?.nombre} (${p.size})`)
+                    .join('\n• ');
+                expect(itemsSummary).toContain('2x Detergente Industrial 20L (20L)');
+                expect(itemsSummary).toContain('1x Desengrasante 20L (20L)');
+            }).not.toThrow();
         });
     });
 });

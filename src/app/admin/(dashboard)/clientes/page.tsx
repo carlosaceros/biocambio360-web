@@ -1129,7 +1129,7 @@ export default function ClientesPage() {
                                                         <span className="font-black text-indigo-700">{formatCurrency(order.total)}</span>
                                                     </div>
                                                     <div className="flex justify-between text-[10px] text-slate-500">
-                                                        <span>{order.productos?.length || 0} producto(s)</span>
+                                                        <span>{(Array.isArray(order.productos) ? order.productos.length : Object.keys(order.productos || {}).length)} producto(s)</span>
                                                         <span>{order.createdAt ? format(parseSafeDate(order.createdAt), 'dd MMM yyyy', { locale: es }) : 'N/A'}</span>
                                                     </div>
                                                 </div>

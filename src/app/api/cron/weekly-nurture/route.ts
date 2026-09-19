@@ -92,7 +92,10 @@ export async function GET(request: Request) {
             else if (daysSinceDelivery >= 20 && daysSinceDelivery <= 22) targetWeek = 3;
 
             if (targetWeek > 0) {
-                const items = data.productos?.map((p: any) => ({ nombre: p.nombre || p.product?.nombre || 'Producto' })) || [];
+                const rawProds = Array.isArray(data.productos)
+                    ? data.productos
+                    : (data.productos && typeof data.productos === 'object' ? Object.values(data.productos) : []);
+                const items = rawProds.map((p: any) => ({ nombre: p.nombre || p.product?.nombre || 'Producto' }));
                 
                 if (!dryRun) {
                     const res = await sendWeeklyNurtureEmail({

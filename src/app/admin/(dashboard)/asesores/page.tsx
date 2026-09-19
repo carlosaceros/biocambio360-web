@@ -50,7 +50,7 @@ import SalesScriptsCopilotModal from '@/components/admin/SalesScriptsCopilotModa
 import OrderTimingAnalyticsPanel from '@/components/admin/OrderTimingAnalyticsPanel';
 import { ORDER_STATUS_CONFIG, OrderStatus, Order } from '@/types/order';
 import { subscribeToAdminUsers } from '@/lib/users-service';
-import { getDraftOrdersByAdvisor, discardDraftOrder, getFailedDeliveryOrders } from '@/lib/orders-service';
+import { getDraftOrdersByAdvisor, discardDraftOrder, getFailedDeliveryOrders, safeToArray } from '@/lib/orders-service';
 
 const DEFAULT_ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
 
@@ -144,7 +144,11 @@ export default function AsesoresCockpitPage() {
                 getAdvisorAlertsData(advName)
             ]);
             setPortfolio(data);
-            setDraftOrders(drafts);
+            const sanitizedDrafts = (drafts || []).map(d => ({
+                ...d,
+                productos: safeToArray(d.productos)
+            }));
+            setDraftOrders(sanitizedDrafts);
             setFailedOrders(failed);
             setAlertsData(alerts);
         } finally {
@@ -223,7 +227,10 @@ export default function AsesoresCockpitPage() {
 
     const handleResumeDraft = (draft: Order & { id: string }) => {
         setPreloadedClientForOrder(null);
-        setSelectedDraftForModal(draft);
+        setSelectedDraftForModal({
+            ...draft,
+            productos: safeToArray(draft.productos)
+        });
         setIsFastOrderOpen(true);
     };
 
@@ -800,8 +807,9 @@ export default function AsesoresCockpitPage() {
                                       })
                                     : 'Reciente';
 
-                                const itemsSummary = (draft.productos || [])
-                                    .map(p => `${p.cantidad}x ${p.product?.nombre || 'Producto'} (${p.size})`)
+                                const safeProds = safeToArray(draft.productos);
+                                const itemsSummary = safeProds
+                                    .map((p: any) => `${p.cantidad || 1}x ${p.product?.nombre || p.nombre || 'Producto'} (${p.size || 'Unidad'})`)
                                     .join('\n• ');
 
                                 const whatsappFollowupMsg = encodeURIComponent(
@@ -844,16 +852,16 @@ export default function AsesoresCockpitPage() {
                                             {/* Productos */}
                                             <div className="space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-slate-400">
-                                                    Productos ({draft.productos?.length || 0}):
+                                                    Productos ({safeProds.length}):
                                                 </span>
                                                 <div className="max-h-24 overflow-y-auto space-y-1 text-xs text-slate-700 bg-white/70 p-2 rounded-lg border border-slate-200/60">
-                                                    {draft.productos?.map((p, pIdx) => (
+                                                    {safeProds.map((p: any, pIdx: number) => (
                                                         <div key={pIdx} className="flex justify-between items-baseline gap-2">
                                                             <span className="truncate">
-                                                                {p.cantidad}x {p.product?.nombre || 'Producto'} ({p.size})
+                                                                {p.cantidad || 1}x {p.product?.nombre || p.nombre || 'Producto'} {p.size ? `(${p.size})` : ''}
                                                             </span>
                                                             <span className="font-bold text-slate-900 shrink-0">
-                                                                {formatCurrency(p.price * p.cantidad)}
+                                                                {formatCurrency((p.price || 0) * (p.cantidad || 1))}
                                                             </span>
                                                         </div>
                                                     ))}

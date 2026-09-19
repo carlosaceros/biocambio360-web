@@ -319,7 +319,7 @@ export default function ConfirmacionPage({ params }: { params: Promise<{ orderId
                     <div className="mb-6">
                         <h2 className="text-lg font-black text-gray-900 mb-3">Productos</h2>
                         <div className="space-y-2">
-                            {order.productos.map((item, index) => (
+                            {(Array.isArray(order.productos) ? order.productos : Object.values(order.productos || {})).map((item: any, index) => (
                                 <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100">
                                     <div>
                                         <p className="font-bold text-gray-900">{item.product.nombre} {item.size}</p>

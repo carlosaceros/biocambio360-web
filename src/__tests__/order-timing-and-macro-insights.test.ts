@@ -2,8 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
     generateDynamicFindings,
     getMacroConsolidationData,
-    getMonthlyInsightsHistory,
-    formatDurationSeconds as formatDurationInsights
+    getMonthlyInsightsHistory
 } from '@/lib/monthly-insights-service';
 import {
     formatDurationSeconds,

@@ -24,6 +24,22 @@ import { Order, OrderStatus, TimelineEvent, OrderInternalNote, OrderCustomer, Or
 const ordersCollection = collection(db, 'orders');
 
 /**
+ * Safely convert a Firestore value to an array.
+ * Firestore may serialize arrays as objects with numeric keys ({0: ..., 1: ...}).
+ */
+export function safeToArray<T = any>(value: any): T[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'object') {
+        return Object.keys(value)
+            .sort((a, b) => Number(a) - Number(b))
+            .map(key => value[key])
+            .filter(Boolean);
+    }
+    return [];
+}
+
+/**
  * Recursively removes undefined values from an object so Firestore doesn't reject the document.
  */
 function removeUndefined<T>(obj: T): T {
@@ -227,9 +243,11 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
 
     const docRef = await addDoc(ordersCollection, order);
 
+    const safeOrderProds = safeToArray(orderData.productos);
+
     // Descontar inventario automáticamente si la orden está activa (no cancelada y no borrador)
-    if (orderData.status !== 'cancelado' && orderData.status !== 'borrador' && orderData.productos?.length > 0) {
-        decrementStockForOrderItems(orderData.productos).catch(err =>
+    if (orderData.status !== 'cancelado' && orderData.status !== 'borrador' && safeOrderProds.length > 0) {
+        decrementStockForOrderItems(safeOrderProds).catch(err =>
             console.warn('[OrdersService] Error al descontar inventario de la orden:', err)
         );
     }
@@ -251,7 +269,7 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
                 cliente: orderData.cliente?.nombre,
                 ciudad: orderData.cliente?.ciudad,
                 canal: orderData.canal,
-                itemsCount: orderData.productos?.length || 0,
+                itemsCount: safeOrderProds.length,
             }
         }).catch(err => console.warn('[OrdersService] Error registrando auditoría:', err));
     }
@@ -348,9 +366,11 @@ export async function updateOrderStatus(
         console.warn('[Orders] No se pudo asentar audit log:', auditErr);
     }
 
+    const safeOrderProds = safeToArray(order.productos);
+
     // Descontar inventario si un borrador se convierte en pedido activo
-    if (previousStatus === 'borrador' && newStatus !== 'cancelado' && newStatus !== 'borrador' && order.productos?.length > 0) {
-        decrementStockForOrderItems(order.productos).catch(err =>
+    if (previousStatus === 'borrador' && newStatus !== 'cancelado' && newStatus !== 'borrador' && safeOrderProds.length > 0) {
+        decrementStockForOrderItems(safeOrderProds).catch(err =>
             console.warn('[OrdersService] Error al descontar inventario tras reactivar borrador:', err)
         );
     }
@@ -369,8 +389,8 @@ export async function updateOrderStatus(
                 total: order.total || 0,
                 shippingCarrier: (order as any).shippingInfo?.carrier || (order as any).guiaEnvio?.transportadora,
                 trackingNumber: (order as any).shippingInfo?.trackingNumber || (order as any).guiaEnvio?.numeroGuia,
-                items: order.productos?.map(p => ({
-                    nombre: p.product?.nombre || 'Producto Biocambio360',
+                items: safeOrderProds.map(p => ({
+                    nombre: p.product?.nombre || p.nombre || 'Producto Biocambio360',
                     cantidad: p.cantidad || 1
                 }))
             })
@@ -461,10 +481,14 @@ export function subscribeToOrders(
     const q = query(ordersCollection, ...constraints);
 
     return onSnapshot(q, (snapshot) => {
-        const orders = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as (Order & { id: string })[];
+        const orders = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                productos: safeToArray(data.productos)
+            };
+        }) as (Order & { id: string })[];
 
         callback(orders);
     });
@@ -484,7 +508,12 @@ export async function searchOrdersRemotely(term: string): Promise<(Order & { id:
         const docRef = doc(db, 'orders', cleanTerm);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-            resultsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as any);
+            const data = docSnap.data();
+            resultsMap.set(docSnap.id, {
+                id: docSnap.id,
+                ...data,
+                productos: safeToArray(data.productos)
+            } as any);
         }
     } catch {}
 
@@ -494,7 +523,14 @@ export async function searchOrdersRemotely(term: string): Promise<(Order & { id:
         try {
             const qPhone = query(ordersCollection, where('cliente.celular', '==', cleanPhone), limit(25));
             const snap = await getDocs(qPhone);
-            snap.forEach(d => resultsMap.set(d.id, { id: d.id, ...d.data() } as any));
+            snap.forEach(d => {
+                const data = d.data();
+                resultsMap.set(d.id, {
+                    id: d.id,
+                    ...data,
+                    productos: safeToArray(data.productos)
+                } as any);
+            });
         } catch {}
     }
 
@@ -508,10 +544,14 @@ export async function getOrdersByStatus(status: OrderStatus): Promise<(Order & {
     const q = query(ordersCollection, where('status', '==', status), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-    })) as (Order & { id: string })[];
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            productos: safeToArray(data.productos)
+        };
+    }) as (Order & { id: string })[];
 }
 
 /**
@@ -525,9 +565,11 @@ export async function getOrderById(orderId: string): Promise<(Order & { id: stri
         return null;
     }
 
+    const data = orderSnap.data();
     return {
         id: orderSnap.id,
-        ...orderSnap.data()
+        ...data,
+        productos: safeToArray(data.productos)
     } as Order & { id: string };
 }
 
@@ -684,10 +726,14 @@ export async function getDraftOrdersByAdvisor(advisorName?: string): Promise<(Or
             limit(100)
         );
         const snapshot = await getDocs(q);
-        const drafts = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as (Order & { id: string })[];
+        const drafts = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                productos: safeToArray(data.productos)
+            };
+        }) as (Order & { id: string })[];
 
         const sorted = drafts.sort((a, b) => {
             const ta = (a.createdAt as any)?.toMillis ? (a.createdAt as any).toMillis() : 0;
@@ -881,8 +927,9 @@ export async function processDeliveryException(params: ProcessDeliveryExceptionP
         });
 
         // Restituir existencias a bodega
-        if (order.productos && order.productos.length > 0) {
-            await incrementStockForOrderItems(order.productos);
+        const safeOrderProds = safeToArray(order.productos);
+        if (safeOrderProds.length > 0) {
+            await incrementStockForOrderItems(safeOrderProds);
         }
 
         const noteText = `📦 Mercancía devuelta a bodega tras no entrega contraentrega (${motivo}). Stock restituido satisfactoriamente.`;

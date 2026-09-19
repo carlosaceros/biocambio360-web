@@ -26,7 +26,7 @@ import {
 import { PRODUCTOS, Product, isDisallowedSize } from '@/lib/products';
 import { formatCurrency, DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, calculateShipping } from '@/lib/checkout-utils';
 import { OrderCustomer, OrderItem, Order } from '@/types/order';
-import { createOrder, lookupCustomerByPhone, updateOrderStatus } from '@/lib/orders-service';
+import { createOrder, lookupCustomerByPhone, updateOrderStatus, safeToArray } from '@/lib/orders-service';
 import { doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
@@ -223,8 +223,9 @@ export default function FastOrderModal({
             if (draftOrder.cliente?.departamento) setDepartamento(draftOrder.cliente.departamento);
             if (draftOrder.cliente?.ciudad) setCiudad(draftOrder.cliente.ciudad);
             if (draftOrder.cliente?.notas) setNotas(draftOrder.cliente.notas);
-            if (draftOrder.productos && draftOrder.productos.length > 0) {
-                setCartItems(draftOrder.productos);
+            const safeProds = safeToArray(draftOrder.productos);
+            if (safeProds.length > 0) {
+                setCartItems(safeProds);
             }
             if (typeof draftOrder.envio === 'number') {
                 setFlete(draftOrder.envio);
