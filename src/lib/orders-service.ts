@@ -15,8 +15,10 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { upsertCustomerFromOrder } from './customers-service';
+import { decrementStockForOrderItems } from './products-service';
+import { recordAuditLog } from './audit-service';
 
-import { Order, OrderStatus, TimelineEvent, OrderInternalNote } from '@/types/order';
+import { Order, OrderStatus, TimelineEvent, OrderInternalNote, OrderCustomer } from '@/types/order';
 
 // Collection reference
 const ordersCollection = collection(db, 'orders');
@@ -224,6 +226,35 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
     });
 
     const docRef = await addDoc(ordersCollection, order);
+
+    // Descontar inventario automáticamente si la orden está activa (no cancelada)
+    if (orderData.status !== 'cancelado' && orderData.productos?.length > 0) {
+        decrementStockForOrderItems(orderData.productos).catch(err =>
+            console.warn('[OrdersService] Error al descontar inventario de la orden:', err)
+        );
+    }
+
+    // Registro en bitácora de auditoría ISO 9001 si fue creado por asesor o canal comercial
+    if (orderData.asesorNombre || orderData.canal) {
+        recordAuditLog({
+            userId: orderData.asesorId || orderData.asesorNombre || 'comercial',
+            userName: orderData.asesorNombre || 'Asesor Comercial',
+            userEmail: orderData.asesorEmail || 'comercial@biocambio360.com',
+            userRole: 'asesor',
+            modulo: 'pedidos',
+            accion: 'crear',
+            entidad: 'order',
+            entidadId: docRef.id,
+            descripcion: `Pedido comercial creado por ${orderData.asesorNombre || 'Asesor'} (Canal: ${orderData.canal || 'call_center'}) por valor de $${Number(orderData.total || 0).toLocaleString('es-CO')}`,
+            detalles: {
+                total: orderData.total,
+                cliente: orderData.cliente?.nombre,
+                ciudad: orderData.cliente?.ciudad,
+                canal: orderData.canal,
+                itemsCount: orderData.productos?.length || 0,
+            }
+        }).catch(err => console.warn('[OrdersService] Error registrando auditoría:', err));
+    }
 
     // Async update customer data (fire and forget to not block order flow)
     upsertCustomerFromOrder(orderData.cliente, orderData.total).catch(err =>
@@ -511,4 +542,104 @@ export async function getOrdersByCustomer(customerPhone: string): Promise<(Order
         const timeB = b.createdAt?.toMillis?.() ?? 0;
         return timeB - timeA;
     });
+}
+
+/**
+ * Busca datos de un cliente previo por su número celular o WhatsApp (<50ms).
+ * Primero en 'customers/{cleanPhone}' y como fallback en la última orden de 'orders'.
+ */
+export async function lookupCustomerByPhone(phone: string): Promise<OrderCustomer | null> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 7) return null;
+
+    try {
+        // 1. Consulta directa por ID de documento en customers
+        const customerRef = doc(db, 'customers', cleanPhone);
+        const customerSnap = await getDoc(customerRef);
+
+        if (customerSnap.exists()) {
+            const data = customerSnap.data();
+            return {
+                nombre: data.nombre || '',
+                cedula: data.cedula || '',
+                celular: data.celular || cleanPhone,
+                email: data.email || '',
+                departamento: data.departamento || 'Cundinamarca',
+                ciudad: data.ciudad || 'Bogotá D.C.',
+                direccion: data.direccion || '',
+                barrio: data.barrio || ''
+            };
+        }
+
+        // 2. Fallback: buscar la orden más reciente con ese teléfono
+        const q = query(
+            ordersCollection,
+            where('cliente.celular', '==', cleanPhone),
+            limit(5)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            // Tomar la orden más reciente
+            const sortedDocs = snap.docs.sort((a, b) => {
+                const ta = a.data().createdAt?.toMillis?.() || 0;
+                const tb = b.data().createdAt?.toMillis?.() || 0;
+                return tb - ta;
+            });
+            const lastOrder = sortedDocs[0].data() as Order;
+            if (lastOrder.cliente) {
+                return {
+                    nombre: lastOrder.cliente.nombre || '',
+                    cedula: lastOrder.cliente.cedula || '',
+                    celular: lastOrder.cliente.celular || cleanPhone,
+                    email: lastOrder.cliente.email || '',
+                    departamento: lastOrder.cliente.departamento || 'Cundinamarca',
+                    ciudad: lastOrder.cliente.ciudad || 'Bogotá D.C.',
+                    direccion: lastOrder.cliente.direccion || '',
+                    barrio: lastOrder.cliente.barrio || ''
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('[OrdersService] Error en lookupCustomerByPhone:', e);
+    }
+
+    return null;
+}
+
+/**
+ * Obtiene los pedidos asignados a un asesor comercial para un mes específico (o el mes actual).
+ */
+export async function getOrdersByAdvisor(
+    advisorName: string,
+    monthDate: Date = new Date()
+): Promise<(Order & { id: string })[]> {
+    try {
+        const q = query(
+            ordersCollection,
+            where('asesorNombre', '==', advisorName),
+            limit(300)
+        );
+        const snap = await getDocs(q);
+
+        const targetYear = monthDate.getFullYear();
+        const targetMonth = monthDate.getMonth();
+
+        const orders = snap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Order & { id: string }))
+            .filter(ord => {
+                if (ord.status === 'cancelado') return false;
+                const ts = ord.createdAt?.toMillis?.() ? new Date(ord.createdAt.toMillis()) : null;
+                if (!ts) return true;
+                return ts.getFullYear() === targetYear && ts.getMonth() === targetMonth;
+            });
+
+        return orders.sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() || 0;
+            const tb = b.createdAt?.toMillis?.() || 0;
+            return tb - ta;
+        });
+    } catch (e) {
+        console.warn(`[OrdersService] Error obteniendo órdenes del asesor ${advisorName}:`, e);
+        return [];
+    }
 }

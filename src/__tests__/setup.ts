@@ -19,11 +19,13 @@ vi.mock('@/lib/firebase', () => ({
 vi.mock('firebase/firestore', () => ({
     collection: vi.fn(() => ({})),
     doc: vi.fn(() => ({})),
+    addDoc: vi.fn(),
     getDocs: vi.fn(),
     getDoc: vi.fn(),
     setDoc: vi.fn(),
     updateDoc: vi.fn(),
     deleteDoc: vi.fn(),
+    arrayUnion: vi.fn((...args: any[]) => args),
     query: vi.fn(),
     orderBy: vi.fn(),
     where: vi.fn(),

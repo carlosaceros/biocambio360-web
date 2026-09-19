@@ -18,6 +18,8 @@ import { db } from './firebase';
 import { Customer } from '@/types/customer';
 import { CustomerCRM } from '@/types/crm';
 import { enrichCustomerWithCRM } from './crm-service';
+import { getOrdersByAdvisor } from './orders-service';
+import { Order } from '@/types/order';
 
 export interface AdvisorGoalConfig {
     advisorName: string;
@@ -44,6 +46,10 @@ export interface AdvisorPortfolioSummary {
     metaMesCOP: number;
     porcentajeCumplimiento: number;
     comisionesEstimadasCOP: number;
+    pedidosMesCount: number;
+    pedidosHoyCount: number;
+    ticketPromedioMes: number;
+    pedidosRecientes: (Order & { id: string })[];
     clientesPrioritarios: CustomerCRM[];
 }
 
@@ -104,19 +110,48 @@ export async function getAdvisorPortfolio(advisorName: string): Promise<AdvisorP
             })
             .slice(0, 20);
 
-        const cumplimiento = Math.round((ventasAcumuladas / config.metaMensualCOP) * 100);
+        // Consultar órdenes reales del mes en curso para el asesor
+        let advisorOrders: (Order & { id: string })[] = [];
+        try {
+            advisorOrders = await getOrdersByAdvisor(advisorName);
+        } catch (ordErr) {
+            console.warn(`[AdvisorService] No se pudieron cargar órdenes de ${advisorName}:`, ordErr);
+        }
+
+        let ventasMesReal = 0;
+        let pedidosHoyCount = 0;
+        const todayStr = new Date().toDateString();
+
+        if (advisorOrders.length > 0) {
+            ventasMesReal = advisorOrders.reduce((sum, ord) => sum + (ord.total || 0), 0);
+            pedidosHoyCount = advisorOrders.filter(ord => {
+                const d = ord.createdAt?.toMillis?.() ? new Date(ord.createdAt.toMillis()) : null;
+                return d && d.toDateString() === todayStr;
+            }).length;
+        } else {
+            // Fallback para asesores sin órdenes registradas aún
+            ventasMesReal = ventasAcumuladas;
+        }
+
+        const pedidosMesCount = advisorOrders.length;
+        const ticketPromedio = pedidosMesCount > 0 ? Math.round(ventasMesReal / pedidosMesCount) : 0;
+        const cumplimiento = Math.round((ventasMesReal / config.metaMensualCOP) * 100);
         const tasaComision = cumplimiento >= 100 ? config.porcentajeComisionBonoMeta : config.porcentajeComisionBase;
-        const comisiones = Math.round(ventasAcumuladas * (tasaComision / 100));
+        const comisiones = Math.round(ventasMesReal * (tasaComision / 100));
 
         return {
             advisorName,
             totalClientes: clients.length,
             clientesNuevosEsteMes: clients.filter(c => c.ordersCount <= 1).length,
             clientesEnRiesgo: clients.filter(c => c.stage === 'at_risk' || c.stage === 'lost').length,
-            ventasAcumuladasMes: ventasAcumuladas,
+            ventasAcumuladasMes: ventasMesReal,
             metaMesCOP: config.metaMensualCOP,
             porcentajeCumplimiento: cumplimiento,
             comisionesEstimadasCOP: comisiones,
+            pedidosMesCount,
+            pedidosHoyCount,
+            ticketPromedioMes: ticketPromedio,
+            pedidosRecientes: advisorOrders.slice(0, 30),
             clientesPrioritarios: prioritarios,
         };
     } catch (error) {
@@ -130,6 +165,10 @@ export async function getAdvisorPortfolio(advisorName: string): Promise<AdvisorP
             metaMesCOP: config.metaMensualCOP,
             porcentajeCumplimiento: 0,
             comisionesEstimadasCOP: 0,
+            pedidosMesCount: 0,
+            pedidosHoyCount: 0,
+            ticketPromedioMes: 0,
+            pedidosRecientes: [],
             clientesPrioritarios: [],
         };
     }

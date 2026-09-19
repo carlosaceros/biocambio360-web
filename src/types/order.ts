@@ -17,6 +17,7 @@ export interface OrderCustomer {
     departamento: string;
     ciudad: string;
     direccion: string;
+    barrio?: string;
     notas?: string;
 }
 
@@ -85,7 +86,7 @@ export interface Order {
     subtotal: number;
     envio: number;
     total: number;
-    metodoPago: 'contraentrega' | 'wompi' | 'addi';
+    metodoPago: 'contraentrega' | 'wompi' | 'addi' | 'transferencia' | 'efectivo_pos' | 'sistecredito' | string;
     status: OrderStatus;
     cuponAplicado?: {
         code: string;
@@ -130,7 +131,10 @@ export interface Order {
     whatsappConversation?: string[];
     notas?: string[];
     guiaTransportadora?: string;
-    canal?: string;
+    canal?: 'tienda_virtual' | 'call_center' | 'whatsapp' | 'pos' | 'b2b' | string;
+    asesorId?: string;
+    asesorNombre?: string;
+    asesorEmail?: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
