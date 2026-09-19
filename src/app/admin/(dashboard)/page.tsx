@@ -213,7 +213,10 @@ export default function AdminDashboard() {
             return ['produccion'].includes(capKey);
         }
         if (role === 'gestor' || role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
-            return ['pedidos', 'clientes', 'reabastecimiento', 'envios'].includes(capKey);
+            return ['pedidos', 'clientes', 'reabastecimiento', 'envios', 'mensajeria'].includes(capKey);
+        }
+        if (role === 'mensajero') {
+            return ['mensajeria'].includes(capKey);
         }
         return false;
     };
@@ -521,7 +524,7 @@ export default function AdminDashboard() {
                                 )}
 
                                 {/* Mensajeros & Flota Propia */}
-                                {(hasCap('envios') || hasCap('pedidos')) && (
+                                {(hasCap('envios') || hasCap('pedidos') || hasCap('mensajeria')) && (
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}

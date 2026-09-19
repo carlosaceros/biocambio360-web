@@ -69,45 +69,11 @@ export interface MessengerSettlementSummary {
     balanceNetoEntregar: number;
 }
 
-// Mensajeros semilla oficiales de Biocambio360 (operación Soacha - Bogotá)
-export const INITIAL_MESSENGERS_SEED: Messenger[] = [
-    {
-        id: 'msg-01',
-        nombre: 'Jhonathan Rincón',
-        cedula: '1023948572',
-        telefono: '3124567890',
-        tipoVehiculo: 'moto',
-        placaVehiculo: 'XYZ-45E',
-        zonaPrincipal: 'Bogotá Sur, Soacha & Sibaté',
-        activo: true,
-        fechaIngreso: '2025-02-01',
-        notas: 'Rutas express Bosa, Kennedy, Ciudad Bolívar y Soacha casco urbano.',
-    },
-    {
-        id: 'msg-02',
-        nombre: 'Carlos Ramírez',
-        cedula: '80192834',
-        telefono: '3209876543',
-        tipoVehiculo: 'furgon',
-        placaVehiculo: 'WXY-123',
-        zonaPrincipal: 'Bogotá Norte & Sabana Centro (Chía, Cota, Cajicá)',
-        activo: true,
-        fechaIngreso: '2025-03-15',
-        notas: 'Capacidad de carga pesada: garrafas de 20L y tambores industriales.',
-    },
-    {
-        id: 'msg-03',
-        nombre: 'David Gómez',
-        cedula: '1014298374',
-        telefono: '3105559876',
-        tipoVehiculo: 'moto',
-        placaVehiculo: 'MNO-78F',
-        zonaPrincipal: 'Sabana Occidente (Mosquera, Funza, Madrid)',
-        activo: true,
-        fechaIngreso: '2025-06-01',
-        notas: 'Repartos ágiles calle 13 y calle 80.',
-    },
-];
+// ⚠️  DATOS REALES: Los mensajeros se crean desde /admin/mensajeros → pestaña "Directorio"
+// Esta lista de semilla está vacía. El panel admin permite agregar mensajeros con su
+// nombre, cédula, teléfono, tipo de vehículo, placa y zona de cobertura real.
+export const INITIAL_MESSENGERS_SEED: Messenger[] = [];
+
 
 export const DEFAULT_MESSENGER_RATES: MessengerRateConfig = {
     id: 'default',

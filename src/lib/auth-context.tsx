@@ -22,7 +22,8 @@ export type UserRole =
     | 'logistica' 
     | 'produccion_calidad' 
     | 'asesor' 
-    | 'cajero' 
+    | 'cajero'
+    | 'mensajero'
     | 'user';
 
 export interface AdminUserProfile {
@@ -187,6 +188,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (role === 'cajero') {
             return ['pos'].includes(module);
+        }
+        if (role === 'mensajero') {
+            return ['mensajero', 'mensajeros'].includes(module);
         }
         return false;
     };
