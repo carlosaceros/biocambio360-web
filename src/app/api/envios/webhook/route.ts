@@ -128,6 +128,61 @@ export async function POST(request: Request) {
             }
         }
 
+        // 3. Fallback inteligente: si la guía fue creada manualmente en 99envios.app sin ID de pedido,
+        // buscar por celular o cédula del destinatario entre pedidos activos de los últimos 15 días
+        if (!targetOrderDoc && guia) {
+            const rawDest = rawBody.destinatario || rawBody.Destinatario || rawBody.data?.destinatario || rawBody.data?.Destinatario || {};
+            const rawPhone = String(rawDest.telefono || rawDest.celular || rawBody.telefono || rawBody.phone || '').replace(/\D/g, '');
+            const rawCedula = String(rawDest.numeroDocumento || rawDest.cedula || rawBody.cedula || '').replace(/\D/g, '');
+
+            if (rawPhone && rawPhone.length >= 7) {
+                const phoneSnap = await db.collection('orders')
+                    .where('cliente.celular', '==', rawPhone)
+                    .limit(5)
+                    .get();
+
+                const candidate = phoneSnap.docs.find(d => {
+                    const st = d.data()?.status;
+                    return st === 'preparacion' || st === 'en_camino' || st === 'confirmado';
+                }) || phoneSnap.docs[0];
+
+                if (candidate) {
+                    targetOrderDoc = candidate;
+                    matchedOrderId = candidate.id;
+                    // Auto-vincular la guía al pedido de inmediato
+                    await candidate.ref.set({
+                        guiaTransportadora: guia,
+                        transportadora: transportadora || '99envios',
+                        tipoEnvio: '99envios',
+                        updatedAt: new Date().toISOString(),
+                    }, { merge: true });
+                    console.log(`[99Envios Webhook] Guía ${guia} auto-vinculada por celular ${rawPhone} al pedido #${matchedOrderId}`);
+                }
+            } else if (rawCedula && rawCedula.length >= 6) {
+                const cedulaSnap = await db.collection('orders')
+                    .where('cliente.cedula', '==', rawCedula)
+                    .limit(3)
+                    .get();
+
+                const candidate = cedulaSnap.docs.find(d => {
+                    const st = d.data()?.status;
+                    return st === 'preparacion' || st === 'en_camino' || st === 'confirmado';
+                }) || cedulaSnap.docs[0];
+
+                if (candidate) {
+                    targetOrderDoc = candidate;
+                    matchedOrderId = candidate.id;
+                    await candidate.ref.set({
+                        guiaTransportadora: guia,
+                        transportadora: transportadora || '99envios',
+                        tipoEnvio: '99envios',
+                        updatedAt: new Date().toISOString(),
+                    }, { merge: true });
+                    console.log(`[99Envios Webhook] Guía ${guia} auto-vinculada por cédula ${rawCedula} al pedido #${matchedOrderId}`);
+                }
+            }
+        }
+
         if (!targetOrderDoc || !matchedOrderId) {
             console.warn(`[99Envios Webhook] Pedido no encontrado para guía '${guia}' o ID '${orderId}'`);
             return NextResponse.json(

@@ -39,7 +39,11 @@ import {
     Send,
     FileText,
     ArrowRight,
-    AlertTriangle
+    AlertTriangle,
+    Truck,
+    Copy,
+    Check,
+    Link2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -302,6 +306,16 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
 
                 <div className="flex items-center gap-1.5 flex-wrap">
                     {getOriginBadge(order.origen)}
+                    {order.guiaTransportadora ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200" title={`Guía: ${order.guiaTransportadora} (${order.transportadora || '99 Envíos'})`}>
+                            <Truck size={11} className="text-emerald-600" />
+                            {order.guiaTransportadora}
+                        </span>
+                    ) : order.status === 'en_camino' && !order.mensajeroId && order.tipoEnvio !== 'recogida_mostrador' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse" title="En camino sin guía asignada">
+                            ⚠️ Sin guía
+                        </span>
+                    ) : null}
                     {order.cuponAplicado && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200" title={`Cupón ${order.cuponAplicado.code}`}>
                             <Ticket size={11} className="text-purple-600" />
@@ -525,6 +539,120 @@ export default function PedidosPage() {
             setAddiStatusFeedback(`❌ Error al consultar Addi: ${e.message}`);
         } finally {
             setIsCheckingAddi(false);
+        }
+    };
+
+    // Estados y funciones para Vinculación y Gestión de Guías (99 Envíos / Transportadoras Externas)
+    const [manualGuiaInput, setManualGuiaInput] = useState('');
+    const [manualTransportadoraInput, setManualTransportadoraInput] = useState('99envios');
+    const [isLinkingGuia, setIsLinkingGuia] = useState(false);
+    const [isGenerating99Guia, setIsGenerating99Guia] = useState(false);
+    const [linkingGuiaFeedback, setLinkingGuiaFeedback] = useState<string | null>(null);
+    const [copiedGuia, setCopiedGuia] = useState(false);
+    const [showManualGuiaForm, setShowManualGuiaForm] = useState(false);
+
+    useEffect(() => {
+        if (activeOrder) {
+            setManualGuiaInput(activeOrder.guiaTransportadora || '');
+            setManualTransportadoraInput(activeOrder.transportadora || '99envios');
+            setLinkingGuiaFeedback(null);
+            setShowManualGuiaForm(!activeOrder.guiaTransportadora);
+        }
+    }, [activeOrder?.id]);
+
+    const handleVincularGuia = async (orderId: string) => {
+        if (!manualGuiaInput.trim()) {
+            alert('Por favor escribe el número de guía a vincular.');
+            return;
+        }
+        setIsLinkingGuia(true);
+        setLinkingGuiaFeedback(null);
+        try {
+            const res = await fetch('/api/envios/vincular-guia', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId,
+                    numeroGuia: manualGuiaInput.trim(),
+                    transportadora: manualTransportadoraInput,
+                    user: userProfile?.nombre || user?.email || 'Logística'
+                })
+            });
+            const data = await res.json();
+            if (data.exito) {
+                setLinkingGuiaFeedback(`✅ Guía #${data.numeroGuia} vinculada con éxito.`);
+                setActiveOrder(prev => prev && prev.id === orderId ? {
+                    ...prev,
+                    guiaTransportadora: data.numeroGuia,
+                    transportadora: data.transportadora,
+                    trackingUrl: data.trackingUrl,
+                    status: 'en_camino' as OrderStatus
+                } : prev);
+                setOrders(prev => prev.map(o => o.id === orderId ? {
+                    ...o,
+                    guiaTransportadora: data.numeroGuia,
+                    transportadora: data.transportadora,
+                    trackingUrl: data.trackingUrl,
+                    status: 'en_camino' as OrderStatus
+                } : o));
+            } else {
+                setLinkingGuiaFeedback(`❌ Error: ${data.error || 'No se pudo vincular la guía'}`);
+            }
+        } catch (e: any) {
+            setLinkingGuiaFeedback(`❌ Error de conexión: ${e.message}`);
+        } finally {
+            setIsLinkingGuia(false);
+        }
+    };
+
+    const handleGenerarGuia99 = async (order: Order & { id: string }) => {
+        if (order.guiaTransportadora) {
+            if (!confirm(`Este pedido ya tiene la guía #${order.guiaTransportadora}. ¿Deseas solicitar una nueva guía a 99 Envíos?`)) {
+                return;
+            }
+        }
+        setIsGenerating99Guia(true);
+        try {
+            const res = await fetch('/api/envios/crear-guia', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: order.id,
+                    transportadora: 'interrapidisimo',
+                    destinatario: {
+                        nombre: order.cliente.nombre,
+                        telefono: order.cliente.celular,
+                        direccion: order.cliente.direccion,
+                        correo: order.cliente.email || '',
+                        idLocalidad: '11001000'
+                    },
+                    valorDeclarado: order.subtotal || 80000,
+                    valorContrapago: order.metodoPago === 'contraentrega' ? order.total : 0
+                })
+            });
+            const data = await res.json();
+            if (data.exito && data.numeroGuia) {
+                alert(`¡Guía #${data.numeroGuia} generada con éxito! Abriendo rótulo/sticker PDF...`);
+                window.open(`/api/envios/pdf-guia?guia=${data.numeroGuia}`, '_blank');
+                setActiveOrder(prev => prev && prev.id === order.id ? {
+                    ...prev,
+                    guiaTransportadora: data.numeroGuia,
+                    transportadora: '99envios',
+                    status: 'en_camino' as OrderStatus
+                } : prev);
+                setOrders(prev => prev.map(o => o.id === order.id ? {
+                    ...o,
+                    guiaTransportadora: data.numeroGuia,
+                    transportadora: '99envios',
+                    status: 'en_camino' as OrderStatus
+                } : o));
+            } else {
+                alert(`Error al generar guía: ${data.error || 'Verifica credenciales o saldo en 99 Envíos'}`);
+            }
+        } catch (e: any) {
+            alert(`Error al conectar con 99 Envíos: ${e.message}`);
+        } finally {
+            setIsGenerating99Guia(false);
         }
     };
 
@@ -1116,6 +1244,205 @@ export default function PedidosPage() {
                                             </div>
                                         </div>
 
+                                        {/* Despacho & Guía de Transporte */}
+                                        <div>
+                                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                <Truck className="text-blue-600" size={18} />
+                                                Despacho & Guía de Transporte
+                                            </h3>
+
+                                            {/* Alerta si está 'En Camino' sin guía ni mensajero */}
+                                            {activeOrder.status === 'en_camino' && !activeOrder.guiaTransportadora && !activeOrder.mensajeroId && activeOrder.tipoEnvio !== 'recogida_mostrador' && (
+                                                <div className="mb-3 bg-amber-50 border-2 border-amber-300 p-3.5 rounded-xl text-amber-900 space-y-1 animate-pulse">
+                                                    <div className="flex items-center gap-1.5 font-black text-xs text-amber-950">
+                                                        <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                                                        <span>⚠️ PEDIDO "EN CAMINO" SIN GUÍA REGISTRADA</span>
+                                                    </div>
+                                                    <p className="text-xs text-amber-900 leading-snug">
+                                                        El pedido figura en tránsito pero aún no tiene número de guía asignado. Si ya generaste la guía en la plataforma web de 99 Envíos u otra transportadora, vincúlala aquí abajo para mantener la trazabilidad sincronizada.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div className="bg-white border rounded-xl p-4 space-y-3">
+                                                {/* Caso 1: Tiene Guía Registrada */}
+                                                {activeOrder.guiaTransportadora ? (
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs text-gray-500 font-bold uppercase">Estado de Despacho</span>
+                                                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[11px] font-black rounded-full border border-emerald-300 flex items-center gap-1">
+                                                                <Truck size={12} />
+                                                                GUÍA ASIGNADA
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                            <div>
+                                                                <span className="text-[10px] text-gray-500 block uppercase font-bold">
+                                                                    Transportadora: <strong className="text-slate-800 uppercase">{activeOrder.transportadora || '99 Envíos'}</strong>
+                                                                </span>
+                                                                <span className="text-lg font-black font-mono text-gray-900 break-all">
+                                                                    {activeOrder.guiaTransportadora}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(activeOrder.guiaTransportadora || '');
+                                                                        setCopiedGuia(true);
+                                                                        setTimeout(() => setCopiedGuia(false), 2000);
+                                                                    }}
+                                                                    className="px-2.5 py-1.5 hover:bg-white text-gray-700 rounded-lg text-xs font-bold border border-gray-300 flex items-center gap-1 transition-colors"
+                                                                >
+                                                                    {copiedGuia ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                                                                    <span>{copiedGuia ? 'Copiada' : 'Copiar'}</span>
+                                                                </button>
+                                                                <a
+                                                                    href={activeOrder.trackingUrl || `https://www.google.com/search?q=rastreo+guia+${activeOrder.guiaTransportadora}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                                                                >
+                                                                    <ExternalLink size={13} />
+                                                                    <span>Rastrear</span>
+                                                                </a>
+                                                                <a
+                                                                    href={`/api/envios/pdf-guia?guia=${activeOrder.guiaTransportadora}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                                                                >
+                                                                    <Package size={13} />
+                                                                    <span>Rótulo PDF</span>
+                                                                </a>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Toggle para cambiar o corregir guía */}
+                                                        <div className="pt-1 text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowManualGuiaForm(!showManualGuiaForm)}
+                                                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
+                                                            >
+                                                                {showManualGuiaForm ? 'Ocultar reasignación de guía' : '¿Deseas corregir o cambiar la guía?'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    /* Caso 2: Sin Guía Registrada */
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs text-gray-500 font-bold uppercase">Estado de Despacho</span>
+                                                            <span className="px-2.5 py-1 bg-yellow-100 text-yellow-800 text-[11px] font-black rounded-full border border-yellow-300">
+                                                                PENDIENTE DE GUÍA
+                                                            </span>
+                                                        </div>
+
+                                                        {activeOrder.tipoEnvio === 'flota_propia' || activeOrder.mensajeroId ? (
+                                                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-1">
+                                                                <p className="font-bold flex items-center gap-1.5">
+                                                                    <Truck size={14} /> Asignado a Flota Propia Biocambio360
+                                                                </p>
+                                                                <p className="text-blue-800 text-[11px]">
+                                                                    Mensajero: <strong>{activeOrder.mensajeroNombre || 'Por asignar'}</strong> · {activeOrder.mensajeroTelefono || ''}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                                                                <p className="text-xs text-slate-700">
+                                                                    Puedes generar la guía de forma automática con la API de <strong>99 Envíos</strong> o vincular una guía creada manualmente:
+                                                                </p>
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleGenerarGuia99(activeOrder)}
+                                                                        disabled={isGenerating99Guia}
+                                                                        className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                                    >
+                                                                        <Package size={14} />
+                                                                        {isGenerating99Guia ? 'Generando en 99 Envíos...' : '📦 Generar en 99 Envíos'}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setShowManualGuiaForm(!showManualGuiaForm)}
+                                                                        className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                                                                    >
+                                                                        <Link2 size={14} />
+                                                                        {showManualGuiaForm ? 'Cerrar Formulario' : 'Vincular Guía Manual / Externa'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Formulario de Vinculación Manual */}
+                                                {showManualGuiaForm && (
+                                                    <div className="p-3.5 bg-blue-50/50 border border-blue-200 rounded-xl space-y-3 mt-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <h4 className="text-xs font-black text-blue-950 uppercase flex items-center gap-1.5">
+                                                                <Link2 size={14} className="text-blue-600" />
+                                                                Vincular Guía Manual / Externa
+                                                            </h4>
+                                                        </div>
+                                                        <p className="text-[11px] text-blue-900 leading-snug">
+                                                            Si generaste la guía directamente en la web de <strong>99envios.app</strong>, Inter Rapidísimo, Servientrega u otra empresa, pega el número aquí para asociarla al pedido de inmediato.
+                                                        </p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                            <div className="sm:col-span-2">
+                                                                <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">
+                                                                    Número de Guía
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={manualGuiaInput}
+                                                                    onChange={(e) => setManualGuiaInput(e.target.value)}
+                                                                    placeholder="Ej: 700012345678"
+                                                                    className="w-full text-xs p-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 font-mono text-gray-900"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">
+                                                                    Transportadora
+                                                                </label>
+                                                                <select
+                                                                    value={manualTransportadoraInput}
+                                                                    onChange={(e) => setManualTransportadoraInput(e.target.value)}
+                                                                    className="w-full text-xs p-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900"
+                                                                >
+                                                                    <option value="99envios">99 Envíos</option>
+                                                                    <option value="interrapidisimo">Inter Rapidísimo</option>
+                                                                    <option value="coordinadora">Coordinadora</option>
+                                                                    <option value="servientrega">Servientrega</option>
+                                                                    <option value="envia">Envía</option>
+                                                                    <option value="flota_propia">Flota Propia</option>
+                                                                    <option value="otra">Otra Transportadora</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+
+                                                        {linkingGuiaFeedback && (
+                                                            <p className="text-xs font-bold text-slate-800">{linkingGuiaFeedback}</p>
+                                                        )}
+
+                                                        <div className="flex justify-end gap-2 pt-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleVincularGuia(activeOrder.id)}
+                                                                disabled={isLinkingGuia || !manualGuiaInput.trim()}
+                                                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                            >
+                                                                <Check size={14} />
+                                                                {isLinkingGuia ? 'Guardando...' : 'Vincular Guía al Pedido'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
                                         {/* Traffic Attribution & Origin */}
                                         <div>
                                             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -1567,52 +1894,52 @@ export default function PedidosPage() {
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3 sticky bottom-0">
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            alert(`Generando guía 99 Envíos para el pedido #${activeOrder.id}...`);
-                                            const res = await fetch('/api/envios/crear-guia', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    orderId: activeOrder.id,
-                                                    transportadora: 'interrapidisimo',
-                                                    destinatario: {
-                                                        nombre: activeOrder.cliente.nombre,
-                                                        telefono: activeOrder.cliente.celular,
-                                                        direccion: activeOrder.cliente.direccion,
-                                                        correo: activeOrder.cliente.email || '',
-                                                        idLocalidad: '11001000'
-                                                    },
-                                                    valorDeclarado: activeOrder.subtotal || 80000,
-                                                    valorContrapago: activeOrder.metodoPago === 'contraentrega' ? activeOrder.total : 0
-                                                })
-                                            });
-                                            const data = await res.json();
-                                            if (data.exito && data.numeroGuia) {
-                                                alert(`¡Guía #${data.numeroGuia} generada con éxito! Abriendo PDF...`);
-                                                window.open(`/api/envios/pdf-guia`, '_blank');
-                                            } else {
-                                                alert(`Error al generar guía: ${data.error || 'Verifica las credenciales de 99 Envíos'}`);
-                                            }
-                                        } catch (e: any) {
-                                            alert(`Error al conectar con 99 Envíos: ${e.message}`);
-                                        }
-                                    }}
-                                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl flex items-center gap-2 transition-colors"
-                                >
-                                    📦 Generar Guía 99 Envíos
-                                </button>
-                                <a
-                                    href={`https://wa.me/57${activeOrder.cliente.celular.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${activeOrder.cliente.nombre}, respecto a tu pedido #${activeOrder.id}...`)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl flex items-center gap-2 transition-colors"
-                                >
-                                    <MessageCircle size={20} />
-                                    Contactar por WhatsApp
-                                </a>
+                            <div className="p-6 border-t bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sticky bottom-0">
+                                <div>
+                                    {activeOrder.guiaTransportadora ? (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-mono font-bold text-gray-700 bg-white px-3 py-1.5 rounded-lg border border-gray-200 flex items-center gap-1.5 shadow-xs">
+                                                <Truck size={14} className="text-emerald-600" />
+                                                Guía #{activeOrder.guiaTransportadora} ({activeOrder.transportadora || '99 Envíos'})
+                                            </span>
+                                            <a
+                                                href={`/api/envios/pdf-guia?guia=${activeOrder.guiaTransportadora}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+                                            >
+                                                <Package size={14} />
+                                                Rótulo / Sticker PDF
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 font-medium hidden sm:block">
+                                            {activeOrder.tipoEnvio === 'flota_propia' ? 'Despacho local por flota propia' : 'Guía de transporte pendiente'}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                    {!activeOrder.guiaTransportadora && activeOrder.tipoEnvio !== 'flota_propia' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleGenerarGuia99(activeOrder)}
+                                            disabled={isGenerating99Guia}
+                                            className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                        >
+                                            <Package size={16} />
+                                            {isGenerating99Guia ? 'Generando...' : '📦 Generar Guía 99 Envíos'}
+                                        </button>
+                                    )}
+                                    <a
+                                        href={`https://wa.me/57${activeOrder.cliente.celular.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${activeOrder.cliente.nombre}, respecto a tu pedido #${activeOrder.id}...`)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-5 py-2.5 bg-green-500 hover:bg-green-600 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors shadow-xs"
+                                    >
+                                        <MessageCircle size={16} />
+                                        Contactar por WhatsApp
+                                    </a>
+                                </div>
                             </div>
                         </motion.div>
                     </div>
@@ -1644,6 +1971,24 @@ export default function PedidosPage() {
                             <p className="text-xs font-bold text-gray-500">
                                 {stageChangePrompt.orderTitle}
                             </p>
+
+                            {/* Alerta preventiva al pasar a 'en_camino' sin guía ni mensajero */}
+                            {stageChangePrompt.targetStatus === 'en_camino' && (() => {
+                                const targetOrder = orders.find(o => o.id === stageChangePrompt.orderId);
+                                const missingCarrier = !targetOrder?.guiaTransportadora && !targetOrder?.mensajeroId && targetOrder?.tipoEnvio !== 'recogida_mostrador';
+                                if (!missingCarrier) return null;
+                                return (
+                                    <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs space-y-1">
+                                        <p className="font-black flex items-center gap-1.5 text-amber-950">
+                                            <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                                            Recordatorio de Despacho:
+                                        </p>
+                                        <p className="leading-snug">
+                                            Este pedido no tiene guía de transporte ni mensajero asignado. Recuerda generar la guía en <strong>99 Envíos</strong> o vincular el número de guía externa en el detalle del pedido para no perder la trazabilidad.
+                                        </p>
+                                    </div>
+                                );
+                            })()}
 
                             {/* State transition badges */}
                             <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">

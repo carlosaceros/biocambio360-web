@@ -22,19 +22,31 @@ export async function POST(req: Request) {
         });
 
         // Extraer número de guía generado por 99 Envíos
-        const numeroGuia = preenvio.numeroGuia || preenvio.guia || preenvio.data?.numeroGuia || preenvio.id;
+        const numeroGuia = String(preenvio.numeroGuia || preenvio.guia || preenvio.data?.numeroGuia || preenvio.id || '').trim();
 
-        // Actualizar el pedido en Firestore si existe orderId
-        if (orderId) {
+        // Actualizar el pedido en Firestore (colección oficial 'orders')
+        if (orderId && numeroGuia) {
             try {
                 const db = getAdminDB();
-                await db.collection('pedidos').doc(orderId).update({
-                    numeroGuia: numeroGuia || 'GUIA-GENERADA',
-                    guiaDetalle: preenvio,
+                const trackingUrl = (transportadora || '').toLowerCase().includes('coordinadora')
+                    ? `https://coordinadora.com/rastreo/rastreo-de-guia/?guia=${numeroGuia}`
+                    : `https://www.interrapidisimo.com/sigue-tu-envio/?guia=${numeroGuia}`;
+
+                const updatePayload: any = {
+                    guiaTransportadora: numeroGuia,
                     transportadora: transportadora || 'interrapidisimo',
+                    tipoEnvio: '99envios',
+                    status: 'en_camino',
+                    trackingUrl,
+                    guiaDetalle: preenvio,
                     estadoGuia: 'GENERADA',
                     updatedAt: new Date().toISOString(),
-                });
+                };
+
+                // Actualizar orders
+                await db.collection('orders').doc(orderId).set(updatePayload, { merge: true });
+                // Compatibilidad pedidos
+                await db.collection('pedidos').doc(orderId).set(updatePayload, { merge: true }).catch(() => {});
             } catch (err: any) {
                 console.warn('[crear-guia] No se pudo actualizar orden en Firestore:', err.message);
             }

@@ -165,6 +165,8 @@ export interface Order {
     whatsappConversation?: string[];
     notas?: string[];
     guiaTransportadora?: string;
+    transportadora?: string;
+    trackingUrl?: string;
     canal?: 'tienda_virtual' | 'call_center' | 'whatsapp' | 'pos' | 'b2b' | string;
     asesorId?: string;
     asesorNombre?: string;
