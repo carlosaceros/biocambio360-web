@@ -113,7 +113,14 @@ export default function AdminUsuariosPage() {
     const handleRoleChangeInCreate = (role: SystemRole) => {
         setNewRole(role);
         const def = ROLE_DEFINITIONS[role]?.defaultCapabilities;
-        if (def) setNewCapabilities(def);
+        if (def) setNewCapabilities({ ...def });
+    };
+
+    // Actualizar capacidades por defecto al cambiar de rol en el modal de edición
+    const handleRoleChangeInEdit = (role: SystemRole) => {
+        setEditRole(role);
+        const def = ROLE_DEFINITIONS[role]?.defaultCapabilities;
+        if (def) setEditCapabilities({ ...def });
     };
 
     const handleOpenEditModal = (u: AdminUserRecord) => {
@@ -261,7 +268,7 @@ export default function AdminUsuariosPage() {
     const directorsCount = users.filter(u => u.rol === 'superadmin' || u.rol === 'director').length;
 
     const ALL_CAPABILITIES_KEYS: (keyof UserModuleCapabilities)[] = [
-        'pedidos', 'pos', 'asesores', 'produccion', 'finanzas', 'clientes', 'reabastecimiento', 'cupones', 'envios', 'auditoria'
+        'pedidos', 'pos', 'asesores', 'produccion', 'finanzas', 'clientes', 'reabastecimiento', 'cupones', 'envios', 'mensajeria', 'auditoria'
     ];
 
     return (
@@ -697,6 +704,7 @@ export default function AdminUsuariosPage() {
                                         <option value="produccion_calidad">🧪 Jefe de Planta & Calidad (Diego)</option>
                                         <option value="asesor">💼 Asesor Comercial (Karen, Katherine, Camilo)</option>
                                         <option value="cajero">🏪 Cajero Mostrador Soacha</option>
+                                        <option value="mensajero">🛵 Mensajero (Flota Propia Bogotá/Sabana)</option>
                                     </select>
                                     <p className="text-[11px] text-gray-500 mt-1">
                                         {ROLE_DEFINITIONS[newRole]?.description}
@@ -798,7 +806,7 @@ export default function AdminUsuariosPage() {
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Rol en la Organización</label>
                                     <select
                                         value={editRole}
-                                        onChange={(e) => setEditRole(e.target.value as SystemRole)}
+                                        onChange={(e) => handleRoleChangeInEdit(e.target.value as SystemRole)}
                                         className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-white text-gray-800 focus:outline-none focus:border-purple-600"
                                     >
                                         <option value="superadmin">👑 Super Administrador</option>
@@ -807,6 +815,7 @@ export default function AdminUsuariosPage() {
                                         <option value="produccion_calidad">🧪 Jefe de Planta & Calidad (Diego)</option>
                                         <option value="asesor">💼 Asesor Comercial</option>
                                         <option value="cajero">🏪 Cajero Mostrador Soacha</option>
+                                        <option value="mensajero">🛵 Mensajero (Flota Propia Bogotá/Sabana)</option>
                                     </select>
                                 </div>
 

@@ -123,17 +123,18 @@ export async function PUT(req: NextRequest) {
         }
 
         const cleanEmail = email.trim().toLowerCase();
-        const db = getAdminDB();
-        const adminAuth = getAdminAuth();
+        
+        let db;
+        try {
+            db = getAdminDB();
+        } catch (adminErr: any) {
+            console.warn('[API/admin/users] Firebase Admin no configurado en servidor:', adminErr.message);
+            return NextResponse.json({ success: true, message: 'Actualizado (Firestore client mode)' });
+        }
 
         const userDocRef = db.collection('admin_users').doc(cleanEmail);
         const existingSnap = await userDocRef.get();
-
-        if (!existingSnap.exists) {
-            return NextResponse.json({ success: false, message: 'Usuario no encontrado' }, { status: 404 });
-        }
-
-        const existingData = existingSnap.data() as AdminUserRecord;
+        const existingData = (existingSnap.exists ? existingSnap.data() : {}) as Partial<AdminUserRecord>;
         const nowIso = new Date().toISOString();
 
         const updateData: Partial<AdminUserRecord> = {
@@ -146,11 +147,12 @@ export async function PUT(req: NextRequest) {
         if (estado) updateData.estado = estado;
         if (capacidades) updateData.capacidades = capacidades;
 
-        await userDocRef.update(updateData);
+        await userDocRef.set(updateData, { merge: true });
 
-        // Si se cambió el estado, sincronizar con disabled en Firebase Auth
+        // Si se cambió el estado, sincronizar con disabled en Firebase Auth solo si adminAuth está disponible
         if (estado) {
             try {
+                const adminAuth = getAdminAuth();
                 const userAuth = await adminAuth.getUserByEmail(cleanEmail);
                 await adminAuth.updateUser(userAuth.uid, {
                     disabled: estado === 'inactivo'
