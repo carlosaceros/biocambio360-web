@@ -78,7 +78,9 @@ export type CRMActivityType =
     | 'recompra_alert'
     | 'sarlaft_check'
     | 'tag_change'
-    | 'stage_change';
+    | 'stage_change'
+    | 'referral_activated'
+    | 'advisor_reassigned';
 
 export interface CRMActivity {
     id: string;
@@ -92,15 +94,17 @@ export interface CRMActivity {
 }
 
 export const CRM_ACTIVITY_ICONS: Record<CRMActivityType, string> = {
-    note:            '📝',
-    call:            '📞',
-    whatsapp:        '💬',
-    email:           '📧',
-    order:           '🛒',
-    recompra_alert:  '🔔',
-    sarlaft_check:   '🛡️',
-    tag_change:      '🏷️',
-    stage_change:    '📊',
+    note:                '📝',
+    call:                '📞',
+    whatsapp:            '💬',
+    email:               '📧',
+    order:               '🛒',
+    recompra_alert:      '🔔',
+    sarlaft_check:       '🛡️',
+    tag_change:          '🏷️',
+    stage_change:        '📊',
+    referral_activated:  '🌟',
+    advisor_reassigned:  '🔄',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -116,7 +120,16 @@ export interface CustomerCRM extends Customer {
     lastActivityAt?: any;           // Timestamp
     sarlaftStatus?: 'pendiente' | 'verificado' | 'rechazado';
     sarlaftCheckedAt?: any;         // Timestamp
-    assignedTo?: string;            // email del asesor asignado
+    assignedTo?: string;            // Asesor asignado (nombre o email)
+    assignedToName?: string;
+    assignedAt?: string;            // ISO date string
+    assignedBy?: string;            // email del operador/coordinador que asignó
+    // Campos Programa de Referidos (Comunidad Biocambio360)
+    isReferrer?: boolean;
+    referralCode?: string;
+    referralActivatedManually?: boolean;
+    referralActivatedBy?: string;
+    referralActivatedAt?: string;
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -33,6 +33,7 @@ import { subscribeToOrders } from '@/lib/orders-service';
 import { Order, OrderStatus } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
 import { calculateOrderProfitability } from '@/lib/profitability-service';
+import ManufacturingBOMCostingPanel from '@/components/admin/ManufacturingBOMCostingPanel';
 import Image from 'next/image';
 
 type PeriodPreset = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'all_time' | 'custom';
@@ -50,6 +51,7 @@ export default function AnalisisFinancieroPage() {
     const { user, role } = useAuth();
     const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [activeSection, setActiveSection] = useState<'balance' | 'costeo_bom'>('balance');
 
     // Period selector states
     const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('this_month');
@@ -468,15 +470,46 @@ export default function AnalisisFinancieroPage() {
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 flex-1 w-full space-y-6">
                 
-                {/* 📅 Period Selector Bar */}
-                <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-xs space-y-4">
-                    <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-2">
-                            <Calendar className="text-slate-700" size={18} />
-                            <span className="text-sm font-black text-slate-900 uppercase tracking-wide">
-                                Seleccionar Periodo de Análisis
-                            </span>
-                        </div>
+                {/* Selector de Sección: Balance Financiero vs Costeo Industrial BOM */}
+                <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+                    <button
+                        onClick={() => setActiveSection('balance')}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                            activeSection === 'balance'
+                                ? 'bg-slate-900 text-white shadow-xs'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                        }`}
+                    >
+                        <TrendingUp size={15} className={activeSection === 'balance' ? 'text-emerald-400' : 'text-slate-500'} />
+                        <span>Balance Financiero & P&L Real</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveSection('costeo_bom')}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                            activeSection === 'costeo_bom'
+                                ? 'bg-gradient-to-r from-indigo-900 to-slate-900 text-white shadow-xs'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                        }`}
+                    >
+                        <Factory size={15} className={activeSection === 'costeo_bom' ? 'text-amber-400' : 'text-indigo-600'} />
+                        <span>Desglose Industrial BOM & Fórmulas (SGC 300926115)</span>
+                    </button>
+                </div>
+
+                {activeSection === 'costeo_bom' ? (
+                    <ManufacturingBOMCostingPanel />
+                ) : (
+                    <>
+                        {/* 📅 Period Selector Bar */}
+                        <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-xs space-y-4">
+                            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
+                                <div className="flex items-center gap-2">
+                                    <Calendar className="text-slate-700" size={18} />
+                                    <span className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                                        Seleccionar Periodo de Análisis
+                                    </span>
+                                </div>
                         <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
                             {dateRange.label}: {dateRange.start.toLocaleDateString('es-CO')} ➔ {dateRange.end.toLocaleDateString('es-CO')}
                         </span>
@@ -934,6 +967,8 @@ export default function AnalisisFinancieroPage() {
                         </div>
                     )}
                 </div>
+                    </>
+                )}
 
             </main>
         </div>

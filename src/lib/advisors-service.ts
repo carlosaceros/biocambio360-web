@@ -173,3 +173,63 @@ export async function getAdvisorPortfolio(advisorName: string): Promise<AdvisorP
         };
     }
 }
+
+export interface AdvisorAlertsData {
+    recompras: any[]; // CustomerReplenishment[]
+    entregasDiaSiguiente: (Order & { id: string })[];
+    totalAlertasCount: number;
+}
+
+/**
+ * Obtiene las alertas operativas del día para el asesor:
+ * 1. Recompras sugeridas (fin de ciclo o riesgo)
+ * 2. Entregas día siguiente (confirmación de recepción y efectivo contraentrega)
+ */
+export async function getAdvisorAlertsData(advisorName: string): Promise<AdvisorAlertsData> {
+    try {
+        const { getAllReplenishmentRecords } = await import('./replenishment-service');
+        const replenishments = await getAllReplenishmentRecords();
+
+        // Filtrar clientes en alerta o vencidos
+        const recompras = replenishments.filter(r => 
+            r.status === 'alerta_temprana' || 
+            r.status === 'critico_10_dias' || 
+            r.status === 'vencido'
+        ).slice(0, 50);
+
+        // Consultar pedidos activos para entrega próxima
+        const ordersRef = collection(db, 'orders');
+        const qOrders = query(
+            ordersRef,
+            where('status', 'in', ['preparacion', 'enviado', 'en_camino']),
+            limit(100)
+        );
+        const ordersSnap = await getDocs(qOrders);
+
+        const entregasDiaSiguiente: (Order & { id: string })[] = [];
+        if (ordersSnap && typeof (ordersSnap as any).forEach === 'function') {
+            ordersSnap.forEach(d => {
+                const ord = { id: d.id, ...d.data() } as Order & { id: string };
+                const ordAdvisor = (ord as any).asesor || (ord as any).advisorName || (ord as any).assignedToAdvisor || '';
+                // Si tiene asesor asignado, filtrar por asesor o permitir ver las de su cartera
+                if (!ordAdvisor || ordAdvisor.toLowerCase() === advisorName.toLowerCase() || advisorName === 'Diego' || advisorName === 'Fernando') {
+                    entregasDiaSiguiente.push(ord);
+                }
+            });
+        }
+
+        return {
+            recompras,
+            entregasDiaSiguiente,
+            totalAlertasCount: recompras.length + entregasDiaSiguiente.length
+        };
+    } catch (err) {
+        console.error(`[AdvisorService] Error obteniendo alertas de ${advisorName}:`, err);
+        return {
+            recompras: [],
+            entregasDiaSiguiente: [],
+            totalAlertasCount: 0
+        };
+    }
+}
+

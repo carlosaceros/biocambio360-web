@@ -26,20 +26,27 @@ import {
     Shield,
     Bookmark,
     Trash2,
-    MapPin
+    MapPin,
+    Bell,
+    Copy,
+    Check
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/checkout-utils';
 import {
     getAdvisorPortfolio,
     AdvisorPortfolioSummary,
-    DEFAULT_ADVISOR_GOALS
+    DEFAULT_ADVISOR_GOALS,
+    getAdvisorAlertsData,
+    AdvisorAlertsData
 } from '@/lib/advisors-service';
 import { CustomerCRM } from '@/types/crm';
 import { addCRMActivity } from '@/lib/crm-service';
+import { markReminderSent } from '@/lib/replenishment-service';
 import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
 import DeliveryExceptionModal from '@/components/admin/DeliveryExceptionModal';
+import SalesScriptsCopilotModal from '@/components/admin/SalesScriptsCopilotModal';
 import { ORDER_STATUS_CONFIG, OrderStatus, Order } from '@/types/order';
 import { subscribeToAdminUsers } from '@/lib/users-service';
 import { getDraftOrdersByAdvisor, discardDraftOrder, getFailedDeliveryOrders } from '@/lib/orders-service';
@@ -71,7 +78,15 @@ export default function AsesoresCockpitPage() {
     // Fast order modal & tab state
     const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
     const [preloadedClientForOrder, setPreloadedClientForOrder] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores' | 'novedades'>('tareas');
+    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores' | 'novedades' | 'alertas'>('tareas');
+
+    // Protocolo de Alertas y Copilot IA
+    const [alertsData, setAlertsData] = useState<AdvisorAlertsData | null>(null);
+    const [alertsSubTab, setAlertsSubTab] = useState<'recompras' | 'entregas'>('recompras');
+    const [isCopilotModalOpen, setIsCopilotModalOpen] = useState(false);
+    const [copilotPreloadedClient, setCopilotPreloadedClient] = useState<{ name: string; phone: string }>({ name: '', phone: '' });
+    const [copiedAlertId, setCopiedAlertId] = useState<string | null>(null);
+    const [alertProcessingId, setAlertProcessingId] = useState<string | null>(null);
 
     // Cargar asesores dinámicamente desde admin_users
     useEffect(() => {
@@ -121,17 +136,56 @@ export default function AsesoresCockpitPage() {
     const loadData = async (advName: string) => {
         setIsLoading(true);
         try {
-            const [data, drafts, failed] = await Promise.all([
+            const [data, drafts, failed, alerts] = await Promise.all([
                 getAdvisorPortfolio(advName),
                 getDraftOrdersByAdvisor(advName),
-                getFailedDeliveryOrders(advName)
+                getFailedDeliveryOrders(advName),
+                getAdvisorAlertsData(advName)
             ]);
             setPortfolio(data);
             setDraftOrders(drafts);
             setFailedOrders(failed);
+            setAlertsData(alerts);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleMarkAlertSent = async (recompra: any) => {
+        setAlertProcessingId(recompra.id);
+        try {
+            if (recompra.id) {
+                await markReminderSent(recompra.id);
+            }
+            const cleanPhone = (recompra.customerPhone || '').replace(/\D/g, '');
+            if (cleanPhone) {
+                await addCRMActivity({
+                    customerId: cleanPhone,
+                    type: 'whatsapp',
+                    description: `Protocolo de Alerta de Recompra enviado por ${selectedAdvisor}. Producto: ${recompra.itemsSummary}`,
+                    authorName: selectedAdvisor,
+                    authorEmail: userProfile?.email || `${selectedAdvisor.toLowerCase()}@biocambio360.com`,
+                });
+            }
+            const updatedAlerts = await getAdvisorAlertsData(selectedAdvisor);
+            setAlertsData(updatedAlerts);
+            alert('Alerta registrada en el CRM y marcada como enviada exitosamente.');
+        } catch (err) {
+            console.error('Error marcando alerta:', err);
+        } finally {
+            setAlertProcessingId(null);
+        }
+    };
+
+    const handleCopyAlertText = (id: string, text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedAlertId(id);
+        setTimeout(() => setCopiedAlertId(null), 2500);
+    };
+
+    const handleOpenCopilotForClient = (clientName: string, clientPhone: string) => {
+        setCopilotPreloadedClient({ name: clientName, phone: clientPhone });
+        setIsCopilotModalOpen(true);
     };
 
     const handleSendQuickNote = async (customerId: string) => {
@@ -246,6 +300,18 @@ export default function AsesoresCockpitPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Botón Copilot IA y Guiones Comerciales */}
+                        <button
+                            onClick={() => {
+                                setCopilotPreloadedClient({ name: '', phone: '' });
+                                setIsCopilotModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 rounded-xl text-xs font-black shadow-xs hover:shadow-md transition-all cursor-pointer"
+                        >
+                            <Sparkles size={14} className="text-slate-950" />
+                            <span>✨ Guiones & Copilot IA</span>
+                        </button>
 
                         {/* Botón Acción Rápida Header */}
                         <button
@@ -424,6 +490,26 @@ export default function AsesoresCockpitPage() {
                                     activeTab === 'novedades' ? 'bg-white text-rose-700' : 'bg-rose-100 text-rose-800'
                                 }`}>
                                     {failedOrders.length}
+                                </span>
+                            )}
+                        </button>
+
+                        <button
+                            data-tour="asesor-tab-alertas"
+                            onClick={() => setActiveTab('alertas')}
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                                activeTab === 'alertas'
+                                    ? 'bg-purple-600 text-white shadow-xs'
+                                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                        >
+                            <Bell size={14} className={activeTab === 'alertas' ? 'text-white' : 'text-purple-600'} />
+                            <span>Protocolo de Alertas</span>
+                            {(alertsData?.totalAlertasCount || 0) > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    activeTab === 'alertas' ? 'bg-white text-purple-700' : 'bg-purple-100 text-purple-800'
+                                }`}>
+                                    {alertsData?.totalAlertasCount}
                                 </span>
                             )}
                         </button>
@@ -913,6 +999,250 @@ export default function AsesoresCockpitPage() {
                         )}
                     </div>
                 )}
+
+                {/* TAB 5: Protocolo de Alertas (Recompras del Día & Entregas Día Siguiente) */}
+                {activeTab === 'alertas' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                                    <Bell size={18} className="text-purple-600" />
+                                    <span>Protocolo de Alertas Operativas de {selectedAdvisor}</span>
+                                </h2>
+                                <p className="text-xs text-slate-500">
+                                    Digitalización del protocolo manual de alertas: confirmaciones para despacho mañana y contactos estratégicos de reabastecimiento.
+                                </p>
+                            </div>
+
+                            {/* Sub-pestañas: Recompras vs Entregas */}
+                            <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shrink-0">
+                                <button
+                                    onClick={() => setAlertsSubTab('recompras')}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        alertsSubTab === 'recompras'
+                                            ? 'bg-white text-purple-700 shadow-xs'
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    <span>🔄 Recompras del Día</span>
+                                    <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full font-black">
+                                        {alertsData?.recompras.length || 0}
+                                    </span>
+                                </button>
+
+                                <button
+                                    onClick={() => setAlertsSubTab('entregas')}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        alertsSubTab === 'entregas'
+                                            ? 'bg-white text-indigo-700 shadow-xs'
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    <span>🚗 Entregas Día Siguiente</span>
+                                    <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full font-black">
+                                        {alertsData?.entregasDiaSiguiente.length || 0}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* SUBTAB 1: RECOMPRAS DEL DÍA */}
+                        {alertsSubTab === 'recompras' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {alertsData?.recompras.map((rec: any) => {
+                                        const cleanPhone = (rec.customerPhone || '').replace(/\D/g, '');
+                                        const scriptRecompra = `¡Hola ${rec.customerName}! Te saluda ${selectedAdvisor} de Biocambio360 🌿. Esperamos que estés disfrutando de la calidad concentrada en tu hogar. Revisando nuestro sistema, vemos que según el consumo promedio familiar tu producto (${rec.itemsSummary}) debe estar por terminarse. ¿Deseas que te programemos tu reabastecimiento directo de fábrica esta semana con domicilio prioritario? Te mantenemos el precio especial de fábrica. ¡Quedo muy atento/a para apartar tu pedido!`;
+
+                                        const statusBadge = rec.status === 'vencido'
+                                            ? { text: 'Ciclo Vencido', bg: 'bg-rose-100 text-rose-800 border-rose-200' }
+                                            : rec.status === 'critico_10_dias'
+                                            ? { text: 'Crítico (<10 días)', bg: 'bg-amber-100 text-amber-800 border-amber-200' }
+                                            : { text: 'Alerta Temprana', bg: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+
+                                        const isCopied = copiedAlertId === `rec_${rec.id}`;
+                                        const isProcessing = alertProcessingId === rec.id;
+
+                                        return (
+                                            <div key={rec.id || cleanPhone} className="bg-slate-50/70 rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${statusBadge.bg}`}>
+                                                            {statusBadge.text}
+                                                        </span>
+                                                        <span className="text-[10px] font-bold text-slate-400">
+                                                            Ciclo: {rec.estimatedCycleDays}d
+                                                        </span>
+                                                    </div>
+
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-900 text-sm">
+                                                            {rec.customerName}
+                                                        </h3>
+                                                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                                                            <MapPin size={12} className="text-slate-400" />
+                                                            {rec.customerCity || 'Bogotá'} • {rec.customerPhone}
+                                                        </p>
+                                                        <div className="mt-2 bg-white p-2.5 rounded-xl border border-slate-200 text-xs text-slate-700">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase block">Última compra:</span>
+                                                            <span className="font-medium">{rec.itemsSummary}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="pt-4 mt-3 border-t border-slate-200 space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleCopyAlertText(`rec_${rec.id}`, scriptRecompra)}
+                                                            className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                                                isCopied ? 'bg-emerald-600 text-white' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                                                            }`}
+                                                            title="Copiar guión con datos del cliente"
+                                                        >
+                                                            {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                                                            <span>{isCopied ? '¡Copiado!' : 'Copiar Guión'}</span>
+                                                        </button>
+
+                                                        <a
+                                                            href={`https://wa.me/57${cleanPhone}?text=${encodeURIComponent(scriptRecompra)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors cursor-pointer"
+                                                            title="Enviar alerta de recompra por WhatsApp"
+                                                        >
+                                                            <MessageCircle size={16} />
+                                                        </a>
+
+                                                        <button
+                                                            onClick={() => handleOpenCopilotForClient(rec.customerName, rec.customerPhone)}
+                                                            className="p-1.5 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-lg transition-colors cursor-pointer"
+                                                            title="Abrir Copilot IA para este cliente"
+                                                        >
+                                                            <Sparkles size={16} />
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleMarkAlertSent(rec)}
+                                                            disabled={isProcessing}
+                                                            className="flex-1 py-1.5 px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                                                        >
+                                                            <CheckCircle2 size={12} className="text-emerald-600" />
+                                                            <span>{isProcessing ? 'Guardando...' : 'Marcar Enviada'}</span>
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => {
+                                                                setPreloadedClientForOrder({
+                                                                    nombre: rec.customerName,
+                                                                    celular: rec.customerPhone,
+                                                                    ciudad: rec.customerCity || 'Bogotá',
+                                                                });
+                                                                setIsFastOrderOpen(true);
+                                                            }}
+                                                            className="py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer"
+                                                            title="Cerrar pedido en 1 clic"
+                                                        >
+                                                            <Zap size={12} className="text-amber-300" />
+                                                            <span>Pedido</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {(!alertsData?.recompras || alertsData.recompras.length === 0) && (
+                                    <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                        🌿 ¡Excelente! No tienes clientes con ciclo de recompra vencido o en alerta para hoy.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* SUBTAB 2: ENTREGAS DÍA SIGUIENTE */}
+                        {alertsSubTab === 'entregas' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {alertsData?.entregasDiaSiguiente.map(ord => {
+                                        const cleanPhone = (ord.cliente?.celular || '').replace(/\D/g, '');
+                                        const totalFormatted = formatCurrency(ord.total || 0);
+                                        const scriptEntrega = `👉 ¡Hola ${ord.cliente?.nombre || 'Cliente'}! Te informo que tu pedido de Biocambio360 será entregado el día *MAÑANA* 🚗🛵 por nuestro domiciliario en el transcurso del día. Por favor estar muy atentos a tu celular. 💵 Total a pagar contraentrega en efectivo: *${totalFormatted}* (o si prefieres pagar por transferencia, avísanos para validar el soporte con anticipación). 🙏 ¿Eres tan amable de confirmarnos si mañana te encuentras en tu dirección (${ord.cliente?.direccion || ''}) para recibir sin contratiempos? Si puedes, compártenos tu ubicación actual para que el repartidor llegue más rápido. ¡Muchas gracias por tu compra!`;
+
+                                        const isCopied = copiedAlertId === `ent_${ord.id}`;
+
+                                        return (
+                                            <div key={ord.id} className="bg-slate-50/70 rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
+                                                            <Truck size={11} /> En Ruta Mañana
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-slate-400">
+                                                            #{ord.id.slice(-6).toUpperCase()}
+                                                        </span>
+                                                    </div>
+
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-900 text-sm">
+                                                            {ord.cliente?.nombre || 'Cliente'}
+                                                        </h3>
+                                                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                                                            <MapPin size={12} className="text-slate-400" />
+                                                            {ord.cliente?.ciudad}, {ord.cliente?.direccion}
+                                                        </p>
+                                                        <div className="mt-2 bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">A Cobrar Efectivo:</span>
+                                                            <span className="font-black text-emerald-700 text-sm">{totalFormatted}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="pt-4 mt-3 border-t border-slate-200 flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleCopyAlertText(`ent_${ord.id}`, scriptEntrega)}
+                                                        className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                                            isCopied ? 'bg-emerald-600 text-white' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                                                        }`}
+                                                    >
+                                                        {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                                                        <span>{isCopied ? '¡Copiado!' : 'Copiar Alerta'}</span>
+                                                    </button>
+
+                                                    <a
+                                                        href={`https://wa.me/57${cleanPhone}?text=${encodeURIComponent(scriptEntrega)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors cursor-pointer"
+                                                        title="Enviar confirmación de entrega por WhatsApp"
+                                                    >
+                                                        <MessageCircle size={16} />
+                                                    </a>
+
+                                                    <button
+                                                        onClick={() => handleOpenCopilotForClient(ord.cliente?.nombre || 'Cliente', ord.cliente?.celular || '')}
+                                                        className="p-1.5 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-lg transition-colors cursor-pointer"
+                                                        title="Abrir Copilot IA"
+                                                    >
+                                                        <Sparkles size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {(!alertsData?.entregasDiaSiguiente || alertsData.entregasDiaSiguiente.length === 0) && (
+                                    <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                        📦 No hay pedidos programados para entrega mañana en este momento.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
             {/* BOTÓN FLOTANTE PERMANENTE (FAB) PARA ASESORES COMERCIALES */}
@@ -948,7 +1278,6 @@ export default function AsesoresCockpitPage() {
                 draftOrder={selectedDraftForModal}
                 preloadedCustomer={preloadedClientForOrder}
                 onOrderCreated={() => {
-                    // Recargar datos inmediatamente al crear o cerrar la orden
                     loadData(selectedAdvisor);
                 }}
             />
@@ -962,6 +1291,17 @@ export default function AsesoresCockpitPage() {
                     setSelectedOrderForException(null);
                     loadData(selectedAdvisor);
                 }}
+            />
+
+            {/* MODAL DE GUIONES COMERCIALES Y COPILOT IA */}
+            <SalesScriptsCopilotModal
+                isOpen={isCopilotModalOpen}
+                onClose={() => setIsCopilotModalOpen(false)}
+                currentAdvisorName={selectedAdvisor}
+                preloadedClientName={copilotPreloadedClient.name}
+                preloadedClientPhone={copilotPreloadedClient.phone}
+                advisorSalesMonth={portfolio?.ventasAcumuladasMes || 18500000}
+                advisorGoalMonth={portfolio?.metaMesCOP || 30000000}
             />
         </div>
     );

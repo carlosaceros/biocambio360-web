@@ -81,6 +81,7 @@ export async function getCustomers(): Promise<Customer[]> {
             const data = doc.data();
             return {
                 id: doc.id,
+                ...data,
                 nombre: data.nombre || 'Cliente',
                 cedula: data.cedula || '',
                 celular: data.celular || doc.id || '',

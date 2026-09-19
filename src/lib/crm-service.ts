@@ -11,7 +11,10 @@ import {
     collection,
     doc,
     addDoc,
+    setDoc,
+    getDoc,
     updateDoc,
+    writeBatch,
     getDocs,
     query,
     where,
@@ -22,6 +25,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Customer } from '@/types/customer';
+import { recordAuditLog } from './audit-service';
+import { generateReferralCode } from './referrals-service';
 import {
     CRMStage,
     CRMActivity,
@@ -120,6 +125,14 @@ export function enrichCustomerWithCRM(
         stage,
         tags: firestoreExtras?.tags || [],
         assignedTo: firestoreExtras?.assignedTo || undefined,
+        assignedToName: firestoreExtras?.assignedToName || firestoreExtras?.assignedTo || undefined,
+        assignedAt: firestoreExtras?.assignedAt || undefined,
+        assignedBy: firestoreExtras?.assignedBy || undefined,
+        isReferrer: Boolean(firestoreExtras?.isReferrer),
+        referralCode: firestoreExtras?.referralCode || undefined,
+        referralActivatedManually: Boolean(firestoreExtras?.referralActivatedManually),
+        referralActivatedBy: firestoreExtras?.referralActivatedBy || undefined,
+        referralActivatedAt: firestoreExtras?.referralActivatedAt || undefined,
         sarlaftStatus: firestoreExtras?.sarlaftStatus || 'pendiente',
         sarlaftCheckedAt: firestoreExtras?.sarlaftCheckedAt || undefined,
         lastActivityAt: firestoreExtras?.lastActivityAt || undefined,
@@ -275,22 +288,234 @@ export async function assignCustomerToAdvisor(
     authorEmail?: string,
     authorName?: string
 ): Promise<void> {
+    return reassignCustomerAdvisor({
+        customerId,
+        newAdvisor: advisorEmail,
+        performedByEmail: authorEmail || 'admin@biocambio360.com',
+        performedByName: authorName || 'Administrador',
+    });
+}
+
+/**
+ * Reasigna formalmente la cartera de un cliente a un nuevo asesor
+ * con trazabilidad completa en CRM Timeline y en bitácora de auditoría ISO 9001.
+ * Justificación opcional según requerimiento operativo.
+ */
+export async function reassignCustomerAdvisor(params: {
+    customerId: string;
+    newAdvisor: string; // Ej: "Karen", "Diego", "Katherine", etc.
+    previousAdvisor?: string;
+    performedByEmail: string;
+    performedByName: string;
+    reason?: string;
+}): Promise<void> {
     try {
-        const customerDocRef = doc(customersRef, customerId);
+        const customerDocRef = doc(customersRef, params.customerId);
+        const nowIso = new Date().toISOString();
+
         await updateDoc(customerDocRef, {
-            assignedTo: advisorEmail,
+            assignedTo: params.newAdvisor,
+            assignedToName: params.newAdvisor,
+            assignedAt: nowIso,
+            assignedBy: params.performedByEmail,
             updatedAt: serverTimestamp(),
         });
 
+        const prev = params.previousAdvisor || 'Sin Asignar';
+        const reasonText = params.reason?.trim() ? ` Motivo: ${params.reason.trim()}` : '';
+        const desc = `🔄 Reasignación de cartera: de '${prev}' a '${params.newAdvisor}'. Realizado por ${params.performedByName}.${reasonText}`;
+
         await addCRMActivity({
-            customerId,
-            type: 'note',
-            description: `Asesor asignado: ${advisorEmail}`,
-            authorEmail,
-            authorName,
+            customerId: params.customerId,
+            type: 'advisor_reassigned',
+            description: desc,
+            authorEmail: params.performedByEmail,
+            authorName: params.performedByName,
+            metadata: {
+                previousAdvisor: prev,
+                newAdvisor: params.newAdvisor,
+                reason: params.reason || null
+            }
+        });
+
+        await recordAuditLog({
+            userId: params.performedByEmail,
+            userEmail: params.performedByEmail,
+            userName: params.performedByName,
+            userRole: 'director',
+            modulo: 'clientes',
+            accion: 'editar',
+            entidad: 'asignacion_cartera',
+            entidadId: params.customerId,
+            descripcion: desc,
+            detalles: {
+                previousAdvisor: prev,
+                newAdvisor: params.newAdvisor,
+                reason: params.reason || null
+            }
         });
     } catch (error) {
-        console.error('[CRM] Error assigning advisor:', error);
+        console.error('[CRM] Error reassigning customer advisor:', error);
+        throw error;
+    }
+}
+
+/**
+ * Reasignación masiva de cartera de clientes a un nuevo asesor
+ */
+export async function bulkReassignCustomers(params: {
+    customerIds: string[];
+    newAdvisor: string;
+    performedByEmail: string;
+    performedByName: string;
+    reason?: string;
+}): Promise<{ success: boolean; reassignedCount: number }> {
+    try {
+        let count = 0;
+        for (const id of params.customerIds) {
+            await reassignCustomerAdvisor({
+                customerId: id,
+                newAdvisor: params.newAdvisor,
+                performedByEmail: params.performedByEmail,
+                performedByName: params.performedByName,
+                reason: params.reason
+            });
+            count++;
+        }
+        return { success: true, reassignedCount: count };
+    } catch (error) {
+        console.error('[CRM] Error in bulkReassignCustomers:', error);
+        throw error;
+    }
+}
+
+/**
+ * Activa o desactiva manualmente a libre demanda a un cliente como Referidor/Embajador
+ * de la Comunidad Biocambio360 sin necesidad de haber realizado una compra previa.
+ * Genera código único, crea/actualiza el perfil en 'referral_profiles' y registra auditoría.
+ */
+export async function toggleCustomerReferrerStatus(params: {
+    customerId: string;
+    isReferrer: boolean;
+    customerName: string;
+    customerPhone: string;
+    activatedByEmail: string;
+    activatedByName: string;
+}): Promise<{ success: boolean; referralCode: string; message: string }> {
+    try {
+        const cleanPhone = params.customerPhone.replace(/\D/g, '') || params.customerId;
+        const customerDocRef = doc(customersRef, params.customerId);
+        const customerSnap = await getDoc(customerDocRef);
+        const existingData = customerSnap.exists() ? customerSnap.data() : {};
+
+        if (!params.isReferrer) {
+            // Desactivar referidor
+            await updateDoc(customerDocRef, {
+                isReferrer: false,
+                updatedAt: serverTimestamp(),
+            });
+
+            // Actualizar también en referral_profiles
+            const profileRef = doc(collection(db, 'referral_profiles'), cleanPhone);
+            const pSnap = await getDoc(profileRef);
+            if (pSnap.exists()) {
+                await updateDoc(profileRef, {
+                    isActive: false,
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            await addCRMActivity({
+                customerId: params.customerId,
+                type: 'referral_activated',
+                description: `Estado de Embajador / Referidor pausado manualmente por ${params.activatedByName}.`,
+                authorEmail: params.activatedByEmail,
+                authorName: params.activatedByName,
+            });
+
+            return { success: true, referralCode: existingData.referralCode || '', message: 'Referidor desactivado con éxito' };
+        }
+
+        // Activar referidor
+        let code = existingData.referralCode;
+        if (!code) {
+            code = generateReferralCode(params.customerName, cleanPhone);
+        }
+
+        const nowIso = new Date().toISOString();
+        await updateDoc(customerDocRef, {
+            isReferrer: true,
+            referralCode: code,
+            referralActivatedManually: true,
+            referralActivatedBy: params.activatedByEmail,
+            referralActivatedAt: nowIso,
+            updatedAt: serverTimestamp(),
+        });
+
+        // Asegurar documento en referral_profiles
+        const profileRef = doc(collection(db, 'referral_profiles'), cleanPhone);
+        const profileSnap = await getDoc(profileRef);
+        if (!profileSnap.exists()) {
+            await setDoc(profileRef, {
+                id: cleanPhone,
+                code: code,
+                nombre: params.customerName,
+                celular: cleanPhone,
+                tier: 'referidor',
+                totalReferredOrders: 0,
+                totalDeliveredOrders: 0,
+                totalSalesGenerated: 0,
+                balancePending: 0,
+                balanceInHolding: 0,
+                balanceAvailable: 0,
+                balanceRedeemed: 0,
+                isActive: true,
+                allowWithoutPurchase: true,
+                activatedManuallyBy: params.activatedByEmail,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+        } else {
+            await updateDoc(profileRef, {
+                isActive: true,
+                allowWithoutPurchase: true,
+                activatedManuallyBy: params.activatedByEmail,
+                updatedAt: serverTimestamp()
+            });
+        }
+
+        await addCRMActivity({
+            customerId: params.customerId,
+            type: 'referral_activated',
+            description: `🌟 Activado manualmente como Embajador / Referidor (Código: ${code}) a libre demanda por ${params.activatedByName} (${params.activatedByEmail}). Habilitado sin exigencia de compra mínima previa.`,
+            authorEmail: params.activatedByEmail,
+            authorName: params.activatedByName,
+            metadata: {
+                referralCode: code,
+                link: `https://biocambio360.com/comunidad?ref=${code}`
+            }
+        });
+
+        await recordAuditLog({
+            userId: params.activatedByEmail,
+            userEmail: params.activatedByEmail,
+            userName: params.activatedByName,
+            userRole: 'director',
+            modulo: 'clientes',
+            accion: 'editar',
+            entidad: 'cliente_referidor',
+            entidadId: params.customerId,
+            descripcion: `Activación manual de referidor para '${params.customerName}' con código '${code}' a libre demanda por ${params.activatedByName}.`,
+            detalles: { referralCode: code, cleanPhone }
+        });
+
+        return {
+            success: true,
+            referralCode: code,
+            message: `¡Cliente activado exitosamente como Referidor! Código: ${code}`
+        };
+    } catch (error: any) {
+        console.error('[CRM] Error toggling customer referrer status:', error);
         throw error;
     }
 }

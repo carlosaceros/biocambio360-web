@@ -369,6 +369,15 @@ export async function checkReferrerQualifiedPurchase(phone: string, minSpend = 5
         const customerSnap = await getDoc(doc(db, 'customers', cleanPhone));
         if (customerSnap.exists()) {
             const cData = customerSnap.data();
+            // Si fue activado manualmente a libre demanda por Diego, Fernando o Administrador
+            if (cData.isReferrer || cData.referralActivatedManually) {
+                return {
+                    qualified: true,
+                    totalSpent: cData.totalSpent || 50000,
+                    ordersCount: cData.ordersCount || 1,
+                    highestOrder: cData.totalSpent || 50000
+                };
+            }
             const spent = cData.totalSpent || 0;
             const count = cData.ordersCount || 0;
             if (spent >= minSpend && count > 0) {
