@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     TrendingUp,
@@ -32,7 +32,8 @@ import {
     HISTORICAL_SALES_DATA,
     ADVISORS_PERFORMANCE_DATA,
     POS_MONTHLY_DATA,
-    getCommercialSummaryForMonth
+    getCommercialSummaryForMonth,
+    getAdvisorsPerformanceForMonth
 } from '@/lib/commercial-reports-data';
 import { MonthlySalesData, AdvisorPerformance } from '@/types/commercial-reports';
 import { formatCurrency } from '@/lib/checkout-utils';
@@ -42,12 +43,37 @@ type ReportTab = 'ventas' | 'clientes' | 'metas' | 'asesores' | 'pos' | 'gaps' |
 export default function InformeVentasPage() {
     const [selectedTab, setSelectedTab] = useState<ReportTab>('metas');
     const [selectedYear, setSelectedYear] = useState<number>(2026);
-    const [selectedMonth, setSelectedMonth] = useState<number>(8); // Agosto (mes completo del reporte)
-    const [selectedPosMonth, setSelectedPosMonth] = useState<number>(8); // Agosto para POS
+    const [selectedMonth, setSelectedMonth] = useState<number>(8); // Por defecto Agosto
+    const [selectedPosMonth, setSelectedPosMonth] = useState<number>(8); // Para POS
 
-    // Resumen ejecutivo
+    // Meses disponibles para el año seleccionado
+    const availableMonthsForYear = useMemo(() => {
+        return HISTORICAL_SALES_DATA.filter(d => d.anio === selectedYear);
+    }, [selectedYear]);
+
+    // Asegurar que el mes seleccionado exista en el año actual al cambiar de año
+    useEffect(() => {
+        const exists = availableMonthsForYear.some(m => m.mesNumero === selectedMonth);
+        if (!exists && availableMonthsForYear.length > 0) {
+            setSelectedMonth(availableMonthsForYear[availableMonthsForYear.length - 1].mesNumero);
+        }
+    }, [selectedYear, availableMonthsForYear, selectedMonth]);
+
+    // Resumen ejecutivo del mes y año seleccionados
     const summary = useMemo(() => {
         return getCommercialSummaryForMonth(selectedMonth, selectedYear, 220);
+    }, [selectedMonth, selectedYear]);
+
+    // Datos del mes actual seleccionado
+    const currentMonthData = useMemo(() => {
+        return HISTORICAL_SALES_DATA.find(d => d.anio === selectedYear && d.mesNumero === selectedMonth) || availableMonthsForYear[availableMonthsForYear.length - 1];
+    }, [selectedYear, selectedMonth, availableMonthsForYear]);
+
+    const monthName = currentMonthData?.mes || 'Agosto';
+
+    // Rendimiento dinámico por asesor para el mes y año
+    const advisorsPerformance = useMemo(() => {
+        return getAdvisorsPerformanceForMonth(selectedMonth, selectedYear);
     }, [selectedMonth, selectedYear]);
 
     // Filtrar datos por año seleccionado
@@ -128,7 +154,7 @@ export default function InformeVentasPage() {
                     {/* Barra de Pestañas (Tabs) */}
                     <div className="flex items-center gap-1.5 overflow-x-auto mt-4 pt-1 no-scrollbar border-t border-slate-100">
                         {[
-                            { id: 'metas', label: 'Cumplimiento Metas', icon: Target, badge: 'Agosto' },
+                            { id: 'metas', label: 'Cumplimiento Metas', icon: Target, badge: `${monthName}` },
                             { id: 'asesores', label: 'Comportamiento Asesores', icon: Award },
                             { id: 'ventas', label: 'Evolución Ventas', icon: TrendingUp },
                             { id: 'clientes', label: 'Nuevos vs Recompra', icon: Users },
@@ -168,8 +194,43 @@ export default function InformeVentasPage() {
             {/* Contenido Principal */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
 
+                {/* Barra de Selección Dinámica de Mes */}
+                <div className="mb-6 bg-white border border-slate-200/80 rounded-2xl p-3 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider">
+                        <Calendar className="w-4 h-4 text-indigo-600" />
+                        <span>Mes en Auditoría ({selectedYear}):</span>
+                        <span className="bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-extrabold text-xs normal-case">
+                            {monthName} {selectedYear}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                        {availableMonthsForYear.map(m => {
+                            const isSelected = selectedMonth === m.mesNumero;
+                            return (
+                                <button
+                                    key={m.mesNumero}
+                                    onClick={() => setSelectedMonth(m.mesNumero)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                        isSelected
+                                            ? 'bg-indigo-600 text-white shadow-xs font-black'
+                                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/60'
+                                    }`}
+                                >
+                                    <span>{m.mes}</span>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+                                    }`}>
+                                        ${m.ventasMillones}M
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
                 {/* ─────────────────────────────────────────────────────────────
-                    TAB 1: CUMPLIMIENTO DE METAS (Agosto 2026 - Pág 4 del Power BI)
+                    TAB 1: CUMPLIMIENTO DE METAS (Dinámico según Mes y Año Seleccionados)
                 ───────────────────────────────────────────────────────────── */}
                 {selectedTab === 'metas' && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -179,27 +240,27 @@ export default function InformeVentasPage() {
                             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                                 <div>
                                     <span className="inline-block bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-2">
-                                        Corte Oficial: Agosto 2026
+                                        Corte Oficial: {monthName} {selectedYear}
                                     </span>
                                     <h2 className="text-3xl font-black tracking-tight">
-                                        Informe 2026: Cumplimiento META
+                                        Informe {selectedYear}: Cumplimiento META ({monthName})
                                     </h2>
                                     <p className="text-slate-400 text-sm mt-1 max-w-xl">
-                                        Monitoreo de objetivos comerciales de la fábrica. Meta global mensual de <strong>$220 Millones</strong> y cuota individual de <strong>$30 Millones</strong> por asesor comercial.
+                                        Monitoreo de objetivos comerciales de la fábrica. Meta global mensual de <strong>${summary.metaGlobalMillones} Millones</strong> y cuota individual de <strong>$30 Millones</strong> por asesor comercial.
                                     </p>
                                 </div>
 
                                 <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-xl backdrop-blur-xs">
                                     <div className="text-right">
                                         <p className="text-[11px] text-slate-400 font-bold uppercase">Meta Nuevos</p>
-                                        <p className="text-2xl font-black text-amber-400">75%</p>
-                                        <p className="text-[10px] text-slate-400">166 clientes nuevos</p>
+                                        <p className="text-2xl font-black text-amber-400">{summary.logradoNuevosPorcentaje}%</p>
+                                        <p className="text-[10px] text-slate-400">{currentMonthData?.clientesNuevosCantidad || 0} clientes nuevos</p>
                                     </div>
                                     <div className="h-10 w-px bg-white/10" />
                                     <div className="text-right">
                                         <p className="text-[11px] text-slate-400 font-bold uppercase">Meta Global</p>
-                                        <p className="text-2xl font-black text-emerald-400">71%</p>
-                                        <p className="text-[10px] text-slate-400">$157M de $220M</p>
+                                        <p className="text-2xl font-black text-emerald-400">{summary.porcentajeCumplimientoGlobal}%</p>
+                                        <p className="text-[10px] text-slate-400">${summary.ventasActualesMillones}M de ${summary.metaGlobalMillones}M</p>
                                     </div>
                                 </div>
                             </div>
@@ -212,7 +273,7 @@ export default function InformeVentasPage() {
                                 <div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Meta General</span>
-                                        <span className="text-xs font-bold text-slate-500">AGOSTO</span>
+                                        <span className="text-xs font-bold text-indigo-600 uppercase">{monthName} {selectedYear}</span>
                                     </div>
                                     <h3 className="text-lg font-black text-slate-900 mt-1">Cumplimiento Global</h3>
                                 </div>
@@ -225,28 +286,30 @@ export default function InformeVentasPage() {
                                         {/* Arco de progreso */}
                                         <div
                                             className="absolute top-0 w-48 h-48 rounded-full border-[18px] border-transparent border-t-indigo-600 border-l-indigo-600 rotate-[-45deg]"
-                                            style={{ transform: `rotate(${-45 + (summary.porcentajeCumplimientoGlobal * 1.8)}deg)` }}
+                                            style={{ transform: `rotate(${-45 + Math.min(180, summary.porcentajeCumplimientoGlobal * 1.8)}deg)` }}
                                         />
                                         <div className="text-center pb-2 z-10">
-                                            <span className="text-4xl font-black text-indigo-700">71%</span>
+                                            <span className="text-4xl font-black text-indigo-700">{summary.porcentajeCumplimientoGlobal}%</span>
                                             <p className="text-xs font-bold text-slate-400">ALCANZADO</p>
                                         </div>
                                     </div>
                                     <div className="w-full flex justify-between text-xs font-bold text-slate-400 px-4 mt-2">
                                         <span>0 mill.</span>
-                                        <span className="text-indigo-600 font-extrabold text-sm">$157 mill.</span>
-                                        <span>220 mill.</span>
+                                        <span className="text-indigo-600 font-extrabold text-sm">${summary.ventasActualesMillones} mill.</span>
+                                        <span>{summary.metaGlobalMillones} mill.</span>
                                     </div>
                                 </div>
 
                                 <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 text-xs text-indigo-900 space-y-1">
                                     <div className="flex justify-between font-bold">
                                         <span>Faltante para la meta:</span>
-                                        <span className="text-rose-600">$63 Millones</span>
+                                        <span className={summary.ventasActualesMillones >= summary.metaGlobalMillones ? "text-emerald-600" : "text-rose-600"}>
+                                            ${Math.max(0, summary.metaGlobalMillones - summary.ventasActualesMillones)} Millones
+                                        </span>
                                     </div>
                                     <div className="flex justify-between text-[11px] text-slate-600">
-                                        <span>Total facturado en agosto:</span>
-                                        <span className="font-semibold">$157,000,000 COP</span>
+                                        <span>Total facturado en {monthName.toLowerCase()}:</span>
+                                        <span className="font-semibold">{formatCurrency(summary.ventasActualesMillones * 1_000_000)} COP</span>
                                     </div>
                                 </div>
                             </div>
@@ -264,7 +327,7 @@ export default function InformeVentasPage() {
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                    {ADVISORS_PERFORMANCE_DATA.map(advisor => {
+                                    {advisorsPerformance.map(advisor => {
                                         const isOverTarget = advisor.porcentajeCumplimiento >= 100;
                                         const isCritical = advisor.porcentajeCumplimiento < 30;
                                         const isWarning = advisor.porcentajeCumplimiento >= 30 && advisor.porcentajeCumplimiento < 70;
@@ -331,7 +394,7 @@ export default function InformeVentasPage() {
                             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs lg:col-span-2">
                                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                                     <Award className="w-4 h-4 text-amber-500" />
-                                    Ranking de Productividad Comercial (Agosto 2026)
+                                    Ranking de Productividad Comercial ({monthName} {selectedYear})
                                 </h3>
 
                                 <div className="overflow-x-auto">
@@ -348,7 +411,7 @@ export default function InformeVentasPage() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                                            {ADVISORS_PERFORMANCE_DATA.map((adv, idx) => (
+                                            {advisorsPerformance.map((adv, idx) => (
                                                 <tr key={adv.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="py-3 flex items-center gap-2">
                                                         <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
@@ -441,7 +504,7 @@ export default function InformeVentasPage() {
 
                             {/* Gráfica de Barras Horizontales (Composición de Venta en Millones) */}
                             <div className="space-y-4">
-                                {ADVISORS_PERFORMANCE_DATA.map(adv => (
+                                {advisorsPerformance.map(adv => (
                                     <div key={adv.id} className="space-y-1.5">
                                         <div className="flex items-center justify-between text-xs">
                                             <div className="flex items-center gap-2">
@@ -457,14 +520,14 @@ export default function InformeVentasPage() {
                                         {/* Barra apilada */}
                                         <div className="w-full h-7 bg-slate-100 rounded-lg overflow-hidden flex text-[10px] font-black text-white">
                                             <div
-                                                style={{ width: `${(adv.clientesNuevosMillones / 50) * 100}%` }}
+                                                style={{ width: `${(adv.clientesNuevosMillones / Math.max(1, (adv.ventasMillones || 1))) * 100}%` }}
                                                 className="bg-blue-600 flex items-center justify-center transition-all"
                                                 title={`Nuevos: $${adv.clientesNuevosMillones}M`}
                                             >
-                                                {adv.clientesNuevosMillones > 2 ? `$${adv.clientesNuevosMillones}M` : ''}
+                                                {adv.clientesNuevosMillones > 1 ? `$${adv.clientesNuevosMillones}M` : ''}
                                             </div>
                                             <div
-                                                style={{ width: `${(adv.recompraMillones / 50) * 100}%` }}
+                                                style={{ width: `${(adv.recompraMillones / Math.max(1, (adv.ventasMillones || 1))) * 100}%` }}
                                                 className="bg-indigo-500 flex items-center justify-center transition-all"
                                                 title={`Recompra: $${adv.recompraMillones}M`}
                                             >
@@ -481,12 +544,12 @@ export default function InformeVentasPage() {
                             {/* Ticket Promedio (Media de Ventas) */}
                             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
                                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-2">
-                                    Media de Ventas (Ticket Promedio COP)
+                                    Media de Ventas (Ticket Promedio COP) — {monthName} {selectedYear}
                                 </h3>
                                 <p className="text-xs text-slate-500 mb-6">Monto promedio facturado por cada pedido atendido</p>
 
                                 <div className="space-y-3">
-                                    {ADVISORS_PERFORMANCE_DATA.map(adv => (
+                                    {advisorsPerformance.map(adv => (
                                         <div key={adv.id} className="flex items-center gap-3">
                                             <span className="text-xs font-bold text-slate-700 w-20">{adv.nombre}</span>
                                             <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
@@ -506,12 +569,12 @@ export default function InformeVentasPage() {
                             {/* Profundidad de Carrito (Promedio de Productos) */}
                             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
                                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-2">
-                                    Promedio de Productos por Pedido (Cross-selling)
+                                    Promedio de Productos por Pedido (Cross-selling) — {monthName} {selectedYear}
                                 </h3>
                                 <p className="text-xs text-slate-500 mb-6">Capacidad de ofrecer combos y productos complementarios</p>
 
                                 <div className="space-y-3">
-                                    {ADVISORS_PERFORMANCE_DATA.map(adv => (
+                                    {advisorsPerformance.map(adv => (
                                         <div key={adv.id} className="flex items-center gap-3">
                                             <span className="text-xs font-bold text-slate-700 w-20">{adv.nombre}</span>
                                             <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">

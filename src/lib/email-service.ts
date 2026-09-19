@@ -336,84 +336,86 @@ export async function sendOrderStatusCustomerEmail(data: {
 
     switch (data.status) {
         case 'confirmado':
-            title = '¡Tu pedido fue confirmado con éxito! 🎉';
-            headline = 'estamos procesando tu orden';
-            description = 'Hemos validado y confirmado tu pedido. En breve pasará a nuestro equipo de bodega para su correcto empaque y alistamiento con el estándar de Biocambio360.';
+            title = '¡Qué emoción tenerte en la familia Biocambio360! 💚✨';
+            headline = 'acabas de tomar una decisión maravillosa para tu hogar y tu tranquilidad';
+            description = `Hola <strong>${data.customerName}</strong>, queremos darte las gracias de todo corazón por confiar en nosotros.<br><br>Cada vez que eliges Biocambio360, no solo estás adquiriendo productos de limpieza con la mayor concentración y rendimiento directo de fábrica; estás eligiendo cuidar la salud de tu familia, disfrutar de un aroma a limpio inconfundible y proteger a quienes más amas con fórmulas biodegradables y respetuosas con el medio ambiente.<br><br>Tu orden ya está confirmada en nuestro sistema y el equipo de planta la tiene lista para alistarla con todo el cariño y la rigurosidad que te mereces.`;
             badgeBg = '#dbeafe';
             badgeText = '#1e40af';
-            badgeLabel = 'CONFIRMADO';
+            badgeLabel = 'CONFIRMADO CON AMOR';
             break;
         case 'preparacion':
-            title = '¡Tu pedido está en preparación! 📦';
-            headline = 'alistando productos en bodega';
-            description = 'Nuestro equipo logístico está empacando cuidadosamente tus productos químicos biodegradables y asegurando el embalaje antiderrames de alta resistencia.';
+            title = '¡Tus productos se están empacando con todo el cuidado! 🌿🧼';
+            headline = 'consentimos cada detalle directamente desde nuestra fábrica';
+            description = `¡Excelentes noticias, <strong>${data.customerName}</strong>! Tus productos ya están en nuestra línea de alistamiento.<br><br>Nuestro equipo de bodega está inspeccionando personalmente cada lote, verificando el sellado hermético y reforzando las esquinas con embalaje de alta resistencia para que cada garrafa llegue a tu puerta tan impecable y fresca como cuando fue envasada.<br><br>Nos llena de alegría saber que muy pronto tu ropa, tu cocina y tus espacios favoritos van a respirar esta frescura y pureza inigualable.`;
             badgeBg = '#fef3c7';
             badgeText = '#92400e';
-            badgeLabel = 'EN PREPARACIÓN';
+            badgeLabel = 'EN PREPARACIÓN ARTESANAL';
             break;
         case 'enviado':
         case 'en_camino':
-            title = '¡Tu pedido va en camino! 🚚';
-            headline = `despachado con ${carrierName}`;
-            description = data.trackingNumber 
-                ? `Tu paquete ya fue entregado a la transportadora con la guía <strong>${data.trackingNumber}</strong> (${carrierName}). Ya puedes realizar el seguimiento en vivo.`
-                : `Tu paquete ha sido despachado a través de <strong>${carrierName}</strong> y se encuentra en ruta hacia tu dirección de entrega.`;
+            title = '¡Tu pedido ya viaja rumbo a tus manos! 🚚💨';
+            headline = 'un paso más cerca de transformar tu rutina de limpieza';
+            description = `¡Qué felicidad! El transportador de <strong>${carrierName}</strong> ya tiene tu paquete en ruta hacia tu dirección.<br><br>Muy pronto vas a comprobar por qué miles de familias y lavanderías en Colombia aman la fragancia duradera, el ahorro real y el poder desmanchador de nuestras fórmulas.<br><br>${
+                data.trackingNumber 
+                    ? `Puedes seguir el recorrido en tiempo real con el número de guía <strong>${data.trackingNumber}</strong> (${carrierName}) haciendo clic en el botón de abajo.`
+                    : `Nuestro equipo logístico está monitoreando el despacho para que lo recibas en el menor tiempo posible.`
+            }`;
             badgeBg = '#e0e7ff';
             badgeText = '#3730a3';
             badgeLabel = 'EN CAMINO';
             showTrackingBtn = true;
             break;
         case 'entregado':
-            title = '¡Tu pedido ha sido entregado! 🌿';
-            headline = 'entrega completada exitosamente';
-            description = 'Confirmamos la entrega de tus productos de limpieza industrial Biocambio360. Esperamos que disfrutes de su máxima concentración, rendimiento y poder biodegradable.';
+            title = '¡Entregado! Tu hogar está a punto de brillar con frescura 🏡✨';
+            headline = 'gracias infinitas por abrirnos las puertas de tu espacio';
+            description = `¡Llegó el momento más esperado, <strong>${data.customerName}</strong>! La transportadora nos confirma que tu paquete ya está en tus manos.<br><br>Deseamos de todo corazón que disfrutes cada gota: el aroma acogedor que perdura en tus prendas, la facilidad con que arranca la grasa sin maltratar tus manos y la satisfacción de saber que estás apoyando con orgullo la industria nacional ecológica.<br><br><strong>Un tip de amigos:</strong> nuestras fórmulas son ultra concentradas; no necesitas usar de más. ¡Una pequeña medida hace maravillas!`;
             badgeBg = '#dcfce7';
             badgeText = '#15803d';
-            badgeLabel = 'ENTREGADO';
+            badgeLabel = '¡ENTREGADO CON ÉXITO!';
             break;
         case 'no_entregado':
-            title = 'Novedad en la entrega de tu pedido ⚠️';
-            headline = 'no fue posible completar la entrega hoy';
-            description = 'La transportadora nos reportó una novedad y no pudo concretar la entrega de tu pedido en la dirección indicada. No te preocupes: nuestro equipo logístico y comercial está gestionando el caso para coordinar un reintento de entrega lo antes posible.';
+            title = '¡No te preocupes! Estamos aquí para ayudarte a recibir tu pedido 🤝';
+            headline = 'tuvimos un pequeño tropiezo con la entrega hoy, pero lo solucionaremos juntos';
+            description = `Hola <strong>${data.customerName}</strong>, el transportador nos informó que hoy no fue posible completar la entrega en tu dirección (quizás saliste un momento o hubo una novedad en la vía).<br><br>¡Respira tranquilo(a)! Tu paquete está 100% seguro bajo nuestro resguardo y tu satisfacción es nuestra máxima prioridad. Ya estamos coordinando un reintento para que lo recibas cómodamente en la franja y dirección que mejor te convenga. Si prefieres, escríbenos directamente a nuestro WhatsApp para programarlo a tu gusto.`;
             badgeBg = '#ffe4e6';
             badgeText = '#9f1239';
-            badgeLabel = 'NO ENTREGADO / NOVEDAD';
+            badgeLabel = 'NOVEDAD / REINTENTO SEGURO';
             showTrackingBtn = !!data.trackingNumber;
             break;
         case 'cancelado':
-            title = 'Tu pedido ha sido cancelado ⚠️';
-            headline = 'actualización sobre tu orden';
-            description = 'Tu pedido ha sido marcado como cancelado en nuestro sistema. Si esto fue un error o necesitas ayuda personalizada, nuestro equipo comercial está listo para asistirte.';
+            title = 'Estamos siempre aquí para escucharte y apoyarte 💙';
+            headline = 'actualización sincera sobre tu orden';
+            description = `Hola <strong>${data.customerName}</strong>, te escribimos para confirmarte que tu pedido ha sido cancelado en el sistema. Sabemos que a veces los planes cambian o se presentan imprevistos.<br><br>Queremos que sepas que en Biocambio360 cuentas con un equipo de amigos dispuestos a orientarte con honestidad, ética y sin presiones. Si más adelante deseas retomar tu pedido o tienes cualquier pregunta sobre nuestros productos, estaremos felices de atenderte con la misma calidez de siempre.`;
             badgeBg = '#fee2e2';
             badgeText = '#b91c1c';
-            badgeLabel = 'CANCELADO';
+            badgeLabel = 'PEDIDO CANCELADO';
             break;
         default:
             return;
     }
 
     const itemsSummary = (data.items && data.items.length > 0)
-        ? `<div style="margin-bottom:20px;padding:14px;background:#f8fafc;border-radius:10px;font-size:13px;color:#475569;">
-            <strong style="color:#0f172a;">Productos incluidos:</strong>
-            <ul style="margin:8px 0 0 16px;padding:0;">
-                ${data.items.map(it => `<li style="margin-bottom:4px;">${it.cantidad}x ${it.nombre}</li>`).join('')}
+        ? `<div style="margin-bottom:20px;padding:16px;background:#f8fafc;border-radius:12px;font-size:13px;color:#334155;border:1px solid #f1f5f9;">
+            <strong style="color:#0f172a;display:block;margin-bottom:8px;font-size:14px;">🛍️ Tus productos elegidos:</strong>
+            <ul style="margin:0 0 0 16px;padding:0;line-height:1.6;">
+                ${data.items.map(it => `<li style="margin-bottom:4px;"><strong>${it.cantidad}x</strong> ${it.nombre}</li>`).join('')}
             </ul>
            </div>`
         : '';
 
     const content = `
         <div style="text-align:center;margin-bottom:24px;">
-          <span style="display:inline-block;padding:6px 14px;background:${badgeBg};color:${badgeText};border-radius:100px;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;">
+          <span style="display:inline-block;padding:6px 16px;background:${badgeBg};color:${badgeText};border-radius:100px;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;">
             ${badgeLabel}
           </span>
-          <h1 style="margin:12px 0 6px;color:#0f172a;font-size:22px;font-weight:900;">${title}</h1>
+          <h1 style="margin:14px 0 8px;color:#0f172a;font-size:22px;font-weight:900;line-height:1.3;">${title}</h1>
           <p style="margin:0;color:#64748b;font-size:14px;">Hola <strong>${data.customerName}</strong>, ${headline}.</p>
         </div>
 
-        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-          <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.6;">
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:26px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+          <div style="color:#334155;font-size:14px;line-height:1.7;margin-bottom:20px;">
             ${description}
-          </p>
+          </div>
 
           ${itemsSummary}
 
@@ -422,23 +424,31 @@ export async function sendOrderStatusCustomerEmail(data: {
               <tr>
                 <td>
                   <span style="font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;">N° Pedido</span>
-                  <p style="margin:2px 0 0;font-size:15px;font-weight:800;color:#0f172a;">#${orderShort}</p>
+                  <p style="margin:2px 0 0;font-size:15px;font-weight:900;color:#0f172a;">#${orderShort}</p>
                 </td>
                 <td align="right">
-                  <span style="font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Total</span>
-                  <p style="margin:2px 0 0;font-size:16px;font-weight:900;color:#059669;">${formatCOP(data.total)}</p>
+                  <span style="font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Total Invertido</span>
+                  <p style="margin:2px 0 0;font-size:18px;font-weight:900;color:#059669;">${formatCOP(data.total)}</p>
                 </td>
               </tr>
             </table>
           </div>
 
           ${data.trackingNumber ? `
-          <div style="margin-top:16px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;">
-            <p style="margin:0;font-size:12px;color:#166534;"><strong>Transportadora:</strong> ${carrierName} · <strong>N° de Guía:</strong> <span style="font-family:monospace;font-weight:800;">${data.trackingNumber}</span></p>
+          <div style="margin-top:18px;padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;">
+            <p style="margin:0;font-size:13px;color:#166534;line-height:1.5;">
+              <strong>Transportadora Aliada:</strong> ${carrierName}<br/>
+              <strong>Número de Guía:</strong> <span style="font-family:monospace;font-weight:800;letter-spacing:0.5px;font-size:14px;">${data.trackingNumber}</span>
+            </p>
           </div>` : ''}
+
+          <div style="margin-top:20px;padding-top:16px;border-top:1px dashed #e2e8f0;font-size:12px;color:#64748b;font-style:italic;line-height:1.5;">
+            "La limpieza no solo es un deber, es el acto de cuidar y llenar de armonía el lugar donde florece tu familia."
+            <br/><span style="font-style:normal;font-weight:700;color:#0f172a;">— Con cariño, Julián, Danilo y todo el equipo de Biocambio360 🌱</span>
+          </div>
         </div>
 
-        <div style="text-align:center;margin-top:28px;">
+        <div style="text-align:center;margin-top:24px;">
           ${showTrackingBtn ? `
             <a href="${trackingUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:100px;font-weight:800;font-size:14px;box-shadow:0 4px 12px rgba(37,99,235,0.25);margin-right:8px;margin-bottom:8px;">
               🔍 Rastrear Envío en Vivo

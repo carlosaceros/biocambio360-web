@@ -342,3 +342,60 @@ export function getCommercialSummaryForMonth(
         tasaRecompraPorcentaje: tasaRecompra
     };
 }
+
+/**
+ * Calcula el rendimiento dinámico por asesor para cualquier mes y año seleccionado
+ */
+export function getAdvisorsPerformanceForMonth(
+    mesNumero: number = 8,
+    anio: number = 2026
+): AdvisorPerformance[] {
+    const monthData = HISTORICAL_SALES_DATA.find(d => d.mesNumero === mesNumero && d.anio === anio);
+    const totalMillones = monthData ? monthData.ventasMillones : 157;
+    const baseTotal = 148; // sumatoria base de asesores (49+36+21+21+18+3)
+
+    const weights: Record<string, { share: number; nuevosRatio: number; ticket: number; prodRatio: number; perfil: 'farmer' | 'hunter' | 'balanceado' }> = {
+        karen: { share: 49 / baseTotal, nuevosRatio: 0.11, ticket: 118, prodRatio: 2.53, perfil: 'farmer' },
+        katherine: { share: 36 / baseTotal, nuevosRatio: 0.10, ticket: 116, prodRatio: 2.45, perfil: 'farmer' },
+        andrea: { share: 21 / baseTotal, nuevosRatio: 0.11, ticket: 104, prodRatio: 2.53, perfil: 'farmer' },
+        diego: { share: 21 / baseTotal, nuevosRatio: 0.18, ticket: 104, prodRatio: 2.37, perfil: 'balanceado' },
+        laura: { share: 18 / baseTotal, nuevosRatio: 0.37, ticket: 95, prodRatio: 2.56, perfil: 'hunter' },
+        camilo: { share: 3 / baseTotal, nuevosRatio: 0.33, ticket: 90, prodRatio: 2.10, perfil: 'hunter' },
+    };
+
+    return ADVISORS_PERFORMANCE_DATA.map(adv => {
+        const w = weights[adv.id] || { share: 1 / 6, nuevosRatio: 0.2, ticket: 110, prodRatio: 2.4, perfil: 'balanceado' };
+        // Si es Agosto 2026, mantener los valores exactos históricos de auditoría
+        if (mesNumero === 8 && anio === 2026) {
+            return adv;
+        }
+
+        const ventasAdv = Math.max(1, Math.round(totalMillones * w.share));
+        const meta = adv.metaMillones;
+        const pct = Math.round((ventasAdv / meta) * 100);
+        const clientesNuevosM = Number((ventasAdv * w.nuevosRatio).toFixed(1));
+        const recompraM = Number((ventasAdv * (1 - w.nuevosRatio)).toFixed(1));
+        const totalCli = Math.max(10, Math.round((ventasAdv * 1_000_000) / (w.ticket * 1_000)));
+        const cliNuevosCant = Math.round(totalCli * w.nuevosRatio);
+        const recompraCant = Math.max(0, totalCli - cliNuevosCant);
+
+        let estado: 'supera_meta' | 'en_meta' | 'en_riesgo' = 'en_riesgo';
+        if (pct >= 100) estado = 'supera_meta';
+        else if (pct >= 70) estado = 'en_meta';
+
+        return {
+            ...adv,
+            ventasMillones: ventasAdv,
+            porcentajeCumplimiento: pct,
+            clientesNuevosMillones: clientesNuevosM,
+            recompraMillones: recompraM,
+            clientesNuevosCantidad: cliNuevosCant,
+            recompraCantidad: recompraCant,
+            totalClientes: totalCli,
+            ticketPromedioMil: w.ticket,
+            promedioProductosPorPedido: w.prodRatio,
+            estadoRendimiento: estado
+        };
+    });
+}
+
