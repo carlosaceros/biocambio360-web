@@ -53,6 +53,7 @@ INFORME_TECNICO_*.pdf
 MANUAL_*.pdf
 scripts/*
 !scripts/etl_migrate_excels.py
+!scripts/etl_industrial_production_big_data.py
 *.csv
 EXCELS POR INTEGRAR/
 

@@ -46,6 +46,7 @@ import {
 } from '@/lib/production-service';
 import { ProductionBatch, ProductFormula } from '@/types/production';
 import { useAuth } from '@/lib/auth-context';
+import ManufacturingBOMCostingPanel from '@/components/admin/ManufacturingBOMCostingPanel';
 
 export default function ProduccionPlantaPage() {
     const router = useRouter();
@@ -54,7 +55,7 @@ export default function ProduccionPlantaPage() {
     // Iniciar con el catálogo maestro de 2,563 lotes de fábrica para cero latencia
     const [batches, setBatches] = useState<ProductionBatch[]>(MASTER_BATCHES);
     const [isLoading, setIsLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'batches' | 'formulas' | 'traceability'>('batches');
+    const [activeTab, setActiveTab] = useState<'batches' | 'formulas' | 'traceability' | 'industrial_bi'>('batches');
 
     // Filtros de Lotes
     const [searchQuery, setSearchQuery] = useState('');
@@ -295,6 +296,15 @@ export default function ProduccionPlantaPage() {
                                 }`}
                             >
                                 Trazabilidad INVIMA
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('industrial_bi')}
+                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    activeTab === 'industrial_bi' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-amber-300 hover:text-white'
+                                }`}
+                            >
+                                <Sparkles size={13} />
+                                <span>Inteligencia Industrial Big Data (2025-2026)</span>
                             </button>
                         </div>
                     </div>
@@ -883,6 +893,13 @@ export default function ProduccionPlantaPage() {
                                 No se encontró ningún lote con el código &ldquo;{lotSearchQuery}&rdquo;. Verifica los números sugeridos arriba.
                             </div>
                         ) : null}
+                    </div>
+                )}
+
+                {/* TAB 4: INTELIGENCIA INDUSTRIAL BIG DATA & BOM */}
+                {activeTab === 'industrial_bi' && (
+                    <div className="space-y-4 pt-2">
+                        <ManufacturingBOMCostingPanel />
                     </div>
                 )}
             </main>

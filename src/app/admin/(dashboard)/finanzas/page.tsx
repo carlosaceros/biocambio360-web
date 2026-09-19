@@ -493,7 +493,7 @@ export default function AnalisisFinancieroPage() {
                         }`}
                     >
                         <Factory size={15} className={activeSection === 'costeo_bom' ? 'text-amber-400' : 'text-indigo-600'} />
-                        <span>Desglose Industrial BOM & Fórmulas (SGC 300926115)</span>
+                        <span>🏭 Inteligencia Industrial BOM & Big Data (2025 - 2026)</span>
                     </button>
                 </div>
 
