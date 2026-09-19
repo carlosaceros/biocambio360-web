@@ -8,16 +8,10 @@
  * - Carritos abandonados del día
  */
 
-import { sendEmail } from './email-service';
+import { sendEmail, ADMIN_RECIPIENTS } from './email-service';
 
 const FROM_NAME = 'Biocambio360 Admin';
 const FROM_EMAIL = process.env.SMTP_FROM || 'tiendavirtual@biocambio360.com';
-
-const ADMIN_RECIPIENTS = [
-    { email: 'infobiocambio360@gmail.com', name: 'Biocambio360 Info' },
-    { email: 'carlos.aceros@thinktic.co', name: 'Carlos Aceros' },
-    { email: 'tiendavirtual@biocambio360.com', name: 'Tienda Virtual Biocambio360' },
-];
 
 function formatCOP(amount: number): string {
     return new Intl.NumberFormat('es-CO', {
@@ -28,6 +22,9 @@ function formatCOP(amount: number): string {
 }
 
 export interface DailyAlertData {
+    // Fecha de reporte (opcional, por defecto hoy en Bogotá)
+    dateString?: string;
+
     // Ventas del día
     todaySales: number;
     todayOrdersCount: number;
@@ -66,8 +63,18 @@ export interface DailyAlertData {
     };
 }
 
-export async function sendDailyAlertEmail(data: DailyAlertData): Promise<void> {
-    const today = new Date().toLocaleDateString('es-CO', {
+export async function sendDailyAlertEmail(
+    data: DailyAlertData,
+    customRecipients?: { email: string; name?: string }[]
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    let dateObj = new Date();
+    if (data.dateString && /^\d{4}-\d{2}-\d{2}$/.test(data.dateString)) {
+        const [y, m, d] = data.dateString.split('-').map(Number);
+        dateObj = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    }
+
+    const today = dateObj.toLocaleDateString('es-CO', {
+        timeZone: 'America/Bogota',
         weekday: 'long',
         day: 'numeric',
         month: 'long',
@@ -80,7 +87,7 @@ export async function sendDailyAlertEmail(data: DailyAlertData): Promise<void> {
         { label: '📦 En Preparación', count: data.pipeline.preparacion, color: '#8b5cf6' },
         { label: '🚚 Enviados', count: data.pipeline.enviado, color: '#6366f1' },
         { label: '📍 En Camino', count: data.pipeline.en_camino, color: '#f97316' },
-        { label: '✓ Entregados (hoy)', count: data.pipeline.entregado, color: '#22c55e' },
+        { label: '✓ Entregados (Total Histórico)', count: data.pipeline.entregado, color: '#22c55e' },
         { label: '✕ Cancelados', count: data.pipeline.cancelado, color: '#ef4444' },
     ].map(row => `
         <tr>
@@ -223,10 +230,14 @@ export async function sendDailyAlertEmail(data: DailyAlertData): Promise<void> {
     </html>
     `;
 
-    await sendEmail({
+    const recipients = (customRecipients && customRecipients.length > 0)
+        ? customRecipients
+        : ADMIN_RECIPIENTS;
+
+    return await sendEmail({
         sender: { name: FROM_NAME, email: FROM_EMAIL },
-        to: ADMIN_RECIPIENTS,
-        subject: `📊 Resumen Diario — ${formatCOP(data.todaySales)} en ventas · ${data.todayOrdersCount} pedidos`,
+        to: recipients,
+        subject: `📊 Resumen Diario (${today}) — ${formatCOP(data.todaySales)} en ventas · ${data.todayOrdersCount} pedidos`,
         htmlContent: emailBody,
     });
 }

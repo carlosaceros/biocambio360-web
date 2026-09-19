@@ -13,21 +13,27 @@ const FROM_NAME = 'Biocambio360';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
-const ADMIN_RECIPIENTS = [
+export const ADMIN_RECIPIENTS = [
     { email: 'infobiocambio360@gmail.com', name: 'Biocambio360 Info' },
     { email: 'carlos.aceros@thinktic.co', name: 'Carlos Aceros' },
+    { email: 'daniloespinalospina@gmail.com', name: 'Danilo Espinal' },
+    { email: 'thinktic.thinktic@gmail.com', name: 'Think TIC' },
     { email: 'tiendavirtual@biocambio360.com', name: 'Tienda Virtual Biocambio360' },
 ];
 
-interface EmailPayload {
+export interface EmailPayload {
     sender?: { name: string; email: string };
     to: { email: string; name?: string }[];
     subject: string;
     htmlContent: string;
 }
 
-export async function sendEmail(payload: EmailPayload): Promise<void> {
-    const toAddresses = payload.to.map(t => t.email).join(', ');
+export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const toAddresses = payload.to.map(t => t.name ? `"${t.name}" <${t.email}>` : t.email).join(', ');
+    const senderName = payload.sender?.name || FROM_NAME;
+    const senderEmail = payload.sender?.email || FROM_EMAIL;
+
+    let smtpError: string | null = null;
 
     // 1. Try sending via Hostinger SMTP (Primary)
     try {
@@ -50,15 +56,16 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
         });
 
         const info = await transporter.sendMail({
-            from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+            from: `"${senderName}" <${senderEmail}>`,
             to: toAddresses,
             subject: payload.subject,
             html: payload.htmlContent,
         });
         console.log('[Email/SMTP] Sent successfully via Hostinger SMTP:', info.messageId);
-        return;
+        return { success: true, messageId: info.messageId };
     } catch (err: any) {
-        console.error('[Email/SMTP] Hostinger SMTP error:', err?.message || err);
+        smtpError = err?.message || String(err);
+        console.error('[Email/SMTP] Hostinger SMTP error:', smtpError);
     }
 
     // 2. Fallback to Brevo REST API if configured
@@ -72,7 +79,7 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
                     'content-type': 'application/json',
                 },
                 body: JSON.stringify({
-                    sender: { name: FROM_NAME, email: FROM_EMAIL },
+                    sender: payload.sender || { name: FROM_NAME, email: FROM_EMAIL },
                     to: payload.to,
                     subject: payload.subject,
                     htmlContent: payload.htmlContent,
@@ -82,15 +89,19 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
             if (!res.ok) {
                 const errText = await res.text();
                 console.error('[Email/Brevo] Fallback failed:', res.status, errText);
+                return { success: false, error: `SMTP: ${smtpError} | Brevo: ${res.status} ${errText}` };
             } else {
                 const data = await res.json();
                 console.log('[Email/Brevo] Fallback sent successfully:', data.messageId);
-                return;
+                return { success: true, messageId: data.messageId };
             }
         } catch (err: any) {
             console.error('[Email/Brevo] Fallback exception:', err?.message || err);
+            return { success: false, error: `SMTP: ${smtpError} | Brevo exception: ${err?.message || err}` };
         }
     }
+
+    return { success: false, error: smtpError || 'No email transport succeeded' };
 }
 
 function formatCOP(amount: number): string {

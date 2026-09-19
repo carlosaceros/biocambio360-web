@@ -1,8 +1,13 @@
 /**
- * Biocambio360 — Cron Job: Resumen Diario
+ * Biocambio360 — Cron Job: Resumen Diario Consolidado
  * 
- * Ejecuta diariamente a las 8:00 PM COT (01:00 UTC del día siguiente).
- * Recopila KPIs del día y envía email consolidado a administradores.
+ * Ejecuta automáticamente a las 8:00 PM COT (01:00 UTC del día siguiente)
+ * o bajo demanda manual por administradores.
+ * 
+ * Parámetros query soportados:
+ * - ?date=YYYY-MM-DD : Evalúa un día específico en hora Colombia (por defecto: hoy en Bogotá)
+ * - ?dryRun=true     : Calcula y devuelve JSON sin enviar email ni push
+ * - ?sendTo=email    : Envía copia de prueba a un correo específico en vez de a todos los admins
  */
 
 import { NextResponse } from 'next/server';
@@ -11,20 +16,57 @@ import type { DailyAlertData } from '@/lib/daily-alert-email';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+const BOGOTA_TZ = 'America/Bogota';
+
+const bogotaDateFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BOGOTA_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+});
+
+function parseDate(val: any): Date | null {
+    if (!val) return null;
+    if (typeof val.toDate === 'function') {
+        const d = val.toDate();
+        return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof val.seconds === 'number') {
+        const d = new Date(val.seconds * 1000);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof val === 'string' || typeof val === 'number') {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+}
+
+function getBogotaDateStr(date: Date | null): string | null {
+    if (!date || isNaN(date.getTime())) return null;
+    return bogotaDateFormatter.format(date);
+}
+
 export async function GET(request: Request) {
     try {
-        const { collection, getDocs, query, where, Timestamp } = await import('firebase/firestore');
+        const { collection, getDocs, query, where } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
         const { sendDailyAlertEmail } = await import('@/lib/daily-alert-email');
         const { getAllReplenishmentRecords } = await import('@/lib/replenishment-service');
 
-        console.log('[Cron/DailyAlerts] Generating daily report...');
+        const url = new URL(request.url);
+        const customDate = url.searchParams.get('date');
+        const dryRun = url.searchParams.get('dryRun') === 'true';
+        const sendTo = url.searchParams.get('sendTo');
 
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+        // Fecha de corte en hora de Colombia (YYYY-MM-DD)
+        const targetBogotaDateStr = (customDate && /^\d{4}-\d{2}-\d{2}$/.test(customDate))
+            ? customDate
+            : bogotaDateFormatter.format(new Date());
 
-        // ─── 1. Obtener todas las órdenes ───
+        console.log(`[Cron/DailyAlerts] Generating daily report for Colombia date: ${targetBogotaDateStr} (dryRun=${dryRun}, sendTo=${sendTo || 'all'})`);
+
+        // ─── 1. Obtener y evaluar todas las órdenes ───
         const ordersRef = collection(db, 'orders');
         const ordersSnap = await getDocs(ordersRef);
 
@@ -44,24 +86,18 @@ export async function GET(request: Request) {
             const order = docSnap.data();
             const status = (order.status || 'pendiente') as keyof typeof pipeline;
 
-            // Contar pipeline
+            // Pipeline global de estados
             if (status in pipeline) {
                 pipeline[status]++;
             }
 
-            // Ventas de hoy (excluir cancelados)
+            // Filtrado estricto por fecha Colombia (excluyendo cancelados)
             if (status !== 'cancelado') {
-                let orderDate: Date | null = null;
-                if (order.createdAt && typeof order.createdAt.toDate === 'function') {
-                    orderDate = order.createdAt.toDate();
-                } else if (order.createdAt?.seconds) {
-                    orderDate = new Date(order.createdAt.seconds * 1000);
-                } else if (order.createdAt) {
-                    orderDate = new Date(order.createdAt);
-                }
+                const orderDate = parseDate(order.createdAt);
+                const orderBogotaDate = getBogotaDateStr(orderDate);
 
-                if (orderDate && orderDate >= todayStart && orderDate < todayEnd) {
-                    todaySales += order.total || 0;
+                if (orderBogotaDate === targetBogotaDateStr) {
+                    todaySales += Number(order.total) || 0;
                     todayOrdersCount++;
                 }
             }
@@ -94,7 +130,7 @@ export async function GET(request: Request) {
             console.warn('[Cron/DailyAlerts] Could not fetch recompra data:', e);
         }
 
-        // ─── 3. Carritos Abandonados de Hoy ───
+        // ─── 3. Carritos Abandonados del Día (Zona Horaria Colombia) ───
         let abandonedCartsToday = 0;
         let abandonedCartsValue = 0;
 
@@ -104,23 +140,34 @@ export async function GET(request: Request) {
 
             cartsSnap.forEach(docSnap => {
                 const cart = docSnap.data();
-                let cartDate: Date | null = null;
-                if (cart.createdAt && typeof cart.createdAt.toDate === 'function') {
-                    cartDate = cart.createdAt.toDate();
-                } else if (cart.createdAt?.seconds) {
-                    cartDate = new Date(cart.createdAt.seconds * 1000);
-                }
+                const cartDate = parseDate(cart.createdAt);
+                const cartBogotaDate = getBogotaDateStr(cartDate);
 
-                if (cartDate && cartDate >= todayStart && cartDate < todayEnd) {
+                if (cartBogotaDate === targetBogotaDateStr) {
                     abandonedCartsToday++;
-                    abandonedCartsValue += cart.total || cart.subtotal || 0;
+                    abandonedCartsValue += Number(cart.total || cart.subtotal) || 0;
                 }
             });
         } catch (e) {
             console.warn('[Cron/DailyAlerts] Could not fetch abandoned carts:', e);
         }
 
-        // ─── 4. CRM Stats ───
+        // ─── 4. Clientes Nuevos de Hoy & CRM Stats ───
+        let newCustomersToday = 0;
+        try {
+            const customersRef = collection(db, 'customers');
+            const customersSnap = await getDocs(customersRef);
+            customersSnap.forEach(docSnap => {
+                const cData = docSnap.data();
+                const cDate = parseDate(cData.createdAt);
+                if (getBogotaDateStr(cDate) === targetBogotaDateStr) {
+                    newCustomersToday++;
+                }
+            });
+        } catch (e) {
+            console.warn('[Cron/DailyAlerts] Error counting new customers today:', e);
+        }
+
         let crmStats: DailyAlertData['crmStats'] = undefined;
         try {
             const { getCRMDashboardStats } = await import('@/lib/crm-service');
@@ -129,14 +176,15 @@ export async function GET(request: Request) {
                 totalCustomers: stats.totalCustomers,
                 atRisk: stats.byStage.at_risk || 0,
                 lost: stats.byStage.lost || 0,
-                newToday: 0, // Se podría calcular filtrando por createdAt de hoy
+                newToday: newCustomersToday,
             };
         } catch (e) {
             console.warn('[Cron/DailyAlerts] Could not fetch CRM stats:', e);
         }
 
-        // ─── 5. Enviar email ───
+        // ─── 5. Preparar Data del Reporte ───
         const alertData: DailyAlertData = {
+            dateString: targetBogotaDateStr,
             todaySales,
             todayOrdersCount,
             todayAvgTicket,
@@ -147,34 +195,46 @@ export async function GET(request: Request) {
             crmStats,
         };
 
-        await sendDailyAlertEmail(alertData);
-
-        // ─── 6. Push notification (FCM) ───
-        try {
-            const { sendAdminPushNotification } = await import('@/lib/fcm-service');
-            await sendAdminPushNotification({
-                title: `📊 Resumen: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(todaySales)} en ventas`,
-                body: `${todayOrdersCount} pedidos · ${pipeline.pendiente} pendientes · ${recompraAlerts.length} alertas recompra`,
-                data: { type: 'daily_report' },
-            });
-        } catch (e) {
-            console.warn('[Cron/DailyAlerts] FCM push failed:', e);
+        let emailResult: any = null;
+        if (!dryRun) {
+            const customRecipients = sendTo ? [{ email: sendTo, name: 'Admin Test' }] : undefined;
+            emailResult = await sendDailyAlertEmail(alertData, customRecipients);
         }
 
-        const summary = {
+        // ─── 6. Push notification (FCM) — Solo en ejecuciones regulares ───
+        if (!dryRun && !sendTo) {
+            try {
+                const { sendAdminPushNotification } = await import('@/lib/fcm-service');
+                await sendAdminPushNotification({
+                    title: `📊 Resumen: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(todaySales)} en ventas`,
+                    body: `${todayOrdersCount} pedidos · ${pipeline.pendiente} pendientes · ${recompraAlerts.length} alertas recompra`,
+                    data: { type: 'daily_report' },
+                });
+            } catch (e) {
+                console.warn('[Cron/DailyAlerts] FCM push failed:', e);
+            }
+        }
+
+        const responsePayload = {
             status: 'ok',
-            timestamp: new Date().toISOString(),
-            todaySales,
-            todayOrdersCount,
-            todayAvgTicket: Math.round(todayAvgTicket),
-            pipeline,
-            recompraAlertsCount: recompraAlerts.length,
-            abandonedCartsToday,
+            date: targetBogotaDateStr,
+            dryRun,
+            emailResult,
+            recipients: sendTo ? [sendTo] : 'ADMIN_RECIPIENTS (5 directores)',
+            summary: {
+                todaySales,
+                todayOrdersCount,
+                todayAvgTicket: Math.round(todayAvgTicket),
+                pipeline,
+                recompraAlertsCount: recompraAlerts.length,
+                abandonedCartsToday,
+                abandonedCartsValue,
+                crmStats,
+            },
         };
 
-        console.log('[Cron/DailyAlerts] Report sent:', JSON.stringify(summary));
-
-        return NextResponse.json(summary);
+        console.log('[Cron/DailyAlerts] Execution completed successfully:', JSON.stringify(responsePayload));
+        return NextResponse.json(responsePayload);
     } catch (error: any) {
         console.error('[Cron/DailyAlerts] Fatal error:', error);
         return NextResponse.json(

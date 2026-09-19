@@ -24,7 +24,8 @@ import {
     Target,
     Store,
     FlaskConical,
-    Award
+    Award,
+    Mail
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -40,6 +41,39 @@ export default function AdminDashboard() {
     const router = useRouter();
     const { notifications, unreadCount, permissionGranted, markAllAsRead, markAsRead, requestPermission } = useAdminNotifications();
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [isSendingReport, setIsSendingReport] = useState(false);
+    const [reportToast, setReportToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const handleSendDailyReport = async () => {
+        if (!confirm('¿Deseas generar y enviar el reporte consolidado diario a los correos de administración ahora mismo?')) {
+            return;
+        }
+        setIsSendingReport(true);
+        try {
+            const res = await fetch('/api/cron/daily-alerts');
+            const data = await res.json();
+            if (res.ok && data.status === 'ok') {
+                const formattedTotal = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(data.summary?.todaySales || 0);
+                setReportToast({
+                    message: `✅ Reporte diario enviado exitosamente: ${data.summary?.todayOrdersCount || 0} pedidos de hoy (${formattedTotal})`,
+                    type: 'success'
+                });
+            } else {
+                setReportToast({
+                    message: `❌ Error al enviar reporte: ${data.message || 'Error desconocido'}`,
+                    type: 'error'
+                });
+            }
+        } catch (err: any) {
+            setReportToast({
+                message: `❌ Error de conexión: ${err?.message || err}`,
+                type: 'error'
+            });
+        } finally {
+            setIsSendingReport(false);
+            setTimeout(() => setReportToast(null), 7000);
+        }
+    };
 
     const handleSignOut = async () => {
         await signOut();
@@ -191,6 +225,19 @@ export default function AdminDashboard() {
                             onRequestPermission={requestPermission}
                         />
 
+                        {/* Botón Enviar Reporte Diario */}
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            disabled={isSendingReport}
+                            onClick={handleSendDailyReport}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200 transition-colors disabled:opacity-50"
+                            title="Enviar Reporte Diario a Administradores"
+                        >
+                            <Mail size={15} className="text-emerald-600" />
+                            <span className="hidden sm:inline">{isSendingReport ? 'Enviando...' : 'Reporte Diario'}</span>
+                        </motion.button>
+
                         {/* Botón Cambiar Contraseña */}
                         <motion.button
                             whileHover={{ scale: 1.05 }}
@@ -220,6 +267,17 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             </header>
+
+            {reportToast && (
+                <div className="max-w-7xl mx-auto px-4 md:px-6 pt-4">
+                    <div className={`p-4 rounded-xl text-sm font-bold flex items-center justify-between border ${
+                        reportToast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'
+                    }`}>
+                        <span>{reportToast.message}</span>
+                        <button onClick={() => setReportToast(null)} className="text-xs underline opacity-70 hover:opacity-100 ml-4">Cerrar</button>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-8">
