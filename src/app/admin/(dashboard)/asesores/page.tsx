@@ -121,6 +121,17 @@ export default function AsesoresCockpitPage() {
         loadData(selectedAdvisor);
     }, [selectedAdvisor]);
 
+    // Leer tab desde URL (?tab=alertas, etc.)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get('tab');
+            if (tabParam && ['tareas', 'pedidos', 'borradores', 'novedades', 'alertas', 'tiempos'].includes(tabParam)) {
+                setActiveTab(tabParam as any);
+            }
+        }
+    }, []);
+
     // Atajo de teclado: Ctrl + N o Cmd + N para nuevo pedido rápido
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -308,6 +319,16 @@ export default function AsesoresCockpitPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Botón Banco de Textos (Word 2025) */}
+                        <button
+                            onClick={() => router.push('/admin/banco-textos')}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer"
+                            title="Abrir Banco de Textos Respuesta Word 2025 con precios dinámicos"
+                        >
+                            <MessageCircle size={14} className="text-indigo-600" />
+                            <span>💬 Banco de Textos 2025</span>
+                        </button>
 
                         {/* Botón Copilot IA y Guiones Comerciales */}
                         <button

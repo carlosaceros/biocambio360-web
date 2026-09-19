@@ -74,65 +74,141 @@ export async function upsertCustomerFromOrder(orderCustomer: OrderCustomer, orde
     }
 }
 
+import { COMPACT_CUSTOMERS_TOP_INDEX, CUSTOMERS_MACRO_STATS } from './integrated-customers-summary';
+
+export interface CustomerQueryOptions {
+    page?: number;
+    limit?: number;
+    search?: string;
+    advisor?: string;
+    stage?: string;
+    activeOnly?: boolean;
+}
+
+export interface CustomersPaginatedResponse {
+    customers: Customer[];
+    totalCount: number;
+    page: number;
+    totalPages: number;
+    stats: typeof CUSTOMERS_MACRO_STATS;
+}
+
 /**
- * Get all customers safely without requiring complex composite indexes
+ * Get customers with pagination, search and filters (Big Data 31,000+ support)
  */
-export async function getCustomers(): Promise<Customer[]> {
-    try {
-        const q = query(customersCollection, limit(500));
-        const snapshot = await getDocs(q);
+export async function getCustomersWithPagination(options: CustomerQueryOptions = {}): Promise<CustomersPaginatedResponse> {
+    const page = options.page || 1;
+    const limitCount = options.limit || 50;
 
-        const customers = snapshot.docs.map(doc => {
-            const data = doc.data();
-            const normGeo = normalizeDepartmentAndCity(data.departamento, data.ciudad);
-            return {
-                id: doc.id,
-                ...data,
-                nombre: data.nombre || 'Cliente',
-                cedula: data.cedula || '',
-                celular: data.celular || doc.id || '',
-                email: data.email || '',
-                direccion: data.direccion || '',
-                ciudad: normGeo.ciudad,
-                departamento: normGeo.departamento,
-                totalSpent: data.totalSpent || 0,
-                ordersCount: data.ordersCount || 1,
-                lastOrderDate: data.lastOrderDate || data.createdAt || null,
-                firstOrderDate: data.firstOrderDate || data.createdAt || null,
-                createdAt: data.createdAt || null,
-                updatedAt: data.updatedAt || null,
-            } as Customer;
-        });
+    // Si estamos en entorno navegador, consultar la API server-side
+    if (typeof window !== 'undefined') {
+        try {
+            const params = new URLSearchParams();
+            if (options.page) params.set('page', String(options.page));
+            if (options.limit) params.set('limit', String(options.limit));
+            if (options.search) params.set('search', options.search);
+            if (options.advisor) params.set('advisor', options.advisor);
+            if (options.stage) params.set('stage', options.stage);
+            if (options.activeOnly) params.set('activeOnly', 'true');
 
-        // Ordenar en memoria por fecha más reciente
-        return customers.sort((a, b) => {
-            const timeA = a.lastOrderDate?.seconds ? a.lastOrderDate.seconds * 1000 : 0;
-            const timeB = b.lastOrderDate?.seconds ? b.lastOrderDate.seconds * 1000 : 0;
-            return timeB - timeA;
-        });
-    } catch (error) {
-        console.error('[getCustomers] Error:', error);
-        return [];
+            const res = await fetch(`/api/admin/customers?${params.toString()}`);
+            if (res.ok) {
+                const data = await res.json();
+                return {
+                    customers: data.customers || [],
+                    totalCount: data.totalCount || 0,
+                    page: data.page || 1,
+                    totalPages: data.totalPages || 1,
+                    stats: data.stats || CUSTOMERS_MACRO_STATS
+                };
+            }
+        } catch (apiErr) {
+            console.warn('[getCustomersWithPagination] API fetch failed, using fallback:', apiErr);
+        }
     }
+
+    // Fallback en memoria o server-side
+    let pool: any[] = COMPACT_CUSTOMERS_TOP_INDEX;
+
+    if (options.activeOnly) {
+        pool = pool.filter(c => c.activo === true);
+    }
+    if (options.advisor && options.advisor !== 'all') {
+        if (options.advisor === 'unassigned' || options.advisor === 'sin_asignar') {
+            pool = pool.filter(c => !c.asesorAsignado);
+        } else {
+            pool = pool.filter(c => c.asesorAsignado?.toLowerCase() === options.advisor?.toLowerCase());
+        }
+    }
+    if (options.stage && options.stage !== 'all') {
+        pool = pool.filter(c => c.stage === options.stage);
+    }
+    if (options.search) {
+        const q = options.search.toLowerCase();
+        pool = pool.filter(c =>
+            (c.nombre || '').toLowerCase().includes(q) ||
+            (c.celular || '').toLowerCase().includes(q) ||
+            (c.email || '').toLowerCase().includes(q) ||
+            (c.cedula || '').toLowerCase().includes(q)
+        );
+    }
+
+    const hasFilter = !!(options.search || options.activeOnly || (options.advisor && options.advisor !== 'all') || (options.stage && options.stage !== 'all'));
+    const totalCount = hasFilter ? pool.length : (CUSTOMERS_MACRO_STATS.totalUniqueCustomers || pool.length);
+    const totalPages = Math.ceil(totalCount / limitCount) || 1;
+    const offset = (page - 1) * limitCount;
+    const items = pool.slice(offset, offset + limitCount);
+
+    return {
+        customers: items as Customer[],
+        totalCount,
+        page,
+        totalPages,
+        stats: CUSTOMERS_MACRO_STATS
+    };
+}
+
+/**
+ * Get all customers safely without hardcoded 500 limit
+ */
+export async function getCustomers(options: CustomerQueryOptions = {}): Promise<Customer[]> {
+    const result = await getCustomersWithPagination(options);
+    return result.customers;
 }
 
 /**
  * Get customer by ID (Phone)
  */
 export async function getCustomerById(id: string): Promise<Customer | null> {
-    const docRef = doc(customersCollection, id);
-    const docSnap = await getDoc(docRef);
+    const cleanId = id.replace(/\D/g, '');
+    try {
+        const docRef = doc(customersCollection, cleanId);
+        const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        const normGeo = normalizeDepartmentAndCity(data.departamento, data.ciudad);
-        return {
-            id: docSnap.id,
-            ...data,
-            ciudad: normGeo.ciudad,
-            departamento: normGeo.departamento
-        } as Customer;
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const normGeo = normalizeDepartmentAndCity(data.departamento, data.ciudad);
+            return {
+                id: docSnap.id,
+                ...data,
+                ciudad: normGeo.ciudad,
+                departamento: normGeo.departamento
+            } as Customer;
+        }
+    } catch (e) {
+        // Fallback a memoria si Firestore falla o excede cuota
     }
+
+    // Buscar en el índice consolidado
+    const match = COMPACT_CUSTOMERS_TOP_INDEX.find(c => c.id === cleanId || c.celular === cleanId);
+    if (match) {
+        return {
+            ...match,
+            ciudad: match.ciudad,
+            departamento: match.departamento
+        } as unknown as Customer;
+    }
+
     return null;
 }
 

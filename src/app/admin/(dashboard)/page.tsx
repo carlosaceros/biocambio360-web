@@ -26,7 +26,8 @@ import {
     FlaskConical,
     Award,
     Mail,
-    Zap
+    Zap,
+    MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -470,6 +471,30 @@ export default function AdminDashboard() {
                                         </p>
                                         <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
                                             Abrir Cockpit <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
+
+                                {/* Banco de Guiones & Textos Respuesta 2025 */}
+                                {(hasCap('asesores') || hasCap('clientes')) && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/banco-textos')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-indigo-300 text-left hover:border-indigo-500 hover:shadow-md transition-all group ring-1 ring-indigo-100"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                            <MessageSquare size={22} />
+                                        </div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <h3 className="text-base font-black text-gray-900">Banco de Guiones</h3>
+                                            <span className="text-[10px] font-black bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full">Word 2025</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Respuestas comerciales, precios en vivo, objeciones y alertas operativas.
+                                        </p>
+                                        <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
+                                            Abrir Guiones <ArrowUpRight size={14} />
                                         </span>
                                     </motion.button>
                                 )}

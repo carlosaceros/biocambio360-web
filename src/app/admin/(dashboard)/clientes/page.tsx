@@ -37,7 +37,9 @@ import {
     Users2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getCustomers, syncCustomersFromOrders } from '@/lib/customers-service';
+import { getCustomers, getCustomersWithPagination, syncCustomersFromOrders } from '@/lib/customers-service';
+import { CUSTOMERS_MACRO_STATS } from '@/lib/integrated-customers-summary';
+import SalesScriptsBankModal from '@/components/admin/SalesScriptsBankModal';
 import { getOrdersByCustomer } from '@/lib/orders-service';
 import { Customer } from '@/types/customer';
 import { Order, ORDER_STATUS_CONFIG } from '@/types/order';
@@ -100,6 +102,16 @@ export default function ClientesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
 
+    const [totalCustomersCount, setTotalCustomersCount] = useState<number>(CUSTOMERS_MACRO_STATS.totalUniqueCustomers || 0);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [pageSize, setPageSize] = useState<number>(50);
+    const [totalPages, setTotalPages] = useState<number>(1);
+    const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false);
+
+    // Banco de Textos Respuesta Modal
+    const [isScriptsBankOpen, setIsScriptsBankOpen] = useState(false);
+    const [preloadedClientForScripts, setPreloadedClientForScripts] = useState<{ name: string; phone: string }>({ name: '', phone: '' });
+
     // Multi-selection for bulk reassignment
     const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
     const [bulkAdvisor, setBulkAdvisor] = useState<string>('');
@@ -138,21 +150,39 @@ export default function ClientesPage() {
         };
     }, []);
 
-    useEffect(() => {
-        loadCustomers();
-    }, []);
-
-    const loadCustomers = async () => {
+    const loadCustomers = async (page: number = currentPage) => {
         setIsLoading(true);
         try {
-            const data = await getCustomers();
-            setRawCustomers(data);
+            const res = await getCustomersWithPagination({
+                page,
+                limit: pageSize,
+                search: searchQuery,
+                advisor: selectedAdvisor,
+                stage: selectedStage,
+                activeOnly: showActiveOnly
+            });
+            setRawCustomers(res.customers);
+            setTotalCustomersCount(res.totalCount);
+            setTotalPages(res.totalPages);
+            setCurrentPage(res.page);
         } catch (error) {
             console.error('Error loading customers:', error);
         } finally {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        loadCustomers(1);
+    }, [selectedStage, selectedAdvisor, showActiveOnly, pageSize]);
+
+    // Debounced search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            loadCustomers(1);
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     // Enrich customers with CRM stage & calculated data
     const crmCustomers: CustomerCRM[] = useMemo(() => {
@@ -440,19 +470,42 @@ export default function ClientesPage() {
                                     Gestión de Clientes & CRM
                                 </h1>
                                 <p className="text-xs text-slate-500">
-                                    {crmCustomers.length} clientes en base de datos · Pipeline de fidelización y recompra
+                                    <strong className="text-indigo-700 font-bold">{totalCustomersCount > 0 ? totalCustomersCount.toLocaleString('es-CO') : crmCustomers.length}</strong> clientes en base de datos · Pipeline de fidelización y recompra
                                 </p>
                             </div>
                         </div>
 
-                        {/* Controles de Vista y Sincronización */}
-                        <div className="flex items-center gap-2.5 flex-wrap">
+                        {/* Controles de Vista, Banco de Textos, Alertas y Sincronización */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Botón Banco de Textos (Word 2025) */}
+                            <button
+                                onClick={() => {
+                                    setPreloadedClientForScripts({ name: '', phone: '' });
+                                    setIsScriptsBankOpen(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-indigo-300 bg-indigo-600 hover:bg-indigo-700 text-xs font-black text-white shadow-xs transition-all cursor-pointer"
+                                title="Abrir Banco de Textos Respuesta basado en el Word 2025"
+                            >
+                                <MessageCircle className="w-3.5 h-3.5 text-indigo-200" />
+                                💬 Banco de Textos (Word 2025)
+                            </button>
+
+                            {/* Botón Protocolo de Alertas */}
+                            <button
+                                onClick={() => router.push('/admin/asesores')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-black text-amber-900 shadow-xs transition-all cursor-pointer"
+                                title="Ir al Protocolo de Alertas (Entregas y Recompras)"
+                            >
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                🔔 Protocolo de Alertas
+                            </button>
+
                             <button
                                 onClick={() => router.push('/admin/informe-ventas')}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-bold text-indigo-700 transition-colors"
                             >
                                 <BarChart3 className="w-3.5 h-3.5" />
-                                Ver Informe Ventas (Power BI)
+                                <span className="hidden sm:inline">Power BI</span>
                             </button>
 
                             <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
@@ -481,7 +534,7 @@ export default function ClientesPage() {
                                     setIsSyncing(true);
                                     try {
                                         await syncCustomersFromOrders();
-                                        await loadCustomers();
+                                        await loadCustomers(1);
                                     } finally {
                                         setIsSyncing(false);
                                     }
@@ -509,20 +562,35 @@ export default function ClientesPage() {
                             />
                         </div>
 
-                        {/* Filtro por Asesor */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-500">Asesor:</span>
-                            <select
-                                value={selectedAdvisor}
-                                onChange={(e) => setSelectedAdvisor(e.target.value)}
-                                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-hidden focus:border-indigo-500"
+                        {/* Filtro por Asesor y Activos SGC */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                onClick={() => setShowActiveOnly(prev => !prev)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border shadow-2xs cursor-pointer ${
+                                    showActiveOnly
+                                        ? 'bg-amber-500 border-amber-600 text-white'
+                                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                                }`}
+                                title="Filtrar únicamente los 3.713 clientes activos con compras históricas y trazabilidad SGC"
                             >
-                                <option value="all">Todos los Asesores ({advisorsList.length})</option>
-                                {advisorsList.map(adv => (
-                                    <option key={adv} value={adv}>{adv}</option>
-                                ))}
-                                <option value="sin_asignar">Sin Asignar</option>
-                            </select>
+                                <Star className={`w-3.5 h-3.5 ${showActiveOnly ? 'fill-white text-white' : 'text-amber-500 fill-amber-500'}`} />
+                                <span>⭐ Solo Activos SGC ({CUSTOMERS_MACRO_STATS.activeClientsPool ? CUSTOMERS_MACRO_STATS.activeClientsPool.toLocaleString('es-CO') : '3.713'})</span>
+                            </button>
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-500">Asesor:</span>
+                                <select
+                                    value={selectedAdvisor}
+                                    onChange={(e) => setSelectedAdvisor(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-hidden focus:border-indigo-500"
+                                >
+                                    <option value="all">Todos los Asesores ({advisorsList.length})</option>
+                                    <option value="sin_asignar">Sin Asignar (31k Libres)</option>
+                                    {advisorsList.map(adv => (
+                                        <option key={adv} value={adv}>{adv}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -728,6 +796,47 @@ export default function ClientesPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Paginador Server-Side */}
+                        <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                            <div className="text-slate-500 font-medium">
+                                Mostrando <strong className="text-slate-800 font-bold">{((currentPage - 1) * pageSize) + (filteredCustomers.length > 0 ? 1 : 0)}</strong> a <strong className="text-slate-800 font-bold">{Math.min(currentPage * pageSize, totalCustomersCount)}</strong> de <strong className="text-indigo-700 font-black">{totalCustomersCount.toLocaleString('es-CO')}</strong> clientes
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-slate-500 font-medium">Por página:</span>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => setPageSize(Number(e.target.value))}
+                                    className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:outline-hidden focus:border-indigo-500 cursor-pointer"
+                                >
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={200}>200</option>
+                                </select>
+
+                                <div className="flex items-center gap-1 ml-2">
+                                    <button
+                                        onClick={() => loadCustomers(currentPage - 1)}
+                                        disabled={currentPage <= 1 || isLoading}
+                                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                    >
+                                        ← Anterior
+                                    </button>
+                                    <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-lg text-xs font-black text-indigo-700">
+                                        Pág. {currentPage} de {Math.max(1, totalPages)}
+                                    </span>
+                                    <button
+                                        onClick={() => loadCustomers(currentPage + 1)}
+                                        disabled={currentPage >= totalPages || isLoading}
+                                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                    >
+                                        Siguiente →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -882,24 +991,39 @@ export default function ClientesPage() {
 
                                 {/* Contenido con Scroll */}
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs text-slate-700">
-                                    {/* Acciones Rápidas (WhatsApp / Llamar) */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <a
-                                            href={`https://wa.me/57${selectedCustomer.celular.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(selectedCustomer.nombre)}%2C%20te%20saludo%20de%20Biocambio360`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center justify-center gap-2 p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs transition-colors"
+                                    {/* Acciones Rápidas (WhatsApp / Llamar / Banco de Guiones) */}
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <a
+                                                href={`https://wa.me/57${selectedCustomer.celular.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(selectedCustomer.nombre)}%2C%20te%20saludo%20de%20Biocambio360`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center justify-center gap-2 p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs transition-colors"
+                                            >
+                                                <MessageCircle className="w-4 h-4" />
+                                                Abrir WhatsApp
+                                            </a>
+                                            <a
+                                                href={`tel:${selectedCustomer.celular}`}
+                                                className="flex items-center justify-center gap-2 p-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold transition-colors"
+                                            >
+                                                <Phone className="w-4 h-4 text-slate-600" />
+                                                Llamar
+                                            </a>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setPreloadedClientForScripts({
+                                                    name: selectedCustomer.nombre || '',
+                                                    phone: selectedCustomer.celular || ''
+                                                });
+                                                setIsScriptsBankOpen(true);
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer"
                                         >
                                             <MessageCircle className="w-4 h-4" />
-                                            Abrir WhatsApp
-                                        </a>
-                                        <a
-                                            href={`tel:${selectedCustomer.celular}`}
-                                            className="flex items-center justify-center gap-2 p-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold transition-colors"
-                                        >
-                                            <Phone className="w-4 h-4 text-slate-600" />
-                                            Llamar
-                                        </a>
+                                            <span>💬 Abrir Banco de Guiones (Word 2025)</span>
+                                        </button>
                                     </div>
 
                                     {/* Métricas Financieras del Cliente */}
@@ -1142,6 +1266,15 @@ export default function ClientesPage() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Modal de Banco de Textos Respuesta (Word 2025 Dinámico) */}
+            <SalesScriptsBankModal
+                isOpen={isScriptsBankOpen}
+                onClose={() => setIsScriptsBankOpen(false)}
+                initialClientName={preloadedClientForScripts.name}
+                initialClientPhone={preloadedClientForScripts.phone}
+                initialAdvisorName={userProfile?.nombre || user?.displayName || 'Asesor Biocambio360'}
+            />
         </div>
     );
 }
