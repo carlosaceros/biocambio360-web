@@ -497,6 +497,36 @@ export async function decrementStockForOrderItems(
 }
 
 /**
+ * Restituye existencias de inventario de forma segura cuando un pedido es devuelto físicamente a bodega
+ */
+export async function incrementStockForOrderItems(
+    items: Array<{ product: { id: string; nombre: string }; size: string; cantidad: number }>
+): Promise<void> {
+    if (!items || items.length === 0) return;
+
+    for (const item of items) {
+        try {
+            const productId = item.product?.id;
+            const size = item.size;
+            const qty = item.cantidad || 1;
+
+            if (!productId || !size) continue;
+
+            const product = await getProductById(productId);
+            if (!product) continue;
+
+            const currentStockMap = product.stock || {};
+            const currentQty = currentStockMap[size] !== undefined ? currentStockMap[size] : 25;
+            const newQty = currentQty + qty;
+
+            await updateProductStock(productId, size, newQty);
+        } catch (err) {
+            console.warn(`[ProductsService] Error al restituir stock de ${item.product?.id} (${item.size}):`, err);
+        }
+    }
+}
+
+/**
  * Deletes a product (soft delete + purge)
  */
 export async function deleteProduct(id: string): Promise<void> {

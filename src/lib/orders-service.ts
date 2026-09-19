@@ -15,10 +15,10 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { upsertCustomerFromOrder } from './customers-service';
-import { decrementStockForOrderItems } from './products-service';
+import { decrementStockForOrderItems, incrementStockForOrderItems } from './products-service';
 import { recordAuditLog } from './audit-service';
 
-import { Order, OrderStatus, TimelineEvent, OrderInternalNote, OrderCustomer } from '@/types/order';
+import { Order, OrderStatus, TimelineEvent, OrderInternalNote, OrderCustomer, OrderDeliveryException } from '@/types/order';
 
 // Collection reference
 const ordersCollection = collection(db, 'orders');
@@ -718,4 +718,237 @@ export async function discardDraftOrder(
     userContext?: { email?: string; nombre?: string; role?: string }
 ): Promise<void> {
     return updateOrderStatus(orderId, 'cancelado', 'Cotización/Borrador descartado por el asesor comercial', userContext);
+}
+
+/**
+ * Parámetros para procesar la resolución de una novedad contraentrega
+ */
+export interface ProcessDeliveryExceptionParams {
+    orderId: string;
+    resolucion: 'reintento_programado' | 'devuelto_bodega' | 'perdido_transportadora';
+    motivo: OrderDeliveryException['motivo'];
+    motivoDetalle?: string;
+    fechaReintentoProgramada?: string; // YYYY-MM-DD
+    franjaHoraria?: 'manana' | 'tarde' | 'todo_el_dia';
+    tarifaEspecialReintento?: number; // COP adicional al flete (puede ser 0)
+    transportadoraReintento?: string;
+    nuevaDireccion?: string;
+    nuevoBarrio?: string;
+    nuevoTelefono?: string;
+    notasSeguimiento?: string;
+    radicadoSiniestro?: string;
+    montoReclamado?: number;
+    userContext?: { email?: string; nombre?: string; role?: string };
+}
+
+/**
+ * Marca un pedido como no entregado (novedad logística contraentrega)
+ */
+export async function markOrderAsFailedDelivery(
+    orderId: string,
+    motivo: OrderDeliveryException['motivo'],
+    motivoDetalle?: string,
+    userContext?: { email?: string; nombre?: string; role?: string }
+): Promise<void> {
+    const orderRef = doc(db, 'orders', orderId);
+    const orderSnap = await getDoc(orderRef);
+    if (!orderSnap.exists()) throw new Error('Order not found');
+
+    const order = orderSnap.data() as Order;
+    const nowIso = new Date().toISOString();
+
+    const previousException = order.novedadEntrega;
+    const intentos = (previousException?.intentosPrevios || 0) + 1;
+
+    const novedad: OrderDeliveryException = {
+        motivo,
+        motivoDetalle: motivoDetalle || 'Entrega no lograda en el primer intento',
+        fechaNovedad: nowIso,
+        intentosPrevios: intentos,
+        gestorResponsable: userContext?.nombre || 'Gestor Logístico',
+        gestorEmail: userContext?.email || 'logistica@biocambio360.com',
+        fleteAnterior: order.envio || 0
+    };
+
+    const note = `⚠️ Novedad en entrega (${intentos}° intento fallido). Motivo: ${motivo}. ${motivoDetalle || ''}`;
+
+    await updateDoc(orderRef, {
+        novedadEntrega: removeUndefined(novedad)
+    });
+
+    await updateOrderStatus(orderId, 'no_entregado', note, userContext);
+}
+
+/**
+ * Procesa el tratamiento especial de un pedido con novedad contraentrega:
+ * - reintento_programado: ajusta flete (tarifa especial), actualiza dirección/fecha, pasa a 'preparacion' o 'en_camino'
+ * - devuelto_bodega: pasa a 'cancelado' y restituye stock a bodega
+ * - perdido_transportadora: pasa a 'cancelado' SIN restituir stock (siniestro transportadora)
+ */
+export async function processDeliveryException(params: ProcessDeliveryExceptionParams): Promise<void> {
+    const {
+        orderId,
+        resolucion,
+        motivo,
+        motivoDetalle,
+        fechaReintentoProgramada,
+        franjaHoraria,
+        tarifaEspecialReintento = 0,
+        transportadoraReintento,
+        nuevaDireccion,
+        nuevoBarrio,
+        nuevoTelefono,
+        notasSeguimiento,
+        radicadoSiniestro,
+        montoReclamado,
+        userContext
+    } = params;
+
+    const orderRef = doc(db, 'orders', orderId);
+    const orderSnap = await getDoc(orderRef);
+    if (!orderSnap.exists()) throw new Error('Order not found');
+
+    const order = orderSnap.data() as Order;
+    const nowIso = new Date().toISOString();
+
+    if (resolucion === 'reintento_programado') {
+        const nuevoFlete = (order.envio || 0) + Math.max(0, tarifaEspecialReintento);
+        const nuevoTotal = (order.total || 0) + Math.max(0, tarifaEspecialReintento);
+
+        const updatedCustomer: OrderCustomer = {
+            ...order.cliente,
+            direccion: nuevaDireccion?.trim() ? nuevaDireccion.trim() : order.cliente.direccion,
+            barrio: nuevoBarrio?.trim() ? nuevoBarrio.trim() : order.cliente.barrio,
+            celular: nuevoTelefono?.trim() ? nuevoTelefono.trim() : order.cliente.celular
+        };
+
+        const novedadUpdate: OrderDeliveryException = {
+            ...(order.novedadEntrega || { fechaNovedad: nowIso, intentosPrevios: 1 }),
+            motivo,
+            motivoDetalle,
+            resolucion: 'reintento_programado',
+            fechaReintentoProgramada,
+            franjaHoraria: franjaHoraria || 'todo_el_dia',
+            tarifaEspecialReintento,
+            fleteAnterior: order.envio || 0,
+            transportadoraReintento: transportadoraReintento || (order as any).shippingInfo?.carrier || 'Flota Propia Biocambio360',
+            nuevaDireccion: nuevaDireccion?.trim() || undefined,
+            nuevoBarrio: nuevoBarrio?.trim() || undefined,
+            nuevoTelefono: nuevoTelefono?.trim() || undefined,
+            gestorResponsable: userContext?.nombre || 'Asesor Comercial',
+            gestorEmail: userContext?.email,
+            notasSeguimiento
+        };
+
+        const updatePayload: Record<string, any> = {
+            cliente: removeUndefined(updatedCustomer),
+            envio: nuevoFlete,
+            total: nuevoTotal,
+            novedadEntrega: removeUndefined(novedadUpdate),
+            updatedAt: Timestamp.now()
+        };
+
+        if (transportadoraReintento) {
+            updatePayload.guiaTransportadora = transportadoraReintento.includes('Flota')
+                ? `FLOTA-${orderId.slice(-6).toUpperCase()}`
+                : (order.guiaTransportadora || 'REINTENTO');
+        }
+
+        await updateDoc(orderRef, updatePayload);
+
+        const noteText = `🔄 Reintento contraentrega programado para ${fechaReintentoProgramada || 'próxima fecha'}. ` +
+            `Tarifa especial adicional: $${tarifaEspecialReintento.toLocaleString('es-CO')}. ` +
+            `Transportadora: ${transportadoraReintento || 'Coordinada'}. ` +
+            (notasSeguimiento ? `Detalle: ${notasSeguimiento}` : '');
+
+        // Pasa a 'preparacion' para que bodega vuelva a despachar o a 'en_camino'
+        await updateOrderStatus(orderId, 'preparacion', noteText, userContext);
+
+    } else if (resolucion === 'devuelto_bodega') {
+        const novedadUpdate: OrderDeliveryException = {
+            ...(order.novedadEntrega || { fechaNovedad: nowIso, intentosPrevios: 1 }),
+            motivo,
+            motivoDetalle,
+            resolucion: 'devuelto_bodega',
+            gestorResponsable: userContext?.nombre || 'Gestor Logístico',
+            gestorEmail: userContext?.email,
+            notasSeguimiento: notasSeguimiento || 'Mercancía devuelta físicamente a bodega central. Inventario restituido.'
+        };
+
+        await updateDoc(orderRef, {
+            novedadEntrega: removeUndefined(novedadUpdate),
+            updatedAt: Timestamp.now()
+        });
+
+        // Restituir existencias a bodega
+        if (order.productos && order.productos.length > 0) {
+            await incrementStockForOrderItems(order.productos);
+        }
+
+        const noteText = `📦 Mercancía devuelta a bodega tras no entrega contraentrega (${motivo}). Stock restituido satisfactoriamente.`;
+        await updateOrderStatus(orderId, 'cancelado', noteText, userContext);
+
+    } else if (resolucion === 'perdido_transportadora') {
+        const novedadUpdate: OrderDeliveryException = {
+            ...(order.novedadEntrega || { fechaNovedad: nowIso, intentosPrevios: 1 }),
+            motivo: 'perdido_transportadora',
+            motivoDetalle: motivoDetalle || 'Paquete extraviado, hurtado o siniestrado en manos de la transportadora',
+            resolucion: 'perdido_transportadora',
+            gestorResponsable: userContext?.nombre || 'Gestor Logístico',
+            gestorEmail: userContext?.email,
+            notasSeguimiento,
+            reclamacionSeguroTransportadora: {
+                radicado: radicadoSiniestro || `REC-${Date.now().toString().slice(-6)}`,
+                montoReclamado: montoReclamado || order.total || 0,
+                estado: 'pendiente'
+            }
+        };
+
+        await updateDoc(orderRef, {
+            novedadEntrega: removeUndefined(novedadUpdate),
+            updatedAt: Timestamp.now()
+        });
+
+        // IMPORTANTE: NO restituir stock porque el producto se perdió físicamente
+        const noteText = `🚨 SINIESTRO / PÉRDIDA EN TRANSPORTADORA. Radicado seguro: ${radicadoSiniestro || 'Pendiente'}. ` +
+            `Monto reclamado: $${(montoReclamado || order.total || 0).toLocaleString('es-CO')}. Mercancía NO disponible.`;
+        await updateOrderStatus(orderId, 'cancelado', noteText, userContext);
+    }
+}
+
+/**
+ * Obtiene pedidos en novedad o no entregados (para cockpit de asesor o logística)
+ */
+export async function getFailedDeliveryOrders(advisorName?: string): Promise<(Order & { id: string })[]> {
+    try {
+        const q = query(
+            ordersCollection,
+            where('status', '==', 'no_entregado'),
+            limit(100)
+        );
+        const snapshot = await getDocs(q);
+        const orders = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as (Order & { id: string })[];
+
+        const sorted = orders.sort((a, b) => {
+            const ta = (a.updatedAt as any)?.toMillis ? (a.updatedAt as any).toMillis() : 0;
+            const tb = (b.updatedAt as any)?.toMillis ? (b.updatedAt as any).toMillis() : 0;
+            return tb - ta;
+        });
+
+        if (!advisorName || advisorName === 'superadmin' || advisorName === 'admin') {
+            return sorted;
+        }
+
+        const cleanAdv = advisorName.toLowerCase().trim();
+        return sorted.filter(d =>
+            (d.asesorNombre && d.asesorNombre.toLowerCase().includes(cleanAdv)) ||
+            (d.asesorId && d.asesorId.toLowerCase() === cleanAdv)
+        );
+    } catch (e) {
+        console.warn('[OrdersService] Error al obtener pedidos no entregados:', e);
+        return [];
+    }
 }

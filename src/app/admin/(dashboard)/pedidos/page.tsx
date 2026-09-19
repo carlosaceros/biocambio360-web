@@ -38,7 +38,8 @@ import {
     Globe,
     Send,
     FileText,
-    ArrowRight
+    ArrowRight,
+    AlertTriangle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -52,6 +53,7 @@ import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
 import { Product } from '@/lib/products';
 import { getProductImage } from '@/lib/product-utils';
 import { getAllProducts } from '@/lib/products-service';
+import DeliveryExceptionModal from '@/components/admin/DeliveryExceptionModal';
 
 /**
  * Safely convert a Firestore Timestamp (or serialized version) to a JS Date.
@@ -124,6 +126,7 @@ const ALL_STATUSES: OrderStatus[] = [
     'preparacion',
     'enviado',
     'en_camino',
+    'no_entregado',
     'entregado',
     'cancelado'
 ];
@@ -435,6 +438,7 @@ export default function PedidosPage() {
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [isCheckingWompi, setIsCheckingWompi] = useState(false);
     const [wompiStatusFeedback, setWompiStatusFeedback] = useState<string | null>(null);
+    const [deliveryExceptionOrder, setDeliveryExceptionOrder] = useState<(Order & { id: string }) | null>(null);
 
     // Filtro de ventana de tiempo para aligerar la carga del tablero
     type TimeWindow = '5_dias' | '15_dias' | '30_dias' | 'activos' | 'todos';
@@ -670,7 +674,7 @@ export default function PedidosPage() {
     };
 
     const isOrderInWindow = (order: Order & { id: string }) => {
-        const ACTIVE_STATUSES: OrderStatus[] = ['pendiente', 'confirmado', 'preparacion', 'enviado', 'en_camino'];
+        const ACTIVE_STATUSES: OrderStatus[] = ['pendiente', 'confirmado', 'preparacion', 'enviado', 'en_camino', 'no_entregado'];
         // Regla Innegociable: Las órdenes activas SIEMPRE se muestran para no perder despachos
         if (ACTIVE_STATUSES.includes(order.status)) return true;
 
@@ -768,7 +772,7 @@ export default function PedidosPage() {
                     </div>
 
                     {/* Selector de Ventana de Tiempo (Optimización de Carga) */}
-                    <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <div className="flex flex-wrap items-center gap-1.5 mb-3" data-tour="pedidos-ventana-tiempo">
                         <span className="text-[10px] font-black uppercase text-gray-400 mr-1 flex items-center gap-1">
                             <Clock size={12} /> Ventana:
                         </span>
@@ -794,7 +798,7 @@ export default function PedidosPage() {
                     </div>
 
                     {/* Search Bar con Soporte Remoto */}
-                    <div className="relative">
+                    <div className="relative" data-tour="pedidos-search-bar">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                             type="text"
@@ -833,7 +837,7 @@ export default function PedidosPage() {
             </header>
 
             {/* Kanban Board */}
-            <main className="flex-1 p-6 overflow-x-auto">
+            <main className="flex-1 p-6 overflow-x-auto" data-tour="pedidos-kanban-board">
                 <DndContext
                     sensors={sensors}
                     onDragStart={handleDragStart}
@@ -893,16 +897,52 @@ export default function PedidosPage() {
                                         {format(safeToDate(activeOrder.createdAt), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => setActiveOrder(null)}
-                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                                >
-                                    <X size={24} className="text-gray-400" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {(activeOrder.status === 'no_entregado' || activeOrder.metodoPago === 'contraentrega' || activeOrder.status === 'enviado' || activeOrder.status === 'en_camino') && (
+                                        <button
+                                            onClick={() => setDeliveryExceptionOrder(activeOrder)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs"
+                                            title="Gestionar novedad, reprogramar reintento con tarifa especial o declarar siniestro"
+                                        >
+                                            <AlertTriangle size={14} className="text-rose-600" />
+                                            <span>Tratar Novedad</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setActiveOrder(null)}
+                                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                    >
+                                        <X size={24} className="text-gray-400" />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Modal Body */}
                             <div className="p-6 overflow-y-auto custom-scrollbar">
+                                {activeOrder.novedadEntrega && (
+                                    <div className="mb-6 p-4 bg-rose-50/80 border border-rose-200 rounded-2xl flex items-start justify-between gap-4">
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 flex items-center gap-1 mb-1">
+                                                <AlertTriangle size={13} className="text-rose-600" />
+                                                Novedad en Entrega Contraentrega ({activeOrder.novedadEntrega.intentosPrevios || 1}° Intento)
+                                            </span>
+                                            <p className="text-xs font-bold text-rose-900">
+                                                Motivo: {activeOrder.novedadEntrega.motivo} — {activeOrder.novedadEntrega.motivoDetalle || 'Reportado por transportadora'}
+                                            </p>
+                                            {activeOrder.novedadEntrega.resolucion === 'reintento_programado' && (
+                                                <p className="text-xs text-indigo-700 font-bold mt-1">
+                                                    🔄 Reintento programado: {activeOrder.novedadEntrega.fechaReintentoProgramada} ({activeOrder.novedadEntrega.franjaHoraria}) | Flete especial: +${activeOrder.novedadEntrega.tarifaEspecialReintento?.toLocaleString('es-CO')}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => setDeliveryExceptionOrder(activeOrder)}
+                                            className="px-3 py-1.5 bg-white hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold shrink-0 transition-colors"
+                                        >
+                                            Editar Resolución
+                                        </button>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {/* Left Column: Products & Financials */}
                                     <div className="space-y-6">
@@ -1654,6 +1694,17 @@ export default function PedidosPage() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Modal de Tratamiento Especial de Novedades Contraentrega */}
+            <DeliveryExceptionModal
+                isOpen={!!deliveryExceptionOrder}
+                onClose={() => setDeliveryExceptionOrder(null)}
+                order={deliveryExceptionOrder}
+                onSuccess={() => {
+                    setDeliveryExceptionOrder(null);
+                    setActiveOrder(null);
+                }}
+            />
 
             {/* Modal Cambiar Contraseña */}
             <ChangePasswordModal

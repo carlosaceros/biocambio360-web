@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import AdminTourSystem from '@/components/admin/tour/AdminTourSystem';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -62,5 +63,5 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return null;
     }
 
-    return <>{children}</>;
+    return <AdminTourSystem>{children}</AdminTourSystem>;
 }

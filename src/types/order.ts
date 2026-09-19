@@ -7,6 +7,7 @@ export type OrderStatus =
     | 'preparacion'
     | 'enviado'
     | 'en_camino'
+    | 'no_entregado'
     | 'entregado'
     | 'cancelado';
 
@@ -80,6 +81,38 @@ export interface AddiTransactionDetails {
     note?: string;
 }
 
+export interface OrderDeliveryException {
+    motivo:
+        | 'cliente_ausente'
+        | 'sin_dinero'
+        | 'direccion_erronea'
+        | 'solicito_reprogramacion'
+        | 'rechazado'
+        | 'zona_dificil'
+        | 'perdido_transportadora'
+        | 'otro';
+    motivoDetalle?: string;
+    fechaNovedad: string; // ISO string
+    intentosPrevios?: number;
+    resolucion?: 'reintento_programado' | 'devuelto_bodega' | 'perdido_transportadora';
+    fechaReintentoProgramada?: string; // YYYY-MM-DD
+    franjaHoraria?: 'manana' | 'tarde' | 'todo_el_dia';
+    tarifaEspecialReintento?: number; // COP adicional o acordado
+    fleteAnterior?: number;
+    transportadoraReintento?: string; // Ej: "Flota Propia Biocambio360", "99 Envíos", "Interrapidísimo"
+    nuevaDireccion?: string;
+    nuevoBarrio?: string;
+    nuevoTelefono?: string;
+    gestorResponsable?: string;
+    gestorEmail?: string;
+    notasSeguimiento?: string;
+    reclamacionSeguroTransportadora?: {
+        radicado?: string;
+        montoReclamado?: number;
+        estado?: 'pendiente' | 'aprobado' | 'rechazado';
+    };
+}
+
 export interface Order {
     id: string;
     cliente: OrderCustomer;
@@ -138,6 +171,7 @@ export interface Order {
     asesorEmail?: string;
     motivoBorrador?: string;
     fechaSeguimiento?: string;
+    novedadEntrega?: OrderDeliveryException;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
@@ -183,6 +217,12 @@ export const ORDER_STATUS_CONFIG: Record<OrderStatus, {
         color: 'text-orange-700',
         bgColor: 'bg-orange-100',
         icon: '📍'
+    },
+    no_entregado: {
+        label: 'No Entregado / Novedad',
+        color: 'text-rose-800',
+        bgColor: 'bg-rose-100',
+        icon: '⚠️'
     },
     entregado: {
         label: 'Entregado',

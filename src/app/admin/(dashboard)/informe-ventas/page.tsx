@@ -141,6 +141,7 @@ export default function InformeVentasPage() {
                             return (
                                 <button
                                     key={tab.id}
+                                    {...(tab.id === 'geografia' ? { 'data-tour': 'bi-nav-geografia' } : {})}
                                     onClick={() => setSelectedTab(tab.id as ReportTab)}
                                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                                         isActive
@@ -945,6 +946,7 @@ export default function InformeVentasPage() {
                 {/* PESTAÑA: DISTRIBUCIÓN GEOGRÁFICA & MAPAS DE CALOR */}
                 {selectedTab === 'geografia' && (
                     <motion.div
+                        data-tour="bi-geo-view"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}

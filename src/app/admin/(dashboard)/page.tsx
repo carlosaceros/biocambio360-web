@@ -126,6 +126,7 @@ export default function AdminDashboard() {
             confirmado: 0,
             enviado: 0,
             en_camino: 0,
+            no_entregado: 0,
             entregado: 0,
             preparacion: 0,
             cancelado: 0

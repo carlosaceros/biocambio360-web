@@ -371,6 +371,15 @@ export async function sendOrderStatusCustomerEmail(data: {
             badgeText = '#15803d';
             badgeLabel = 'ENTREGADO';
             break;
+        case 'no_entregado':
+            title = 'Novedad en la entrega de tu pedido ⚠️';
+            headline = 'no fue posible completar la entrega hoy';
+            description = 'La transportadora nos reportó una novedad y no pudo concretar la entrega de tu pedido en la dirección indicada. No te preocupes: nuestro equipo logístico y comercial está gestionando el caso para coordinar un reintento de entrega lo antes posible.';
+            badgeBg = '#ffe4e6';
+            badgeText = '#9f1239';
+            badgeLabel = 'NO ENTREGADO / NOVEDAD';
+            showTrackingBtn = !!data.trackingNumber;
+            break;
         case 'cancelado':
             title = 'Tu pedido ha sido cancelado ⚠️';
             headline = 'actualización sobre tu orden';

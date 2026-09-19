@@ -25,7 +25,8 @@ import {
     FileSpreadsheet,
     Shield,
     Bookmark,
-    Trash2
+    Trash2,
+    MapPin
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/checkout-utils';
@@ -38,9 +39,10 @@ import { CustomerCRM } from '@/types/crm';
 import { addCRMActivity } from '@/lib/crm-service';
 import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
+import DeliveryExceptionModal from '@/components/admin/DeliveryExceptionModal';
 import { ORDER_STATUS_CONFIG, OrderStatus, Order } from '@/types/order';
 import { subscribeToAdminUsers } from '@/lib/users-service';
-import { getDraftOrdersByAdvisor, discardDraftOrder } from '@/lib/orders-service';
+import { getDraftOrdersByAdvisor, discardDraftOrder, getFailedDeliveryOrders } from '@/lib/orders-service';
 
 const DEFAULT_ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
 
@@ -59,7 +61,9 @@ export default function AsesoresCockpitPage() {
     const [advisorsList, setAdvisorsList] = useState<string[]>(DEFAULT_ADVISORS);
     const [portfolio, setPortfolio] = useState<AdvisorPortfolioSummary | null>(null);
     const [draftOrders, setDraftOrders] = useState<(Order & { id: string })[]>([]);
+    const [failedOrders, setFailedOrders] = useState<(Order & { id: string })[]>([]);
     const [selectedDraftForModal, setSelectedDraftForModal] = useState<(Order & { id: string }) | null>(null);
+    const [selectedOrderForException, setSelectedOrderForException] = useState<(Order & { id: string }) | null>(null);
     const [isDiscardingDraft, setIsDiscardingDraft] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [quickNoteText, setQuickNoteText] = useState<{ [key: string]: string }>({});
@@ -67,7 +71,7 @@ export default function AsesoresCockpitPage() {
     // Fast order modal & tab state
     const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
     const [preloadedClientForOrder, setPreloadedClientForOrder] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores'>('tareas');
+    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores' | 'novedades'>('tareas');
 
     // Cargar asesores dinámicamente desde admin_users
     useEffect(() => {
@@ -117,12 +121,14 @@ export default function AsesoresCockpitPage() {
     const loadData = async (advName: string) => {
         setIsLoading(true);
         try {
-            const [data, drafts] = await Promise.all([
+            const [data, drafts, failed] = await Promise.all([
                 getAdvisorPortfolio(advName),
-                getDraftOrdersByAdvisor(advName)
+                getDraftOrdersByAdvisor(advName),
+                getFailedDeliveryOrders(advName)
             ]);
             setPortfolio(data);
             setDraftOrders(drafts);
+            setFailedOrders(failed);
         } finally {
             setIsLoading(false);
         }
@@ -190,7 +196,7 @@ export default function AsesoresCockpitPage() {
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 pb-28 relative">
             {/* Top Bar */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs" data-tour="asesor-header">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <button
@@ -358,6 +364,7 @@ export default function AsesoresCockpitPage() {
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <div className="flex items-center gap-3">
                         <button
+                            data-tour="asesor-clientes-prioritarios"
                             onClick={() => setActiveTab('tareas')}
                             className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
                                 activeTab === 'tareas'
@@ -382,6 +389,7 @@ export default function AsesoresCockpitPage() {
                         </button>
 
                         <button
+                            data-tour="asesor-tab-borradores"
                             onClick={() => setActiveTab('borradores')}
                             className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
                                 activeTab === 'borradores'
@@ -396,6 +404,26 @@ export default function AsesoresCockpitPage() {
                                     activeTab === 'borradores' ? 'bg-slate-950 text-amber-300' : 'bg-amber-100 text-amber-800'
                                 }`}>
                                     {draftOrders.length}
+                                </span>
+                            )}
+                        </button>
+
+                        <button
+                            data-tour="asesor-tab-novedades"
+                            onClick={() => setActiveTab('novedades')}
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                                activeTab === 'novedades'
+                                    ? 'bg-rose-600 text-white shadow-xs'
+                                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                        >
+                            <AlertTriangle size={14} className={activeTab === 'novedades' ? 'text-white' : 'text-rose-600'} />
+                            <span>Novedades & Rescate ({failedOrders.length})</span>
+                            {failedOrders.length > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    activeTab === 'novedades' ? 'bg-white text-rose-700' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                    {failedOrders.length}
                                 </span>
                             )}
                         </button>
@@ -784,10 +812,112 @@ export default function AsesoresCockpitPage() {
                         )}
                     </div>
                 )}
+
+                {/* TAB 4: Novedades y Rescate Contraentrega */}
+                {activeTab === 'novedades' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-base font-black text-rose-900 flex items-center gap-2">
+                                    <AlertTriangle size={18} className="text-rose-600" />
+                                    <span>Novedades & Rescate de Envíos Contraentrega</span>
+                                </h2>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Pedidos contraentrega que no pudieron entregarse en el primer intento. Contacta al cliente para acordar un reintento (tarifa especial o cortesía) y asegurar la venta.
+                                </p>
+                            </div>
+                            <span className="text-xs font-black text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full">
+                                {failedOrders.length} por rescatar
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {failedOrders.map(ord => {
+                                const cleanPhone = (ord.cliente?.celular || '').replace(/\D/g, '');
+                                const attempts = ord.novedadEntrega?.intentosPrevios || 1;
+                                const motivoLabel = ord.novedadEntrega?.motivo 
+                                    ? ord.novedadEntrega.motivo.replace('_', ' ') 
+                                    : 'Fallo de entrega';
+
+                                const whatsappRescueMsg = encodeURIComponent(
+                                    `Hola *${ord.cliente?.nombre || 'Cliente'}*, te saluda *${selectedAdvisor}* de *Biocambio360* 🌿. Vemos que la transportadora reportó una novedad con la entrega contraentrega de tu pedido #${ord.id.slice(-6).toUpperCase()}. ¿Deseas que coordinemos un reintento para mañana en una franja horaria que te quede cómoda?`
+                                );
+
+                                return (
+                                    <div key={ord.id} className="bg-gradient-to-b from-rose-50/40 to-white rounded-2xl border border-rose-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-all">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black uppercase text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                                    <AlertTriangle size={11} /> {motivoLabel}
+                                                </span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {attempts}° Intento
+                                                </span>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-bold text-slate-900 text-sm">
+                                                    {ord.cliente?.nombre || 'Cliente'}
+                                                </h3>
+                                                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                                                    <MapPin size={12} className="text-slate-400" />
+                                                    {ord.cliente?.ciudad}, {ord.cliente?.direccion}
+                                                </p>
+                                                {ord.novedadEntrega?.motivoDetalle && (
+                                                    <p className="text-[11px] text-rose-700 font-medium mt-1 bg-white p-2 rounded-lg border border-rose-100">
+                                                        "{ord.novedadEntrega.motivoDetalle}"
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                                                <span className="text-[10px] font-mono text-slate-400">#{ord.id.slice(-6).toUpperCase()}</span>
+                                                <div className="text-right">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Cobro Contraentrega</span>
+                                                    <span className="text-sm font-black text-rose-700">
+                                                        ${ord.total?.toLocaleString('es-CO')} COP
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 pt-4 mt-3 border-t border-slate-200">
+                                            <button
+                                                onClick={() => setSelectedOrderForException(ord)}
+                                                className="flex-1 py-2 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                                title="Programar reintento con tarifa especial, cambiar flota o cancelar"
+                                            >
+                                                <Zap size={14} className="text-amber-300" />
+                                                <span>Tratar Novedad</span>
+                                            </button>
+
+                                            <a
+                                                href={`https://wa.me/57${cleanPhone}?text=${whatsappRescueMsg}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition-colors cursor-pointer"
+                                                title="Contactar al cliente por WhatsApp para rescatar la venta"
+                                            >
+                                                <MessageCircle size={16} />
+                                            </a>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {failedOrders.length === 0 && (
+                            <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                🎉 ¡Excelente! No tienes pedidos contraentrega con novedades pendientes de entrega en este momento.
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
             {/* BOTÓN FLOTANTE PERMANENTE (FAB) PARA ASESORES COMERCIALES */}
             <motion.button
+                data-tour="asesor-fab-nuevo-pedido"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
@@ -819,6 +949,17 @@ export default function AsesoresCockpitPage() {
                 preloadedCustomer={preloadedClientForOrder}
                 onOrderCreated={() => {
                     // Recargar datos inmediatamente al crear o cerrar la orden
+                    loadData(selectedAdvisor);
+                }}
+            />
+
+            {/* MODAL DE TRATAMIENTO DE NOVEDAD CONTRAENTREGA */}
+            <DeliveryExceptionModal
+                isOpen={!!selectedOrderForException}
+                onClose={() => setSelectedOrderForException(null)}
+                order={selectedOrderForException}
+                onSuccess={() => {
+                    setSelectedOrderForException(null);
                     loadData(selectedAdvisor);
                 }}
             />
