@@ -216,5 +216,83 @@ describe('Centralización de Ventas Call Center / WhatsApp & Fast Order Entry', 
             // Comisiones base 2.0%: 1,200,000 * 0.02 = 24,000
             expect(portfolio.comisionesEstimadasCOP).toBe(24000);
         });
+
+        it('debe excluir estrictamente borradores y cancelados de pedidos cerrados y detallar los escenarios operativos', async () => {
+            // Mock de customers de Karen
+            vi.mocked(firestore.getDocs).mockResolvedValueOnce({
+                forEach: (cb: any) => {
+                    cb({
+                        id: 'cust-1',
+                        data: () => ({
+                            nombre: 'Cliente Prueba',
+                            totalSpent: 100000,
+                            ordersCount: 1,
+                            assignedTo: 'Karen'
+                        })
+                    });
+                }
+            } as any);
+
+            // Mock de getOrdersByAdvisor: 1 confirmado ($100k), 1 borrador ($46.737) y 1 cancelado ($80k)
+            vi.mocked(firestore.getDocs).mockResolvedValueOnce({
+                docs: [
+                    {
+                        id: 'ord-confirmado',
+                        data: () => ({
+                            asesorNombre: 'Karen',
+                            total: 100000,
+                            status: 'confirmado',
+                            createdAt: { toMillis: () => Date.now() }
+                        })
+                    },
+                    {
+                        id: 'ord-borrador',
+                        data: () => ({
+                            asesorNombre: 'Karen',
+                            total: 46737,
+                            status: 'borrador',
+                            createdAt: { toMillis: () => Date.now() }
+                        })
+                    },
+                    {
+                        id: 'ord-cancelado',
+                        data: () => ({
+                            asesorNombre: 'Karen',
+                            total: 80000,
+                            status: 'cancelado',
+                            createdAt: { toMillis: () => Date.now() }
+                        })
+                    }
+                ]
+            } as any);
+
+            // Mock de getDraftOrdersByAdvisor
+            vi.mocked(firestore.getDocs).mockResolvedValueOnce({
+                docs: [
+                    {
+                        id: 'ord-borrador',
+                        data: () => ({
+                            asesorNombre: 'Karen',
+                            total: 46737,
+                            status: 'borrador',
+                            productos: []
+                        })
+                    }
+                ]
+            } as any);
+
+            const portfolio = await getAdvisorPortfolio('Karen');
+
+            // El borrador ($46.737) y el cancelado ($80.000) NO deben sumar a pedidos cerrados
+            expect(portfolio.pedidosMesCount).toBe(1);
+            expect(portfolio.ventasAcumuladasMes).toBe(100000);
+            expect(portfolio.comisionesEstimadasCOP).toBe(2000); // 2% de 100k, NO sobre el borrador
+
+            // Desglose de escenarios operativos debe estar detallado
+            expect(portfolio.desgloseEscenarios.efectivosCount).toBe(1);
+            expect(portfolio.desgloseEscenarios.efectivosMonto).toBe(100000);
+            expect(portfolio.desgloseEscenarios.borradoresCount).toBe(1);
+            expect(portfolio.desgloseEscenarios.borradoresMonto).toBe(46737);
+        });
     });
 });

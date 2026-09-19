@@ -19,7 +19,7 @@ import { db } from './firebase';
 import { Customer } from '@/types/customer';
 import { CustomerCRM } from '@/types/crm';
 import { enrichCustomerWithCRM } from './crm-service';
-import { getOrdersByAdvisor } from './orders-service';
+import { getOrdersByAdvisor, getDraftOrdersByAdvisor } from './orders-service';
 import { Order } from '@/types/order';
 
 export interface AdvisorGoalConfig {
@@ -52,6 +52,16 @@ export interface AdvisorPortfolioSummary {
     ticketPromedioMes: number;
     pedidosRecientes: (Order & { id: string })[];
     clientesPrioritarios: CustomerCRM[];
+    desgloseEscenarios: {
+        efectivosCount: number;
+        efectivosMonto: number;
+        pendientesCount: number;
+        pendientesMonto: number;
+        novedadesCount: number;
+        novedadesMonto: number;
+        borradoresCount: number;
+        borradoresMonto: number;
+    };
 }
 
 /**
@@ -111,7 +121,7 @@ export async function getAdvisorPortfolio(advisorName: string): Promise<AdvisorP
             })
             .slice(0, 20);
 
-        // Consultar órdenes reales del mes en curso para el asesor
+        // Consultar órdenes reales del mes en curso para el asesor (excluye borradores y cancelados)
         let advisorOrders: (Order & { id: string })[] = [];
         try {
             advisorOrders = await getOrdersByAdvisor(advisorName);
@@ -119,26 +129,63 @@ export async function getAdvisorPortfolio(advisorName: string): Promise<AdvisorP
             console.warn(`[AdvisorService] No se pudieron cargar órdenes de ${advisorName}:`, ordErr);
         }
 
+        // Consultar cotizaciones y borradores en caliente del asesor
+        let advisorDrafts: (Order & { id: string })[] = [];
+        try {
+            advisorDrafts = await getDraftOrdersByAdvisor(advisorName);
+        } catch (draftErr) {
+            console.warn(`[AdvisorService] No se pudieron cargar borradores de ${advisorName}:`, draftErr);
+        }
+
+        // ⚠️ REGLA CRÍTICA DE AUDITORÍA:
+        // Los borradores ('borrador') y cancelados ('cancelado') NUNCA computan como pedidos cerrados ni suman a la meta mensual
+        const closedOrders = advisorOrders.filter(
+            ord => ord.status !== 'borrador' && ord.status !== 'cancelado'
+        );
+
         let ventasMesReal = 0;
         let pedidosHoyCount = 0;
         const todayStr = new Date().toDateString();
 
-        if (advisorOrders.length > 0) {
-            ventasMesReal = advisorOrders.reduce((sum, ord) => sum + (ord.total || 0), 0);
-            pedidosHoyCount = advisorOrders.filter(ord => {
+        if (closedOrders.length > 0) {
+            ventasMesReal = closedOrders.reduce((sum, ord) => sum + (ord.total || 0), 0);
+            pedidosHoyCount = closedOrders.filter(ord => {
                 const d = ord.createdAt?.toMillis?.() ? new Date(ord.createdAt.toMillis()) : null;
                 return d && d.toDateString() === todayStr;
             }).length;
         } else {
-            // Fallback para asesores sin órdenes registradas aún
-            ventasMesReal = ventasAcumuladas;
+            // Si no hay pedidos cerrados este mes, las ventas son $0 (NUNCA usar ventas históricas de clientes)
+            ventasMesReal = 0;
         }
 
-        const pedidosMesCount = advisorOrders.length;
+        const pedidosMesCount = closedOrders.length;
         const ticketPromedio = pedidosMesCount > 0 ? Math.round(ventasMesReal / pedidosMesCount) : 0;
         const cumplimiento = Math.round((ventasMesReal / config.metaMensualCOP) * 100);
         const tasaComision = cumplimiento >= 100 ? config.porcentajeComisionBonoMeta : config.porcentajeComisionBase;
         const comisiones = Math.round(ventasMesReal * (tasaComision / 100));
+
+        // Desglose de Escenarios Operativos del Mes:
+        // 1. Efectivos / En Firme (confirmado, preparacion, enviado, en_camino, entregado)
+        const efectivos = closedOrders.filter(o =>
+            ['confirmado', 'preparacion', 'enviado', 'en_camino', 'entregado'].includes(o.status)
+        );
+        // 2. Pendientes de Validación/Pago (pendiente)
+        const pendientes = closedOrders.filter(o => o.status === 'pendiente');
+        // 3. Novedades de Entrega (no_entregado)
+        const novedades = closedOrders.filter(o => o.status === 'no_entregado');
+        // 4. Borradores / Cotizaciones Activas (borrador)
+        const borradores = advisorDrafts.filter(d => d.status === 'borrador');
+
+        const desgloseEscenarios = {
+            efectivosCount: efectivos.length,
+            efectivosMonto: efectivos.reduce((s, o) => s + (o.total || 0), 0),
+            pendientesCount: pendientes.length,
+            pendientesMonto: pendientes.reduce((s, o) => s + (o.total || 0), 0),
+            novedadesCount: novedades.length,
+            novedadesMonto: novedades.reduce((s, o) => s + (o.total || 0), 0),
+            borradoresCount: borradores.length,
+            borradoresMonto: borradores.reduce((s, o) => s + (o.total || 0), 0),
+        };
 
         return {
             advisorName,
@@ -152,8 +199,9 @@ export async function getAdvisorPortfolio(advisorName: string): Promise<AdvisorP
             pedidosMesCount,
             pedidosHoyCount,
             ticketPromedioMes: ticketPromedio,
-            pedidosRecientes: advisorOrders.slice(0, 30),
+            pedidosRecientes: closedOrders.slice(0, 30),
             clientesPrioritarios: prioritarios,
+            desgloseEscenarios,
         };
     } catch (error) {
         console.error(`[AdvisorService] Error cargando cartera de ${advisorName}:`, error);
@@ -171,6 +219,16 @@ export async function getAdvisorPortfolio(advisorName: string): Promise<AdvisorP
             ticketPromedioMes: 0,
             pedidosRecientes: [],
             clientesPrioritarios: [],
+            desgloseEscenarios: {
+                efectivosCount: 0,
+                efectivosMonto: 0,
+                pendientesCount: 0,
+                pendientesMonto: 0,
+                novedadesCount: 0,
+                novedadesMonto: 0,
+                borradoresCount: 0,
+                borradoresMonto: 0,
+            },
         };
     }
 }

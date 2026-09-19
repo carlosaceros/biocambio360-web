@@ -380,10 +380,10 @@ export default function AsesoresCockpitPage() {
                 {portfolio && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                         {/* Meta Mensual & Cumplimiento */}
-                        <div className="sm:col-span-2 bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl text-white shadow-sm flex flex-col justify-between">
+                        <div className="sm:col-span-2 bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 p-5 rounded-2xl text-white shadow-sm flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">
+                                    <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
                                         Meta Mensual ($30M)
                                     </span>
                                     <span className="text-xs text-indigo-200 font-mono font-bold">
@@ -393,15 +393,46 @@ export default function AsesoresCockpitPage() {
                                 <p className="text-3xl font-black text-amber-400 mt-1">
                                     {formatCurrency(portfolio.ventasAcumuladasMes)}
                                 </p>
-                                <p className="text-xs text-slate-300 mt-0.5">
-                                    {portfolio.pedidosMesCount} pedidos cerrados este mes
-                                </p>
+                                <div className="flex items-center justify-between text-xs text-slate-300 mt-0.5">
+                                    <span>{portfolio.pedidosMesCount} pedidos cerrados este mes</span>
+                                    {portfolio.desgloseEscenarios?.borradoresCount > 0 && (
+                                        <span className="text-[10px] text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded font-medium">
+                                            +{portfolio.desgloseEscenarios.borradoresCount} borrador(es) en cotización
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                            <div className="w-full bg-white/10 rounded-full h-2.5 mt-4 overflow-hidden">
+
+                            <div className="w-full bg-white/10 rounded-full h-2 mt-3 overflow-hidden">
                                 <div
                                     className="bg-amber-400 h-full rounded-full transition-all"
                                     style={{ width: `${Math.min(100, portfolio.porcentajeCumplimiento)}%` }}
                                 />
+                            </div>
+
+                            {/* Desglose Detallado de Escenarios Operativos */}
+                            <div className="mt-3.5 pt-3 border-t border-white/10">
+                                <div className="text-[10px] uppercase font-bold text-indigo-300 mb-1.5 flex items-center justify-between">
+                                    <span>Escenarios de Cartera</span>
+                                    <span className="text-[9px] lowercase font-normal text-slate-400">solo cerrados suman a meta</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                                    <div className="bg-emerald-950/50 border border-emerald-500/30 rounded-lg p-1.5 text-center">
+                                        <span className="text-emerald-400 font-bold block">✓ Cerrados</span>
+                                        <span className="font-mono text-white font-black text-xs">{portfolio.desgloseEscenarios?.efectivosCount || 0}</span>
+                                        <span className="text-[9px] text-emerald-300/80 block truncate font-mono">{formatCurrency(portfolio.desgloseEscenarios?.efectivosMonto || 0)}</span>
+                                    </div>
+                                    <div className="bg-amber-950/50 border border-amber-500/30 rounded-lg p-1.5 text-center" title="Cotizaciones en caliente. NO computan como cierre hasta ser confirmadas">
+                                        <span className="text-amber-400 font-bold block">📝 Borradores</span>
+                                        <span className="font-mono text-white font-black text-xs">{portfolio.desgloseEscenarios?.borradoresCount || 0}</span>
+                                        <span className="text-[9px] text-amber-300/80 block truncate font-mono">{formatCurrency(portfolio.desgloseEscenarios?.borradoresMonto || 0)}</span>
+                                    </div>
+                                    <div className="bg-rose-950/50 border border-rose-500/30 rounded-lg p-1.5 text-center" title="Novedades de entrega pendientes de rescate">
+                                        <span className="text-rose-400 font-bold block">⚠️ Novedades</span>
+                                        <span className="font-mono text-white font-black text-xs">{portfolio.desgloseEscenarios?.novedadesCount || 0}</span>
+                                        <span className="text-[9px] text-rose-300/80 block truncate font-mono">{formatCurrency(portfolio.desgloseEscenarios?.novedadesMonto || 0)}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -788,8 +819,19 @@ export default function AsesoresCockpitPage() {
 
                                     {(!portfolio?.pedidosRecientes || portfolio.pedidosRecientes.length === 0) && (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-8 text-center text-slate-400 italic">
-                                                Aún no se registran pedidos este mes para este asesor. ¡Haz clic en "Nuevo Pedido" para comenzar!
+                                            <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                                                <div className="max-w-md mx-auto space-y-2">
+                                                    <p className="font-bold text-slate-700 text-sm">Aún no hay pedidos cerrados este mes para {selectedAdvisor}.</p>
+                                                    {draftOrders.length > 0 ? (
+                                                        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 text-left leading-relaxed">
+                                                            📝 <b>Tienes {draftOrders.length} cotización(es) / borrador(es) en caliente</b> en la pestaña <b>"Borradores & Cotizaciones"</b>. Recuerda que los borradores no computan como pedidos cerrados hasta que sean formalmente confirmados por el cliente.
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-xs text-slate-400">
+                                                            Haz clic en "Nuevo Pedido" (o presiona F2) para registrar una venta o cotización.
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     )}
@@ -813,7 +855,7 @@ export default function AsesoresCockpitPage() {
                                     </span>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-0.5">
-                                    Cotizaciones en caliente guardadas durante llamadas o chats. No comprometen inventario hasta que el cliente confirme.
+                                    Cotizaciones en caliente guardadas durante llamadas o chats. No comprometen inventario, ni suman a la meta mensual ni generan comisiones hasta que sean confirmadas y convertidas a pedido formal.
                                 </p>
                             </div>
 

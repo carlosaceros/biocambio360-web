@@ -695,11 +695,16 @@ export async function getOrdersByAdvisor(
     monthDate: Date = new Date()
 ): Promise<(Order & { id: string })[]> {
     try {
-        const q = query(
-            ordersCollection,
-            where('asesorNombre', '==', advisorName),
-            limit(300)
-        );
+        let q;
+        if (!advisorName || advisorName === 'todos') {
+            q = query(ordersCollection, limit(500));
+        } else {
+            q = query(
+                ordersCollection,
+                where('asesorNombre', '==', advisorName),
+                limit(300)
+            );
+        }
         const snap = await getDocs(q);
 
         const targetYear = monthDate.getFullYear();
@@ -708,7 +713,8 @@ export async function getOrdersByAdvisor(
         const orders = snap.docs
             .map(d => ({ id: d.id, ...d.data() } as Order & { id: string }))
             .filter(ord => {
-                if (ord.status === 'cancelado') return false;
+                // ⚠️ REGLA CRÍTICA DE NEGOCIO: Un borrador (cotización) o pedido cancelado NUNCA es un pedido cerrado
+                if (ord.status === 'cancelado' || ord.status === 'borrador') return false;
                 const ts = ord.createdAt?.toMillis?.() ? new Date(ord.createdAt.toMillis()) : null;
                 if (!ts) return true;
                 return ts.getFullYear() === targetYear && ts.getMonth() === targetMonth;
