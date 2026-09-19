@@ -24,47 +24,17 @@ import {
     Bookmark
 } from 'lucide-react';
 import { PRODUCTOS, Product, isDisallowedSize } from '@/lib/products';
-import { formatCurrency, DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, calculateShipping, normalizeDepartmentAndCity } from '@/lib/checkout-utils';
+import { formatCurrency, DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, calculateShipping, normalizeDepartmentAndCity, findDaneCode } from '@/lib/checkout-utils';
 import { OrderCustomer, OrderItem, Order } from '@/types/order';
 
 import { createOrder, lookupCustomerByPhone, updateOrderStatus, safeToArray } from '@/lib/orders-service';
 import { doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
-import citiesData from '@/lib/cities-99envios.json';
 import { subscribeToAdminUsers } from '@/lib/users-service';
 import { recordOrderTimingSession } from '@/lib/order-timing-service';
 
 const ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
-
-function findDaneCode(dept: string, city: string): { codigo: string; nombre: string } {
-    const cleanCity = (city || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-    const cleanDept = (dept || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-
-    if (cleanCity.includes('BOGOTA')) {
-        return { codigo: '11001000', nombre: 'BOGOTA, DISTRITO CAPITAL' };
-    }
-    if (cleanCity.includes('SOACHA')) {
-        return { codigo: '25754000', nombre: 'SOACHA' };
-    }
-
-    const entries = Object.values(citiesData as Record<string, { codigo: string; ciudad: string; departamento: string }>);
-    
-    const exact = entries.find(e => {
-        const c = e.ciudad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-        const d = e.departamento.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-        return c === cleanCity && (d.includes(cleanDept) || cleanDept.includes(d));
-    });
-    if (exact) return { codigo: exact.codigo, nombre: exact.ciudad };
-
-    const partial = entries.find(e => {
-        const c = e.ciudad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-        return c.includes(cleanCity) || cleanCity.includes(c);
-    });
-    if (partial) return { codigo: partial.codigo, nombre: partial.ciudad };
-
-    return { codigo: '11001000', nombre: cleanCity || 'BOGOTA, DISTRITO CAPITAL' };
-}
 
 interface FastOrderModalProps {
     isOpen: boolean;
@@ -920,9 +890,16 @@ export default function FastOrderModal({
 
                                         {/* Ciudad */}
                                         <div>
-                                            <label className="text-[11px] font-bold text-slate-600">
-                                                Ciudad / Municipio
-                                            </label>
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[11px] font-bold text-slate-600">
+                                                    Ciudad / Municipio
+                                                </label>
+                                                {ciudad && (
+                                                    <span className="text-[10px] font-mono text-emerald-700 font-medium">
+                                                        DANE: {findDaneCode(departamento, ciudad).codigo}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <select
                                                 value={ciudad}
                                                 onChange={(e) => {
