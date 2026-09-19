@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { Customer } from '@/types/customer';
 import { PosItem } from '@/types/pos';
-import { formatCurrency } from '@/lib/checkout-utils';
+import { formatCurrency, normalizeDepartmentAndCity } from '@/lib/checkout-utils';
 import {
     getCustomerPurchaseHistory,
     CustomerPurchaseHistoryItem
@@ -198,6 +198,12 @@ export default function PosCustomerDetailsSidebar({
         setTimeout(() => setCopiedField(null), 2500);
     };
 
+    // Normalized geo for display and clipboard
+    const normGeo = useMemo(() => {
+        if (!customer) return { ciudad: 'Soacha', departamento: 'Cundinamarca' };
+        return normalizeDepartmentAndCity(customer.departamento, customer.ciudad);
+    }, [customer?.departamento, customer?.ciudad]);
+
     // Copy entire customer dossier
     const handleCopyFullInfo = () => {
         if (!customer) return;
@@ -205,7 +211,7 @@ export default function PosCustomerDetailsSidebar({
             `• Nombre: ${customer.nombre}\n` +
             `• Celular: ${customer.celular}\n` +
             `• Cédula / NIT: ${customer.cedula || 'No registrada'}\n` +
-            `• Ciudad: ${customer.ciudad || 'Soacha'} (${customer.departamento || 'Cundinamarca'})\n` +
+            `• Ciudad: ${normGeo.ciudad} (${normGeo.departamento})\n` +
             `• Dirección: ${customer.direccion || 'Venta Mostrador Soacha'}\n` +
             `• Email: ${customer.email || 'No registrado'}\n` +
             `• Compras: ${customer.ordersCount} pedidos (${formatCurrency(customer.totalSpent)})\n` +
@@ -547,7 +553,7 @@ export default function PosCustomerDetailsSidebar({
                                             <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase block">Ciudad / Depto</span>
                                                 <span className="font-semibold text-slate-900 block mt-0.5">
-                                                    {customer.ciudad || 'Soacha'}, {customer.departamento || 'Cundinamarca'}
+                                                    {normGeo.ciudad}, {normGeo.departamento}
                                                 </span>
                                             </div>
 

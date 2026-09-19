@@ -12,7 +12,8 @@ import {
     CIUDADES_POR_DEPARTAMENTO,
     validateCedula,
     validateCelular,
-    formatCurrency
+    formatCurrency,
+    normalizeDepartmentAndCity
 } from '@/lib/checkout-utils';
 import citiesData from '@/lib/cities-99envios.json';
 
@@ -386,6 +387,7 @@ export default function CheckoutPage() {
         });
 
         try {
+            const normGeo = normalizeDepartmentAndCity(formData.departamento, formData.ciudad);
             // Create order in Firestore
             const orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'timeline'> = {
                 cliente: {
@@ -393,8 +395,8 @@ export default function CheckoutPage() {
                     cedula: formData.cedula,
                     celular: formData.celular,
                     email: formData.email || undefined,
-                    departamento: formData.departamento,
-                    ciudad: formData.ciudad,
+                    departamento: normGeo.departamento,
+                    ciudad: normGeo.ciudad,
                     direccion: formData.direccion,
                     notas: formData.notas || undefined
                 },
@@ -801,10 +803,11 @@ export default function CheckoutPage() {
                                                             type="button"
                                                             className="w-full text-left px-4 py-3 hover:bg-red-50 transition-colors flex items-center justify-between border-b border-gray-100 last:border-0"
                                                             onMouseDown={() => {
+                                                                const norm = normalizeDepartmentAndCity(city.departamento, city.ciudad);
                                                                 setFormData(prev => ({
                                                                     ...prev,
-                                                                    ciudad: city.ciudad,
-                                                                    departamento: city.departamento,
+                                                                    ciudad: norm.ciudad,
+                                                                    departamento: norm.departamento,
                                                                 }));
                                                                 setDestinoCodigo(city.codigo);
                                                                 setCitySearch('');

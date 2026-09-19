@@ -19,6 +19,7 @@ import { decrementStockForOrderItems, incrementStockForOrderItems } from './prod
 import { recordAuditLog } from './audit-service';
 
 import { Order, OrderStatus, TimelineEvent, OrderInternalNote, OrderCustomer, OrderDeliveryException } from '@/types/order';
+import { normalizeDepartmentAndCity } from './checkout-utils';
 
 // Collection reference
 const ordersCollection = collection(db, 'orders');
@@ -192,6 +193,13 @@ export async function detectRecentAddressOrder(
  */
 export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'timeline'>): Promise<string> {
     const now = Timestamp.now();
+
+    // Normalizar departamento y ciudad para evitar discrepancias (p. ej. Bogotá -> Cundinamarca)
+    if (orderData.cliente) {
+        const normGeo = normalizeDepartmentAndCity(orderData.cliente.departamento, orderData.cliente.ciudad);
+        orderData.cliente.departamento = normGeo.departamento;
+        orderData.cliente.ciudad = normGeo.ciudad;
+    }
 
     // Detección Antifraude / Logística: Coincidencia de dirección en los últimos 30 días (NO bloquea)
     let alertaDireccionReciente = false;
@@ -630,13 +638,14 @@ export async function lookupCustomerByPhone(phone: string): Promise<OrderCustome
 
         if (customerSnap.exists()) {
             const data = customerSnap.data();
+            const normGeo = normalizeDepartmentAndCity(data.departamento, data.ciudad);
             return {
                 nombre: data.nombre || '',
                 cedula: data.cedula || '',
                 celular: data.celular || cleanPhone,
                 email: data.email || '',
-                departamento: data.departamento || 'Cundinamarca',
-                ciudad: data.ciudad || 'Bogotá D.C.',
+                departamento: normGeo.departamento,
+                ciudad: normGeo.ciudad,
                 direccion: data.direccion || '',
                 barrio: data.barrio || ''
             };
@@ -658,13 +667,14 @@ export async function lookupCustomerByPhone(phone: string): Promise<OrderCustome
             });
             const lastOrder = sortedDocs[0].data() as Order;
             if (lastOrder.cliente) {
+                const normGeo = normalizeDepartmentAndCity(lastOrder.cliente.departamento, lastOrder.cliente.ciudad);
                 return {
                     nombre: lastOrder.cliente.nombre || '',
                     cedula: lastOrder.cliente.cedula || '',
                     celular: lastOrder.cliente.celular || cleanPhone,
                     email: lastOrder.cliente.email || '',
-                    departamento: lastOrder.cliente.departamento || 'Cundinamarca',
-                    ciudad: lastOrder.cliente.ciudad || 'Bogotá D.C.',
+                    departamento: normGeo.departamento,
+                    ciudad: normGeo.ciudad,
                     direccion: lastOrder.cliente.direccion || '',
                     barrio: lastOrder.cliente.barrio || ''
                 };

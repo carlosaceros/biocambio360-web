@@ -17,6 +17,7 @@ import {
 import { db } from './firebase'; // Adjust import path if needed
 import { Customer } from '@/types/customer';
 import { OrderCustomer } from '@/types/order';
+import { normalizeDepartmentAndCity } from './checkout-utils';
 
 const customersCollection = collection(db, 'customers');
 
@@ -32,14 +33,16 @@ export async function upsertCustomerFromOrder(orderCustomer: OrderCustomer, orde
     const customerSnap = await getDoc(customerRef);
     const now = Timestamp.now(); // Create a client-side Timestamp.
 
+    const normGeo = normalizeDepartmentAndCity(orderCustomer.departamento, orderCustomer.ciudad);
+
     if (customerSnap.exists()) {
         // Update existing customer
         await updateDoc(customerRef, {
             nombre: orderCustomer.nombre, // Update name in case of typo fix
             email: orderCustomer.email || customerSnap.data().email, // Update email if provided
             direccion: orderCustomer.direccion, // Update address to latest
-            ciudad: orderCustomer.ciudad,
-            departamento: orderCustomer.departamento,
+            ciudad: normGeo.ciudad,
+            departamento: normGeo.departamento,
 
             totalSpent: increment(orderTotal),
             ordersCount: increment(1),
@@ -55,8 +58,8 @@ export async function upsertCustomerFromOrder(orderCustomer: OrderCustomer, orde
             celular: orderCustomer.celular,
             email: orderCustomer.email,
             direccion: orderCustomer.direccion,
-            ciudad: orderCustomer.ciudad,
-            departamento: orderCustomer.departamento,
+            ciudad: normGeo.ciudad,
+            departamento: normGeo.departamento,
 
             totalSpent: orderTotal,
             ordersCount: 1,
@@ -81,6 +84,7 @@ export async function getCustomers(): Promise<Customer[]> {
 
         const customers = snapshot.docs.map(doc => {
             const data = doc.data();
+            const normGeo = normalizeDepartmentAndCity(data.departamento, data.ciudad);
             return {
                 id: doc.id,
                 ...data,
@@ -89,8 +93,8 @@ export async function getCustomers(): Promise<Customer[]> {
                 celular: data.celular || doc.id || '',
                 email: data.email || '',
                 direccion: data.direccion || '',
-                ciudad: data.ciudad || '',
-                departamento: data.departamento || '',
+                ciudad: normGeo.ciudad,
+                departamento: normGeo.departamento,
                 totalSpent: data.totalSpent || 0,
                 ordersCount: data.ordersCount || 1,
                 lastOrderDate: data.lastOrderDate || data.createdAt || null,
@@ -120,7 +124,14 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as Customer;
+        const data = docSnap.data();
+        const normGeo = normalizeDepartmentAndCity(data.departamento, data.ciudad);
+        return {
+            id: docSnap.id,
+            ...data,
+            ciudad: normGeo.ciudad,
+            departamento: normGeo.departamento
+        } as Customer;
     }
     return null;
 }
@@ -186,6 +197,10 @@ export async function quickCreateCustomer(data: {
 
     const existing = snap.exists() ? snap.data() : null;
 
+    const rawDept = data.departamento || existing?.departamento || 'Cundinamarca';
+    const rawCity = data.ciudad || existing?.ciudad || 'Soacha';
+    const normGeo = normalizeDepartmentAndCity(rawDept, rawCity);
+
     const customerData: Customer = {
         id: cleanPhone,
         nombre: data.nombre.trim(),
@@ -193,8 +208,8 @@ export async function quickCreateCustomer(data: {
         cedula: data.cedula?.trim() || existing?.cedula || '222222222222',
         email: data.email?.trim() || existing?.email || undefined,
         direccion: data.direccion?.trim() || existing?.direccion || 'Venta Mostrador Soacha',
-        ciudad: data.ciudad?.trim() || existing?.ciudad || 'Soacha',
-        departamento: data.departamento?.trim() || existing?.departamento || 'Cundinamarca',
+        ciudad: normGeo.ciudad,
+        departamento: normGeo.departamento,
         totalSpent: existing?.totalSpent || 0,
         ordersCount: existing?.ordersCount || 0,
         lastOrderDate: existing?.lastOrderDate || now,
@@ -239,12 +254,15 @@ export async function searchCustomers(
             const customerSnap = await getDoc(doc(customersCollection, cleanDigits));
             if (customerSnap.exists()) {
                 const data = customerSnap.data();
+                const normGeo = normalizeDepartmentAndCity(data.departamento, data.ciudad);
                 return [{
                     id: customerSnap.id,
                     ...data,
                     nombre: data.nombre || 'Cliente',
                     celular: data.celular || customerSnap.id,
                     cedula: data.cedula || '',
+                    ciudad: normGeo.ciudad,
+                    departamento: normGeo.departamento
                 } as Customer];
             }
         } catch (e) {

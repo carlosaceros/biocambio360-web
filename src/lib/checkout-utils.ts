@@ -59,8 +59,9 @@ export const CIUDADES_POR_DEPARTAMENTO: Record<string, string[]> = {
 
 // Shipping cost calculation by region (Biocambio360 Logistics)
 export function calculateShipping(departamento: string, ciudad: string): number {
-    const isLocal = departamento === 'Cundinamarca' && 
-        ['Bogotá D.C.', 'Soacha', 'Sibaté', 'Chía', 'Cota', 'Mosquera', 'Funza', 'Madrid', 'Cajicá', 'Fusagasugá', 'Zipaquirá'].includes(ciudad);
+    const norm = normalizeDepartmentAndCity(departamento, ciudad);
+    const isLocal = norm.departamento === 'Cundinamarca' && 
+        ['Bogotá D.C.', 'Soacha', 'Sibaté', 'Chía', 'Cota', 'Mosquera', 'Funza', 'Madrid', 'Cajicá', 'Fusagasugá', 'Zipaquirá'].includes(norm.ciudad);
 
     if (isLocal) {
         return 9000;
@@ -69,6 +70,112 @@ export function calculateShipping(departamento: string, ciudad: string): number 
     // National
     return 18000;
 }
+
+/**
+ * Normaliza departamento y ciudad para evitar incongruencias geográficas.
+ * En particular, en Biocambio360 la ciudad 'Bogotá D.C.', 'Soacha' y municipios
+ * de Cundinamarca deben tener SIEMPRE departamento 'Cundinamarca', nunca 'Amazonas'
+ * ni valores desfasados como 'BOGOTA, D.C.'.
+ */
+export function normalizeDepartmentAndCity(
+    deptInput?: string,
+    cityInput?: string
+): { departamento: string; ciudad: string } {
+    const rawDept = (deptInput || '').trim();
+    const rawCity = (cityInput || '').trim();
+
+    const cleanDept = rawDept.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    const cleanCity = rawCity.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+    // 1. Si la ciudad o departamento menciona Bogotá / Distrito Capital / D.C.
+    if (
+        cleanCity.includes('BOGOTA') ||
+        cleanCity.includes('SANTAFE DE BOGOTA') ||
+        cleanDept.includes('BOGOTA') ||
+        cleanDept === 'D.C.' ||
+        cleanDept === 'DC' ||
+        cleanDept.includes('DISTRITO CAPITAL')
+    ) {
+        return {
+            departamento: 'Cundinamarca',
+            ciudad: 'Bogotá D.C.'
+        };
+    }
+
+    // 2. Si la ciudad menciona Soacha
+    if (cleanCity.includes('SOACHA')) {
+        return {
+            departamento: 'Cundinamarca',
+            ciudad: 'Soacha'
+        };
+    }
+
+    // 3. Si la ciudad pertenece a Cundinamarca
+    const cundinamarcaCities = CIUDADES_POR_DEPARTAMENTO['Cundinamarca'] || [];
+    const matchedCund = cundinamarcaCities.find(c => {
+        const normC = c.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        return normC === cleanCity || cleanCity.includes(normC);
+    });
+    if (matchedCund) {
+        return {
+            departamento: 'Cundinamarca',
+            ciudad: matchedCund
+        };
+    }
+
+    // 4. Si el departamento dice 'Amazonas' pero la ciudad NO es de Amazonas (Leticia)
+    // (Caso típico donde el select se desfasó a la primera opción 'Amazonas')
+    if (cleanDept === 'AMAZONAS' && !cleanCity.includes('LETICIA') && !cleanCity.includes('AMAZONAS')) {
+        // Intentar encontrar el departamento al que pertenece la ciudad
+        for (const [dName, cList] of Object.entries(CIUDADES_POR_DEPARTAMENTO)) {
+            const found = cList.find(c => {
+                const normC = c.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+                return normC === cleanCity || cleanCity.includes(normC);
+            });
+            if (found) {
+                return {
+                    departamento: dName,
+                    ciudad: found
+                };
+            }
+        }
+        // Fallback predeterminado de Biocambio360
+        return {
+            departamento: 'Cundinamarca',
+            ciudad: rawCity || 'Bogotá D.C.'
+        };
+    }
+
+    // 5. Normalizar el departamento al nombre canónico exacto en DEPARTAMENTOS
+    let canonicalDept: string | undefined = undefined;
+    if (cleanDept && cleanDept.length >= 3) {
+        canonicalDept = DEPARTAMENTOS.find(d => {
+            const normD = d.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+            return normD === cleanDept;
+        });
+
+        if (!canonicalDept) {
+            canonicalDept = DEPARTAMENTOS.find(d => {
+                const normD = d.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+                return normD.includes(cleanDept) || cleanDept.includes(normD);
+            });
+        }
+    }
+
+    const finalDept = canonicalDept || 'Cundinamarca';
+    const deptCities = CIUDADES_POR_DEPARTAMENTO[finalDept] || [];
+
+    const canonicalCity = deptCities.find(c => {
+        const normC = c.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        return normC === cleanCity || cleanCity.includes(normC);
+    }) || rawCity || deptCities[0] || 'Bogotá D.C.';
+
+    return {
+        departamento: finalDept,
+        ciudad: canonicalCity
+    };
+}
+
 
 // Validate Colombian ID number (basic validation)
 export function validateCedula(cedula: string): boolean {

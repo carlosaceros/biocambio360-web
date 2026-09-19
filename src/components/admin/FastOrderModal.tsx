@@ -24,8 +24,9 @@ import {
     Bookmark
 } from 'lucide-react';
 import { PRODUCTOS, Product, isDisallowedSize } from '@/lib/products';
-import { formatCurrency, DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, calculateShipping } from '@/lib/checkout-utils';
+import { formatCurrency, DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, calculateShipping, normalizeDepartmentAndCity } from '@/lib/checkout-utils';
 import { OrderCustomer, OrderItem, Order } from '@/types/order';
+
 import { createOrder, lookupCustomerByPhone, updateOrderStatus, safeToArray } from '@/lib/orders-service';
 import { doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -204,9 +205,10 @@ export default function FastOrderModal({
             if (preloadedCustomer.nombre) setNombre(preloadedCustomer.nombre);
             if (preloadedCustomer.cedula) setCedula(preloadedCustomer.cedula);
             if (preloadedCustomer.direccion) setDireccion(preloadedCustomer.direccion);
-            if (preloadedCustomer.departamento) setDepartamento(preloadedCustomer.departamento);
-            if (preloadedCustomer.ciudad) setCiudad(preloadedCustomer.ciudad);
             if (preloadedCustomer.barrio) setBarrio(preloadedCustomer.barrio);
+            const norm = normalizeDepartmentAndCity(preloadedCustomer.departamento, preloadedCustomer.ciudad);
+            setDepartamento(norm.departamento);
+            setCiudad(norm.ciudad);
             setCustomerFound(true);
         }
     }, [preloadedCustomer]);
@@ -220,8 +222,9 @@ export default function FastOrderModal({
             if (draftOrder.cliente?.email) setEmail(draftOrder.cliente.email);
             if (draftOrder.cliente?.direccion) setDireccion(draftOrder.cliente.direccion);
             if (draftOrder.cliente?.barrio) setBarrio(draftOrder.cliente.barrio);
-            if (draftOrder.cliente?.departamento) setDepartamento(draftOrder.cliente.departamento);
-            if (draftOrder.cliente?.ciudad) setCiudad(draftOrder.cliente.ciudad);
+            const norm = normalizeDepartmentAndCity(draftOrder.cliente?.departamento, draftOrder.cliente?.ciudad);
+            setDepartamento(norm.departamento);
+            setCiudad(norm.ciudad);
             if (draftOrder.cliente?.notas) setNotas(draftOrder.cliente.notas);
             const safeProds = safeToArray(draftOrder.productos);
             if (safeProds.length > 0) {
@@ -241,8 +244,10 @@ export default function FastOrderModal({
 
     // Available cities based on department
     const availableCities = useMemo(() => {
-        return CIUDADES_POR_DEPARTAMENTO[departamento] || ['Bogotá D.C.'];
+        const activeDept = DEPARTAMENTOS.includes(departamento) ? departamento : 'Cundinamarca';
+        return CIUDADES_POR_DEPARTAMENTO[activeDept] || ['Bogotá D.C.'];
     }, [departamento]);
+
 
     // Cotizar flete en vivo con 99 Envíos cada vez que cambia ciudad, departamento o carrito
     useEffect(() => {
@@ -325,9 +330,11 @@ export default function FastOrderModal({
                     if (prev.email) setEmail(prev.email);
                     if (prev.direccion) setDireccion(prev.direccion);
                     if (prev.barrio) setBarrio(prev.barrio || '');
-                    if (prev.departamento) setDepartamento(prev.departamento);
-                    if (prev.ciudad) setCiudad(prev.ciudad);
+                    const norm = normalizeDepartmentAndCity(prev.departamento, prev.ciudad);
+                    setDepartamento(norm.departamento);
+                    setCiudad(norm.ciudad);
                     setCustomerFound(true);
+
                 } else {
                     setCustomerFound(false);
                 }
@@ -896,10 +903,11 @@ export default function FastOrderModal({
                                                 Departamento
                                             </label>
                                             <select
-                                                value={departamento}
+                                                value={DEPARTAMENTOS.includes(departamento) ? departamento : 'Cundinamarca'}
                                                 onChange={(e) => {
-                                                    setDepartamento(e.target.value);
-                                                    const cities = CIUDADES_POR_DEPARTAMENTO[e.target.value] || [];
+                                                    const newDept = e.target.value;
+                                                    setDepartamento(newDept);
+                                                    const cities = CIUDADES_POR_DEPARTAMENTO[newDept] || [];
                                                     setCiudad(cities[0] || 'Bogotá D.C.');
                                                 }}
                                                 className="mt-1 w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-hidden"
@@ -917,7 +925,14 @@ export default function FastOrderModal({
                                             </label>
                                             <select
                                                 value={ciudad}
-                                                onChange={(e) => setCiudad(e.target.value)}
+                                                onChange={(e) => {
+                                                    const newCity = e.target.value;
+                                                    setCiudad(newCity);
+                                                    const norm = normalizeDepartmentAndCity(departamento, newCity);
+                                                    if (norm.departamento !== departamento) {
+                                                        setDepartamento(norm.departamento);
+                                                    }
+                                                }}
                                                 className="mt-1 w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-hidden"
                                             >
                                                 {availableCities.map(c => (
@@ -925,6 +940,7 @@ export default function FastOrderModal({
                                                 ))}
                                             </select>
                                         </div>
+
 
                                         {/* Barrio / Localidad */}
                                         <div>
