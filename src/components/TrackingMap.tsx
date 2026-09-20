@@ -1,8 +1,10 @@
+// Componente de Tracking Satelital Interactivo con Mapa Oficial de Colombia (IGAC / Natural Earth)
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Truck, CheckCircle2, Clock, MapPin, Building2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Truck, CheckCircle2, Clock, MapPin, Building2, ShieldCheck, AlertCircle, Compass } from 'lucide-react';
+import { COLOMBIA_DEPARTMENTS, getCoordinatesForLocation, ColombiaDepartment } from './colombia-map-data';
 
 export interface TrackingData {
     guia: string;
@@ -33,107 +35,40 @@ export interface TrackingData {
     }[];
 }
 
-// Coordenadas calibradas dentro del viewBox SVG de Colombia (0 0 800 900)
-const COLOMBIA_CITIES_COORDS: Record<string, { x: number; y: number }> = {
-    'SOACHA': { x: 425, y: 490 },
-    'BOGOTA': { x: 430, y: 485 },
-    'BOGOTÁ': { x: 430, y: 485 },
-    'MEDELLIN': { x: 375, y: 395 },
-    'MEDELLÍN': { x: 375, y: 395 },
-    'BELLO': { x: 376, y: 390 },
-    'ITAGUI': { x: 374, y: 400 },
-    'ITAGÜÍ': { x: 374, y: 400 },
-    'ENVIGADO': { x: 375, y: 402 },
-    'SABANETA': { x: 374, y: 405 },
-    'CALI': { x: 325, y: 575 },
-    'PALMIRA': { x: 335, y: 565 },
-    'JAMUNDI': { x: 320, y: 585 },
-    'JAMUNDÍ': { x: 320, y: 585 },
-    'BARRANQUILLA': { x: 410, y: 135 },
-    'SOLEDAD': { x: 415, y: 140 },
-    'CARTAGENA': { x: 375, y: 165 },
-    'SANTA MARTA': { x: 445, y: 125 },
-    'BUCARAMANGA': { x: 485, y: 335 },
-    'FLORIDABLANCA': { x: 485, y: 340 },
-    'GIRON': { x: 482, y: 338 },
-    'GIRÓN': { x: 482, y: 338 },
-    'CUCUTA': { x: 535, y: 295 },
-    'CÚCUTA': { x: 535, y: 295 },
-    'IBAGUE': { x: 395, y: 505 },
-    'IBAGUÉ': { x: 395, y: 505 },
-    'VILLAVICENCIO': { x: 470, y: 510 },
-    'PEREIRA': { x: 370, y: 470 },
-    'DOSQUEBRADAS': { x: 372, y: 468 },
-    'MANIZALES': { x: 380, y: 450 },
-    'ARMENIA': { x: 370, y: 485 },
-    'NEIVA': { x: 395, y: 620 },
-    'PASTO': { x: 290, y: 720 },
-    'POPAYAN': { x: 315, y: 640 },
-    'POPAYÁN': { x: 315, y: 640 },
-    'MONTERIA': { x: 360, y: 245 },
-    'MONTERÍA': { x: 360, y: 245 },
-    'SINCELEJO': { x: 380, y: 220 },
-    'VALLEDUPAR': { x: 475, y: 175 },
-    'TUNJA': { x: 465, y: 440 },
-    'SOGAMOSO': { x: 480, y: 430 },
-    'DUITAMA': { x: 478, y: 428 },
-    'YOPAL': { x: 535, y: 450 },
-    'RIOHACHA': { x: 505, y: 95 },
-    'FLORENCIA': { x: 410, y: 700 },
-    'QUIBDO': { x: 325, y: 430 },
-    'QUIBDÓ': { x: 325, y: 430 },
-    'GIRARDOT': { x: 410, y: 510 },
-    'FLANDES': { x: 408, y: 512 },
-    'FUSAGASUGA': { x: 420, y: 515 },
-    'FUSAGASUGÁ': { x: 420, y: 515 },
-    'CHIA': { x: 435, y: 465 },
-    'CHÍA': { x: 435, y: 465 },
-    'CAJICA': { x: 435, y: 462 },
-    'CAJICÁ': { x: 435, y: 462 },
-    'ZIPAQUIRA': { x: 435, y: 455 },
-    'ZIPAQUIRÁ': { x: 435, y: 455 },
-    'FACATATIVA': { x: 415, y: 480 },
-    'FACATATIVÁ': { x: 415, y: 480 },
-    'MADRID': { x: 420, y: 482 },
-    'MOSQUERA': { x: 422, y: 484 },
-    'FUNZA': { x: 423, y: 483 },
-    'TENJO': { x: 428, y: 470 },
-};
-
-function getCityCoords(cityName?: string): { x: number; y: number } {
-    if (!cityName) return { x: 375, y: 395 }; // default Medellín
-    const clean = cityName.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    for (const [key, coords] of Object.entries(COLOMBIA_CITIES_COORDS)) {
-        const normKey = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        if (clean.includes(normKey) || normKey.includes(clean)) {
-            return coords;
-        }
-    }
-    return { x: 375, y: 395 };
-}
-
 export default function TrackingMap({ data }: { data: TrackingData }) {
-    const originCoords = COLOMBIA_CITIES_COORDS['SOACHA']; // Planta Principal
-    const destCoords = getCityCoords(data.destino.ciudad);
+    const [hoveredDept, setHoveredDept] = useState<string | null>(null);
 
-    // Progreso numérico según estado
-    let progressFactor = 0.15;
+    // Origen Fijo Oficial: Planta Biocambio360 en Soacha, Cundinamarca
+    const originCoords = { x: 304, y: 356 };
+
+    // Coordenadas calibradas del Destino según ciudad y departamento
+    const destCoords = getCoordinatesForLocation(data.destino.ciudad, data.destino.departamento);
+    const targetDeptName = destCoords.dept;
+
+    // Progreso numérico de la entrega
+    let progressFactor = 0.12;
     if (data.estado === 'en_transporte') progressFactor = 0.52;
-    if (data.estado === 'en_reparto') progressFactor = 0.85;
+    if (data.estado === 'en_reparto') progressFactor = 0.86;
     if (data.estado === 'entregado') progressFactor = 1.0;
 
-    // Calcular punto medio con curva para la ruta (Bézier Cuadrática)
-    const midX = (originCoords.x + destCoords.x) / 2 - 35;
-    const midY = (originCoords.y + destCoords.y) / 2 - 25;
-    const pathD = `M ${originCoords.x} ${originCoords.y} Q ${midX} ${midY} ${destCoords.x} ${destCoords.y}`;
+    // Control point para la Curva Bézier Cuadrática
+    const dx = destCoords.x - originCoords.x;
+    const dy = destCoords.y - originCoords.y;
+    const midX = (originCoords.x + destCoords.x) / 2;
+    const midY = (originCoords.y + destCoords.y) / 2;
+    const curveOffset = Math.min(Math.max(-35, -dx * 0.25), 35);
+    const ctrlX = midX + (dy > 0 ? curveOffset : -curveOffset);
+    const ctrlY = midY - 18;
+
+    const pathD = `M ${originCoords.x} ${originCoords.y} Q ${ctrlX} ${ctrlY} ${destCoords.x} ${destCoords.y}`;
 
     // Posición interpolada del camión en la curva Bézier cuadrática: B(t) = (1-t)^2 P0 + 2(1-t)t P1 + t^2 P2
     const t = progressFactor;
-    const truckX = Math.round((1 - t) * (1 - t) * originCoords.x + 2 * (1 - t) * t * midX + t * t * destCoords.x);
-    const truckY = Math.round((1 - t) * (1 - t) * originCoords.y + 2 * (1 - t) * t * midY + t * t * destCoords.y);
+    const truckX = Math.round((1 - t) * (1 - t) * originCoords.x + 2 * (1 - t) * t * ctrlX + t * t * destCoords.x);
+    const truckY = Math.round((1 - t) * (1 - t) * originCoords.y + 2 * (1 - t) * t * ctrlY + t * t * destCoords.y);
 
     return (
-        <div className="w-full bg-slate-900 rounded-3xl p-4 sm:p-8 text-white border border-slate-800 shadow-2xl overflow-hidden relative">
+        <div className="w-full bg-[#0B1120] rounded-3xl p-4 sm:p-8 text-white border border-slate-800/80 shadow-2xl overflow-hidden relative">
             {/* Header del Tracker */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800 relative z-10">
                 <div>
@@ -147,137 +82,200 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                         </span>
                     </div>
                     <h2 className="text-xl sm:text-2xl font-black text-white mt-1.5 flex items-center gap-2">
-                        <span>{data.destino.ciudad.toUpperCase()}</span>
+                        <span className="text-emerald-400">{data.destino.ciudad.toUpperCase()}</span>
                         <span className="text-slate-500 text-sm font-normal">←</span>
                         <span className="text-slate-400 text-sm font-medium">Planta Soacha</span>
                     </h2>
                 </div>
 
                 <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <div className="bg-slate-800/80 px-4 py-2 rounded-2xl border border-slate-700/60 text-right">
+                    <div className="bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-700/60 text-right">
                         <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Transportadora</span>
-                        <span className="text-sm font-black text-emerald-400 uppercase tracking-wide">
+                        <span className="text-sm font-black text-blue-400 uppercase tracking-wide">
                             {data.transportadora || 'Coordinadora'}
                         </span>
                     </div>
                 </div>
             </div>
 
-            {/* Layout Principal: Mapa SVG Animado + Panel Lateral de Hitos */}
+            {/* Layout Principal: Mapa SVG de Colombia + Panel Lateral de Hitos */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-6 items-center">
-                {/* 🗺️ MAPA SVG DE COLOMBIA CON RUTA ANIMADA */}
-                <div className="lg:col-span-7 relative flex items-center justify-center min-h-[380px] bg-slate-950/60 rounded-2xl border border-slate-800/70 p-4">
+                {/* 🗺️ MAPA SVG EXACTO DE COLOMBIA CON PALETA BIOCAMBIO360 */}
+                <div className="lg:col-span-7 relative flex items-center justify-center min-h-[440px] bg-slate-950/70 rounded-2xl border border-slate-800/80 p-2 sm:p-4 overflow-hidden">
                     {/* Grilla sutil de fondo tipo radar táctico */}
                     <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none rounded-2xl" />
 
+                    {/* Resplandor ambiental de marca en el fondo */}
+                    <div className="absolute top-1/4 left-1/3 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-pink-600/10 rounded-full blur-3xl pointer-events-none" />
+
                     <svg
-                        viewBox="180 50 450 780"
-                        className="w-full h-auto max-h-[460px] drop-shadow-[0_0_25px_rgba(16,185,129,0.15)]"
+                        viewBox="85 10 525 705"
+                        className="w-full h-auto max-h-[520px] drop-shadow-[0_0_30px_rgba(45,110,181,0.25)] select-none"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                     >
-                        {/* Silueta estilizada y moderna de Colombia */}
-                        <path
-                            d="M 370 120 
-                               C 410 80, 480 70, 510 95
-                               C 530 115, 480 180, 480 230
-                               C 490 280, 545 285, 545 330
-                               C 545 370, 490 410, 485 460
-                               C 485 490, 555 490, 570 550
-                               C 580 600, 510 650, 490 710
-                               C 480 740, 430 790, 390 810
-                               C 350 820, 310 810, 300 760
-                               C 285 710, 275 660, 290 610
-                               C 300 570, 295 510, 310 460
-                               C 315 410, 350 340, 345 270
-                               C 340 220, 360 170, 370 120 Z"
-                            fill="#0f172a"
-                            stroke="#334155"
-                            strokeWidth="2.5"
-                            strokeLinejoin="round"
-                            className="transition-all duration-700"
-                        />
+                        {/* 1. Recuadro Recorte de San Andrés y Providencia (Esquina Noroccidental) */}
+                        <g>
+                            <rect
+                                x="92"
+                                y="14"
+                                width="78"
+                                height="82"
+                                rx="8"
+                                fill="#090D16"
+                                stroke="#1e293b"
+                                strokeWidth="1"
+                                className="shadow-sm"
+                            />
+                            <text
+                                x="131"
+                                y="26"
+                                fill="#94a3b8"
+                                fontSize="6.5"
+                                fontWeight="800"
+                                textAnchor="middle"
+                                className="font-sans uppercase tracking-wider"
+                            >
+                                San Andrés y Prov.
+                            </text>
+                            {/* Silueta miniatura de San Andrés */}
+                            <path
+                                d="M 125 45 C 126 40, 132 40, 133 46 C 134 52, 128 58, 126 62 C 124 58, 123 50, 125 45 Z"
+                                fill="#06B6D4"
+                                stroke="#334155"
+                                strokeWidth="0.8"
+                            />
+                        </g>
 
-                        {/* Relieve interno sutil (Líneas de cordilleras) */}
-                        <path
-                            d="M 340 680 Q 380 520 420 380"
-                            stroke="#1e293b"
-                            strokeWidth="3"
-                            strokeDasharray="4 6"
-                        />
-                        <path
-                            d="M 390 720 Q 420 540 470 340"
-                            stroke="#1e293b"
-                            strokeWidth="3"
-                            strokeDasharray="4 6"
-                        />
+                        {/* 2. Todos los 33 Departamentos con Formas Geográficas Oficiales y Colores Biocambio360 */}
+                        <g id="departamentos-colombia">
+                            {COLOMBIA_DEPARTMENTS.map((dept: ColombiaDepartment) => {
+                                if (dept.id === 'CO.SA') return null; // Ya renderizado en recuadro especial
 
-                        {/* Ruta Trazada (Glow de fondo) */}
+                                const isTargetDept = targetDeptName && (
+                                    dept.name.toLowerCase().includes(targetDeptName.toLowerCase()) ||
+                                    targetDeptName.toLowerCase().includes(dept.name.toLowerCase())
+                                );
+
+                                const isOriginDept = dept.name === 'Cundinamarca' || dept.name === 'Bogota';
+
+                                return (
+                                    <path
+                                        key={dept.id}
+                                        d={dept.d}
+                                        fill={isTargetDept ? '#E91E8C' : isOriginDept ? '#2D6EB5' : dept.brandColor}
+                                        fillOpacity={isTargetDept ? 0.95 : hoveredDept === dept.name ? 0.8 : 0.55}
+                                        stroke={isTargetDept ? '#FFFFFF' : '#0B1120'}
+                                        strokeWidth={isTargetDept ? 2 : 0.9}
+                                        strokeLinejoin="round"
+                                        strokeLinecap="round"
+                                        className="transition-all duration-300 cursor-pointer"
+                                        onMouseEnter={() => setHoveredDept(dept.name)}
+                                        onMouseLeave={() => setHoveredDept(null)}
+                                    >
+                                        <title>{dept.name}</title>
+                                    </path>
+                                );
+                            })}
+                        </g>
+
+                        {/* 3. Nombres de Departamentos Principales */}
+                        {COLOMBIA_DEPARTMENTS.filter(d => ['Antioquia', 'Cundinamarca', 'Valle del Cauca', 'Santander', 'Boyacá', 'Meta', 'Tolima', 'Atlántico', 'Bolívar'].includes(d.name)).map(dept => (
+                            <text
+                                key={`label-${dept.id}`}
+                                x={dept.cx}
+                                y={dept.cy}
+                                fill="rgba(255, 255, 255, 0.75)"
+                                fontSize="7"
+                                fontWeight="800"
+                                textAnchor="middle"
+                                className="pointer-events-none font-sans drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] uppercase tracking-wider"
+                            >
+                                {dept.name === 'Valle del Cauca' ? 'Valle' : dept.name}
+                            </text>
+                        ))}
+
+                        {/* 4. Resplandor / Halo en el Departamento de Destino si existe */}
+                        {targetDeptName && (
+                            <circle
+                                cx={destCoords.x}
+                                cy={destCoords.y}
+                                r="32"
+                                fill="#E91E8C"
+                                opacity="0.18"
+                                className="animate-pulse pointer-events-none"
+                            />
+                        )}
+
+                        {/* 5. Ruta Trazada: Línea de Glow de Fondo */}
                         <path
                             d={pathD}
-                            stroke="#10b981"
+                            stroke="#38bdf8"
                             strokeWidth="6"
                             strokeLinecap="round"
                             opacity="0.25"
                         />
 
-                        {/* Línea principal animada con dash flow */}
+                        {/* 6. Línea Principal Animada (Autopista Troncal con Dash Flow) */}
                         <path
                             d={pathD}
-                            stroke="#34d399"
-                            strokeWidth="3"
+                            stroke="#10b981"
+                            strokeWidth="2.5"
                             strokeLinecap="round"
-                            strokeDasharray="8 8"
+                            strokeDasharray="6 6"
                             className="animate-[dash_2s_linear_infinite]"
                         />
 
-                        {/* Origen: Soacha (Planta Biocambio360) */}
+                        {/* 7. Origen: Planta Biocambio360 (Soacha, Cundinamarca) */}
                         <g transform={`translate(${originCoords.x}, ${originCoords.y})`}>
-                            {/* Onda expansiva */}
-                            <circle r="14" fill="#10b981" opacity="0.3" className="animate-ping" />
+                            {/* Anillo de pulso expansivo */}
+                            <circle r="15" fill="#10b981" opacity="0.25" className="animate-ping" />
                             <circle r="8" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                            {/* Label */}
+                            <circle r="3" fill="#ffffff" />
+                            {/* Etiqueta */}
                             <text
-                                x="-10"
-                                y="-14"
-                                fill="#6ee7b7"
-                                fontSize="11"
+                                x="-12"
+                                y="-12"
+                                fill="#34d399"
+                                fontSize="9"
                                 fontWeight="900"
                                 textAnchor="end"
-                                className="drop-shadow-md tracking-wider font-mono"
+                                className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] font-sans tracking-wide"
                             >
                                 🏭 PLANTA SOACHA
                             </text>
                         </g>
 
-                        {/* Destino: Ciudad de Entrega */}
+                        {/* 8. Destino: Ciudad de Entrega */}
                         <g transform={`translate(${destCoords.x}, ${destCoords.y})`}>
-                            {/* Onda expansiva de destino */}
-                            <circle r="18" fill="#818cf8" opacity="0.3" className="animate-ping" />
-                            <circle r="9" fill="#6366f1" stroke="#ffffff" strokeWidth="2.5" />
-                            {/* Icono / Pin */}
+                            {/* Anillo de pulso expansivo destino */}
+                            <circle r="18" fill="#E91E8C" opacity="0.3" className="animate-ping" />
+                            <circle r="9" fill="#E91E8C" stroke="#ffffff" strokeWidth="2" />
+                            <circle r="3.5" fill="#ffffff" />
+                            {/* Etiqueta */}
                             <text
                                 x="14"
-                                y="4"
-                                fill="#c7d2fe"
-                                fontSize="12"
+                                y="3"
+                                fill="#fda4af"
+                                fontSize="10"
                                 fontWeight="900"
                                 textAnchor="start"
-                                className="drop-shadow-md tracking-wider font-mono uppercase"
+                                className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] font-sans tracking-wider uppercase"
                             >
                                 📍 {data.destino.ciudad}
                             </text>
                         </g>
 
-                        {/* 🚚 Camión / Furgón Biocambio360 Animado desplazándose en la ruta */}
+                        {/* 9. 🚚 Furgón Ecológico Biocambio360 SVG Animado sobre la Ruta */}
                         <g
                             transform={`translate(${truckX}, ${truckY})`}
-                            className="transition-transform duration-1000 ease-out"
+                            className="transition-transform duration-700 ease-out"
                         >
                             {/* Halo brillante del vehículo */}
-                            <circle r="18" fill="#10b981" opacity="0.4" className="animate-pulse" />
+                            <circle r="16" fill="#10b981" opacity="0.4" className="animate-pulse" />
                             
-                            {/* Fondo del icono */}
+                            {/* Carrocería del Furgón */}
                             <rect
                                 x="-14"
                                 y="-14"
@@ -287,9 +285,9 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                                 fill="#059669"
                                 stroke="#ffffff"
                                 strokeWidth="2"
-                                className="shadow-lg"
+                                className="shadow-xl"
                             />
-                            {/* Icono camión centrado */}
+                            {/* Icono de camión centrado */}
                             <g transform="translate(-8, -8) scale(0.65)">
                                 <path
                                     d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"
@@ -301,15 +299,19 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                         </g>
                     </svg>
 
-                    {/* Leyenda flotante en la esquina inferior del mapa */}
-                    <div className="absolute bottom-3 left-3 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
-                            <span>Origen: Planta Biocambio360 (Soacha)</span>
+                    {/* Leyenda flotante táctica en la esquina inferior izquierda */}
+                    <div className="absolute bottom-3 left-3 bg-slate-900/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1 shadow-lg">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shrink-0 shadow-xs" />
+                            <span className="font-semibold">Origen: Planta Biocambio360 (Soacha)</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 inline-block" />
-                            <span>Destino: {data.destino.ciudad}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#E91E8C] inline-block shrink-0 shadow-xs" />
+                            <span className="font-semibold">Destino: {data.destino.ciudad} ({destCoords.dept})</span>
+                        </div>
+                        <div className="pt-1 text-[9px] text-slate-400 border-t border-slate-800 flex items-center gap-1">
+                            <Compass size={11} className="text-blue-400" />
+                            <span>Mapa oficial de Colombia · Paleta de marca Biocambio360</span>
                         </div>
                     </div>
                 </div>
@@ -317,7 +319,7 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                 {/* 📋 PANEL LATERAL: ESTADO EN VIVO & HITOS DE ENTREGA */}
                 <div className="lg:col-span-5 space-y-6">
                     {/* Tarjeta de Estado Actual */}
-                    <div className="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/60 space-y-3">
+                    <div className="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 space-y-3 shadow-lg">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Estado Actual</span>
                             <span className={`px-3 py-1 rounded-full text-xs font-black uppercase flex items-center gap-1.5 ${
@@ -340,17 +342,17 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                                 <span>Reparto</span>
                                 <span>Entregado</span>
                             </div>
-                            <div className="w-full h-2.5 bg-slate-700/60 rounded-full overflow-hidden p-0.5">
+                            <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
                                 <motion.div
                                     initial={{ width: 0 }}
                                     animate={{ width: `${progressFactor * 100}%` }}
                                     transition={{ duration: 1.2, ease: 'easeOut' }}
-                                    className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-400 rounded-full shadow-sm"
+                                    className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-[#E91E8C] rounded-full shadow-sm"
                                 />
                             </div>
                         </div>
 
-                        <div className="pt-2 border-t border-slate-700/40 text-xs text-slate-300 space-y-1 leading-relaxed">
+                        <div className="pt-2 border-t border-slate-800 text-xs text-slate-300 space-y-1 leading-relaxed">
                             {data.estado === 'entregado' ? (
                                 <p className="text-emerald-300 font-bold flex items-center gap-1.5">
                                     <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
@@ -370,13 +372,13 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                     </div>
 
                     {/* Timeline de Hitos */}
-                    <div className="bg-slate-800/40 p-5 rounded-2xl border border-slate-700/40 space-y-4">
+                    <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 space-y-4 shadow-lg">
                         <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-2">
                             <Clock size={15} className="text-emerald-400" />
                             Trazabilidad del Despacho
                         </h4>
 
-                        <div className="relative pl-6 border-l-2 border-slate-700 space-y-5">
+                        <div className="relative pl-6 border-l-2 border-slate-800 space-y-5">
                             {/* Hito 1: Despachado */}
                             <div className="relative">
                                 <span className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-slate-900 ring-2 ring-emerald-500/40" />

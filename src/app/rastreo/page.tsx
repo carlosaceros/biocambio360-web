@@ -92,6 +92,40 @@ function RastreoContent() {
                 fechaEnvio: match.fecha,
                 fechaEntregaReal: estadoKey === 'entregado' ? match.fecha : undefined
             });
+        } else if (searchParams.get('ciudad') && (cleanTerm || cleanText)) {
+            // Fallback directo con parámetros URL si se abre desde el admin
+            const pCiudad = searchParams.get('ciudad') || 'Colombia';
+            const pDepto = searchParams.get('depto') || '';
+            const pTransp = searchParams.get('transportadora') || 'Coordinadora';
+            const pStatus = searchParams.get('estado') || 'en_camino';
+
+            let estadoKey: TrackingData['estado'] = 'en_transporte';
+            let estadoTexto = 'En Tránsito Nacional';
+            if (pStatus.toLowerCase().includes('entreg')) {
+                estadoKey = 'entregado';
+                estadoTexto = 'Entregado a Satisfacción';
+            } else if (pStatus.toLowerCase().includes('repart')) {
+                estadoKey = 'en_reparto';
+                estadoTexto = 'En Reparto Urbano';
+            }
+
+            setActiveTracking({
+                guia: term.trim(),
+                transportadora: pTransp.toUpperCase(),
+                origen: {
+                    ciudad: 'Soacha',
+                    departamento: 'Cundinamarca',
+                    instalacion: 'Planta Principal Biocambio360 S.A.S.'
+                },
+                destino: {
+                    ciudad: pCiudad,
+                    departamento: pDepto
+                },
+                estado: estadoKey,
+                estadoTexto,
+                fechaEnvio: new Date().toISOString().slice(0, 10),
+                fechaEntregaReal: estadoKey === 'entregado' ? new Date().toISOString().slice(0, 10) : undefined
+            });
         } else {
             setNotFound(true);
             setActiveTracking(null);

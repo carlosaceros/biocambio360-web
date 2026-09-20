@@ -1500,7 +1500,7 @@ export default function PedidosPage() {
                                                                     <span>{copiedGuia ? 'Copiada' : 'Copiar'}</span>
                                                                 </button>
                                                                 <a
-                                                                    href={`/rastreo?guia=${activeOrder.guiaTransportadora}`}
+                                                                    href={`/rastreo?guia=${activeOrder.guiaTransportadora}&ciudad=${encodeURIComponent(activeOrder.cliente?.ciudad || '')}&depto=${encodeURIComponent(activeOrder.cliente?.departamento || '')}&transportadora=${encodeURIComponent(activeOrder.transportadora || '')}&estado=${encodeURIComponent(activeOrder.status || '')}`}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
                                                                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition-colors"
@@ -2168,8 +2168,8 @@ export default function PedidosPage() {
                                                 <Truck size={14} className="text-emerald-600" />
                                                 Guía #{activeOrder.guiaTransportadora} ({activeOrder.transportadora || '99 Envíos'})
                                             </span>
-                                            <a
-                                                href={`/rastreo?guia=${activeOrder.guiaTransportadora}`}
+                                             <a
+                                                href={`/rastreo?guia=${activeOrder.guiaTransportadora}&ciudad=${encodeURIComponent(activeOrder.cliente?.ciudad || '')}&depto=${encodeURIComponent(activeOrder.cliente?.departamento || '')}&transportadora=${encodeURIComponent(activeOrder.transportadora || '')}&estado=${encodeURIComponent(activeOrder.status || '')}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"

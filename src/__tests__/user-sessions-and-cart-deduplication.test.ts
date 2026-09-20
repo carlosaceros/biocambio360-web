@@ -12,16 +12,16 @@ vi.mock('@/lib/firebase', () => ({
     },
 }));
 
-const mockSetDoc = vi.fn(async () => {});
-const mockUpdateDoc = vi.fn(async () => {});
+const mockSetDoc = vi.fn(async (..._args: any[]) => {});
+const mockUpdateDoc = vi.fn(async (..._args: any[]) => {});
 const mockGetDoc = vi.fn();
 
 vi.mock('firebase/firestore', () => ({
     collection: vi.fn(() => ({})),
     doc: vi.fn((_db, _col, id) => ({ id })),
-    setDoc: (...args: any[]) => mockSetDoc(...args),
-    updateDoc: (...args: any[]) => mockUpdateDoc(...args),
-    getDoc: (...args: any[]) => mockGetDoc(...args),
+    setDoc: vi.fn(async (...args: any[]) => mockSetDoc(...args)),
+    updateDoc: vi.fn(async (...args: any[]) => mockUpdateDoc(...args)),
+    getDoc: vi.fn(async (...args: any[]) => mockGetDoc(...args)),
     getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
     query: vi.fn(() => ({})),
     where: vi.fn(() => ({})),
@@ -50,13 +50,13 @@ describe('1. Registro de Sesiones y Presencia de Usuarios (Super Admin Log)', ()
         expect(sessionId.startsWith('sess_')).toBe(true);
         expect(mockSetDoc).toHaveBeenCalledTimes(1);
 
-        const callArgs = mockSetDoc.mock.calls[0];
-        const record = callArgs[1];
-        expect(record.email).toBe('danilo@thinktic.co');
-        expect(record.nombre).toBe('Danilo Admin');
-        expect(record.rol).toBe('superadmin');
-        expect(record.isOnline).toBe(true);
-        expect(record.status).toBe('active');
+        const callArgs = mockSetDoc.mock.calls[0] as any[];
+        const record = callArgs?.[1];
+        expect(record?.email).toBe('danilo@thinktic.co');
+        expect(record?.nombre).toBe('Danilo Admin');
+        expect(record?.rol).toBe('superadmin');
+        expect(record?.isOnline).toBe(true);
+        expect(record?.status).toBe('active');
     });
 
     it('actualiza el latido de actividad (heartbeat)', async () => {
@@ -80,15 +80,15 @@ describe('1. Registro de Sesiones y Presencia de Usuarios (Super Admin Log)', ()
         expect(mockUpdateDoc).toHaveBeenCalledTimes(2);
 
         // Llamada 1: admin_users
-        const adminCallArgs = mockUpdateDoc.mock.calls[0];
-        expect(adminCallArgs[1].isOnline).toBe(false);
+        const adminCallArgs = mockUpdateDoc.mock.calls[0] as any[];
+        expect(adminCallArgs?.[1]?.isOnline).toBe(false);
 
         // Llamada 2: user_sessions con duration y status closed
-        const sessionCallArgs = mockUpdateDoc.mock.calls[1];
-        const sessionUpdates = sessionCallArgs[1];
-        expect(sessionUpdates.isOnline).toBe(false);
-        expect(sessionUpdates.status).toBe('closed');
-        expect(sessionUpdates.durationMinutes).toBeGreaterThanOrEqual(29);
+        const sessionCallArgs = mockUpdateDoc.mock.calls[1] as any[];
+        const sessionUpdates = sessionCallArgs?.[1];
+        expect(sessionUpdates?.isOnline).toBe(false);
+        expect(sessionUpdates?.status).toBe('closed');
+        expect(sessionUpdates?.durationMinutes).toBeGreaterThanOrEqual(29);
     });
 });
 
