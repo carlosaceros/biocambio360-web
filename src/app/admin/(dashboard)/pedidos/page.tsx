@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     DndContext,
@@ -574,27 +574,30 @@ export default function PedidosPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     orderId,
+                    guiaTransportadora: manualGuiaInput.trim(),
                     numeroGuia: manualGuiaInput.trim(),
                     transportadora: manualTransportadoraInput,
                     user: userProfile?.nombre || user?.email || 'Logística'
                 })
             });
             const data = await res.json();
-            if (data.exito) {
-                setLinkingGuiaFeedback(`✅ Guía #${data.numeroGuia} vinculada con éxito.`);
+            if (data.success || data.exito) {
+                const finalGuia = data.guiaTransportadora || data.numeroGuia || manualGuiaInput.trim();
+                const finalStatus = data.status || 'en_camino';
+                setLinkingGuiaFeedback(`✅ Guía #${finalGuia} vinculada con éxito.`);
                 setActiveOrder(prev => prev && prev.id === orderId ? {
                     ...prev,
-                    guiaTransportadora: data.numeroGuia,
-                    transportadora: data.transportadora,
+                    guiaTransportadora: finalGuia,
+                    transportadora: data.transportadora || manualTransportadoraInput,
                     trackingUrl: data.trackingUrl,
-                    status: 'en_camino' as OrderStatus
+                    status: finalStatus as OrderStatus
                 } : prev);
                 setOrders(prev => prev.map(o => o.id === orderId ? {
                     ...o,
-                    guiaTransportadora: data.numeroGuia,
-                    transportadora: data.transportadora,
+                    guiaTransportadora: finalGuia,
+                    transportadora: data.transportadora || manualTransportadoraInput,
                     trackingUrl: data.trackingUrl,
-                    status: 'en_camino' as OrderStatus
+                    status: finalStatus as OrderStatus
                 } : o));
             } else {
                 setLinkingGuiaFeedback(`❌ Error: ${data.error || 'No se pudo vincular la guía'}`);
@@ -660,6 +663,15 @@ export default function PedidosPage() {
     // ── Conciliación Automática desde Reporte Completo 99 Envíos ──
     const [envios99Records, setEnvios99Records] = useState<any[]>([]);
     const [isAutoConciliando, setIsAutoConciliando] = useState(false);
+    const [reconcileDismissed, setReconcileDismissed] = useState(false);
+
+    useEffect(() => {
+        try {
+            if (localStorage.getItem('conciliacion_99_dismissed') === 'true') {
+                setReconcileDismissed(true);
+            }
+        } catch (_) {}
+    }, []);
 
     useEffect(() => {
         fetch('/data_envios_99_conciliados.json')
@@ -688,34 +700,55 @@ export default function PedidosPage() {
         });
     };
 
-    const handleVincularGuiaDirect = async (orderId: string, guia: string, transportadora: string) => {
+    // Pedidos en vista que aún no tienen guía y cuentan con coincidencia en 99 Envíos
+    const pendingMatches = useMemo(() => {
+        if (!envios99Records.length) return [];
+        const unlinked = orders.filter(o => !o.guiaTransportadora);
+        const list: { order: Order & { id: string }; match: any }[] = [];
+        for (const order of unlinked) {
+            const found = find99MatchesForOrder(order);
+            if (found.length > 0) {
+                list.push({ order, match: found[0] });
+            }
+        }
+        return list;
+    }, [orders, envios99Records]);
+
+    const handleVincularGuiaDirect = async (orderId: string, guia: string, transportadora: string, estado?: string) => {
         setIsLinkingGuia(true);
         setLinkingGuiaFeedback(null);
         try {
+            const isDelivered = (estado || '').toLowerCase().includes('entreg');
             const res = await fetch('/api/envios/vincular-guia', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     orderId,
+                    guiaTransportadora: guia.trim(),
                     numeroGuia: guia.trim(),
                     transportadora: transportadora || 'coordinadora',
+                    status: isDelivered ? 'entregado' : undefined,
                     user: userProfile?.nombre || user?.email || 'Conciliador 99 Envíos'
                 })
             });
             const data = await res.json();
-            if (data.exito) {
-                setLinkingGuiaFeedback(`✅ Guía #${data.numeroGuia} vinculada con éxito desde reporte 99 Envíos.`);
+            if (data.success || data.exito) {
+                setLinkingGuiaFeedback(`✅ Guía #${guia} vinculada con éxito.`);
+                const finalGuia = data.guiaTransportadora || data.numeroGuia || guia;
+                const finalStatus = data.status || (isDelivered ? 'entregado' : undefined);
                 setActiveOrder(prev => prev && prev.id === orderId ? {
                     ...prev,
-                    guiaTransportadora: data.numeroGuia,
-                    transportadora: data.transportadora,
+                    guiaTransportadora: finalGuia,
+                    transportadora: data.transportadora || transportadora,
                     trackingUrl: data.trackingUrl,
+                    ...(finalStatus ? { status: finalStatus as OrderStatus } : {})
                 } : prev);
                 setOrders(prev => prev.map(o => o.id === orderId ? {
                     ...o,
-                    guiaTransportadora: data.numeroGuia,
-                    transportadora: data.transportadora,
+                    guiaTransportadora: finalGuia,
+                    transportadora: data.transportadora || transportadora,
                     trackingUrl: data.trackingUrl,
+                    ...(finalStatus ? { status: finalStatus as OrderStatus } : {})
                 } : o));
             } else {
                 setLinkingGuiaFeedback(`❌ Error: ${data.error || 'No se pudo vincular'}`);
@@ -733,48 +766,45 @@ export default function PedidosPage() {
             return;
         }
 
-        const pendingOrders = orders.filter(o => !o.guiaTransportadora);
-        const matchesToLink: { order: Order & { id: string }; match: any }[] = [];
-
-        for (const order of pendingOrders) {
-            const found = find99MatchesForOrder(order);
-            if (found.length > 0) {
-                matchesToLink.push({ order, match: found[0] });
-            }
-        }
-
-        if (matchesToLink.length === 0) {
+        if (pendingMatches.length === 0) {
             alert('No se encontraron pedidos pendientes en el tablero actual que coincidan con las guías del reporte de 99 Envíos.');
+            setReconcileDismissed(true);
             return;
         }
 
-        if (!confirm(`Se encontraron ${matchesToLink.length} pedidos en este tablero que coinciden con guías del reporte de 99 Envíos.\n\n¿Deseas auto-vincular sus números de guía y transportadoras ahora?`)) {
+        if (!confirm(`Se encontraron ${pendingMatches.length} pedidos en este tablero que coinciden con guías del reporte de 99 Envíos.\n\n¿Deseas auto-vincular sus números de guía y transportadoras ahora?`)) {
             return;
         }
 
         setIsAutoConciliando(true);
         let vinculadosCount = 0;
 
-        for (const item of matchesToLink) {
+        for (const item of pendingMatches) {
             try {
+                const isDelivered = (item.match.estado_envio || '').toLowerCase().includes('entreg');
                 const res = await fetch('/api/envios/vincular-guia', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         orderId: item.order.id,
+                        guiaTransportadora: item.match.guia,
                         numeroGuia: item.match.guia,
                         transportadora: item.match.transportadora || 'coordinadora',
+                        status: isDelivered ? 'entregado' : undefined,
                         user: userProfile?.nombre || user?.email || 'Auto-Conciliador Masivo'
                     })
                 });
                 const data = await res.json();
-                if (data.exito) {
+                if (data.success || data.exito) {
                     vinculadosCount++;
+                    const finalGuia = data.guiaTransportadora || data.numeroGuia || item.match.guia;
+                    const finalStatus = data.status || (isDelivered ? 'entregado' : item.order.status);
                     setOrders(prev => prev.map(o => o.id === item.order.id ? {
                         ...o,
-                        guiaTransportadora: item.match.guia,
-                        transportadora: item.match.transportadora,
-                        trackingUrl: data.trackingUrl
+                        guiaTransportadora: finalGuia,
+                        transportadora: data.transportadora || item.match.transportadora,
+                        trackingUrl: data.trackingUrl,
+                        status: finalStatus as OrderStatus
                     } : o));
                 }
             } catch (err) {
@@ -783,7 +813,9 @@ export default function PedidosPage() {
         }
 
         setIsAutoConciliando(false);
-        alert(`¡Conciliación finalizada!\nSe vincularon exitosamente ${vinculadosCount} guías de ${matchesToLink.length} pedidos detectados.`);
+        setReconcileDismissed(true);
+        try { localStorage.setItem('conciliacion_99_dismissed', 'true'); } catch (_) {}
+        alert(`¡Conciliación finalizada!\nSe vincularon exitosamente ${vinculadosCount} guías de ${pendingMatches.length} pedidos detectados.`);
     };
 
     const sensors = useSensors(
@@ -1016,17 +1048,8 @@ export default function PedidosPage() {
                             </div>
                         </div>
 
-                        {/* Botón Cambiar Contraseña y Conciliación 99 Envíos */}
+                        {/* Botón Cambiar Contraseña */}
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={handleAutoConciliarTodos}
-                                disabled={isAutoConciliando}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-black rounded-xl border border-purple-200 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
-                                title="Auto-conciliar guías de pedidos pendientes usando el reporte de 99 Envíos"
-                            >
-                                <Sparkles size={14} className="text-purple-600 shrink-0" />
-                                <span>{isAutoConciliando ? 'Conciliando...' : '⚡ Auto-Conciliar 99 Envíos'}</span>
-                            </button>
                             <button
                                 onClick={() => setIsPasswordModalOpen(true)}
                                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors"
@@ -1037,6 +1060,45 @@ export default function PedidosPage() {
                             </button>
                         </div>
                     </div>
+
+                    {/* Banner de Conciliación Masiva 99 Envíos (Un solo uso / Descartable) */}
+                    {!reconcileDismissed && pendingMatches.length > 0 && (
+                        <div className="mb-3 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200/80 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                            <div className="flex items-start sm:items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5 sm:mt-0">
+                                    <Sparkles size={16} />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-purple-950">
+                                        Conciliación retroactiva pendiente: {pendingMatches.length} pedido{pendingMatches.length !== 1 ? 's coinciden' : ' coincide'} con el reporte de 99 Envíos
+                                    </p>
+                                    <p className="text-[11px] text-purple-700">
+                                        Detectamos guías de Coordinadora listas para vincular masivamente en un solo clic.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                <button
+                                    onClick={handleAutoConciliarTodos}
+                                    disabled={isAutoConciliando}
+                                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    {isAutoConciliando ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                                    <span>{isAutoConciliando ? 'Vinculando...' : `Auto-Vincular (${pendingMatches.length})`}</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setReconcileDismissed(true);
+                                        try { localStorage.setItem('conciliacion_99_dismissed', 'true'); } catch (_) {}
+                                    }}
+                                    className="p-1.5 text-purple-400 hover:text-purple-700 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Descartar aviso"
+                                >
+                                    <X size={15} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Selector de Ventana de Tiempo (Optimización de Carga) */}
                     <div className="flex flex-wrap items-center gap-1.5 mb-3" data-tour="pedidos-ventana-tiempo">
@@ -1513,25 +1575,23 @@ export default function PedidosPage() {
                                                                     </p>
                                                                     <div className="space-y-1.5">
                                                                         {matches.slice(0, 3).map((m: any) => (
-                                                                            <div key={m.guia} className="bg-white p-2.5 rounded-lg border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                                                                                <div>
-                                                                                    <div className="flex items-center gap-1.5 font-bold">
-                                                                                        <span className="font-mono text-gray-900 font-black">Guía #{m.guia}</span>
-                                                                                        <span className="text-[10px] uppercase px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded font-black">{m.transportadora}</span>
-                                                                                        <span className="text-[10px] uppercase px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-black">{m.estado_envio}</span>
-                                                                                    </div>
-                                                                                    <p className="text-[11px] text-gray-600 mt-0.5">
-                                                                                        {m.nombre} · {m.ciudad} · Fecha: {m.fecha?.slice(0, 10)}
-                                                                                    </p>
+                                                                            <div key={m.guia} className="bg-white p-3 rounded-xl border border-purple-200/90 shadow-xs space-y-2 text-xs">
+                                                                                <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                                                                                    <span className="font-mono text-gray-900 font-black">Guía #{m.guia}</span>
+                                                                                    <span className="text-[10px] uppercase px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-black">{m.transportadora}</span>
+                                                                                    <span className="text-[10px] uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black">{m.estado_envio}</span>
                                                                                 </div>
+                                                                                <p className="text-[11px] text-gray-600">
+                                                                                    {m.nombre} · {m.ciudad} · Fecha: {m.fecha?.slice(0, 10)}
+                                                                                </p>
                                                                                 <button
                                                                                     type="button"
-                                                                                    onClick={() => handleVincularGuiaDirect(activeOrder.id, m.guia, m.transportadora)}
+                                                                                    onClick={() => handleVincularGuiaDirect(activeOrder.id, m.guia, m.transportadora, m.estado_envio)}
                                                                                     disabled={isLinkingGuia}
-                                                                                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer shrink-0 self-start sm:self-auto disabled:opacity-50"
+                                                                                    className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
                                                                                 >
-                                                                                    <Check size={13} />
-                                                                                    Auto-Vincular
+                                                                                    <Check size={14} />
+                                                                                    <span>Auto-Vincular Guía #{m.guia}</span>
                                                                                 </button>
                                                                             </div>
                                                                         ))}

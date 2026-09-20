@@ -4,17 +4,19 @@ import { getAdminDB } from '@/lib/firebase-admin';
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { orderId, guiaTransportadora, transportadora, notas, adminUser } = body;
+        const rawGuia = body.guiaTransportadora || body.numeroGuia || body.guia;
+        const rawCarrier = body.transportadora || body.carrier || 'coordinadora';
+        const { orderId, notas, adminUser, user, status } = body;
 
-        if (!orderId || !guiaTransportadora) {
+        if (!orderId || !rawGuia) {
             return NextResponse.json(
-                { error: 'Se requiere orderId y guiaTransportadora' },
+                { error: 'Se requiere orderId y numeroGuia / guiaTransportadora' },
                 { status: 400 }
             );
         }
 
-        const cleanGuia = String(guiaTransportadora).trim();
-        const carrier = (transportadora || 'interrapidisimo').toLowerCase();
+        const cleanGuia = String(rawGuia).trim();
+        const carrier = String(rawCarrier).toLowerCase();
         const db = getAdminDB();
 
         // 1. Obtener la orden actual
@@ -26,7 +28,7 @@ export async function POST(req: Request) {
         }
 
         const currentData = orderSnap.data() || {};
-        const authorName = adminUser?.nombre || adminUser?.email || 'Gestor Logístico';
+        const authorName = adminUser?.nombre || adminUser?.email || user || 'Gestor Logístico';
 
         // 2. Construir URL de tracking según la transportadora
         let trackingUrl = '';
@@ -43,19 +45,22 @@ export async function POST(req: Request) {
         // 3. Crear nueva nota interna
         const newInternalNote = {
             id: `note_${Date.now()}`,
-            text: `Guía vinculada manualmente (${carrier.toUpperCase()} #${cleanGuia}): ${notas || 'Generada directamente en 99 Envíos o portal de la transportadora'}.`,
+            text: `Guía vinculada (${carrier.toUpperCase()} #${cleanGuia}): ${notas || 'Asignada desde reporte oficial o manual'}.`,
             createdAt: new Date().toISOString(),
             authorEmail: adminUser?.email || 'logistica@biocambio360.com',
             authorName,
             authorRole: adminUser?.role || 'logistica',
         };
 
-        // 4. Crear evento en timeline
+        // 4. Determinar estado: si ya estaba entregado o si se indica que está entregado, conservarlo
+        const targetStatus = (status === 'entregado' || currentData.status === 'entregado') ? 'entregado' : (status || currentData.status || 'en_camino');
+
+        // 5. Crear evento en timeline
         const newTimelineEvent = {
-            status: 'en_camino',
+            status: targetStatus,
             timestamp: new Date().toISOString(),
             user: authorName,
-            note: `Guía ${carrier.toUpperCase()} #${cleanGuia} vinculada manualmente`,
+            note: `Guía ${carrier.toUpperCase()} #${cleanGuia} vinculada (${targetStatus})`,
         };
 
         const existingNotes = Array.isArray(currentData.notasInternas) ? currentData.notasInternas : [];
@@ -63,9 +68,10 @@ export async function POST(req: Request) {
 
         const updateData: any = {
             guiaTransportadora: cleanGuia,
+            numeroGuia: cleanGuia,
             transportadora: carrier,
             tipoEnvio: '99envios',
-            status: 'en_camino',
+            status: targetStatus,
             trackingUrl,
             notasInternas: [...existingNotes, newInternalNote],
             timeline: [...existingTimeline, newTimelineEvent],
@@ -79,10 +85,13 @@ export async function POST(req: Request) {
 
         return NextResponse.json({
             success: true,
+            exito: true,
             orderId,
             guiaTransportadora: cleanGuia,
+            numeroGuia: cleanGuia,
             transportadora: carrier,
             trackingUrl,
+            status: targetStatus,
             message: `Guía #${cleanGuia} vinculada exitosamente al pedido #${orderId}`,
         });
     } catch (e: any) {
