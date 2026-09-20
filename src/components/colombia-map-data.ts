@@ -315,7 +315,7 @@ export const COLOMBIA_DEPARTMENTS: ColombiaDepartment[] = [
 // dentro del viewBox del mapa oficial (viewBox="80 0 540 715"):
 export const COLOMBIA_CITIES_COORDS: Record<string, { x: number; y: number; dept: string }> = {
     // Origen Principal
-    'SOACHA': { x: 304, y: 356, dept: 'Cundinamarca' },
+    'SOACHA': { x: 306, y: 355, dept: 'Cundinamarca' },
     'BOGOTA': { x: 308, y: 348, dept: 'Bogota' },
     'BOGOTÁ': { x: 308, y: 348, dept: 'Bogota' },
     'BOGOTA D.C.': { x: 308, y: 348, dept: 'Bogota' },

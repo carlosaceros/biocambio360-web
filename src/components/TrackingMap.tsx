@@ -39,11 +39,15 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
     const [hoveredDept, setHoveredDept] = useState<string | null>(null);
 
     // Origen Fijo Oficial: Planta Biocambio360 en Soacha, Cundinamarca
-    const originCoords = { x: 304, y: 356 };
+    const originCoords = { x: 306, y: 355 };
 
     // Coordenadas calibradas del Destino según ciudad y departamento
     const destCoords = getCoordinatesForLocation(data.destino.ciudad, data.destino.departamento);
     const targetDeptName = destCoords.dept;
+
+    // Distancia aproximada en km para telemetría
+    const distUnits = Math.hypot(destCoords.x - originCoords.x, destCoords.y - originCoords.y);
+    const estimatedKm = Math.max(15, Math.round(distUnits * 1.85));
 
     // Progreso numérico de la entrega
     let progressFactor = 0.12;
@@ -51,21 +55,32 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
     if (data.estado === 'en_reparto') progressFactor = 0.86;
     if (data.estado === 'entregado') progressFactor = 1.0;
 
-    // Control point para la Curva Bézier Cuadrática
+    // Control point para la Curva Bézier Cuadrática natural (Arco aerodinámico)
     const dx = destCoords.x - originCoords.x;
     const dy = destCoords.y - originCoords.y;
+    const dist = Math.hypot(dx, dy);
+    const nx = -dy / (dist || 1);
+    const ny = dx / (dist || 1);
+    const arcSide = dx > 0 ? -1 : 1;
+    const arcMagnitude = Math.min(Math.max(dist * 0.16, 14), 40);
     const midX = (originCoords.x + destCoords.x) / 2;
     const midY = (originCoords.y + destCoords.y) / 2;
-    const curveOffset = Math.min(Math.max(-35, -dx * 0.25), 35);
-    const ctrlX = midX + (dy > 0 ? curveOffset : -curveOffset);
-    const ctrlY = midY - 18;
+    const ctrlX = Math.round(midX + nx * arcMagnitude * arcSide);
+    const ctrlY = Math.round(midY + ny * arcMagnitude * arcSide - 12);
 
-    const pathD = `M ${originCoords.x} ${originCoords.y} Q ${ctrlX} ${ctrlY} ${destCoords.x} ${destCoords.y}`;
+    // Subdivisión de De Casteljau en t = progressFactor
+    const t = Math.max(0.04, Math.min(0.98, progressFactor));
+    const q0x = Number(((1 - t) * originCoords.x + t * ctrlX).toFixed(1));
+    const q0y = Number(((1 - t) * originCoords.y + t * ctrlY).toFixed(1));
+    const q1x = Number(((1 - t) * ctrlX + t * destCoords.x).toFixed(1));
+    const q1y = Number(((1 - t) * ctrlY + t * destCoords.y).toFixed(1));
 
-    // Posición interpolada del camión en la curva Bézier cuadrática: B(t) = (1-t)^2 P0 + 2(1-t)t P1 + t^2 P2
-    const t = progressFactor;
-    const truckX = Math.round((1 - t) * (1 - t) * originCoords.x + 2 * (1 - t) * t * ctrlX + t * t * destCoords.x);
-    const truckY = Math.round((1 - t) * (1 - t) * originCoords.y + 2 * (1 - t) * t * ctrlY + t * t * destCoords.y);
+    const truckX = Math.round((1 - t) * q0x + t * q1x);
+    const truckY = Math.round((1 - t) * q0y + t * q1y);
+
+    const fullPathD = `M ${originCoords.x} ${originCoords.y} Q ${ctrlX} ${ctrlY} ${destCoords.x} ${destCoords.y}`;
+    const pathCompletedD = `M ${originCoords.x} ${originCoords.y} Q ${q0x} ${q0y} ${truckX} ${truckY}`;
+    const pathRemainingD = `M ${truckX} ${truckY} Q ${q1x} ${q1y} ${destCoords.x} ${destCoords.y}`;
 
     return (
         <div className="w-full bg-[#0B1120] rounded-3xl p-4 sm:p-8 text-white border border-slate-800/80 shadow-2xl overflow-hidden relative">
@@ -84,7 +99,7 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                     <h2 className="text-xl sm:text-2xl font-black text-white mt-1.5 flex items-center gap-2">
                         <span className="text-emerald-400">{data.destino.ciudad.toUpperCase()}</span>
                         <span className="text-slate-500 text-sm font-normal">←</span>
-                        <span className="text-slate-400 text-sm font-medium">Planta Soacha</span>
+                        <span className="text-slate-400 text-sm font-medium">Planta Soacha (Cundinamarca)</span>
                     </h2>
                 </div>
 
@@ -101,7 +116,7 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
             {/* Layout Principal: Mapa SVG de Colombia + Panel Lateral de Hitos */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-6 items-center">
                 {/* 🗺️ MAPA SVG EXACTO DE COLOMBIA CON PALETA BIOCAMBIO360 */}
-                <div className="lg:col-span-7 relative flex items-center justify-center min-h-[440px] bg-slate-950/70 rounded-2xl border border-slate-800/80 p-2 sm:p-4 overflow-hidden">
+                <div className="lg:col-span-7 relative flex items-center justify-center min-h-[460px] bg-slate-950/80 rounded-2xl border border-slate-800/80 p-2 sm:p-4 overflow-hidden">
                     {/* Grilla sutil de fondo tipo radar táctico */}
                     <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none rounded-2xl" />
 
@@ -109,12 +124,56 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                     <div className="absolute top-1/4 left-1/3 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
                     <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-pink-600/10 rounded-full blur-3xl pointer-events-none" />
 
+                    {/* Telemetría Satelital en Esquina Superior Derecha */}
+                    <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-800/90 text-right shadow-lg z-10 pointer-events-none">
+                        <div className="flex items-center justify-end gap-1.5 text-[10px] font-black text-emerald-400 uppercase tracking-wider">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                            Trazabilidad Activa
+                        </div>
+                        <p className="text-[11px] font-bold text-white mt-0.5">
+                            Distancia ~{estimatedKm} km
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-mono">
+                            {data.estado === 'entregado' ? '100% completado' : `${Math.round(progressFactor * 100)}% de recorrido`}
+                        </p>
+                    </div>
+
                     <svg
                         viewBox="85 10 525 705"
                         className="w-full h-auto max-h-[520px] drop-shadow-[0_0_30px_rgba(45,110,181,0.25)] select-none"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                     >
+                        <defs>
+                            {/* Filtro de glow para ruta y balizas */}
+                            <filter id="routeGlow" x="-30%" y="-30%" width="160%" height="160%">
+                                <feGaussianBlur stdDeviation="3" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                            <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.85" />
+                            </filter>
+                            {/* Gradiente del tramo completado */}
+                            <linearGradient id="completedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#10B981" />
+                                <stop offset="100%" stopColor="#06B6D4" />
+                            </linearGradient>
+                            {/* Estilos de animación inline garantizados para SVG */}
+                            <style>{`
+                                @keyframes dashFlowAnim {
+                                    from {
+                                        stroke-dashoffset: 24;
+                                    }
+                                    to {
+                                        stroke-dashoffset: 0;
+                                    }
+                                }
+                                .route-dash-flow {
+                                    animation: dashFlowAnim 1.2s linear infinite;
+                                }
+                            `}</style>
+                        </defs>
+
                         {/* 1. Recuadro Recorte de San Andrés y Providencia (Esquina Noroccidental) */}
                         <g>
                             <rect
@@ -208,102 +267,210 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                             />
                         )}
 
-                        {/* 5. Ruta Trazada: Línea de Glow de Fondo */}
+                        {/* 5. 🛣️ TRAZABILIDAD DE LA RUTA */}
+                        {/* 5.1 Carril Guía de Fondo (Autopista Nacional Sólida) */}
                         <path
-                            d={pathD}
-                            stroke="#38bdf8"
-                            strokeWidth="6"
+                            d={fullPathD}
+                            stroke="#0B1120"
+                            strokeWidth="7"
                             strokeLinecap="round"
-                            opacity="0.25"
+                            opacity="0.9"
+                        />
+                        <path
+                            d={fullPathD}
+                            stroke="#1E293B"
+                            strokeWidth="4.5"
+                            strokeLinecap="round"
+                            opacity="0.8"
                         />
 
-                        {/* 6. Línea Principal Animada (Autopista Troncal con Dash Flow) */}
+                        {/* 5.2 Tramo Recorrido (Completado: Soacha ➔ Camión) */}
                         <path
-                            d={pathD}
-                            stroke="#10b981"
-                            strokeWidth="2.5"
+                            d={pathCompletedD}
+                            stroke="#10B981"
+                            strokeWidth="9"
                             strokeLinecap="round"
-                            strokeDasharray="6 6"
-                            className="animate-[dash_2s_linear_infinite]"
+                            opacity="0.35"
+                            filter="url(#routeGlow)"
+                        />
+                        <path
+                            d={pathCompletedD}
+                            stroke="url(#completedGrad)"
+                            strokeWidth="3.8"
+                            strokeLinecap="round"
+                        />
+                        <path
+                            d={pathCompletedD}
+                            stroke="#FFFFFF"
+                            strokeWidth="1.2"
+                            strokeLinecap="round"
+                            opacity="0.9"
                         />
 
-                        {/* 7. Origen: Planta Biocambio360 (Soacha, Cundinamarca) */}
+                        {/* 5.3 Tramo Pendiente (En Ruta Satelital: Camión ➔ Destino) */}
+                        {data.estado !== 'entregado' && (
+                            <>
+                                <path
+                                    d={pathRemainingD}
+                                    stroke="#334155"
+                                    strokeWidth="2.8"
+                                    strokeLinecap="round"
+                                    opacity="0.45"
+                                />
+                                {/* Línea punteada de alta visibilidad que fluye continuamente */}
+                                <path
+                                    d={pathRemainingD}
+                                    stroke="#38BDF8"
+                                    strokeWidth="3.2"
+                                    strokeLinecap="round"
+                                    strokeDasharray="5 7"
+                                    className="route-dash-flow"
+                                />
+                                <path
+                                    d={pathRemainingD}
+                                    stroke="#FFFFFF"
+                                    strokeWidth="1.2"
+                                    strokeLinecap="round"
+                                    strokeDasharray="5 7"
+                                    className="route-dash-flow"
+                                    opacity="0.85"
+                                />
+                            </>
+                        )}
+
+                        {/* 6. 🏭 ORIGEN: PLANTA BIOCAMBIO360 (SOACHA, CUNDINAMARCA) */}
                         <g transform={`translate(${originCoords.x}, ${originCoords.y})`}>
-                            {/* Anillo de pulso expansivo */}
-                            <circle r="15" fill="#10b981" opacity="0.25" className="animate-ping" />
-                            <circle r="8" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                            <circle r="3" fill="#ffffff" />
-                            {/* Etiqueta */}
-                            <text
-                                x="-12"
-                                y="-12"
-                                fill="#34d399"
-                                fontSize="9"
-                                fontWeight="900"
-                                textAnchor="end"
-                                className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] font-sans tracking-wide"
-                            >
-                                🏭 PLANTA SOACHA
-                            </text>
+                            {/* Anillos de anclaje geográfico concéntricos */}
+                            <circle r="14" fill="#10B981" opacity="0.25" className="animate-ping" />
+                            <circle r="6.5" fill="#047857" stroke="#FFFFFF" strokeWidth="2" />
+                            <circle r="2.5" fill="#FFFFFF" />
+
+                            {/* Puntero de conexión al badge de la planta */}
+                            <line x1="0" y1="0" x2="14" y2="-12" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
+
+                            {/* Cartela de Planta Soacha (Ubicada al ESTE sobre Cundinamarca / Bogotá, CERO contacto con Tolima) */}
+                            <g transform="translate(14, -28)" filter="url(#badgeShadow)">
+                                <rect
+                                    x="0"
+                                    y="0"
+                                    width="106"
+                                    height="25"
+                                    rx="6"
+                                    fill="#042F2E"
+                                    stroke="#10B981"
+                                    strokeWidth="1.2"
+                                />
+                                <text x="6" y="17" fontSize="12">🏭</text>
+                                <text x="24" y="11" fill="#FFFFFF" fontSize="7.5" fontWeight="900" letterSpacing="0.4">
+                                    PLANTA SOACHA
+                                </text>
+                                <text x="24" y="19" fill="#34D399" fontSize="6" fontWeight="800" letterSpacing="0.6">
+                                    CUNDINAMARCA · ORIGEN
+                                </text>
+                            </g>
                         </g>
 
-                        {/* 8. Destino: Ciudad de Entrega */}
+                        {/* 7. 📍 DESTINO: CIUDAD DE ENTREGA */}
                         <g transform={`translate(${destCoords.x}, ${destCoords.y})`}>
                             {/* Anillo de pulso expansivo destino */}
-                            <circle r="18" fill="#E91E8C" opacity="0.3" className="animate-ping" />
-                            <circle r="9" fill="#E91E8C" stroke="#ffffff" strokeWidth="2" />
-                            <circle r="3.5" fill="#ffffff" />
-                            {/* Etiqueta */}
-                            <text
-                                x="14"
-                                y="3"
-                                fill="#fda4af"
-                                fontSize="10"
-                                fontWeight="900"
-                                textAnchor="start"
-                                className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] font-sans tracking-wider uppercase"
-                            >
-                                📍 {data.destino.ciudad}
-                            </text>
+                            <circle r="16" fill="#E91E8C" opacity="0.3" className="animate-ping" />
+                            <circle r="7" fill="#E91E8C" stroke="#FFFFFF" strokeWidth="2" />
+                            <circle r="2.5" fill="#FFFFFF" />
+
+                            {/* Puntero y Cartela Inteligente de Destino */}
+                            {(() => {
+                                const isRight = destCoords.x <= 380;
+                                const bx = isRight ? 14 : -112;
+                                const lx = isRight ? 14 : -14;
+                                return (
+                                    <>
+                                        <line x1="0" y1="0" x2={lx} y2="-12" stroke="#E91E8C" strokeWidth="1.5" strokeLinecap="round" />
+                                        <g transform={`translate(${bx}, -28)`} filter="url(#badgeShadow)">
+                                            <rect
+                                                x="0"
+                                                y="0"
+                                                width="106"
+                                                height="25"
+                                                rx="6"
+                                                fill="#370D28"
+                                                stroke="#E91E8C"
+                                                strokeWidth="1.2"
+                                            />
+                                            <text x="6" y="17" fontSize="12">📍</text>
+                                            <text x="24" y="11" fill="#FFFFFF" fontSize="7.5" fontWeight="900" letterSpacing="0.4">
+                                                {data.destino.ciudad.toUpperCase().slice(0, 14)}
+                                            </text>
+                                            <text x="24" y="19" fill="#FDA4AF" fontSize="6" fontWeight="800" letterSpacing="0.6">
+                                                {destCoords.dept.toUpperCase().slice(0, 14)} · DESTINO
+                                            </text>
+                                        </g>
+                                    </>
+                                );
+                            })()}
                         </g>
 
-                        {/* 9. 🚚 Furgón Ecológico Biocambio360 SVG Animado sobre la Ruta */}
+                        {/* 8. 🚚 FURGÓN ECOLÓGICO BIOCAMBIO360 SVG ANIMADO SOBRE LA RUTA */}
                         <g
                             transform={`translate(${truckX}, ${truckY})`}
                             className="transition-transform duration-700 ease-out"
                         >
                             {/* Halo brillante del vehículo */}
-                            <circle r="16" fill="#10b981" opacity="0.4" className="animate-pulse" />
+                            <circle r="18" fill="#10b981" opacity="0.35" className="animate-pulse" />
                             
                             {/* Carrocería del Furgón */}
-                            <rect
-                                x="-14"
-                                y="-14"
-                                width="28"
-                                height="28"
-                                rx="8"
-                                fill="#059669"
-                                stroke="#ffffff"
-                                strokeWidth="2"
-                                className="shadow-xl"
-                            />
-                            {/* Icono de camión centrado */}
-                            <g transform="translate(-8, -8) scale(0.65)">
-                                <path
-                                    d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"
-                                    fill="#ffffff"
+                            <g filter="url(#badgeShadow)">
+                                <rect
+                                    x="-15"
+                                    y="-15"
+                                    width="30"
+                                    height="30"
+                                    rx="9"
+                                    fill="#059669"
+                                    stroke="#ffffff"
+                                    strokeWidth="2"
                                 />
-                                <circle cx="5.5" cy="18.5" r="2.5" fill="#ffffff" />
-                                <circle cx="18.5" cy="18.5" r="2.5" fill="#ffffff" />
+                                <g transform="translate(-9, -9) scale(0.72)">
+                                    <path
+                                        d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"
+                                        fill="#ffffff"
+                                    />
+                                    <circle cx="5.5" cy="18.5" r="2.5" fill="#ffffff" />
+                                    <circle cx="18.5" cy="18.5" r="2.5" fill="#ffffff" />
+                                </g>
+                            </g>
+
+                            {/* Mini Pill de Estado flotante bajo el furgón */}
+                            <g transform="translate(0, 19)" filter="url(#badgeShadow)">
+                                <rect
+                                    x="-32"
+                                    y="0"
+                                    width="64"
+                                    height="13"
+                                    rx="6.5"
+                                    fill="#06281E"
+                                    stroke="#10B981"
+                                    strokeWidth="0.8"
+                                />
+                                <text
+                                    x="0"
+                                    y="9"
+                                    fill="#34D399"
+                                    fontSize="6"
+                                    fontWeight="900"
+                                    textAnchor="middle"
+                                    letterSpacing="0.5"
+                                >
+                                    {data.estado === 'entregado' ? 'ENTREGADO' : data.estado === 'en_reparto' ? 'EN REPARTO' : 'EN TRÁNSITO'}
+                                </text>
                             </g>
                         </g>
                     </svg>
 
                     {/* Leyenda flotante táctica en la esquina inferior izquierda */}
-                    <div className="absolute bottom-3 left-3 bg-slate-900/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1 shadow-lg">
+                    <div className="absolute bottom-3 left-3 bg-slate-900/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1 shadow-lg pointer-events-none">
                         <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shrink-0 shadow-xs" />
-                            <span className="font-semibold">Origen: Planta Biocambio360 (Soacha)</span>
+                            <span className="font-semibold">Origen: Planta Biocambio360 (Soacha, Cundinamarca)</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-[#E91E8C] inline-block shrink-0 shadow-xs" />
