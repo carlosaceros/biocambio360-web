@@ -82,6 +82,14 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
     const pathCompletedD = `M ${originCoords.x} ${originCoords.y} Q ${q0x} ${q0y} ${truckX} ${truckY}`;
     const pathRemainingD = `M ${truckX} ${truckY} Q ${q1x} ${q1y} ${destCoords.x} ${destCoords.y}`;
 
+    // Anti-colisión inteligente de cartelas e hitos
+    const isVeryClose = dist < 95;
+    const isDestSouth = destCoords.y >= originCoords.y - 10;
+    const destCardY = isVeryClose || isDestSouth ? 16 : -30;
+    const destCardX = destCoords.x > 380 ? -104 : 8;
+    const destLeaderY = isVeryClose || isDestSouth ? 16 : -12;
+    const isDelivered = data.estado === 'entregado';
+
     return (
         <div className="w-full bg-[#0B1120] rounded-3xl p-4 sm:p-8 text-white border border-slate-800/80 shadow-2xl overflow-hidden relative">
             {/* Header del Tracker */}
@@ -346,25 +354,25 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                             <circle r="2.5" fill="#FFFFFF" />
 
                             {/* Puntero de conexión al badge de la planta */}
-                            <line x1="0" y1="0" x2="14" y2="-12" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
+                            <line x1="0" y1="0" x2="8" y2="-12" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
 
-                            {/* Cartela de Planta Soacha (Ubicada al ESTE sobre Cundinamarca / Bogotá, CERO contacto con Tolima) */}
-                            <g transform="translate(14, -28)" filter="url(#badgeShadow)">
+                            {/* Cartela de Planta Soacha (Ubicada al ESTE/NORTE sobre Cundinamarca / Bogotá, CERO contacto con Tolima) */}
+                            <g transform="translate(8, -32)" filter="url(#badgeShadow)">
                                 <rect
                                     x="0"
                                     y="0"
-                                    width="106"
-                                    height="25"
+                                    width="104"
+                                    height="24"
                                     rx="6"
                                     fill="#042F2E"
                                     stroke="#10B981"
                                     strokeWidth="1.2"
                                 />
-                                <text x="6" y="17" fontSize="12">🏭</text>
-                                <text x="24" y="11" fill="#FFFFFF" fontSize="7.5" fontWeight="900" letterSpacing="0.4">
+                                <text x="6" y="16" fontSize="11">🏭</text>
+                                <text x="23" y="11" fill="#FFFFFF" fontSize="7.5" fontWeight="900" letterSpacing="0.4">
                                     PLANTA SOACHA
                                 </text>
-                                <text x="24" y="19" fill="#34D399" fontSize="6" fontWeight="800" letterSpacing="0.6">
+                                <text x="23" y="19" fill="#34D399" fontSize="6" fontWeight="800" letterSpacing="0.6">
                                     CUNDINAMARCA · ORIGEN
                                 </text>
                             </g>
@@ -373,97 +381,132 @@ export default function TrackingMap({ data }: { data: TrackingData }) {
                         {/* 7. 📍 DESTINO: CIUDAD DE ENTREGA */}
                         <g transform={`translate(${destCoords.x}, ${destCoords.y})`}>
                             {/* Anillo de pulso expansivo destino */}
-                            <circle r="16" fill="#E91E8C" opacity="0.3" className="animate-ping" />
-                            <circle r="7" fill="#E91E8C" stroke="#FFFFFF" strokeWidth="2" />
-                            <circle r="2.5" fill="#FFFFFF" />
+                            <circle
+                                r={isDelivered ? 20 : 16}
+                                fill={isDelivered ? '#10B981' : '#E91E8C'}
+                                opacity="0.3"
+                                className="animate-ping"
+                            />
 
-                            {/* Puntero y Cartela Inteligente de Destino */}
-                            {(() => {
-                                const isRight = destCoords.x <= 380;
-                                const bx = isRight ? 14 : -112;
-                                const lx = isRight ? 14 : -14;
-                                return (
-                                    <>
-                                        <line x1="0" y1="0" x2={lx} y2="-12" stroke="#E91E8C" strokeWidth="1.5" strokeLinecap="round" />
-                                        <g transform={`translate(${bx}, -28)`} filter="url(#badgeShadow)">
-                                            <rect
-                                                x="0"
-                                                y="0"
-                                                width="106"
-                                                height="25"
-                                                rx="6"
-                                                fill="#370D28"
-                                                stroke="#E91E8C"
-                                                strokeWidth="1.2"
-                                            />
-                                            <text x="6" y="17" fontSize="12">📍</text>
-                                            <text x="24" y="11" fill="#FFFFFF" fontSize="7.5" fontWeight="900" letterSpacing="0.4">
-                                                {data.destino.ciudad.toUpperCase().slice(0, 14)}
-                                            </text>
-                                            <text x="24" y="19" fill="#FDA4AF" fontSize="6" fontWeight="800" letterSpacing="0.6">
-                                                {destCoords.dept.toUpperCase().slice(0, 14)} · DESTINO
-                                            </text>
-                                        </g>
-                                    </>
-                                );
-                            })()}
-                        </g>
+                            {/* Puntero conector dinámico */}
+                            <line
+                                x1="0"
+                                y1="0"
+                                x2={destCardX > 0 ? 8 : -8}
+                                y2={destLeaderY}
+                                stroke={isDelivered ? '#10B981' : '#E91E8C'}
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                            />
 
-                        {/* 8. 🚚 FURGÓN ECOLÓGICO BIOCAMBIO360 SVG ANIMADO SOBRE LA RUTA */}
-                        <g
-                            transform={`translate(${truckX}, ${truckY})`}
-                            className="transition-transform duration-700 ease-out"
-                        >
-                            {/* Halo brillante del vehículo */}
-                            <circle r="18" fill="#10b981" opacity="0.35" className="animate-pulse" />
-                            
-                            {/* Carrocería del Furgón */}
-                            <g filter="url(#badgeShadow)">
-                                <rect
-                                    x="-15"
-                                    y="-15"
-                                    width="30"
-                                    height="30"
-                                    rx="9"
-                                    fill="#059669"
-                                    stroke="#ffffff"
-                                    strokeWidth="2"
-                                />
-                                <g transform="translate(-9, -9) scale(0.72)">
-                                    <path
-                                        d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"
-                                        fill="#ffffff"
-                                    />
-                                    <circle cx="5.5" cy="18.5" r="2.5" fill="#ffffff" />
-                                    <circle cx="18.5" cy="18.5" r="2.5" fill="#ffffff" />
+                            {/* Icono de Anclaje en Tierra */}
+                            {isDelivered ? (
+                                <g filter="url(#badgeShadow)">
+                                    <circle r="12" fill="#059669" stroke="#FFFFFF" strokeWidth="2" />
+                                    <g transform="translate(-6.5, -6.5) scale(0.55)">
+                                        <path
+                                            d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"
+                                            fill="#ffffff"
+                                        />
+                                        <circle cx="5.5" cy="18.5" r="2.5" fill="#ffffff" />
+                                        <circle cx="18.5" cy="18.5" r="2.5" fill="#ffffff" />
+                                    </g>
                                 </g>
-                            </g>
+                            ) : (
+                                <>
+                                    <circle r="7" fill="#E91E8C" stroke="#FFFFFF" strokeWidth="2" />
+                                    <circle r="2.5" fill="#FFFFFF" />
+                                </>
+                            )}
 
-                            {/* Mini Pill de Estado flotante bajo el furgón */}
-                            <g transform="translate(0, 19)" filter="url(#badgeShadow)">
+                            {/* Cartela Inteligente de Destino (Anti-colisión: abajo si está al sur/cerca, arriba si está al norte) */}
+                            <g transform={`translate(${destCardX}, ${destCardY})`} filter="url(#badgeShadow)">
                                 <rect
-                                    x="-32"
-                                    y="0"
-                                    width="64"
-                                    height="13"
-                                    rx="6.5"
-                                    fill="#06281E"
-                                    stroke="#10B981"
-                                    strokeWidth="0.8"
-                                />
-                                <text
                                     x="0"
-                                    y="9"
-                                    fill="#34D399"
+                                    y="0"
+                                    width="106"
+                                    height="25"
+                                    rx="6"
+                                    fill={isDelivered ? '#042F2E' : '#370D28'}
+                                    stroke={isDelivered ? '#10B981' : '#E91E8C'}
+                                    strokeWidth="1.2"
+                                />
+                                <text x="6" y="17" fontSize="12">{isDelivered ? '✅' : '📍'}</text>
+                                <text x="24" y="11" fill="#FFFFFF" fontSize="7.5" fontWeight="900" letterSpacing="0.4">
+                                    {data.destino.ciudad.toUpperCase().slice(0, 14)}
+                                </text>
+                                <text
+                                    x="24"
+                                    y="19"
+                                    fill={isDelivered ? '#34D399' : '#FDA4AF'}
                                     fontSize="6"
-                                    fontWeight="900"
-                                    textAnchor="middle"
-                                    letterSpacing="0.5"
+                                    fontWeight="800"
+                                    letterSpacing="0.6"
                                 >
-                                    {data.estado === 'entregado' ? 'ENTREGADO' : data.estado === 'en_reparto' ? 'EN REPARTO' : 'EN TRÁNSITO'}
+                                    {isDelivered
+                                        ? `✓ ENTREGADO · ${destCoords.dept.toUpperCase().slice(0, 8)}`
+                                        : `${destCoords.dept.toUpperCase().slice(0, 14)} · DESTINO`}
                                 </text>
                             </g>
                         </g>
+
+                        {/* 8. 🚚 FURGÓN ECOLÓGICO EN RUTA (Solo visible durante el viaje, se acopla al destino al ser entregado) */}
+                        {!isDelivered && (
+                            <g
+                                transform={`translate(${truckX}, ${truckY})`}
+                                className="transition-transform duration-700 ease-out"
+                            >
+                                {/* Halo brillante del vehículo */}
+                                <circle r="18" fill="#10b981" opacity="0.35" className="animate-pulse" />
+                                
+                                {/* Carrocería del Furgón */}
+                                <g filter="url(#badgeShadow)">
+                                    <rect
+                                        x="-15"
+                                        y="-15"
+                                        width="30"
+                                        height="30"
+                                        rx="9"
+                                        fill="#059669"
+                                        stroke="#ffffff"
+                                        strokeWidth="2"
+                                    />
+                                    <g transform="translate(-9, -9) scale(0.72)">
+                                        <path
+                                            d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"
+                                            fill="#ffffff"
+                                        />
+                                        <circle cx="5.5" cy="18.5" r="2.5" fill="#ffffff" />
+                                        <circle cx="18.5" cy="18.5" r="2.5" fill="#ffffff" />
+                                    </g>
+                                </g>
+
+                                {/* Mini Pill de Estado flotante bajo el furgón */}
+                                <g transform="translate(0, 19)" filter="url(#badgeShadow)">
+                                    <rect
+                                        x="-32"
+                                        y="0"
+                                        width="64"
+                                        height="13"
+                                        rx="6.5"
+                                        fill="#06281E"
+                                        stroke="#10B981"
+                                        strokeWidth="0.8"
+                                    />
+                                    <text
+                                        x="0"
+                                        y="9"
+                                        fill="#34D399"
+                                        fontSize="6"
+                                        fontWeight="900"
+                                        textAnchor="middle"
+                                        letterSpacing="0.5"
+                                    >
+                                        {data.estado === 'en_reparto' ? 'EN REPARTO' : 'EN TRÁNSITO'}
+                                    </text>
+                                </g>
+                            </g>
+                        )}
                     </svg>
 
                     {/* Leyenda flotante táctica en la esquina inferior izquierda */}
