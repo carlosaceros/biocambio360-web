@@ -1438,6 +1438,16 @@ export default function PedidosPage() {
                                                                     <span>{copiedGuia ? 'Copiada' : 'Copiar'}</span>
                                                                 </button>
                                                                 <a
+                                                                    href={`/rastreo?guia=${activeOrder.guiaTransportadora}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition-colors"
+                                                                    title="Ver seguimiento animado e interactivo con mapa de Colombia"
+                                                                >
+                                                                    <MapPin size={13} />
+                                                                    <span>Mapa En Vivo</span>
+                                                                </a>
+                                                                <a
                                                                     href={activeOrder.trackingUrl || `https://www.google.com/search?q=rastreo+guia+${activeOrder.guiaTransportadora}`}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
@@ -2098,6 +2108,16 @@ export default function PedidosPage() {
                                                 <Truck size={14} className="text-emerald-600" />
                                                 Guía #{activeOrder.guiaTransportadora} ({activeOrder.transportadora || '99 Envíos'})
                                             </span>
+                                            <a
+                                                href={`/rastreo?guia=${activeOrder.guiaTransportadora}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+                                                title="Ver ruta en mapa satelital animado"
+                                            >
+                                                <MapPin size={14} />
+                                                Tracking Satelital
+                                            </a>
                                             <a
                                                 href={`/api/envios/pdf-guia?guia=${activeOrder.guiaTransportadora}`}
                                                 target="_blank"
