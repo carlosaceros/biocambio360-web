@@ -43,7 +43,8 @@ import {
     Truck,
     Copy,
     Check,
-    Link2
+    Link2,
+    Sparkles
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -656,6 +657,135 @@ export default function PedidosPage() {
         }
     };
 
+    // ── Conciliación Automática desde Reporte Completo 99 Envíos ──
+    const [envios99Records, setEnvios99Records] = useState<any[]>([]);
+    const [isAutoConciliando, setIsAutoConciliando] = useState(false);
+
+    useEffect(() => {
+        fetch('/data_envios_99_conciliados.json')
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data.records)) {
+                    setEnvios99Records(data.records);
+                }
+            })
+            .catch(err => console.warn('[Pedidos] Error cargando data_envios_99_conciliados:', err));
+    }, []);
+
+    const find99MatchesForOrder = (order: Order & { id: string }) => {
+        if (!envios99Records.length) return [];
+        const phone = (order.cliente?.celular || '').replace(/\D/g, '').slice(-10);
+        const nameClean = (order.cliente?.nombre || '').toLowerCase().trim();
+        
+        return envios99Records.filter(r => {
+            if (phone && phone.length >= 7 && r.telefono && r.telefono.includes(phone)) {
+                return true;
+            }
+            if (nameClean.length > 5 && r.nombre_clean && (r.nombre_clean.includes(nameClean) || nameClean.includes(r.nombre_clean))) {
+                return true;
+            }
+            return false;
+        });
+    };
+
+    const handleVincularGuiaDirect = async (orderId: string, guia: string, transportadora: string) => {
+        setIsLinkingGuia(true);
+        setLinkingGuiaFeedback(null);
+        try {
+            const res = await fetch('/api/envios/vincular-guia', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId,
+                    numeroGuia: guia.trim(),
+                    transportadora: transportadora || 'coordinadora',
+                    user: userProfile?.nombre || user?.email || 'Conciliador 99 Envíos'
+                })
+            });
+            const data = await res.json();
+            if (data.exito) {
+                setLinkingGuiaFeedback(`✅ Guía #${data.numeroGuia} vinculada con éxito desde reporte 99 Envíos.`);
+                setActiveOrder(prev => prev && prev.id === orderId ? {
+                    ...prev,
+                    guiaTransportadora: data.numeroGuia,
+                    transportadora: data.transportadora,
+                    trackingUrl: data.trackingUrl,
+                } : prev);
+                setOrders(prev => prev.map(o => o.id === orderId ? {
+                    ...o,
+                    guiaTransportadora: data.numeroGuia,
+                    transportadora: data.transportadora,
+                    trackingUrl: data.trackingUrl,
+                } : o));
+            } else {
+                setLinkingGuiaFeedback(`❌ Error: ${data.error || 'No se pudo vincular'}`);
+            }
+        } catch (e: any) {
+            setLinkingGuiaFeedback(`❌ Error de conexión: ${e.message}`);
+        } finally {
+            setIsLinkingGuia(false);
+        }
+    };
+
+    const handleAutoConciliarTodos = async () => {
+        if (!envios99Records.length) {
+            alert('Cargando base de datos de 99 Envíos...');
+            return;
+        }
+
+        const pendingOrders = orders.filter(o => !o.guiaTransportadora);
+        const matchesToLink: { order: Order & { id: string }; match: any }[] = [];
+
+        for (const order of pendingOrders) {
+            const found = find99MatchesForOrder(order);
+            if (found.length > 0) {
+                matchesToLink.push({ order, match: found[0] });
+            }
+        }
+
+        if (matchesToLink.length === 0) {
+            alert('No se encontraron pedidos pendientes en el tablero actual que coincidan con las guías del reporte de 99 Envíos.');
+            return;
+        }
+
+        if (!confirm(`Se encontraron ${matchesToLink.length} pedidos en este tablero que coinciden con guías del reporte de 99 Envíos.\n\n¿Deseas auto-vincular sus números de guía y transportadoras ahora?`)) {
+            return;
+        }
+
+        setIsAutoConciliando(true);
+        let vinculadosCount = 0;
+
+        for (const item of matchesToLink) {
+            try {
+                const res = await fetch('/api/envios/vincular-guia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: item.order.id,
+                        numeroGuia: item.match.guia,
+                        transportadora: item.match.transportadora || 'coordinadora',
+                        user: userProfile?.nombre || user?.email || 'Auto-Conciliador Masivo'
+                    })
+                });
+                const data = await res.json();
+                if (data.exito) {
+                    vinculadosCount++;
+                    setOrders(prev => prev.map(o => o.id === item.order.id ? {
+                        ...o,
+                        guiaTransportadora: item.match.guia,
+                        transportadora: item.match.transportadora,
+                        trackingUrl: data.trackingUrl
+                    } : o));
+                }
+            } catch (err) {
+                console.error('Error auto-vinculando pedido', item.order.id, err);
+            }
+        }
+
+        setIsAutoConciliando(false);
+        alert(`¡Conciliación finalizada!\nSe vincularon exitosamente ${vinculadosCount} guías de ${matchesToLink.length} pedidos detectados.`);
+    };
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -886,8 +1016,17 @@ export default function PedidosPage() {
                             </div>
                         </div>
 
-                        {/* Botón Cambiar Contraseña */}
+                        {/* Botón Cambiar Contraseña y Conciliación 99 Envíos */}
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleAutoConciliarTodos}
+                                disabled={isAutoConciliando}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-black rounded-xl border border-purple-200 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                                title="Auto-conciliar guías de pedidos pendientes usando el reporte de 99 Envíos"
+                            >
+                                <Sparkles size={14} className="text-purple-600 shrink-0" />
+                                <span>{isAutoConciliando ? 'Conciliando...' : '⚡ Auto-Conciliar 99 Envíos'}</span>
+                            </button>
                             <button
                                 onClick={() => setIsPasswordModalOpen(true)}
                                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors"
@@ -1343,6 +1482,53 @@ export default function PedidosPage() {
                                                                 {activeOrder.status === 'entregado' ? '✅ ENTREGADO (SIN GUÍA EN SISTEMA)' : 'PENDIENTE DE GUÍA'}
                                                             </span>
                                                         </div>
+
+                                                        {/* Sugerencia Automática desde Reporte 99 Envíos */}
+                                                        {(() => {
+                                                            const matches = find99MatchesForOrder(activeOrder);
+                                                            if (!matches.length) return null;
+                                                            return (
+                                                                <div className="bg-purple-500/10 border-2 border-purple-500/40 rounded-xl p-3.5 text-purple-950 space-y-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-1.5 font-black text-xs text-purple-900">
+                                                                            <Sparkles size={16} className="text-purple-600 shrink-0" />
+                                                                            <span>🎯 GUÍA ENCONTRADA EN REPORTE 99 ENVÍOS ({matches.length})</span>
+                                                                        </div>
+                                                                        <span className="text-[10px] bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full font-bold uppercase">
+                                                                            Coincidencia Detectada
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-[11px] text-purple-800 leading-snug">
+                                                                        Localizamos el despacho de este cliente en el archivo oficial de 99 Envíos. Pulsa para vincularlo de inmediato:
+                                                                    </p>
+                                                                    <div className="space-y-1.5">
+                                                                        {matches.slice(0, 3).map((m: any) => (
+                                                                            <div key={m.guia} className="bg-white p-2.5 rounded-lg border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                                                                <div>
+                                                                                    <div className="flex items-center gap-1.5 font-bold">
+                                                                                        <span className="font-mono text-gray-900 font-black">Guía #{m.guia}</span>
+                                                                                        <span className="text-[10px] uppercase px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded font-black">{m.transportadora}</span>
+                                                                                        <span className="text-[10px] uppercase px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-black">{m.estado_envio}</span>
+                                                                                    </div>
+                                                                                    <p className="text-[11px] text-gray-600 mt-0.5">
+                                                                                        {m.nombre} · {m.ciudad} · Fecha: {m.fecha?.slice(0, 10)}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleVincularGuiaDirect(activeOrder.id, m.guia, m.transportadora)}
+                                                                                    disabled={isLinkingGuia}
+                                                                                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer shrink-0 self-start sm:self-auto disabled:opacity-50"
+                                                                                >
+                                                                                    <Check size={13} />
+                                                                                    Auto-Vincular
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
 
                                                         {activeOrder.tipoEnvio === 'flota_propia' || activeOrder.mensajeroId ? (
                                                             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-1">
