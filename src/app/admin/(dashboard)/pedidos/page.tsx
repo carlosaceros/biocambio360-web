@@ -48,6 +48,8 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { subscribeToOrders, updateOrderStatus, addOrderInternalNote, searchOrdersRemotely } from '@/lib/orders-service';
 import { Order, OrderStatus, ORDER_STATUS_CONFIG, TimelineEvent, OrderInternalNote } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
@@ -663,6 +665,7 @@ export default function PedidosPage() {
     // ── Conciliación Automática desde Reporte Completo 99 Envíos ──
     const [envios99Records, setEnvios99Records] = useState<any[]>([]);
     const [isAutoConciliando, setIsAutoConciliando] = useState(false);
+    const [autoConciliarProgress, setAutoConciliarProgress] = useState<{ current: number; total: number } | null>(null);
     const [reconcileDismissed, setReconcileDismissed] = useState(false);
 
     useEffect(() => {
@@ -717,47 +720,90 @@ export default function PedidosPage() {
     const handleVincularGuiaDirect = async (orderId: string, guia: string, transportadora: string, estado?: string) => {
         setIsLinkingGuia(true);
         setLinkingGuiaFeedback(null);
+        const isDelivered = (estado || '').toLowerCase().includes('entreg');
+        const finalGuia = guia.trim();
+        const finalCarrier = (transportadora || 'coordinadora').toLowerCase();
+        const targetStatus = isDelivered ? 'entregado' : undefined;
+
+        let linkedSuccess = false;
+        let trackingUrl = '';
+
         try {
-            const isDelivered = (estado || '').toLowerCase().includes('entreg');
             const res = await fetch('/api/envios/vincular-guia', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     orderId,
-                    guiaTransportadora: guia.trim(),
-                    numeroGuia: guia.trim(),
-                    transportadora: transportadora || 'coordinadora',
-                    status: isDelivered ? 'entregado' : undefined,
+                    guiaTransportadora: finalGuia,
+                    numeroGuia: finalGuia,
+                    transportadora: finalCarrier,
+                    status: targetStatus,
                     user: userProfile?.nombre || user?.email || 'Conciliador 99 Envíos'
                 })
             });
-            const data = await res.json();
-            if (data.success || data.exito) {
-                setLinkingGuiaFeedback(`✅ Guía #${guia} vinculada con éxito.`);
-                const finalGuia = data.guiaTransportadora || data.numeroGuia || guia;
-                const finalStatus = data.status || (isDelivered ? 'entregado' : undefined);
-                setActiveOrder(prev => prev && prev.id === orderId ? {
-                    ...prev,
-                    guiaTransportadora: finalGuia,
-                    transportadora: data.transportadora || transportadora,
-                    trackingUrl: data.trackingUrl,
-                    ...(finalStatus ? { status: finalStatus as OrderStatus } : {})
-                } : prev);
-                setOrders(prev => prev.map(o => o.id === orderId ? {
-                    ...o,
-                    guiaTransportadora: finalGuia,
-                    transportadora: data.transportadora || transportadora,
-                    trackingUrl: data.trackingUrl,
-                    ...(finalStatus ? { status: finalStatus as OrderStatus } : {})
-                } : o));
-            } else {
-                setLinkingGuiaFeedback(`❌ Error: ${data.error || 'No se pudo vincular'}`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && (data.success || data.exito)) {
+                linkedSuccess = true;
+                trackingUrl = data.trackingUrl || '';
             }
-        } catch (e: any) {
-            setLinkingGuiaFeedback(`❌ Error de conexión: ${e.message}`);
-        } finally {
-            setIsLinkingGuia(false);
+        } catch (fetchErr) {
+            console.warn('[VincularGuiaDirect] Error en endpoint, usando fallback de Firestore:', fetchErr);
         }
+
+        // Fallback directo a Firestore
+        if (!linkedSuccess) {
+            try {
+                if (finalCarrier.includes('coordinadora')) {
+                    trackingUrl = `https://coordinadora.com/rastreo/rastreo-de-guia/?guia=${finalGuia}`;
+                } else if (finalCarrier.includes('servientrega')) {
+                    trackingUrl = `https://www.servientrega.com/wps/portal/rastreo-envio?guia=${finalGuia}`;
+                } else if (finalCarrier.includes('envia')) {
+                    trackingUrl = `https://envia.co/rastreo?guia=${finalGuia}`;
+                } else {
+                    trackingUrl = `https://www.interrapidisimo.com/sigue-tu-envio/?guia=${finalGuia}`;
+                }
+
+                const orderDocRef = doc(db, 'orders', orderId);
+                await updateDoc(orderDocRef, {
+                    guiaTransportadora: finalGuia,
+                    numeroGuia: finalGuia,
+                    transportadora: finalCarrier,
+                    tipoEnvio: '99envios',
+                    ...(targetStatus ? { status: targetStatus } : {}),
+                    trackingUrl,
+                    updatedAt: new Date().toISOString(),
+                    timeline: arrayUnion({
+                        status: targetStatus || 'en_camino',
+                        timestamp: new Date().toISOString(),
+                        user: userProfile?.nombre || user?.email || 'Conciliador 99 Envíos',
+                        note: `Guía ${finalCarrier.toUpperCase()} #${finalGuia} vinculada (directo)`
+                    })
+                });
+                linkedSuccess = true;
+            } catch (fsErr: any) {
+                setLinkingGuiaFeedback(`❌ Error: ${fsErr.message}`);
+            }
+        }
+
+        if (linkedSuccess) {
+            setLinkingGuiaFeedback(`✅ Guía #${finalGuia} vinculada con éxito.`);
+            setActiveOrder(prev => prev && prev.id === orderId ? {
+                ...prev,
+                guiaTransportadora: finalGuia,
+                transportadora: finalCarrier,
+                trackingUrl,
+                ...(targetStatus ? { status: targetStatus as OrderStatus } : {})
+            } : prev);
+            setOrders(prev => prev.map(o => o.id === orderId ? {
+                ...o,
+                guiaTransportadora: finalGuia,
+                transportadora: finalCarrier,
+                trackingUrl,
+                ...(targetStatus ? { status: targetStatus as OrderStatus } : {})
+            } : o));
+        }
+
+        setIsLinkingGuia(false);
     };
 
     const handleAutoConciliarTodos = async () => {
@@ -777,42 +823,100 @@ export default function PedidosPage() {
         }
 
         setIsAutoConciliando(true);
+        setAutoConciliarProgress({ current: 0, total: pendingMatches.length });
         let vinculadosCount = 0;
 
-        for (const item of pendingMatches) {
-            try {
+        // Procesar concurrentemente en lotes de 5 para máxima velocidad y sin congelar la UI
+        const chunkSize = 5;
+        for (let i = 0; i < pendingMatches.length; i += chunkSize) {
+            const chunk = pendingMatches.slice(i, i + chunkSize);
+            await Promise.allSettled(chunk.map(async (item) => {
                 const isDelivered = (item.match.estado_envio || '').toLowerCase().includes('entreg');
-                const res = await fetch('/api/envios/vincular-guia', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        orderId: item.order.id,
-                        guiaTransportadora: item.match.guia,
-                        numeroGuia: item.match.guia,
-                        transportadora: item.match.transportadora || 'coordinadora',
-                        status: isDelivered ? 'entregado' : undefined,
-                        user: userProfile?.nombre || user?.email || 'Auto-Conciliador Masivo'
-                    })
-                });
-                const data = await res.json();
-                if (data.success || data.exito) {
+                const finalGuia = String(item.match.guia).trim();
+                const finalCarrier = (item.match.transportadora || 'coordinadora').toLowerCase();
+                const targetStatus = isDelivered ? 'entregado' : item.order.status;
+
+                let linkedSuccess = false;
+                let trackingUrl = '';
+
+                // 1. Intento principal vía API de servidor
+                try {
+                    const res = await fetch('/api/envios/vincular-guia', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            orderId: item.order.id,
+                            guiaTransportadora: finalGuia,
+                            numeroGuia: finalGuia,
+                            transportadora: finalCarrier,
+                            status: isDelivered ? 'entregado' : undefined,
+                            user: userProfile?.nombre || user?.email || 'Auto-Conciliador Masivo'
+                        })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok && (data.success || data.exito)) {
+                        linkedSuccess = true;
+                        trackingUrl = data.trackingUrl || '';
+                    }
+                } catch (fetchErr) {
+                    console.warn('[Auto-Conciliar] Fallo API backend, recurriendo a fallback cliente:', fetchErr);
+                }
+
+                // 2. Fallback de cliente directo con Firestore SDK (si la API arrojó error de cuota o timeout)
+                if (!linkedSuccess) {
+                    try {
+                        if (finalCarrier.includes('coordinadora')) {
+                            trackingUrl = `https://coordinadora.com/rastreo/rastreo-de-guia/?guia=${finalGuia}`;
+                        } else if (finalCarrier.includes('servientrega')) {
+                            trackingUrl = `https://www.servientrega.com/wps/portal/rastreo-envio?guia=${finalGuia}`;
+                        } else if (finalCarrier.includes('envia')) {
+                            trackingUrl = `https://envia.co/rastreo?guia=${finalGuia}`;
+                        } else {
+                            trackingUrl = `https://www.interrapidisimo.com/sigue-tu-envio/?guia=${finalGuia}`;
+                        }
+
+                        const orderDocRef = doc(db, 'orders', item.order.id);
+                        await updateDoc(orderDocRef, {
+                            guiaTransportadora: finalGuia,
+                            numeroGuia: finalGuia,
+                            transportadora: finalCarrier,
+                            tipoEnvio: '99envios',
+                            status: targetStatus,
+                            trackingUrl,
+                            updatedAt: new Date().toISOString(),
+                            timeline: arrayUnion({
+                                status: targetStatus,
+                                timestamp: new Date().toISOString(),
+                                user: userProfile?.nombre || user?.email || 'Auto-Conciliador Masivo',
+                                note: `Guía ${finalCarrier.toUpperCase()} #${finalGuia} vinculada automáticamente (99 Envíos)`
+                            })
+                        });
+                        linkedSuccess = true;
+                    } catch (firestoreErr) {
+                        console.error('[Auto-Conciliar] Error en fallback de Firestore:', firestoreErr);
+                    }
+                }
+
+                if (linkedSuccess) {
                     vinculadosCount++;
-                    const finalGuia = data.guiaTransportadora || data.numeroGuia || item.match.guia;
-                    const finalStatus = data.status || (isDelivered ? 'entregado' : item.order.status);
                     setOrders(prev => prev.map(o => o.id === item.order.id ? {
                         ...o,
                         guiaTransportadora: finalGuia,
-                        transportadora: data.transportadora || item.match.transportadora,
-                        trackingUrl: data.trackingUrl,
-                        status: finalStatus as OrderStatus
+                        transportadora: finalCarrier,
+                        trackingUrl: trackingUrl || o.trackingUrl,
+                        status: targetStatus as OrderStatus
                     } : o));
                 }
-            } catch (err) {
-                console.error('Error auto-vinculando pedido', item.order.id, err);
-            }
+            }));
+
+            setAutoConciliarProgress({ 
+                current: Math.min(i + chunkSize, pendingMatches.length), 
+                total: pendingMatches.length 
+            });
         }
 
         setIsAutoConciliando(false);
+        setAutoConciliarProgress(null);
         setReconcileDismissed(true);
         try { localStorage.setItem('conciliacion_99_dismissed', 'true'); } catch (_) {}
         alert(`¡Conciliación finalizada!\nSe vincularon exitosamente ${vinculadosCount} guías de ${pendingMatches.length} pedidos detectados.`);
@@ -1084,7 +1188,11 @@ export default function PedidosPage() {
                                     className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                                 >
                                     {isAutoConciliando ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                                    <span>{isAutoConciliando ? 'Vinculando...' : `Auto-Vincular (${pendingMatches.length})`}</span>
+                                    <span>
+                                        {isAutoConciliando 
+                                            ? (autoConciliarProgress ? `Vinculando (${autoConciliarProgress.current}/${autoConciliarProgress.total})...` : 'Vinculando...') 
+                                            : `Auto-Vincular (${pendingMatches.length})`}
+                                    </span>
                                 </button>
                                 <button
                                     onClick={() => {

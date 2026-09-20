@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import * as admin from 'firebase-admin';
 import { getAdminDB } from '@/lib/firebase-admin';
 
 export async function POST(req: Request) {
@@ -18,16 +19,19 @@ export async function POST(req: Request) {
         const cleanGuia = String(rawGuia).trim();
         const carrier = String(rawCarrier).toLowerCase();
         const db = getAdminDB();
-
-        // 1. Obtener la orden actual
         const orderRef = db.collection('orders').doc(orderId);
-        const orderSnap = await orderRef.get();
 
-        if (!orderSnap.exists) {
-            return NextResponse.json({ error: 'Pedido no encontrado en Firestore' }, { status: 404 });
+        // 1. Intento de lectura opcional con tolerancia a agotamiento de cuota Spark
+        let currentData: any = {};
+        try {
+            const orderSnap = await orderRef.get();
+            if (orderSnap.exists) {
+                currentData = orderSnap.data() || {};
+            }
+        } catch (readErr: any) {
+            console.warn('[vincular-guia] Lectura previa omitida (cuota Spark o error):', readErr.message);
         }
 
-        const currentData = orderSnap.data() || {};
         const authorName = adminUser?.nombre || adminUser?.email || user || 'Gestor Logístico';
 
         // 2. Construir URL de tracking según la transportadora
@@ -42,29 +46,27 @@ export async function POST(req: Request) {
             trackingUrl = `https://www.interrapidisimo.com/sigue-tu-envio/?guia=${cleanGuia}`;
         }
 
-        // 3. Crear nueva nota interna
+        // 3. Crear nueva nota interna y evento de timeline
+        const noteId = `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
         const newInternalNote = {
-            id: `note_${Date.now()}`,
-            text: `Guía vinculada (${carrier.toUpperCase()} #${cleanGuia}): ${notas || 'Asignada desde reporte oficial o manual'}.`,
+            id: noteId,
+            text: `Guía vinculada (${carrier.toUpperCase()} #${cleanGuia}): ${notas || 'Asignada desde reporte oficial de 99 Envíos'}.`,
             createdAt: new Date().toISOString(),
             authorEmail: adminUser?.email || 'logistica@biocambio360.com',
             authorName,
             authorRole: adminUser?.role || 'logistica',
         };
 
-        // 4. Determinar estado: si ya estaba entregado o si se indica que está entregado, conservarlo
-        const targetStatus = (status === 'entregado' || currentData.status === 'entregado') ? 'entregado' : (status || currentData.status || 'en_camino');
+        const targetStatus = (status === 'entregado' || currentData.status === 'entregado') 
+            ? 'entregado' 
+            : (status || currentData.status || 'en_camino');
 
-        // 5. Crear evento en timeline
         const newTimelineEvent = {
             status: targetStatus,
             timestamp: new Date().toISOString(),
             user: authorName,
             note: `Guía ${carrier.toUpperCase()} #${cleanGuia} vinculada (${targetStatus})`,
         };
-
-        const existingNotes = Array.isArray(currentData.notasInternas) ? currentData.notasInternas : [];
-        const existingTimeline = Array.isArray(currentData.timeline) ? currentData.timeline : [];
 
         const updateData: any = {
             guiaTransportadora: cleanGuia,
@@ -73,11 +75,23 @@ export async function POST(req: Request) {
             tipoEnvio: '99envios',
             status: targetStatus,
             trackingUrl,
-            notasInternas: [...existingNotes, newInternalNote],
-            timeline: [...existingTimeline, newTimelineEvent],
             updatedAt: new Date().toISOString(),
         };
 
+        // Si se leyeron notas previas, agregamos al arreglo; de lo contrario usamos FieldValue.arrayUnion atómico
+        if (Array.isArray(currentData.notasInternas) && currentData.notasInternas.length > 0) {
+            updateData.notasInternas = [...currentData.notasInternas, newInternalNote];
+        } else {
+            updateData.notasInternas = admin.firestore.FieldValue.arrayUnion(newInternalNote);
+        }
+
+        if (Array.isArray(currentData.timeline) && currentData.timeline.length > 0) {
+            updateData.timeline = [...currentData.timeline, newTimelineEvent];
+        } else {
+            updateData.timeline = admin.firestore.FieldValue.arrayUnion(newTimelineEvent);
+        }
+
+        // Escritura directa merge (no consume cuota de lectura)
         await orderRef.set(updateData, { merge: true });
 
         // Compatibilidad con colección 'pedidos'
