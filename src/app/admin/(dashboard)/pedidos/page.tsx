@@ -1335,8 +1335,12 @@ export default function PedidosPage() {
                                                     <div className="space-y-3">
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-xs text-gray-500 font-bold uppercase">Estado de Despacho</span>
-                                                            <span className="px-2.5 py-1 bg-yellow-100 text-yellow-800 text-[11px] font-black rounded-full border border-yellow-300">
-                                                                PENDIENTE DE GUÍA
+                                                            <span className={`px-2.5 py-1 text-[11px] font-black rounded-full border ${
+                                                                activeOrder.status === 'entregado'
+                                                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                                                    : 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                                                            }`}>
+                                                                {activeOrder.status === 'entregado' ? '✅ ENTREGADO (SIN GUÍA EN SISTEMA)' : 'PENDIENTE DE GUÍA'}
                                                             </span>
                                                         </div>
 
@@ -1352,25 +1356,31 @@ export default function PedidosPage() {
                                                         ) : (
                                                             <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
                                                                 <p className="text-xs text-slate-700">
-                                                                    Puedes generar la guía de forma automática con la API de <strong>99 Envíos</strong> o vincular una guía creada manualmente:
+                                                                    {activeOrder.status === 'entregado' ? (
+                                                                        <span>Este pedido ya fue entregado al cliente. Si se despachó por <strong>99 Envíos</strong> u otra transportadora externa, puedes documentar la guía histórica aquí:</span>
+                                                                    ) : (
+                                                                        <span>Puedes generar la guía de forma automática con la API de <strong>99 Envíos</strong> o vincular una guía creada manualmente:</span>
+                                                                    )}
                                                                 </p>
                                                                 <div className="flex flex-wrap items-center gap-2">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleGenerarGuia99(activeOrder)}
-                                                                        disabled={isGenerating99Guia}
-                                                                        className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
-                                                                    >
-                                                                        <Package size={14} />
-                                                                        {isGenerating99Guia ? 'Generando en 99 Envíos...' : '📦 Generar en 99 Envíos'}
-                                                                    </button>
+                                                                    {activeOrder.status !== 'entregado' && activeOrder.status !== 'cancelado' && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleGenerarGuia99(activeOrder)}
+                                                                            disabled={isGenerating99Guia}
+                                                                            className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                                        >
+                                                                            <Package size={14} />
+                                                                            {isGenerating99Guia ? 'Generando en 99 Envíos...' : '📦 Generar en 99 Envíos'}
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setShowManualGuiaForm(!showManualGuiaForm)}
                                                                         className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                                                                     >
                                                                         <Link2 size={14} />
-                                                                        {showManualGuiaForm ? 'Cerrar Formulario' : 'Vincular Guía Manual / Externa'}
+                                                                        {showManualGuiaForm ? 'Cerrar Formulario' : 'Vincular Guía Histórica / Manual'}
                                                                     </button>
                                                                 </div>
                                                             </div>
@@ -1919,7 +1929,7 @@ export default function PedidosPage() {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2.5">
-                                    {!activeOrder.guiaTransportadora && activeOrder.tipoEnvio !== 'flota_propia' && (
+                                    {!activeOrder.guiaTransportadora && activeOrder.tipoEnvio !== 'flota_propia' && activeOrder.status !== 'entregado' && activeOrder.status !== 'cancelado' && (
                                         <button
                                             type="button"
                                             onClick={() => handleGenerarGuia99(activeOrder)}
