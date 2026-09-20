@@ -571,38 +571,86 @@ export default function PedidosPage() {
         setIsLinkingGuia(true);
         setLinkingGuiaFeedback(null);
         try {
-            const res = await fetch('/api/envios/vincular-guia', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    orderId,
-                    guiaTransportadora: manualGuiaInput.trim(),
-                    numeroGuia: manualGuiaInput.trim(),
-                    transportadora: manualTransportadoraInput,
-                    user: userProfile?.nombre || user?.email || 'Logística'
-                })
-            });
-            const data = await res.json();
-            if (data.success || data.exito) {
-                const finalGuia = data.guiaTransportadora || data.numeroGuia || manualGuiaInput.trim();
-                const finalStatus = data.status || 'en_camino';
+            let linkedSuccess = false;
+            let finalGuia = manualGuiaInput.trim();
+            let finalCarrier = manualTransportadoraInput.toLowerCase();
+            let finalStatus = 'en_camino';
+            let trackingUrl = '';
+
+            try {
+                const res = await fetch('/api/envios/vincular-guia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId,
+                        guiaTransportadora: finalGuia,
+                        numeroGuia: finalGuia,
+                        transportadora: finalCarrier,
+                        user: userProfile?.nombre || user?.email || 'Logística'
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && (data.success || data.exito)) {
+                    linkedSuccess = true;
+                    finalGuia = data.guiaTransportadora || data.numeroGuia || finalGuia;
+                    finalStatus = data.status || 'en_camino';
+                    trackingUrl = data.trackingUrl || '';
+                }
+            } catch (err) {
+                console.warn('[handleVincularGuia] Endpoint falló, recurriendo a fallback cliente:', err);
+            }
+
+            // Fallback cliente Firestore directo si la API arrojó error
+            if (!linkedSuccess) {
+                try {
+                    if (finalCarrier.includes('coordinadora')) {
+                        trackingUrl = `https://coordinadora.com/rastreo/rastreo-de-guia/?guia=${finalGuia}`;
+                    } else if (finalCarrier.includes('servientrega')) {
+                        trackingUrl = `https://www.servientrega.com/wps/portal/rastreo-envio?guia=${finalGuia}`;
+                    } else if (finalCarrier.includes('envia')) {
+                        trackingUrl = `https://envia.co/rastreo?guia=${finalGuia}`;
+                    } else {
+                        trackingUrl = `https://www.interrapidisimo.com/sigue-tu-envio/?guia=${finalGuia}`;
+                    }
+
+                    const orderDocRef = doc(db, 'orders', orderId);
+                    await updateDoc(orderDocRef, {
+                        guiaTransportadora: finalGuia,
+                        numeroGuia: finalGuia,
+                        transportadora: finalCarrier,
+                        tipoEnvio: '99envios',
+                        status: finalStatus,
+                        trackingUrl,
+                        updatedAt: new Date().toISOString(),
+                        timeline: arrayUnion({
+                            status: finalStatus,
+                            timestamp: new Date().toISOString(),
+                            user: userProfile?.nombre || user?.email || 'Logística',
+                            note: `Guía ${finalCarrier.toUpperCase()} #${finalGuia} vinculada manualmente`
+                        })
+                    });
+                    linkedSuccess = true;
+                } catch (fsErr: any) {
+                    setLinkingGuiaFeedback(`❌ Error: ${fsErr.message}`);
+                }
+            }
+
+            if (linkedSuccess) {
                 setLinkingGuiaFeedback(`✅ Guía #${finalGuia} vinculada con éxito.`);
                 setActiveOrder(prev => prev && prev.id === orderId ? {
                     ...prev,
                     guiaTransportadora: finalGuia,
-                    transportadora: data.transportadora || manualTransportadoraInput,
-                    trackingUrl: data.trackingUrl,
+                    transportadora: finalCarrier,
+                    trackingUrl,
                     status: finalStatus as OrderStatus
                 } : prev);
                 setOrders(prev => prev.map(o => o.id === orderId ? {
                     ...o,
                     guiaTransportadora: finalGuia,
-                    transportadora: data.transportadora || manualTransportadoraInput,
-                    trackingUrl: data.trackingUrl,
+                    transportadora: finalCarrier,
+                    trackingUrl,
                     status: finalStatus as OrderStatus
                 } : o));
-            } else {
-                setLinkingGuiaFeedback(`❌ Error: ${data.error || 'No se pudo vincular la guía'}`);
             }
         } catch (e: any) {
             setLinkingGuiaFeedback(`❌ Error de conexión: ${e.message}`);
