@@ -226,41 +226,116 @@ export async function crearPreenvio(data: PreenvioData): Promise<any> {
 }
 
 export async function obtenerPdfGuia(
-    guias: string[],
+    guiaOLista: string | string[],
+    transportadoraParam?: string,
     tipoPdf: 'sticker' | 'estandar' = 'sticker'
-): Promise<{ buffer: Buffer; contentType: string }> {
+): Promise<{ buffer: Buffer; contentType: string; url?: string }> {
     const token = await getAuthToken();
     const pdfEndpoint = tipoPdf === 'sticker' ? 'sticker' : 'pdf';
+    const guia = Array.isArray(guiaOLista) ? guiaOLista[0] : guiaOLista;
 
-    const res = await fetch(`${API_BASE}/pdf/${pdfEndpoint}`, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/pdf, application/json',
-        },
-        body: JSON.stringify({ guias }),
-    });
-
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Error ${res.status} al obtener PDF 99 Envíos (${tipoPdf}): ${errText.slice(0, 200)}`);
+    if (!guia) {
+        throw new Error('Número de guía no proporcionado');
     }
 
-    const contentType = res.headers.get('content-type') || 'application/pdf';
-    
-    if (contentType.includes('application/json')) {
-        const json = await res.json();
-        if (json.pdfBase64) {
-            return { buffer: Buffer.from(json.pdfBase64, 'base64'), contentType: 'application/pdf' };
-        }
-        if (json.url) {
-            const pdfRes = await fetch(json.url);
-            const arrayBuffer = await pdfRes.arrayBuffer();
-            return { buffer: Buffer.from(arrayBuffer), contentType: 'application/pdf' };
+    // 1. Determinar transportadora sugerida o por defecto
+    let transportadoraCandidata = transportadoraParam?.toLowerCase().trim();
+
+    if (!transportadoraCandidata) {
+        // Heurísticas según numeración de guías en Colombia
+        if (/^64\d{9}$/.test(guia)) {
+            transportadoraCandidata = 'coordinadora';
+        } else if (/^(24|70|71|72)\d{7,8}$/.test(guia)) {
+            transportadoraCandidata = 'interrapidisimo';
+        } else if (/^\d{10}$/.test(guia)) {
+            transportadoraCandidata = 'servientrega';
+        } else {
+            transportadoraCandidata = 'coordinadora';
         }
     }
 
-    const arrayBuffer = await res.arrayBuffer();
-    return { buffer: Buffer.from(arrayBuffer), contentType: 'application/pdf' };
+    // Lista ordenada de transportadoras a probar en caso de 422
+    const transportadorasAProbar = Array.from(
+        new Set([
+            transportadoraCandidata,
+            'coordinadora',
+            'interrapidisimo',
+            'servientrega',
+            'envia'
+        ])
+    );
+
+    let lastError = '';
+
+    for (const transportadora of transportadorasAProbar) {
+        try {
+            const payload = {
+                guia,
+                transportadora: {
+                    pais: 'colombia',
+                    nombre: transportadora,
+                },
+            };
+
+            const res = await fetch(`${API_BASE}/pdf/${pdfEndpoint}`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/pdf, application/json, text/plain, text/html',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                lastError = `Error ${res.status} al obtener PDF (${transportadora}): ${errText.slice(0, 300)}`;
+                // Si es 422 o 404, probamos con la siguiente transportadora
+                continue;
+            }
+
+            const contentTypeHeader = res.headers.get('content-type') || '';
+
+            // Caso A: Respuesta JSON (puede contener url o pdfBase64)
+            if (contentTypeHeader.includes('application/json')) {
+                const json = await res.json();
+                if (json.pdfBase64) {
+                    return { buffer: Buffer.from(json.pdfBase64, 'base64'), contentType: 'application/pdf' };
+                }
+                if (json.url) {
+                    const pdfRes = await fetch(json.url);
+                    if (pdfRes.ok) {
+                        const arrayBuffer = await pdfRes.arrayBuffer();
+                        return { buffer: Buffer.from(arrayBuffer), contentType: 'application/pdf', url: json.url };
+                    }
+                }
+            }
+
+            // Caso B: La respuesta es texto plano o HTML conteniendo una URL directa
+            const textResponse = await res.text();
+            const trimmed = textResponse.trim().replace(/^"|"$/g, '');
+
+            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                // Descargar el binario del PDF desde la URL provista por 99 Envíos
+                const pdfRes = await fetch(trimmed);
+                if (pdfRes.ok) {
+                    const arrayBuffer = await pdfRes.arrayBuffer();
+                    return { buffer: Buffer.from(arrayBuffer), contentType: 'application/pdf', url: trimmed };
+                }
+            }
+
+            // Caso C: Binario directo en el cuerpo (application/pdf)
+            // Si el texto contenía binario PDF (comienza con %PDF)
+            if (textResponse.startsWith('%PDF') || contentTypeHeader.includes('application/pdf')) {
+                return { buffer: Buffer.from(textResponse, 'binary'), contentType: 'application/pdf' };
+            }
+
+            lastError = `Respuesta inesperada de 99 Envíos: ${trimmed.slice(0, 150)}`;
+        } catch (callErr: any) {
+            lastError = callErr.message;
+        }
+    }
+
+    throw new Error(lastError || `No se pudo obtener el PDF de la guía ${guia}`);
 }
+

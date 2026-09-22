@@ -86,32 +86,89 @@ export default function ShippingAuditPage() {
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [simulating, setSimulating] = useState(false);
+    const [quotaExceeded, setQuotaExceeded] = useState(false);
+    const [warningMsg, setWarningMsg] = useState<string | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [filter, setFilter] = useState<string>('all');
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
+    // Cargar caché local de inmediato al montar para evitar parpadeos en blanco
+    useEffect(() => {
+        try {
+            const cached = localStorage.getItem('biocambio_shipping_audit_cache');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setLogs(parsed);
+                    setLoading(false);
+                }
+            }
+        } catch (_) {}
+    }, []);
+
     const fetchLogs = useCallback(async (showRefreshing = false) => {
         if (showRefreshing) setRefreshing(true);
-        else setLoading(true);
+        else setLoading(prev => (logs.length > 0 ? false : true));
         try {
             const res = await fetch('/api/admin/shipping-audit?limit=100');
             const data = await res.json();
-            setLogs(data.logs || []);
-        } catch (e) {
-            console.error(e);
+            if (data.logs && Array.isArray(data.logs)) {
+                setLogs(data.logs);
+                try {
+                    localStorage.setItem('biocambio_shipping_audit_cache', JSON.stringify(data.logs));
+                } catch (_) {}
+            }
+            setQuotaExceeded(!!data.quotaExceeded);
+            setWarningMsg(data.warning || null);
+        } catch (e: any) {
+            console.error('[auditoria-envios] Error cargando logs:', e);
+            // Intentar recuperar de caché si aún no hay logs
+            try {
+                const cached = localStorage.getItem('biocambio_shipping_audit_cache');
+                if (cached) {
+                    setLogs(JSON.parse(cached));
+                }
+            } catch (_) {}
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [logs.length]);
 
     useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+    const runTestQuote = async () => {
+        setSimulating(true);
+        try {
+            await fetch('/api/envios/cotizar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    destinoCodigo: '73001000', // Ibagué
+                    destinoNombre: 'IBAGUÉ',
+                    subtotal: 120000,
+                    aplicaContrapago: false,
+                    totalWeightKg: 4,
+                    items: [
+                        { id: '1', nombre: 'Limpiador Multiusos 3.8L', size: 'Galón (3.8 L)', cantidad: 1, pesoKg: 4 }
+                    ]
+                })
+            });
+            await fetchLogs(true);
+        } catch (err) {
+            console.error('Error al ejecutar cotización de prueba:', err);
+        } finally {
+            setSimulating(false);
+        }
+    };
 
     const clearOldLogs = async () => {
         if (!confirm('¿Eliminar logs con más de 7 días?')) return;
         await fetch('/api/admin/shipping-audit', { method: 'DELETE' });
         fetchLogs(true);
     };
+
 
     const getLogSource = (l: AuditLog) => {
         if (l.source) return l.source;
@@ -172,6 +229,15 @@ export default function ShippingAuditPage() {
                             <span className="hidden sm:inline">Cambiar Clave</span>
                         </button>
                         <button
+                            onClick={runTestQuote}
+                            disabled={simulating}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs md:text-sm font-semibold rounded-xl shadow-sm transition-all"
+                            title="Disparar una cotización real hacia Ibagué para validar la API y alimentar los logs al instante"
+                        >
+                            <Truck size={14} className={simulating ? 'animate-bounce' : ''} />
+                            <span>{simulating ? 'Cotizando...' : '⚡ Probar API en Vivo'}</span>
+                        </button>
+                        <button
                             onClick={() => fetchLogs(true)}
                             disabled={refreshing}
                             className="flex items-center gap-2 bg-white border border-gray-200 hover:border-indigo-400 hover:text-indigo-600 text-gray-600 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-medium transition-all shadow-sm"
@@ -191,6 +257,19 @@ export default function ShippingAuditPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+                {/* Cuota Spark Protegida / Fallback Activo */}
+                {quotaExceeded && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                        <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={20} />
+                        <div>
+                            <p className="font-semibold text-amber-900">🛡️ Modo Alta Disponibilidad Activo (Límite de lectura de Firestore Spark)</p>
+                            <p className="text-sm text-amber-800 mt-1">
+                                {warningMsg || 'La base de datos Firestore alcanzó su cuota gratuita diaria de lecturas. El panel continúa operando fluidamente sirviendo los logs desde el buffer de memoria RAM y la caché local sin interrupciones.'}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[

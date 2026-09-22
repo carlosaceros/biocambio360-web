@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cotizarEnvio } from '@/lib/99envios-service';
-import { getAdminDB } from '@/lib/firebase-admin';
+import { recordShippingAuditLog } from '@/lib/shipping-audit-service';
 import {
     getCartPackagingAnalysis,
     isZonaLocal,
@@ -12,19 +12,14 @@ import {
     CartItemQuote,
 } from '@/lib/shipping-zones';
 
-const LOGS_COLLECTION = 'shipping_audit_logs';
-
 async function writeAuditLog(log: Record<string, unknown>) {
     try {
-        const db = getAdminDB();
-        await db.collection(LOGS_COLLECTION).add({
-            ...log,
-            timestamp: new Date().toISOString(),
-        });
+        await recordShippingAuditLog(log as any);
     } catch (e: any) {
-        console.warn('[Cotizar] No se pudo escribir log de auditoría en Firestore:', e.message);
+        console.warn('[Cotizar] No se pudo escribir log de auditoría:', e.message);
     }
 }
+
 
 export async function POST(request: Request) {
     const startTime = Date.now();
