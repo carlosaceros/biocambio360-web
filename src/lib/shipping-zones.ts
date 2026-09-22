@@ -319,6 +319,14 @@ export interface CartItemQuote {
     cantidad: number;
 }
 
+export interface PackageDetail {
+    pesoKg: number;
+    alto: number;
+    largo: number;
+    ancho: number;
+    descripcion: string;
+}
+
 export interface PackagingAnalysis {
     totalWeightKg: number;
     bultos: number;
@@ -336,6 +344,7 @@ export interface PackagingAnalysis {
         largo: number;
         ancho: number;
     };
+    paquetesDetalle: PackageDetail[];
 }
 
 /**
@@ -434,6 +443,68 @@ export function getCartPackagingAnalysis(items: CartItemQuote[]): PackagingAnaly
 
     const totalBultos = Math.max(1, bultos20L + bultos10L + bultosGalones + bultosSmall);
 
+    // Construcción de la lista física de paquetes/bultos individuales
+    const paquetesDetalle: PackageDetail[] = [];
+
+    // 1. Cada garrafa de 20L viaja en su propio bulto de 20 kg
+    for (let i = 0; i < bultos20L; i++) {
+        paquetesDetalle.push({
+            pesoKg: 20,
+            alto: 38,
+            largo: 38,
+            ancho: 38,
+            descripcion: `Garrafa 20L / 20KG #${i + 1}`,
+        });
+    }
+
+    // 2. Bidones de 10L (hasta 2 por caja de 20 kg)
+    let rem10L = garrafas10L;
+    let box10LIdx = 1;
+    while (rem10L > 0) {
+        const unitsInBox = Math.min(2, rem10L);
+        const w = unitsInBox * 10;
+        paquetesDetalle.push({
+            pesoKg: w,
+            alto: 35,
+            largo: 35,
+            ancho: 32,
+            descripcion: `Caja ${unitsInBox}x Garrafa 10L #${box10LIdx++}`,
+        });
+        rem10L -= unitsInBox;
+    }
+
+    // 3. Galones de 3.8L y productos menores (1/2G, 1L, etc.)
+    // Si hay galones y pequeños, se agrupan en bulto secundario
+    let remGalonesWeight = galones38L * 3.8;
+    let remSmallWeight = smallItemsWeight;
+    let secondaryTotalWeight = Math.round((remGalonesWeight + remSmallWeight) * 10) / 10;
+
+    if (secondaryTotalWeight > 0) {
+        // Si excede 20 kg, dividirlo en cajas de máx 15 kg
+        while (secondaryTotalWeight > 0) {
+            const currentWeight = Math.min(15, secondaryTotalWeight);
+            paquetesDetalle.push({
+                pesoKg: Math.round(currentWeight * 10) / 10,
+                alto: currentWeight > 8 ? 32 : 25,
+                largo: currentWeight > 8 ? 30 : 25,
+                ancho: currentWeight > 8 ? 30 : 25,
+                descripcion: `Caja de Galones / Envases Menores (${Math.round(currentWeight * 10) / 10} kg)`,
+            });
+            secondaryTotalWeight = Math.round((secondaryTotalWeight - currentWeight) * 10) / 10;
+        }
+    }
+
+    // Si por alguna razón la lista quedó vacía, asegurar al menos 1 bulto con el peso total
+    if (paquetesDetalle.length === 0) {
+        paquetesDetalle.push({
+            pesoKg: Math.max(1, Math.round(totalWeightKg * 10) / 10),
+            alto: totalWeightKg >= 20 ? 38 : 25,
+            largo: totalWeightKg >= 20 ? 38 : 25,
+            ancho: totalWeightKg >= 20 ? 42 : 25,
+            descripcion: 'Paquete Consolidado Estándar',
+        });
+    }
+
     // Dimensiones representativas para la API de 99 Envíos:
     let alto = 25;
     let largo = 25;
@@ -451,12 +522,15 @@ export function getCartPackagingAnalysis(items: CartItemQuote[]): PackagingAnaly
 
     return {
         totalWeightKg: Math.round(totalWeightKg * 10) / 10,
-        bultos: totalBultos,
+        bultos: paquetesDetalle.length,
         subsidioBruto,
         desgloseSubsidio: desglose,
         dimensions: { alto, largo, ancho },
+        paquetesDetalle,
     };
 }
+
+
 
 /**
  * Calcula el subsidio BRUTO de fábrica según los items del pedido.
