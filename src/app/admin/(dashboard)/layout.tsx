@@ -38,6 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     '/admin/envios': 'envios',
                     '/admin/mensajeros': 'envios',
                     '/admin/auditoria-envios': 'auditoria',
+                    '/admin/inbox': 'mensajeria',
                 };
 
                 for (const [prefix, capKey] of Object.entries(routeCapabilityMap)) {

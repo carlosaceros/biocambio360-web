@@ -15,7 +15,12 @@ import {
     Building2,
     ShoppingBag,
     TrendingUp,
-    Filter
+    Filter,
+    Send,
+    Megaphone,
+    DollarSign,
+    X,
+    Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -25,6 +30,10 @@ import {
     CustomerReplenishment
 } from '@/lib/replenishment-service';
 import { formatCurrency } from '@/lib/checkout-utils';
+import { auth } from '@/lib/firebase';
+
+const BIOCAMBIO_PHONE_ID = '236893662847270';
+const COST_PER_MARKETING_MSG = 0.0125; // USD — Colombia +57, Meta pricing 2025
 
 export default function ReabastecimientoBIAdminPage() {
     const router = useRouter();
@@ -33,6 +42,15 @@ export default function ReabastecimientoBIAdminPage() {
     const [filterStatus, setFilterStatus] = useState<string>('');
     const [filterType, setFilterType] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
+
+    // 1-clic individual
+    const [sendingId, setSendingId] = useState<string | null>(null);
+
+    // Bulk campaign modal
+    const [showBulkModal, setShowBulkModal] = useState(false);
+    const [bulkLoading, setBulkLoading] = useState(false);
+    const [bulkDryRun, setBulkDryRun] = useState<{ total: number; estimatedCostUsd: number } | null>(null);
+    const [bulkResult, setBulkResult] = useState<{ sent: number; failed: number; estimatedCostUsd: number } | null>(null);
 
     useEffect(() => {
         loadData();
@@ -57,22 +75,117 @@ export default function ReabastecimientoBIAdminPage() {
         }
     };
 
+    /**
+     * Envía recordatorio 1-clic vía WhatsApp Cloud API (plantilla aprobada).
+     * Fallback: abre wa.me si no hay token configurado.
+     */
     const handleSendReminder = async (r: CustomerReplenishment) => {
-        if (!r.id) return;
-        await markReminderSent(r.id);
-        
-        setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, lastReminderSentAt: new Date().toISOString() } : rec));
+        if (!r.id || !r.customerPhone) return;
+        setSendingId(r.id);
+        try {
+            const user = auth.currentUser;
+            if (!user) throw new Error('No autenticado');
+            const token = await user.getIdToken();
 
-        const dueDateStr = new Date(r.nextOrderDueDate).toLocaleDateString('es-CO');
-        let msg = '';
+            // Mark reminder in Firestore
+            await markReminderSent(r.id);
+            setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, lastReminderSentAt: new Date().toISOString() } : rec));
 
-        if (r.customerType === 'b2c') {
-            msg = `Hola ${r.customerName} 👋. En Biocambio360 queremos que tu hogar nunca se quede sin tus productos de aseo favoritos (*${r.itemsSummary}*). Calculamos que tu fecha sugerida de reabastecimiento es este ${dueDateStr}. ¿Te programamos el despacho directo de fábrica para esta semana? Compra en 1-clic aquí: https://biocambio360.com/`;
-        } else {
-            msg = `Hola ${r.customerName} 👋, saludos de Biocambio360 Fábrica. Registramos que el stock de insumos de tu organización (*${r.itemsSummary}*) tiene fecha estimada de reabastecimiento para el ${dueDateStr}. ¿Deseas autorizar la orden de reabastecimiento corporativo para esta semana?`;
+            // Try API first — sends via Cloud API with template
+            const cleanPhone = r.customerPhone.replace(/\D/g, '');
+            const phone = `57${cleanPhone.slice(-10)}`;
+            const dueDateStr = new Date(r.nextOrderDueDate).toLocaleDateString('es-CO');
+
+            const res = await fetch('/api/inbox/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    conversationId: `wa_${BIOCAMBIO_PHONE_ID}_${phone}`,
+                    channel: 'whatsapp',
+                    to: phone,
+                    phoneId: BIOCAMBIO_PHONE_ID,
+                    type: 'text',
+                    text: r.customerType === 'b2c'
+                        ? `Hola ${r.customerName} 👋. En Biocambio360 queremos que tu hogar nunca se quede sin *${r.itemsSummary}*. Tu fecha sugerida de reabastecimiento es el ${dueDateStr}. ¿Te programamos el despacho directo de fábrica? 👉 https://biocambio360.com/`
+                        : `Hola ${r.customerName} 👋, saludos de Biocambio360 Fábrica. El stock de *${r.itemsSummary}* tiene fecha estimada de reabastecimiento para el ${dueDateStr}. ¿Autorizamos la orden de reabastecimiento corporativo?`,
+                }),
+            });
+
+            if (!res.ok) {
+                // Fallback: open wa.me in new tab
+                const msg = `Hola ${r.customerName} 👋. Tu próximo reabastecimiento de *${r.itemsSummary}* es el ${dueDateStr}. 👉 https://biocambio360.com/`;
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            }
+        } catch (err: any) {
+            console.error('[reabastecimiento] Reminder error:', err);
+            // Fallback to wa.me
+            const cleanPhone = r.customerPhone.replace(/\D/g, '');
+            const msg = `Hola ${r.customerName} 👋. Tu próximo reabastecimiento de *${r.itemsSummary}* es próximamente. 👉 https://biocambio360.com/`;
+            window.open(`https://wa.me/57${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+        } finally {
+            setSendingId(null);
         }
+    };
 
-        window.open(`https://wa.me/57${r.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+    // ── Bulk campaign handlers ─────────────────────────────────────────────────
+
+    const criticalCustomers = records.filter(r => r.status === 'critico_10_dias' || r.status === 'vencido');
+
+    const handleBulkDryRun = async () => {
+        setBulkLoading(true);
+        setBulkDryRun(null);
+        try {
+            const user = auth.currentUser;
+            if (!user) return;
+            const token = await user.getIdToken();
+            const res = await fetch('/api/inbox/bulk-reminder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    customerIds: criticalCustomers.map(r => r.id).filter(Boolean),
+                    phoneId: BIOCAMBIO_PHONE_ID,
+                    templateName: 'reabastecimiento_recordatorio',
+                    templateType: 'marketing',
+                    dryRun: true,
+                }),
+            });
+            const data = await res.json();
+            setBulkDryRun({ total: data.total, estimatedCostUsd: data.estimatedCostUsd });
+        } catch (err) {
+            console.error('[bulk-dry-run]', err);
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
+    const handleBulkSend = async () => {
+        if (!bulkDryRun) return;
+        if (!confirm(`¿Confirmas el envío de ${bulkDryRun.total} mensajes por un costo estimado de $${bulkDryRun.estimatedCostUsd.toFixed(2)} USD?`)) return;
+        setBulkLoading(true);
+        setBulkResult(null);
+        try {
+            const user = auth.currentUser;
+            if (!user) return;
+            const token = await user.getIdToken();
+            const res = await fetch('/api/inbox/bulk-reminder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    customerIds: criticalCustomers.map(r => r.id).filter(Boolean),
+                    phoneId: BIOCAMBIO_PHONE_ID,
+                    templateName: 'reabastecimiento_recordatorio',
+                    templateType: 'marketing',
+                    dryRun: false,
+                }),
+            });
+            const data = await res.json();
+            setBulkResult({ sent: data.sent, failed: data.failed, estimatedCostUsd: data.estimatedCostUsd });
+            loadData(); // refresh records
+        } catch (err) {
+            console.error('[bulk-send]', err);
+        } finally {
+            setBulkLoading(false);
+        }
     };
 
     const filteredRecords = records.filter(r => {
@@ -122,12 +235,26 @@ export default function ReabastecimientoBIAdminPage() {
                     </p>
                 </div>
 
-                <button
-                    onClick={loadData}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl text-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
-                >
-                    <RefreshCw size={14} /> Actualizar Timers BI
-                </button>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                        onClick={() => { setShowBulkModal(true); handleBulkDryRun(); }}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm"
+                    >
+                        <Megaphone size={14} />
+                        📤 Campaña Masiva WhatsApp
+                        {criticalCustomers.length > 0 && (
+                            <span className="bg-white text-green-700 px-1.5 py-0.5 rounded-full text-[10px] font-black">
+                                {criticalCustomers.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={loadData}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer"
+                    >
+                        <RefreshCw size={14} /> Actualizar
+                    </button>
+                </div>
             </div>
 
             {/* KPI Summary Grid */}
@@ -278,9 +405,15 @@ export default function ReabastecimientoBIAdminPage() {
                                             <td className="p-4 text-right">
                                                 <button
                                                     onClick={() => handleSendReminder(r)}
-                                                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1 ml-auto shadow-xs cursor-pointer"
+                                                    disabled={sendingId === r.id}
+                                                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1 ml-auto shadow-xs cursor-pointer transition-colors"
                                                 >
-                                                    <MessageCircle size={14} /> Recordatorio 1-Clic
+                                                    {sendingId === r.id ? (
+                                                        <Loader2 size={13} className="animate-spin" />
+                                                    ) : (
+                                                        <MessageCircle size={14} />
+                                                    )}
+                                                    {sendingId === r.id ? 'Enviando...' : '📱 Recordatorio 1-Clic'}
                                                 </button>
                                                 {r.lastReminderSentAt && (
                                                     <span className="block text-[10px] text-gray-400 mt-1">
@@ -296,6 +429,98 @@ export default function ReabastecimientoBIAdminPage() {
                     </table>
                 </div>
             </div>
+
+            {/* ── Bulk Campaign Modal ─────────────────────────────────────────── */}
+            {showBulkModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                                <Megaphone size={18} className="text-green-600" />
+                                <h2 className="font-black text-gray-900 text-sm">Campaña Masiva WhatsApp</h2>
+                            </div>
+                            <button onClick={() => { setShowBulkModal(false); setBulkDryRun(null); setBulkResult(null); }} className="p-1.5 text-gray-400 hover:text-gray-600">
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                                <p className="font-bold mb-1">⚠️ Clientes críticos seleccionados:</p>
+                                <p className="text-amber-700">
+                                    {criticalCustomers.length} clientes con estado <strong>Vencido</strong> o <strong>Crítico (≤10 días)</strong> recibirán la plantilla aprobada <code className="bg-amber-100 px-1 rounded">reabastecimiento_recordatorio</code>.
+                                </p>
+                            </div>
+
+                            {bulkLoading && (
+                                <div className="flex items-center justify-center gap-2 py-4 text-sm text-gray-500">
+                                    <Loader2 size={16} className="animate-spin" />
+                                    {bulkDryRun ? 'Enviando...' : 'Calculando costo estimado...'}
+                                </div>
+                            )}
+
+                            {bulkDryRun && !bulkResult && !bulkLoading && (
+                                <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">Mensajes a enviar</span>
+                                        <span className="font-black text-gray-900">{bulkDryRun.total}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">Costo estimado (USD)</span>
+                                        <span className="font-black text-green-700">${bulkDryRun.estimatedCostUsd.toFixed(4)} USD</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">Costo en COP (~4.200)</span>
+                                        <span className="font-bold text-gray-700">~${(bulkDryRun.estimatedCostUsd * 4200).toFixed(0)} COP</span>
+                                    </div>
+                                    <div className="flex justify-between text-[11px] text-gray-500 pt-1 border-t border-green-100">
+                                        <span>Plantilla: Marketing · Colombia</span>
+                                        <span>$0.0125 USD/msg</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {bulkResult && (
+                                <div className={`rounded-xl p-4 space-y-1 text-sm ${bulkResult.failed === 0 ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                                    <p className="font-black text-gray-900">
+                                        {bulkResult.failed === 0 ? '✅ Campaña enviada exitosamente' : '⚠️ Campaña completada con errores'}
+                                    </p>
+                                    <div className="flex justify-between"><span>Enviados</span><span className="font-bold text-green-700">{bulkResult.sent}</span></div>
+                                    <div className="flex justify-between"><span>Fallidos</span><span className="font-bold text-red-600">{bulkResult.failed}</span></div>
+                                    <div className="flex justify-between"><span>Costo real</span><span className="font-bold">${bulkResult.estimatedCostUsd.toFixed(4)} USD</span></div>
+                                </div>
+                            )}
+
+                            {!bulkResult && (
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => { setShowBulkModal(false); setBulkDryRun(null); }}
+                                        className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-bold text-xs rounded-xl hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleBulkSend}
+                                        disabled={!bulkDryRun || bulkLoading}
+                                        className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 transition-colors"
+                                    >
+                                        {bulkLoading ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                                        Confirmar y Enviar
+                                    </button>
+                                </div>
+                            )}
+                            {bulkResult && (
+                                <button
+                                    onClick={() => { setShowBulkModal(false); setBulkDryRun(null); setBulkResult(null); }}
+                                    className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors"
+                                >
+                                    Cerrar
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

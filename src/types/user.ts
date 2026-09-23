@@ -59,6 +59,7 @@ export const ROLE_DEFINITIONS: Record<SystemRole, {
             envios: true,
             auditoria: true,
             usuarios: true,
+            mensajeria: true,
         }
     },
     director: {
@@ -78,6 +79,7 @@ export const ROLE_DEFINITIONS: Record<SystemRole, {
             envios: true,
             auditoria: true,
             usuarios: false,
+            mensajeria: true,
         }
     },
     gestor: {
@@ -97,6 +99,7 @@ export const ROLE_DEFINITIONS: Record<SystemRole, {
             envios: true,
             auditoria: false,
             usuarios: false,
+            mensajeria: true,
         }
     },
     produccion_calidad: {
@@ -135,6 +138,7 @@ export const ROLE_DEFINITIONS: Record<SystemRole, {
             envios: false,
             auditoria: false,
             usuarios: false,
+            mensajeria: true,
         }
     },
     cajero: {

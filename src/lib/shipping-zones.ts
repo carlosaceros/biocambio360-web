@@ -432,37 +432,57 @@ export function getCartPackagingAnalysis(items: CartItemQuote[]): PackagingAnaly
     }
 
     // Cálculo de bultos físicos:
-    // - Cada 20L es un bulto independiente (20 kg)
-    // - Hasta 2 bidones de 10L por caja/bulto (20 kg)
-    // - Hasta 4 galones de 3.8L por caja/bulto (15.2 kg)
-    // - Pequeños agrupados en cajas de máx 15 kg
+    // - Límite real de las transportadoras: 30 kg por bulto (antes se dividía a partir de 20 kg)
+    // - Cada 20L es la base de un bulto, pero se consolidan galones/productos menores en el
+    //   mismo bulto mientras quede espacio hasta los 30 kg, para evitar bultos extra innecesarios
+    // - Hasta 2 bidones de 10L por caja/bulto base (20 kg), con el mismo criterio de consolidación
+    const MAX_BULTO_KG = 30;
     const bultos20L = garrafas20L;
     const bultos10L = Math.ceil(garrafas10L / 2);
     const bultosGalones = Math.ceil(galones38L / 4);
-    const bultosSmall = smallItemsWeight > 0 ? Math.ceil(smallItemsWeight / 15) : 0;
+    const bultosSmall = smallItemsWeight > 0 ? Math.ceil(smallItemsWeight / MAX_BULTO_KG) : 0;
 
     const totalBultos = Math.max(1, bultos20L + bultos10L + bultosGalones + bultosSmall);
 
     // Construcción de la lista física de paquetes/bultos individuales
     const paquetesDetalle: PackageDetail[] = [];
 
-    // 1. Cada garrafa de 20L viaja en su propio bulto de 20 kg
+    // Peso de galones/productos menores pendiente de asignar a un bulto
+    let remainingSecondaryWeight = Math.round((galones38L * 3.8 + smallItemsWeight) * 10) / 10;
+
+    // 1. Cada garrafa de 20L viaja en su propio bulto, consolidando galones/productos menores
+    //    en el mismo bulto mientras quede espacio hasta el límite de 30 kg
     for (let i = 0; i < bultos20L; i++) {
+        let pesoBulto = 20;
+        const espacioDisponible = MAX_BULTO_KG - pesoBulto;
+        if (remainingSecondaryWeight > 0 && espacioDisponible > 0) {
+            const aConsolidar = Math.min(espacioDisponible, remainingSecondaryWeight);
+            pesoBulto = Math.round((pesoBulto + aConsolidar) * 10) / 10;
+            remainingSecondaryWeight = Math.round((remainingSecondaryWeight - aConsolidar) * 10) / 10;
+        }
         paquetesDetalle.push({
-            pesoKg: 20,
+            pesoKg: pesoBulto,
             alto: 38,
             largo: 38,
             ancho: 38,
-            descripcion: `Garrafa 20L / 20KG #${i + 1}`,
+            descripcion: pesoBulto > 20
+                ? `Garrafa 20L + Accesorios #${i + 1} (${pesoBulto} kg)`
+                : `Garrafa 20L / 20KG #${i + 1}`,
         });
     }
 
-    // 2. Bidones de 10L (hasta 2 por caja de 20 kg)
+    // 2. Bidones de 10L (hasta 2 por caja base de 20 kg), consolidando también accesorios si cabe
     let rem10L = garrafas10L;
     let box10LIdx = 1;
     while (rem10L > 0) {
         const unitsInBox = Math.min(2, rem10L);
-        const w = unitsInBox * 10;
+        let w = unitsInBox * 10;
+        const espacioDisponible = MAX_BULTO_KG - w;
+        if (remainingSecondaryWeight > 0 && espacioDisponible > 0) {
+            const aConsolidar = Math.min(espacioDisponible, remainingSecondaryWeight);
+            w = Math.round((w + aConsolidar) * 10) / 10;
+            remainingSecondaryWeight = Math.round((remainingSecondaryWeight - aConsolidar) * 10) / 10;
+        }
         paquetesDetalle.push({
             pesoKg: w,
             alto: 35,
@@ -473,25 +493,18 @@ export function getCartPackagingAnalysis(items: CartItemQuote[]): PackagingAnaly
         rem10L -= unitsInBox;
     }
 
-    // 3. Galones de 3.8L y productos menores (1/2G, 1L, etc.)
-    // Si hay galones y pequeños, se agrupan en bulto secundario
-    let remGalonesWeight = galones38L * 3.8;
-    let remSmallWeight = smallItemsWeight;
-    let secondaryTotalWeight = Math.round((remGalonesWeight + remSmallWeight) * 10) / 10;
-
-    if (secondaryTotalWeight > 0) {
-        // Si excede 20 kg, dividirlo en cajas de máx 15 kg
-        while (secondaryTotalWeight > 0) {
-            const currentWeight = Math.min(15, secondaryTotalWeight);
-            paquetesDetalle.push({
-                pesoKg: Math.round(currentWeight * 10) / 10,
-                alto: currentWeight > 8 ? 32 : 25,
-                largo: currentWeight > 8 ? 30 : 25,
-                ancho: currentWeight > 8 ? 30 : 25,
-                descripcion: `Caja de Galones / Envases Menores (${Math.round(currentWeight * 10) / 10} kg)`,
-            });
-            secondaryTotalWeight = Math.round((secondaryTotalWeight - currentWeight) * 10) / 10;
-        }
+    // 3. Si aún sobra peso de galones/productos menores (no había garrafas grandes para
+    //    consolidar, o se excedía el límite), se agrupan en cajas independientes de máx 30 kg
+    while (remainingSecondaryWeight > 0) {
+        const currentWeight = Math.min(MAX_BULTO_KG, remainingSecondaryWeight);
+        paquetesDetalle.push({
+            pesoKg: Math.round(currentWeight * 10) / 10,
+            alto: currentWeight > 8 ? 32 : 25,
+            largo: currentWeight > 8 ? 30 : 25,
+            ancho: currentWeight > 8 ? 30 : 25,
+            descripcion: `Caja de Galones / Envases Menores (${Math.round(currentWeight * 10) / 10} kg)`,
+        });
+        remainingSecondaryWeight = Math.round((remainingSecondaryWeight - currentWeight) * 10) / 10;
     }
 
     // Si por alguna razón la lista quedó vacía, asegurar al menos 1 bulto con el peso total

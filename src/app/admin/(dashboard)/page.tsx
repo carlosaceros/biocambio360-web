@@ -589,6 +589,32 @@ export default function AdminDashboard() {
                                     </motion.button>
                                 )}
 
+                                {/* Bandeja de Mensajes — WhatsApp / Messenger / Instagram */}
+                                {hasCap('mensajeria') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/inbox')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-green-300 text-left hover:border-green-500 hover:shadow-md transition-all group ring-1 ring-green-100"
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                                <MessageSquare size={22} />
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="text-base font-black text-gray-900">Bandeja Inbox</h3>
+                                            <span className="text-[10px] font-black bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">WhatsApp</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Mensajes en tiempo real. WhatsApp, Messenger e Instagram unificados.
+                                        </p>
+                                        <span className="text-xs font-bold text-green-700 flex items-center gap-1">
+                                            Abrir Bandeja <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
+
                                 {/* TPV Mostrador Soacha */}
                                 {hasCap('pos') && (
                                     <motion.button

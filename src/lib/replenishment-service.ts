@@ -15,6 +15,8 @@ export interface CustomerReplenishment {
     itemsSummary: string;
     estimatedCycleDays: number;
     lastReminderSentAt?: string;
+    lastWhatsappReminderAt?: string;
+    lastWhatsappReminderTemplate?: string;
     status?: 'surtido' | 'alerta_temprana' | 'critico_10_dias' | 'vencido';
 }
 
