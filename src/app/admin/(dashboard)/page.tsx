@@ -1014,6 +1014,20 @@ export default function AdminDashboard() {
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/inbox')}
+                                    className="bg-white rounded-xl p-6 shadow-md border-2 border-green-300 text-left hover:border-green-500 transition-colors ring-1 ring-green-100"
+                                >
+                                    <MessageSquare className="text-green-600 mb-3" size={24} />
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <p className="font-black text-gray-900">Bandeja Inbox</p>
+                                        <span className="text-[10px] font-black bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">WhatsApp</span>
+                                    </div>
+                                    <p className="text-xs text-gray-600">Mensajes en tiempo real. WhatsApp, Messenger e Instagram unificados.</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => router.push('/admin/asesores')}
                                     className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-amber-200 transition-colors"
                                 >
