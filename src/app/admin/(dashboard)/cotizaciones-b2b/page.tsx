@@ -32,11 +32,14 @@ import {
     Hotel,
     Stethoscope,
     Factory,
-    HelpCircle
+    HelpCircle,
+    ShoppingCart,
+    ArrowRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
     getAllB2BProposals,
+    createB2BProposal,
     updateB2BProposalStatus,
     updateB2BProposalItems,
     getB2BSectorsConfig,
@@ -49,6 +52,7 @@ import {
     DEFAULT_SECTORS
 } from '@/lib/b2b-proposal-service';
 import { formatCurrency } from '@/lib/checkout-utils';
+import { PRODUCTOS, Product, isDisallowedSize } from '@/lib/products';
 
 const STATUS_CONFIG: Record<B2BProposal['status'], { label: string; bg: string; fg: string }> = {
     nuevo: { label: 'Nueva Cotización', bg: 'bg-blue-100', fg: 'text-blue-800' },
@@ -76,7 +80,7 @@ const getSectorIcon = (iconKey?: string) => {
 
 export default function CotizacionesB2BAdminPage() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<'crm' | 'tarifas'>('crm');
+    const [activeTab, setActiveTab] = useState<'crm' | 'tarifas' | 'libre'>('crm');
 
     // ── CRM Proposals State ──
     const [proposals, setProposals] = useState<B2BProposal[]>([]);
@@ -94,6 +98,18 @@ export default function CotizacionesB2BAdminPage() {
     const [isLoadingSectors, setIsLoadingSectors] = useState(true);
     const [isSavingSectors, setIsSavingSectors] = useState(false);
     const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+    // ── Cotizador Libre (todos los productos, selección manual) State ──
+    const [productSearchQuery, setProductSearchQuery] = useState('');
+    const [productCategory, setProductCategory] = useState('all');
+    const [customItems, setCustomItems] = useState<B2BProposalItem[]>([]);
+    const [customNombreEncargado, setCustomNombreEncargado] = useState('');
+    const [customNombreEmpresa, setCustomNombreEmpresa] = useState('');
+    const [customWhatsapp, setCustomWhatsapp] = useState('');
+    const [customEmail, setCustomEmail] = useState('');
+    const [customCiudad, setCustomCiudad] = useState('');
+    const [isSavingCustom, setIsSavingCustom] = useState(false);
+    const [generatedCustomProposal, setGeneratedCustomProposal] = useState<B2BProposal | null>(null);
 
     useEffect(() => {
         loadData();
@@ -167,6 +183,129 @@ export default function CotizacionesB2BAdminPage() {
 
     const handleRemoveItemFromProposal = (index: number) => {
         setEditingProposalItems(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // ── Cotizador Libre: catálogo completo de productos ──
+    const productCategories = useMemo(() => {
+        const cats = new Set<string>();
+        PRODUCTOS.forEach((p: Product) => {
+            if (p.categoria) cats.add(p.categoria);
+        });
+        return ['all', ...Array.from(cats)];
+    }, []);
+
+    const filteredCatalogProducts = useMemo(() => {
+        const q = productSearchQuery.toLowerCase();
+        return PRODUCTOS.filter((p: Product) => {
+            if (p.status === 'archived' || p.isDeleted) return false;
+            const matchesSearch = !q || p.nombre.toLowerCase().includes(q);
+            const matchesCat = productCategory === 'all' || p.categoria === productCategory;
+            return matchesSearch && matchesCat;
+        });
+    }, [productSearchQuery, productCategory]);
+
+    const handleAddCustomItem = (product: Product, sizeKey: string, precioBiocambio: number) => {
+        const precioMercado = product.competidorPromedio?.[sizeKey] || precioBiocambio;
+        const presentacion = sizeKey;
+
+        setCustomItems(prev => {
+            const existingIdx = prev.findIndex(i => i.nombre === product.nombre && i.presentacion === presentacion);
+            if (existingIdx >= 0) {
+                const next = [...prev];
+                const item = { ...next[existingIdx], cantidad: next[existingIdx].cantidad + 1 };
+                item.subtotalBiocambio = item.cantidad * item.precioBiocambio;
+                item.subtotalMercado = item.cantidad * item.precioMercado;
+                item.ahorroItem = item.subtotalMercado - item.subtotalBiocambio;
+                next[existingIdx] = item;
+                return next;
+            }
+            return [...prev, {
+                nombre: product.nombre,
+                presentacion,
+                precioMercado,
+                precioBiocambio,
+                cantidad: 1,
+                subtotalMercado: precioMercado,
+                subtotalBiocambio: precioBiocambio,
+                ahorroItem: precioMercado - precioBiocambio
+            }];
+        });
+    };
+
+    const handleCustomItemChange = (index: number, field: keyof B2BProposalItem, value: any) => {
+        setCustomItems(prev => {
+            const next = [...prev];
+            const item = { ...next[index], [field]: value };
+
+            const cant = Number(item.cantidad) || 1;
+            const pBiocambio = Number(item.precioBiocambio) || 0;
+            const pMercado = Number(item.precioMercado) || 0;
+
+            item.subtotalBiocambio = cant * pBiocambio;
+            item.subtotalMercado = cant * pMercado;
+            item.ahorroItem = item.subtotalMercado - item.subtotalBiocambio;
+
+            next[index] = item;
+            return next;
+        });
+    };
+
+    const handleRemoveCustomItem = (index: number) => {
+        setCustomItems(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const customFinancials = useMemo(() => {
+        const gastoMercadoMes = customItems.reduce((sum, i) => sum + (Number(i.subtotalMercado) || 0), 0);
+        const gastoBiocambioMes = customItems.reduce((sum, i) => sum + (Number(i.subtotalBiocambio) || 0), 0);
+        const ahorroMes = gastoMercadoMes - gastoBiocambioMes;
+        const ahorroAnual = ahorroMes * 12;
+        const ahorroPct = gastoMercadoMes > 0 ? Math.round((ahorroMes / gastoMercadoMes) * 100) : 0;
+
+        return { gastoMercadoMes, gastoBiocambioMes, ahorroMes, ahorroAnual, ahorroPct };
+    }, [customItems]);
+
+    const resetCustomQuoteForm = () => {
+        setCustomItems([]);
+        setCustomNombreEncargado('');
+        setCustomNombreEmpresa('');
+        setCustomWhatsapp('');
+        setCustomEmail('');
+        setCustomCiudad('');
+        setGeneratedCustomProposal(null);
+    };
+
+    const handleGenerateCustomProposal = async () => {
+        if (!customNombreEncargado.trim() || !customNombreEmpresa.trim() || !customWhatsapp.trim() || customItems.length === 0) {
+            showToast('Completa encargado, empresa, WhatsApp y agrega al menos un producto', 'error');
+            return;
+        }
+
+        setIsSavingCustom(true);
+        try {
+            const proposal = await createB2BProposal({
+                sector: 'personalizado',
+                sectorLabel: 'Cotización Personalizada',
+                nombreEncargado: customNombreEncargado,
+                nombreEmpresa: customNombreEmpresa,
+                whatsapp: customWhatsapp,
+                email: customEmail || 'sin-correo@empresa.com',
+                ciudad: customCiudad || 'Bogotá / Soacha',
+                items: customItems,
+                ...customFinancials
+            });
+            setGeneratedCustomProposal(proposal);
+            setProposals(prev => [proposal, ...prev]);
+            showToast('¡Cotización personalizada generada exitosamente!');
+        } catch (err) {
+            showToast('Error al generar la cotización personalizada', 'error');
+        } finally {
+            setIsSavingCustom(false);
+        }
+    };
+
+    const handleOpenWhatsAppCustom = (proposal: B2BProposal) => {
+        const msg = `Hola ${proposal.nombreEncargado} 👋, te saludamos de Biocambio360. Preparamos la cotización *${proposal.code}* para *${proposal.nombreEmpresa}* con un ahorro estimado de *$${proposal.ahorroMes.toLocaleString('es-CO')}/mes* frente al mercado. ¿Coordinamos tu primer pedido?`;
+        window.open(`https://wa.me/57${proposal.whatsapp.replace(/\D/g, '').replace(/^57/, '')}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
     const editedFinancials = useMemo(() => {
@@ -418,6 +557,17 @@ export default function CotizacionesB2BAdminPage() {
                     >
                         <Settings size={16} />
                         Configurar Tarifas & Sectores ({sectors.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('libre')}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                            activeTab === 'libre'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                    >
+                        <ShoppingCart size={16} />
+                        Cotizador Libre
                     </button>
                 </div>
             </div>
@@ -813,6 +963,250 @@ export default function CotizacionesB2BAdminPage() {
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* TAB 3: COTIZADOR LIBRE — todos los productos, selección manual para necesidades específicas del cliente */}
+            {activeTab === 'libre' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    {/* Catálogo completo */}
+                    <div className="lg:col-span-7 flex flex-col space-y-3">
+                        <div className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs space-y-3">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar producto por nombre..."
+                                    value={productSearchQuery}
+                                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-emerald-500 focus:bg-white"
+                                />
+                            </div>
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
+                                {productCategories.map(cat => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setProductCategory(cat)}
+                                        className={`px-3 py-1 rounded-full font-bold whitespace-nowrap transition-all cursor-pointer ${
+                                            productCategory === cat
+                                                ? 'bg-emerald-600 text-white'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {cat === 'all' ? 'Todos' : cat}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex-1 bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs overflow-y-auto max-h-[calc(100vh-280px)]">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                {filteredCatalogProducts.map(p => (
+                                    <div
+                                        key={p.id}
+                                        className="border border-gray-200 rounded-xl p-2.5 hover:border-emerald-400 hover:shadow-xs transition-all flex flex-col justify-between bg-gray-50/50"
+                                    >
+                                        <div>
+                                            <span className="text-[10px] font-bold text-emerald-600 uppercase block truncate">
+                                                {p.categoria || 'Aseo'}
+                                            </span>
+                                            <h3 className="font-bold text-gray-900 text-xs mt-0.5 line-clamp-2">
+                                                {p.nombre}
+                                            </h3>
+                                        </div>
+                                        <div className="mt-3 pt-2 border-t border-gray-200 space-y-1.5">
+                                            <div className="flex flex-wrap gap-1">
+                                                {Object.entries(p.precios || {})
+                                                    .filter(([sizeKey]) => !isDisallowedSize(sizeKey))
+                                                    .map(([sizeKey, sizePrice]) => (
+                                                        <button
+                                                            key={sizeKey}
+                                                            onClick={() => handleAddCustomItem(p, sizeKey, Number(sizePrice))}
+                                                            className="px-2 py-1 bg-white hover:bg-emerald-600 hover:text-white border border-gray-200 rounded-lg text-[10px] font-black transition-colors flex items-center gap-1 cursor-pointer"
+                                                            title={`Añadir ${sizeKey} (${formatCurrency(Number(sizePrice))})`}
+                                                        >
+                                                            <Plus size={10} />
+                                                            <span>{sizeKey}</span>
+                                                        </button>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredCatalogProducts.length === 0 && (
+                                    <p className="col-span-full text-center text-gray-400 text-xs py-8">
+                                        No se encontraron productos con ese criterio.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Cotización en construcción */}
+                    <div className="lg:col-span-5 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col space-y-4 max-h-[calc(100vh-160px)] overflow-y-auto sticky top-20">
+                        {!generatedCustomProposal ? (
+                            <>
+                                <div>
+                                    <h3 className="font-black text-gray-900 text-sm flex items-center gap-1.5">
+                                        <ShoppingCart size={16} className="text-emerald-600" />
+                                        Productos Seleccionados
+                                        <span className="text-xs text-gray-500 font-normal">({customItems.length})</span>
+                                    </h3>
+                                </div>
+
+                                {customItems.length === 0 ? (
+                                    <p className="text-xs text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-xl">
+                                        Agrega productos del catálogo a la izquierda para armar la cotización específica del cliente.
+                                    </p>
+                                ) : (
+                                    <div className="border border-gray-200 rounded-2xl overflow-x-auto">
+                                        <table className="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
+                                                    <th className="p-2">Producto</th>
+                                                    <th className="p-2 w-14 text-center">Cant.</th>
+                                                    <th className="p-2 w-20 text-right">P. Biocambio</th>
+                                                    <th className="p-2 w-8 text-center"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {customItems.map((item, idx) => (
+                                                    <tr key={idx} className="hover:bg-gray-50">
+                                                        <td className="p-2">
+                                                            <span className="font-bold text-gray-900 block">{item.nombre}</span>
+                                                            <span className="text-gray-400 text-[10px]">{item.presentacion}</span>
+                                                        </td>
+                                                        <td className="p-2">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={item.cantidad}
+                                                                onChange={(e) => handleCustomItemChange(idx, 'cantidad', Number(e.target.value))}
+                                                                className="w-full p-1 border border-gray-200 rounded-md text-center font-bold text-xs"
+                                                            />
+                                                        </td>
+                                                        <td className="p-2 text-right font-black text-emerald-700">
+                                                            {formatCurrency(item.subtotalBiocambio || 0)}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveCustomItem(idx)}
+                                                                className="text-gray-400 hover:text-red-600 p-1 rounded cursor-pointer"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {customItems.length > 0 && (
+                                    <div className="grid grid-cols-2 gap-3 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 rounded-2xl border border-emerald-200 text-xs">
+                                        <div>
+                                            <span className="uppercase font-bold text-gray-500 text-[10px]">Total Biocambio / Mes</span>
+                                            <p className="font-black text-emerald-900">{formatCurrency(customFinancials.gastoBiocambioMes)}</p>
+                                        </div>
+                                        <div>
+                                            <span className="uppercase font-bold text-green-800 text-[10px]">Ahorro vs Mercado</span>
+                                            <p className="font-black text-green-700">
+                                                +{formatCurrency(customFinancials.ahorroMes)} <span className="text-[10px]">(-{customFinancials.ahorroPct}%)</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2 pt-2 border-t border-gray-100">
+                                    <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Datos del Cliente</p>
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre del Encargado *"
+                                        value={customNombreEncargado}
+                                        onChange={(e) => setCustomNombreEncargado(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:border-emerald-600 focus:outline-none"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre de la Empresa *"
+                                        value={customNombreEmpresa}
+                                        onChange={(e) => setCustomNombreEmpresa(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:border-emerald-600 focus:outline-none"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="WhatsApp *"
+                                        value={customWhatsapp}
+                                        onChange={(e) => setCustomWhatsapp(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:border-emerald-600 focus:outline-none"
+                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                            type="email"
+                                            placeholder="Correo (opcional)"
+                                            value={customEmail}
+                                            onChange={(e) => setCustomEmail(e.target.value)}
+                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:border-emerald-600 focus:outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Ciudad"
+                                            value={customCiudad}
+                                            onChange={(e) => setCustomCiudad(e.target.value)}
+                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:border-emerald-600 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleGenerateCustomProposal}
+                                    disabled={isSavingCustom || customItems.length === 0}
+                                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-800 hover:opacity-95 text-white font-black py-3 rounded-2xl shadow-md transition-all text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSavingCustom ? 'GENERANDO COTIZACIÓN...' : 'GENERAR COTIZACIÓN PERSONALIZADA'}
+                                    <ArrowRight size={16} />
+                                </button>
+                            </>
+                        ) : (
+                            <div className="text-center space-y-4 py-4">
+                                <div className="inline-flex items-center justify-center p-3 bg-emerald-600 text-white rounded-2xl shadow-md">
+                                    <CheckCircle2 size={28} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-900">
+                                        ¡Cotización {generatedCustomProposal.code} Generada!
+                                    </h3>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        Propuesta personalizada para <strong>{generatedCustomProposal.nombreEmpresa}</strong> con {generatedCustomProposal.items.length} producto(s) seleccionado(s).
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-1 gap-2">
+                                    <button
+                                        onClick={() => handleGeneratePDF(generatedCustomProposal)}
+                                        className="bg-red-600 hover:bg-red-700 text-white font-black py-3 px-4 rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <FileText size={16} />
+                                        DESCARGAR PDF CON MEMBRETE
+                                    </button>
+                                    <button
+                                        onClick={() => handleOpenWhatsAppCustom(generatedCustomProposal)}
+                                        className="bg-slate-900 hover:bg-slate-800 text-white font-black py-3 px-4 rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <MessageCircle size={16} />
+                                        CONTACTAR POR WHATSAPP
+                                    </button>
+                                    <button
+                                        onClick={resetCustomQuoteForm}
+                                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 px-4 rounded-xl transition-all text-xs cursor-pointer"
+                                    >
+                                        + Crear Otra Cotización Personalizada
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
