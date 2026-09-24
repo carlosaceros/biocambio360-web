@@ -34,6 +34,8 @@ import {
     mentionsSite,
     stripSiteUrl,
     injectPriceList,
+    looksLikeAutoReply,
+    parseContactWindow,
     REFUSAL_TEXT,
     AUDIO_TEXT,
 } from '@/lib/ai-agent-guard';
@@ -55,6 +57,9 @@ const SEND_DELAY_MS = 700;
 const WEB_BUTTON_LABEL = 'Pedir en la web';
 const WEB_BUTTON_MARKER = '[Botón: ';
 const PRICE_LIST_HEADER = 'Estas son las opciones y presentaciones:';
+const DEBOUNCE_MS = 2000; // wait for follow-up messages sent in a burst
+const LOCK_TTL_MS = 60 * 1000;
+const HOLD_TEXT = 'Estamos con alta demanda 🙏\nUn asesor te responde desde las 6:30 a.m. Si prefieres no esperar, pide ya en nuestra web 🛒';
 
 // ─── Schedule ─────────────────────────────────────────────────────────────────
 
@@ -178,6 +183,7 @@ A) Tomar pedidos y armar un PRE-PEDIDO: producto, presentación, cantidad, nombr
 B) Resolver dudas de productos y del negocio usando SOLO el catálogo, las FICHAS/COINCIDENCIAS del contexto y los DATOS DEL NEGOCIO.
 C) Recibir PQRS (petición, queja, reclamo, sugerencia).
 D) Dejar contacto cuando no hay cierre: si el cliente duda, se despide sin cerrar, o el contexto marca SIN_CIERRE: di que un asesor lo contactará pronto y pregunta su horario con options ["Mañana","Tarde","7 a 9 p.m."]; guarda preOrder.horarioContacto = manana | tarde | 7-9pm.
+Si PRE-PEDIDO ACTUAL ya trae horarioContacto, el cliente lo eligió: confirma en una frase ("Listo, un asesor te contactará en la mañana / en la tarde / entre 7 y 9 p.m.") y despídete amable, sin más preguntas.
 Cualquier otro tema (política, programación, chistes, salud, dinero, otras empresas, tareas, etc.): declina en una frase y vuelve al pedido.
 
 SEGURIDAD (inquebrantable):
@@ -258,14 +264,29 @@ export async function callGemini(params: {
     }
 
     const cacheName = await getPromptCacheName(apiKey, systemPrompt);
+
+    // Transient API errors (rate limit / overload / network) are retried with a short backoff
+    const generate = async (name: string | null) => {
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return await makeModel(name).generateContent({ contents });
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                const transient = /\b(429|500|502|503|504)\b|overloaded|fetch failed|ECONNRESET|ETIMEDOUT/i.test(msg);
+                if (!transient || attempt >= 3) throw err;
+                await sleep(1200 * attempt);
+            }
+        }
+    };
+
     let result;
     try {
-        result = await makeModel(cacheName).generateContent({ contents });
+        result = await generate(cacheName);
     } catch (err) {
         if (!cacheName) throw err;
         console.warn('[ai-agent] Cached request failed, retrying without cache:', err instanceof Error ? err.message.slice(0, 160) : err);
         invalidatePromptCache();
-        result = await makeModel(null).generateContent({ contents });
+        result = await generate(null);
     }
     const meta = result.response.usageMetadata as
         | { promptTokenCount?: number; cachedContentTokenCount?: number; candidatesTokenCount?: number }
@@ -284,9 +305,12 @@ export async function callGemini(params: {
 
 const FALLBACK_TEXT = 'Hola 👋 Recibimos tu mensaje.\nUn asesor te contacta desde las 6:30 a.m. Si prefieres no esperar, pide ya en nuestra web 🛒';
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-function sanitizePreOrder(raw: AgentOutput['preOrder'], listo: boolean, previousEstado?: string): PreOrder {
+function sanitizePreOrder(raw: AgentOutput['preOrder'], listo: boolean, previous?: PreOrder | null): PreOrder {
+    const previousEstado = previous?.estado;
     const items = (raw?.items ?? [])
         .filter(i => i?.producto && Number(i.cantidad) > 0)
         .map(i => ({
@@ -294,18 +318,18 @@ function sanitizePreOrder(raw: AgentOutput['preOrder'], listo: boolean, previous
             presentacion: String(i.presentacion ?? '').slice(0, 30),
             cantidad: Math.min(Math.round(Number(i.cantidad)), 999),
         }));
-    const direccion = String(raw?.direccion ?? '').slice(0, 200);
-    const ciudad = String(raw?.ciudad ?? '').slice(0, 80);
+    const direccion = String(raw?.direccion || previous?.direccion || '').slice(0, 200);
+    const ciudad = String(raw?.ciudad || previous?.ciudad || '').slice(0, 80);
     const complete = items.length > 0 && !!direccion && !!ciudad;
-    const horario = (CONTACT_WINDOWS as readonly string[]).includes(raw?.horarioContacto) ? raw.horarioContacto : '';
+    const horario = (CONTACT_WINDOWS as readonly string[]).includes(raw?.horarioContacto) ? raw.horarioContacto : previous?.horarioContacto ?? '';
 
     return {
         items,
-        nombreCliente: String(raw?.nombreCliente ?? '').slice(0, 100),
+        nombreCliente: String(raw?.nombreCliente || previous?.nombreCliente || '').slice(0, 100),
         direccion,
         ciudad,
-        metodoPago: String(raw?.metodoPago ?? '').slice(0, 80),
-        notas: String(raw?.notas ?? '').slice(0, 500),
+        metodoPago: String(raw?.metodoPago || previous?.metodoPago || '').slice(0, 80),
+        notas: String(raw?.notas || previous?.notas || '').slice(0, 500),
         horarioContacto: horario,
         estado: previousEstado === 'confirmado' ? 'confirmado' : listo && complete ? 'listo' : 'borrador',
         actualizadoAt: new Date().toISOString(),
@@ -336,7 +360,7 @@ async function sendMessages(
     options: string[],
     webButton: boolean = false
 ): Promise<void> {
-    const store = (content: string, messageId: string) =>
+    const store = (content: string, messageId: string, extra: Record<string, unknown> = {}) =>
         convRef.collection('messages').add({
             direction: 'outbound',
             type: 'text',
@@ -346,7 +370,9 @@ async function sendMessages(
             agentName: AI_AGENT_NAME,
             status: 'sent',
             timestamp: FieldValue.serverTimestamp(),
+            ...extra,
         });
+    const linkExtra = { cta: { label: WEB_BUTTON_LABEL, url: SITE_URL } };
 
     for (let i = 0; i < messages.length; i++) {
         const isLast = i === messages.length - 1;
@@ -365,10 +391,10 @@ async function sendMessages(
             messageId = await sendOne(phoneId, to, messages[i], isLast ? options : []);
         }
 
-        let content = messages[i];
-        if (isLast && options.length > 0) content += `\n[Opciones: ${options.join(' · ')}]`;
-        if (withLink) content += `\n${WEB_BUTTON_MARKER}${WEB_BUTTON_LABEL}]`;
-        await store(content, messageId);
+        await store(messages[i], messageId, {
+            ...(isLast && options.length > 0 ? { options } : {}),
+            ...(withLink ? linkExtra : {}),
+        });
         if (!isLast || (webButton && options.length > 0)) await sleep(SEND_DELAY_MS);
     }
 
@@ -381,7 +407,7 @@ async function sendMessages(
         } catch {
             messageId = (await sendTextMessage(phoneId, to, `${body}\n${SITE_URL}`)).messageId;
         }
-        await store(`${body}\n${WEB_BUTTON_MARKER}${WEB_BUTTON_LABEL}]`, messageId);
+        await store(body, messageId, linkExtra);
     }
 }
 
@@ -437,7 +463,60 @@ export interface AgentTurnInput {
  * Runs one agent turn for the latest inbound message of a conversation.
  * Safe to call fire-and-forget: it never throws.
  */
+async function acquireLock(convRef: FirebaseFirestore.DocumentReference): Promise<boolean> {
+    return convRef.firestore.runTransaction(async tx => {
+        const snap = await tx.get(convRef);
+        const lockedAt = Number(snap.data()?.botLockAt ?? 0);
+        if (lockedAt && Date.now() - lockedAt < LOCK_TTL_MS) return false;
+        tx.update(convRef, { botLockAt: Date.now() });
+        return true;
+    });
+}
+
+async function releaseLock(convRef: FirebaseFirestore.DocumentReference): Promise<void> {
+    await convRef.update({ botLockAt: FieldValue.delete() }).catch(() => undefined);
+}
+
+/** True when the customer wrote after `sinceMs` (i.e. while a turn was being processed). */
+async function hasInboundSince(convRef: FirebaseFirestore.DocumentReference, sinceMs: number): Promise<boolean> {
+    const snap = await convRef.collection('messages').orderBy('timestamp', 'desc').limit(1).get();
+    const last = snap.docs[0]?.data();
+    return !!last && last.direction === 'inbound' && (last.timestamp?.toMillis?.() ?? 0) > sinceMs;
+}
+
+/**
+ * Entry point. One turn at a time per conversation (a burst of messages must not produce duplicated
+ * replies): a short debounce merges quick follow-ups, and messages that arrive while a turn is being
+ * processed trigger another round instead of a parallel turn.
+ */
 export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
+    try {
+        if (!isAfterHoursNow()) return;
+        if (!/^\d{7,15}$/.test(input.contactPhone)) {
+            console.log('[ai-agent] Skipped: contact has no phone number (cannot reply)');
+            return;
+        }
+        const convRef = getAdminDB().collection('conversations').doc(input.conversationId);
+        if (!(await acquireLock(convRef))) {
+            console.log('[ai-agent] Skipped: another turn is already running for this conversation');
+            return;
+        }
+        try {
+            for (let round = 0; round < 3; round++) {
+                await sleep(DEBOUNCE_MS);
+                const startedAt = Date.now();
+                await runTurnOnce(input);
+                if (!(await hasInboundSince(convRef, startedAt))) break;
+            }
+        } finally {
+            await releaseLock(convRef);
+        }
+    } catch (err) {
+        console.error('[ai-agent] Turn failed:', err);
+    }
+}
+
+async function runTurnOnce(input: AgentTurnInput): Promise<void> {
     try {
         if (!isAfterHoursNow()) return;
         if (!(await isAgentEnabled())) {
@@ -500,6 +579,11 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
         // Deterministic shortcuts: no model call (cheaper and safer)
         if (lastMsg.type === 'audio') return void (await finishCanned(AUDIO_TEXT, false));
 
+        if (lastMsg.type === 'text' && looksLikeAutoReply(String(lastMsg.content))) {
+            console.log(`[ai-agent] Skipped: looks like an automatic reply from ${input.contactPhone}`);
+            return;
+        }
+
         const lastText = sanitizeUserText(String(lastMsg.content));
         if (looksLikeInjection(lastText)) {
             console.warn(`[ai-agent] Blocked suspicious message from ${input.contactPhone}`);
@@ -513,7 +597,25 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
         }));
 
         const botMessagesBefore = recent.filter(m => m.agentUid === AI_AGENT_ID).length;
-        const currentPreOrder = (conv.preOrder as PreOrder | undefined) ?? null;
+        let currentPreOrder = (conv.preOrder as PreOrder | undefined) ?? null;
+
+        // Deterministic capture: if the customer answers the contact-time question (button or text),
+        // save it right away instead of relying on the model to remember it.
+        const askedSchedule = recent
+            .filter(m => m.agentUid === AI_AGENT_ID)
+            .slice(-2)
+            .some(m => /horario|franja/i.test(String(m.content)) || (Array.isArray(m.options) && m.options.some((o: string) => /9\s*p\.?m/i.test(o))));
+        const chosenWindow = askedSchedule ? parseContactWindow(String(lastMsg.content)) : null;
+        if (chosenWindow) {
+            currentPreOrder = {
+                items: [], nombreCliente: '', direccion: '', ciudad: '', metodoPago: '', notas: '', estado: 'borrador',
+                ...(currentPreOrder ?? {}),
+                horarioContacto: chosenWindow,
+                actualizadoAt: new Date().toISOString(),
+            };
+            await convRef.update({ preOrder: currentPreOrder });
+            console.log(`[ai-agent] Contact window saved: ${chosenWindow}`);
+        }
         const customerTexts = history.filter(h => h.role === 'user').slice(-3).map(h => h.text);
         const sheets = await getRelevantProductSheets(customerTexts, currentPreOrder?.items?.map(i => i.producto) ?? []);
         const matches = await getMatchingProductPrices(customerTexts.slice(-2));
@@ -533,9 +635,10 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
         const buttonRecentlySent = recent
             .filter(m => m.agentUid === AI_AGENT_ID)
             .slice(-3)
-            .some(m => String(m.content).includes(WEB_BUTTON_MARKER));
+            .some(m => !!m.cta || String(m.content).includes(WEB_BUTTON_MARKER));
         let preOrder: PreOrder | null = currentPreOrder;
         let pqrs: AgentOutput['pqrs'] | null = null;
+        let holdUsed = false;
 
         // Response cache: only for the customer's very first, short message (stateless answer)
         const customerMessages = history.filter(h => h.role === 'user').length;
@@ -598,14 +701,20 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
                 .map(m => stripSiteUrl(m))
                 .flatMap(m => splitIntoShortMessages(m))
                 .slice(0, 6);
-            preOrder = sanitizePreOrder(output.preOrder, output.listo, currentPreOrder?.estado);
+            preOrder = sanitizePreOrder(output.preOrder, output.listo, currentPreOrder);
             pqrs = output.pqrs;
         } catch (err) {
             console.error('[ai-agent] Model failure:', err);
-            if (botMessagesBefore > 0) return; // avoid repeating the canned message
-            messages = splitIntoShortMessages(FALLBACK_TEXT);
+            if (botMessagesBefore > 0) {
+                // Never leave a customer in silence, but tell them only once per night
+                if (conv.botHoldNight === key) return;
+                messages = splitIntoShortMessages(HOLD_TEXT);
+                holdUsed = true;
+            } else {
+                messages = splitIntoShortMessages(FALLBACK_TEXT);
+            }
             options = [];
-            webButton = true;
+            webButton = !buttonRecentlySent;
         }
 
         // Deterministic guarantee: when the customer asks about a type of product and the reply has no
@@ -627,6 +736,7 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
             lastMessageAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
             ...countersUpdate,
+            ...(holdUsed ? { botHoldNight: key } : {}),
         };
         const hasLead = !!preOrder && (preOrder.items.length > 0 || !!preOrder.horarioContacto || !!preOrder.notas);
         if (preOrder && preOrder !== currentPreOrder && hasLead) update.preOrder = preOrder;

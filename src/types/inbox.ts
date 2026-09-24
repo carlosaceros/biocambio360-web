@@ -100,6 +100,10 @@ export interface MessageDoc {
     reactionEmoji?: string;
     /** WhatsApp status update (sent/delivered/read) references */
     statusFor?: string;
+    /** Quick-reply options sent with this message (shown as buttons) */
+    options?: string[];
+    /** Link button sent with this message */
+    cta?: { label: string; url: string };
 }
 
 export interface WhatsAppTemplateComponent {

@@ -191,3 +191,21 @@ export function injectPriceList(messages: string[], header: string, matches: str
     const tail = messages.length > 1 ? messages.slice(-1) : messages;
     return [...head, ...priceMessages, ...tail].slice(0, 9);
 }
+
+/** Automatic replies from other businesses/bots ("gracias por tu mensaje, te responderemos pronto"). */
+export function looksLikeAutoReply(text: string): boolean {
+    if (!text || text.length < 25) return false;
+    return /(te\s+responderemos|te\s+contactaremos\s+pronto|responderemos\s+(lo\s+antes|a\s+la\s+brevedad|pronto)|gracias\s+por\s+(tu|su|comunicarte|escribirnos|contactarnos)|horario\s+de\s+atenci[oó]n|mensaje\s+autom[aá]tico|respuesta\s+autom[aá]tica|fuera\s+de\s+(horario|la\s+oficina)|no\s+estamos\s+disponibles)/i.test(text);
+}
+
+export type ContactWindow = 'manana' | 'tarde' | '7-9pm';
+
+/** Maps a customer's answer to the contact-time question (button title or free text). */
+export function parseContactWindow(text: string): ContactWindow | null {
+    const t = String(text ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (!t || t.length > 40) return null;
+    if (/\b7\s*(a|-|y)\s*9\b|\b(siete|7)\b.*\b(nueve|9)\b|\bnoche\b/.test(t)) return '7-9pm';
+    if (/\bmanana\b/.test(t)) return 'manana';
+    if (/\btarde\b/.test(t)) return 'tarde';
+    return null;
+}

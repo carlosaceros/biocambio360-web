@@ -239,7 +239,41 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                                     <span className="text-xs opacity-75 italic">📋 </span>
                                 )}
                                 {/* Message content */}
-                                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                                {(() => {
+                                    // Older messages stored the options inside the text as "[Opciones: a · b]"
+                                    const legacy = msg.content?.match(/\n?\[Opciones: (.+?)\]\s*$/);
+                                    const text = legacy ? msg.content.replace(legacy[0], '').trim() : msg.content;
+                                    const options = msg.options ?? (legacy ? legacy[1].split(' · ') : []);
+                                    return (
+                                        <>
+                                            <p className="whitespace-pre-wrap break-words">{text}</p>
+                                            {options.length > 0 && (
+                                                <div className="mt-2 flex flex-col gap-1">
+                                                    {options.map((opt, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className="text-center text-xs font-bold rounded-lg py-1.5 px-2 bg-white/95 text-sky-600 shadow-sm border border-black/5"
+                                                            title="Botón enviado al cliente"
+                                                        >
+                                                            {opt}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {msg.cta && (
+                                                <a
+                                                    href={msg.cta.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="mt-2 flex items-center justify-center gap-1 text-xs font-bold rounded-lg py-1.5 px-2 bg-white/95 text-sky-600 shadow-sm border border-black/5"
+                                                    title="Botón enviado al cliente"
+                                                >
+                                                    🔗 {msg.cta.label}
+                                                </a>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                                 {/* Footer */}
                                 <div className={`flex items-center justify-end gap-1 mt-1 ${isOutbound ? 'text-green-200' : 'text-gray-400'}`}>
                                     {isOutbound && msg.agentName && (

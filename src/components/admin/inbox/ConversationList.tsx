@@ -150,6 +150,14 @@ export default function ConversationList({
                                         </span>
                                     </>
                                 )}
+                                {conv.preOrder?.horarioContacto && (
+                                    <>
+                                        <span className="text-[10px] text-gray-300">·</span>
+                                        <span className="text-[10px] bg-violet-50 text-violet-700 px-1 rounded font-semibold" title="Horario de contacto preferido">
+                                            📞 {({ manana: 'Mañana', tarde: 'Tarde', '7-9pm': '7-9 p.m.' } as Record<string, string>)[conv.preOrder.horarioContacto] ?? conv.preOrder.horarioContacto}
+                                        </span>
+                                    </>
+                                )}
                                 {conv.accountKey === 'totalLimpieza' && (
                                     <>
                                         <span className="text-[10px] text-gray-300">·</span>

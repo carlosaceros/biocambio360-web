@@ -82,6 +82,8 @@ function docToMessage(id: string, data: DocumentData): MessageDoc {
         templateName: data.templateName,
         reactionEmoji: data.reactionEmoji,
         statusFor: data.statusFor,
+        options: data.options,
+        cta: data.cta,
     };
 }
 
@@ -98,7 +100,8 @@ export function buildConversationId(
     contactIdentifier: string // phone or PSID
 ): string {
     const prefix = channel === 'whatsapp' ? 'wa' : channel === 'messenger' ? 'ms' : 'ig';
-    return `${prefix}_${phoneId}_${contactIdentifier.replace(/\D/g, '')}`;
+    // Keep letters/digits: phones stay numeric, and IDs of contacts without a phone (usernames) stay distinct
+    return `${prefix}_${phoneId}_${contactIdentifier.replace(/[^A-Za-z0-9_-]/g, '')}`;
 }
 
 // ─── Real-time listeners ──────────────────────────────────────────────────────

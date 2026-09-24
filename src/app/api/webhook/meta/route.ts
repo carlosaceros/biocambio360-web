@@ -267,13 +267,24 @@ async function handleWhatsAppInboundMessage(
     const msgId: string = msg.id ?? '';
     const timestamp = new Date(parseInt(msg.timestamp ?? '0') * 1000);
 
-    // Resolve contact name from contacts array
+    // Resolve the contact. Some users (WhatsApp usernames) arrive WITHOUT a phone number:
+    // keep them in their own conversation instead of merging everyone under an empty id.
     const contacts: any[] = value?.contacts ?? [];
-    const contact = contacts.find((c: any) => c.wa_id === from);
-    const contactName: string = contact?.profile?.name ?? `+${from}`;
+    const contact = contacts.find((c: any) => c.wa_id === from) ?? contacts[0];
+    const hasPhone = /^\d{7,15}$/.test(from);
+    const contactKey: string = hasPhone ? from : String(msg.from_user_id ?? contact?.user_id ?? contact?.wa_id ?? from ?? '');
+    if (!contactKey) {
+        console.error('[webhook/meta] Inbound message without any contact identifier:', JSON.stringify({ msg, contact }).slice(0, 1500));
+        return;
+    }
+    if (!hasPhone) {
+        console.warn('[webhook/meta] Inbound WITHOUT phone number (payload):', JSON.stringify({ msg: { ...msg, text: undefined }, contact }).slice(0, 1500));
+    }
+    const contactName: string =
+        contact?.profile?.name ?? contact?.profile?.username ?? (hasPhone ? `+${from}` : 'Usuario de WhatsApp');
 
     // Determine conversation ID and message type
-    const conversationId = buildConversationId('whatsapp', phoneNumberId, from);
+    const conversationId = buildConversationId('whatsapp', phoneNumberId, contactKey);
     const { type, content, mediaUrl, mimeType, fileName } = extractWhatsAppContent(msg);
 
     // Determine which account this is
@@ -319,7 +330,8 @@ async function handleWhatsAppInboundMessage(
             channel: 'whatsapp' as Channel,
             phoneId: phoneNumberId,
             accountKey,
-            contactPhone: from,
+            contactPhone: hasPhone ? from : null,
+            contactUserId: hasPhone ? null : contactKey,
             contactName,
             lastMessage: content,
             lastMessageAt: FieldValue.serverTimestamp(),
@@ -342,11 +354,11 @@ async function handleWhatsAppInboundMessage(
         throw err;
     }
 
-    console.log(`[webhook/meta] WA inbound msg from ${from} → conv: ${conversationId}`);
+    console.log(`[webhook/meta] WA inbound msg from ${contactKey} → conv: ${conversationId}`);
 
     // After-hours AI agent: runs after the response is sent so Meta is never kept waiting.
     if (type !== 'reaction' && isAfterHoursNow()) {
-        after(() => runOrderAgentTurn({ conversationId, phoneId: phoneNumberId, contactPhone: from }));
+        after(() => runOrderAgentTurn({ conversationId, phoneId: phoneNumberId, contactPhone: hasPhone ? from : '' }));
     }
 }
 
