@@ -40,9 +40,11 @@ export async function GET(req: NextRequest) {
     for (const doc of snap.docs) {
         const conv = doc.data();
         try {
-            const hasPreOrder = Array.isArray(conv.preOrder?.items) && conv.preOrder.items.length > 0;
+            const pre = conv.preOrder ?? {};
+            const hasLead =
+                (Array.isArray(pre.items) && pre.items.length > 0) || !!pre.horarioContacto || !!conv.hasPqrs;
 
-            if (!hasPreOrder || !conv.contactPhone) {
+            if (!hasLead || !conv.contactPhone) {
                 await doc.ref.update({ status: 'abierto', updatedAt: FieldValue.serverTimestamp() });
                 reopened++;
                 continue;
@@ -57,7 +59,12 @@ export async function GET(req: NextRequest) {
 
             assigned++;
 
-            const text = `¡Buenos días! ☀️ Ya pasé tu pre-pedido a ${result.advisorName}, del equipo de Biocambio360. En breve te confirma precios, envío y forma de pago.`;
+            const franja: Record<string, string> = { manana: 'en la mañana', tarde: 'en la tarde', '7-9pm': 'entre 7 y 9 p.m.' };
+            const cuando = franja[pre.horarioContacto as string];
+            const what = conv.hasPqrs ? 'tu solicitud' : 'tu pre-pedido';
+            const text =
+                `¡Buenos días! ☀️ Ya pasé ${what} a ${result.advisorName}, del equipo de Biocambio360.\n` +
+                (cuando ? `Te contactará ${cuando}.` : 'En breve te contacta para confirmar los detalles.');
             try {
                 const { messageId } = await sendTextMessage(conv.phoneId, conv.contactPhone, text);
                 await doc.ref.collection('messages').add({
@@ -70,7 +77,7 @@ export async function GET(req: NextRequest) {
                     status: 'sent',
                     timestamp: FieldValue.serverTimestamp(),
                 });
-                await doc.ref.update({ lastMessage: text, lastMessageAt: FieldValue.serverTimestamp() });
+                await doc.ref.update({ lastMessage: text.split('\n')[0], lastMessageAt: FieldValue.serverTimestamp() });
             } catch (err) {
                 console.warn(`[cron/bot-handoff] Could not notify customer of ${doc.id}:`, err);
             }

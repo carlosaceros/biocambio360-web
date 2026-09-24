@@ -236,11 +236,11 @@ export default function ContactPanel({
             </div>
 
             {/* Pre-order drafted by the AI agent (after hours) */}
-            {conversation.preOrder && conversation.preOrder.items?.length > 0 && (
+            {conversation.preOrder && (conversation.preOrder.items?.length > 0 || !!conversation.preOrder.horarioContacto) && (
                 <div className="p-4 border-b border-gray-100 space-y-2 bg-violet-50/40">
                     <div className="flex items-center justify-between">
                         <p className="text-[10px] font-extrabold uppercase text-violet-700 tracking-wider flex items-center gap-1">
-                            <Sparkles size={11} /> Pre-pedido del Asistente IA
+                            <Sparkles size={11} /> Lead del Asistente IA
                         </p>
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                             conversation.preOrder.estado === 'confirmado'
@@ -266,6 +266,9 @@ export default function ContactPanel({
                             <p><strong>Entrega:</strong> {[conversation.preOrder.direccion, conversation.preOrder.ciudad].filter(Boolean).join(', ')}</p>
                         )}
                         {conversation.preOrder.metodoPago && <p><strong>Pago:</strong> {conversation.preOrder.metodoPago}</p>}
+                        {conversation.preOrder.horarioContacto && (
+                            <p><strong>Contactar:</strong> {{ manana: 'en la mañana', tarde: 'en la tarde', '7-9pm': 'entre 7 y 9 p.m.' }[conversation.preOrder.horarioContacto] ?? conversation.preOrder.horarioContacto}</p>
+                        )}
                         {conversation.preOrder.notas && <p><strong>Notas:</strong> {conversation.preOrder.notas}</p>}
                     </div>
                     <p className="text-[10px] text-gray-400">Precios y disponibilidad los confirma el asesor.</p>

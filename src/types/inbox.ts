@@ -42,6 +42,8 @@ export interface PreOrder {
     ciudad: string;
     metodoPago: string;
     notas: string;
+    /** Preferred contact window: manana | tarde | 7-9pm */
+    horarioContacto?: string;
     estado: 'borrador' | 'listo' | 'confirmado';
     actualizadoAt: string;
 }
