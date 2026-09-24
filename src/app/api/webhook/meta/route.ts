@@ -12,11 +12,13 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 import { NextRequest, NextResponse, after } from 'next/server';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { buildConversationId } from '@/lib/inbox-service';
 import type { Channel, MessageType } from '@/types/inbox';
 import { FieldValue } from 'firebase-admin/firestore';
 import { isAfterHoursNow, runOrderAgentTurn } from '@/lib/ai-order-agent';
+import { fetchSocialProfile } from '@/lib/meta-social-service';
 
 // ─── GET: Webhook verification ────────────────────────────────────────────────
 
@@ -40,9 +42,26 @@ export async function GET(req: NextRequest) {
 // ─── POST: Inbound event handler ──────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+    const rawBody = await req.text();
+
+    // Meta signs every delivery with the app secret (X-Hub-Signature-256). Enforced once META_APP_SECRET
+    // is configured; until then any caller could inject fake messages, so a warning is logged.
+    const appSecret = process.env.META_APP_SECRET;
+    if (appSecret) {
+        const given = req.headers.get('x-hub-signature-256') ?? '';
+        const expected = `sha256=${createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
+        const valid = given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+        if (!valid) {
+            console.warn('[webhook/meta] Rejected: invalid signature');
+            return new NextResponse('Invalid signature', { status: 401 });
+        }
+    } else {
+        console.warn('[webhook/meta] META_APP_SECRET not set: signature not verified');
+    }
+
     let body: any;
     try {
-        body = await req.json();
+        body = JSON.parse(rawBody);
     } catch {
         return new NextResponse('Bad Request', { status: 400 });
     }
@@ -563,129 +582,130 @@ async function handleWhatsAppStatusUpdate(status: any, phoneNumberId: string): P
 // ─── Messenger ────────────────────────────────────────────────────────────────
 
 async function processMessengerPayload(body: any): Promise<void> {
-    const entries: any[] = body?.entry ?? [];
-
-    for (const entry of entries) {
-        const messaging: any[] = entry?.messaging ?? [];
-        for (const event of messaging) {
-            if (!event.message) continue;
-            await handleMessengerInboundMessage(event, entry.id);
-        }
-    }
-}
-
-async function handleMessengerInboundMessage(event: any, pageId: string): Promise<void> {
-    const db = getAdminDB();
-    const psid: string = event.sender?.id ?? '';
-    const msgId: string = event.message?.mid ?? '';
-    const text: string = event.message?.text ?? '';
-
-    if (!psid) return;
-
-    const conversationId = buildConversationId('messenger', pageId, psid);
-    const convRef = db.collection('conversations').doc(conversationId);
-    const convSnap = await convRef.get();
-
-    const content = text || '📎 Adjunto';
-
-    if (convSnap.exists) {
-        await convRef.update({
-            lastMessage: content,
-            lastMessageAt: FieldValue.serverTimestamp(),
-            unreadCount: FieldValue.increment(1),
-            lastInboundAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-        });
-    } else {
-        await convRef.set({
-            channel: 'messenger' as Channel,
-            phoneId: pageId,
-            contactPsid: psid,
-            contactName: `Messenger (${psid.slice(-6)})`,
-            lastMessage: content,
-            lastMessageAt: FieldValue.serverTimestamp(),
-            unreadCount: 1,
-            status: 'abierto',
-            assignedTo: null,
-            lastInboundAt: FieldValue.serverTimestamp(),
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-        });
-    }
-
-    await convRef.collection('messages').add({
-        direction: 'inbound',
-        type: 'text',
-        content,
-        metaMessageId: msgId,
-        timestamp: FieldValue.serverTimestamp(),
-        status: 'delivered',
-    });
-
-    console.log(`[webhook/meta] Messenger inbound from PSID ${psid}`);
+    await processSocialPayload('messenger', body);
 }
 
 // ─── Instagram ────────────────────────────────────────────────────────────────
 
 async function processInstagramPayload(body: any): Promise<void> {
-    const entries: any[] = body?.entry ?? [];
+    await processSocialPayload('instagram', body);
+}
 
+// ─── Messenger + Instagram (shared) ──────────────────────────────────────────
+
+async function processSocialPayload(channel: 'messenger' | 'instagram', body: any): Promise<void> {
+    const entries: any[] = body?.entry ?? [];
     for (const entry of entries) {
         const messaging: any[] = entry?.messaging ?? [];
         for (const event of messaging) {
-            if (!event.message) continue;
-            await handleInstagramInboundMessage(event, entry.id);
+            if (!event.message) continue; // delivery/read/postback events are ignored
+            await handleSocialMessage(channel, event, String(entry.id ?? ''));
         }
     }
 }
 
-async function handleInstagramInboundMessage(event: any, igAccountId: string): Promise<void> {
+function socialContent(message: any): { type: MessageType; content: string; mediaUrl?: string; mimeType?: string } {
+    const text: string = message?.text ?? '';
+    const att = message?.attachments?.[0];
+    if (!att) return { type: 'text', content: text || '📎 Mensaje' };
+
+    const url: string | undefined = att.payload?.url;
+    switch (att.type) {
+        case 'image':
+            return { type: 'image', content: text || '📷 Imagen', mediaUrl: url };
+        case 'audio':
+            return { type: 'audio', content: '🎤 Nota de voz', mediaUrl: url };
+        case 'video':
+        case 'ig_reel':
+            return { type: 'video', content: text || '🎥 Video', mediaUrl: url };
+        case 'file':
+            return { type: 'document', content: text || '📄 Archivo', mediaUrl: url };
+        case 'sticker':
+            return { type: 'sticker', content: '🖼️ Sticker', mediaUrl: url };
+        case 'share':
+        case 'story_mention':
+        case 'fallback':
+            return { type: 'text', content: text || `🔗 ${att.title ?? att.payload?.url ?? 'Contenido compartido'}` };
+        default:
+            return { type: 'text', content: text || '📎 Adjunto' };
+    }
+}
+
+async function handleSocialMessage(channel: 'messenger' | 'instagram', event: any, accountId: string): Promise<void> {
     const db = getAdminDB();
-    const psid: string = event.sender?.id ?? '';
-    const msgId: string = event.message?.mid ?? '';
-    const text: string = event.message?.text ?? '';
+    const message = event.message;
+    const isEcho = !!message?.is_echo; // sent by the Page / linked account (e.g. from Meta Business Suite)
 
-    if (!psid) return;
+    // Customer id: sender for inbound, recipient for echoes
+    const contactId: string = String(isEcho ? event.recipient?.id ?? '' : event.sender?.id ?? '');
+    const mid: string = String(message?.mid ?? '');
+    if (!contactId || !mid) return;
 
-    const conversationId = buildConversationId('instagram', igAccountId, psid);
+    const conversationId = buildConversationId(channel, accountId, contactId);
     const convRef = db.collection('conversations').doc(conversationId);
-    const convSnap = await convRef.get();
 
-    const content = text || '📎 Adjunto';
+    // Replies sent from this inbox are echoed back by Meta: they are already stored
+    if (isEcho) {
+        const dup = await convRef.collection('messages').where('metaMessageId', '==', mid).limit(1).get();
+        if (!dup.empty) return;
+    }
+
+    const convSnap = await convRef.get();
+    const { type, content, mediaUrl, mimeType } = socialContent(message);
+
+    const messageData: Record<string, unknown> = {
+        direction: isEcho ? 'outbound' : 'inbound',
+        type,
+        content,
+        metaMessageId: mid,
+        timestamp: FieldValue.serverTimestamp(),
+        status: isEcho ? 'sent' : 'delivered',
+    };
+    if (isEcho) {
+        messageData.agentUid = 'external-app';
+        messageData.agentName = channel === 'instagram' ? 'Asesor (Instagram)' : 'Asesor (Messenger)';
+    }
+    if (mediaUrl) messageData.mediaUrl = mediaUrl;
+    if (mimeType) messageData.mimeType = mimeType;
+
+    // Idempotent: the message document id derives from Meta's message id
+    const msgId = mid.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 200);
+    const batch = db.batch();
+    batch.create(convRef.collection('messages').doc(msgId), messageData);
 
     if (convSnap.exists) {
-        await convRef.update({
+        batch.update(convRef, {
             lastMessage: content,
             lastMessageAt: FieldValue.serverTimestamp(),
-            unreadCount: FieldValue.increment(1),
-            lastInboundAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
+            ...(isEcho
+                ? {}
+                : { unreadCount: FieldValue.increment(1), lastInboundAt: FieldValue.serverTimestamp(), status: convSnap.data()?.status === 'cerrado' ? 'abierto' : convSnap.data()?.status ?? 'abierto' }),
         });
     } else {
-        await convRef.set({
-            channel: 'instagram' as Channel,
-            phoneId: igAccountId,
-            contactPsid: psid,
-            contactName: `Instagram (${psid.slice(-6)})`,
+        const profile = await fetchSocialProfile(channel, contactId);
+        const label = channel === 'instagram' ? 'Instagram' : 'Messenger';
+        batch.set(convRef, {
+            channel: channel as Channel,
+            phoneId: accountId,
+            contactPsid: contactId,
+            contactName: profile.name ?? (profile.username ? `@${profile.username}` : `${label} (${contactId.slice(-6)})`),
+            ...(profile.profilePic ? { contactAvatarUrl: profile.profilePic } : {}),
             lastMessage: content,
             lastMessageAt: FieldValue.serverTimestamp(),
-            unreadCount: 1,
+            unreadCount: isEcho ? 0 : 1,
             status: 'abierto',
             assignedTo: null,
-            lastInboundAt: FieldValue.serverTimestamp(),
+            ...(isEcho ? {} : { lastInboundAt: FieldValue.serverTimestamp() }),
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
         });
     }
 
-    await convRef.collection('messages').add({
-        direction: 'inbound',
-        type: 'text',
-        content,
-        metaMessageId: msgId,
-        timestamp: FieldValue.serverTimestamp(),
-        status: 'delivered',
-    });
-
-    console.log(`[webhook/meta] Instagram inbound from PSID ${psid}`);
+    try {
+        await batch.commit();
+        console.log(`[webhook/meta] ${channel} ${isEcho ? 'echo' : 'inbound'} ${contactId} → conv: ${conversationId}`);
+    } catch (err: any) {
+        if (err?.code !== 6) throw err; // ALREADY_EXISTS: duplicate delivery
+    }
 }

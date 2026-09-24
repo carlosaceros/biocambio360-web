@@ -14,6 +14,7 @@ import {
     sendImageMessage,
     sendDocumentMessage,
 } from '@/lib/whatsapp-service';
+import { sendSocialText } from '@/lib/meta-social-service';
 import type { SendMessagePayload } from '@/types/inbox';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -79,13 +80,13 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: 'Invalid message type or missing content' }, { status: 400 });
             }
         } else {
-            // Messenger / Instagram — text only for now
-            if (!text) {
-                return NextResponse.json({ error: 'Text is required for Messenger/Instagram' }, { status: 400 });
+            // Messenger / Instagram: text replies inside the 24h customer-initiated window
+            if (!text || type !== 'text') {
+                return NextResponse.json({ error: 'Por ahora solo se pueden enviar mensajes de texto en Messenger e Instagram.' }, { status: 400 });
             }
-            // TODO: implement Messenger/Instagram send via Graph API /me/messages
+            const result = await sendSocialText(channel as 'messenger' | 'instagram', to, text);
+            metaMessageId = result.messageId;
             content = text;
-            console.warn('[inbox/send] Messenger/Instagram send not yet implemented — saving to Firestore only');
         }
     } catch (err: any) {
         console.error('[inbox/send] Meta API error:', err.message);

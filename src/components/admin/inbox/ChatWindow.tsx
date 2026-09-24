@@ -191,7 +191,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                 </div>
                 {!withinWindow && (
                     <div className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-lg font-semibold">
-                        ⏱ Ventana 24h expirada — usa plantilla
+                        {conversation?.channel === 'whatsapp' ? '⏱ Ventana 24h expirada — usa plantilla' : '⏱ Ventana 24h expirada — solo el cliente puede reabrir el chat'}
                     </div>
                 )}
             </div>
@@ -313,16 +313,24 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                 {!withinWindow ? (
                     /* Outside 24h window — must use template */
                     <div className="flex flex-col items-center gap-2 py-2">
-                        <p className="text-xs text-gray-500 text-center">
-                            La ventana de 24 horas expiró. Solo puedes enviar plantillas aprobadas.
-                        </p>
-                        <button
-                            onClick={onOpenTemplates}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors"
-                        >
-                            <FileText size={13} />
-                            Enviar Plantilla
-                        </button>
+                        {conversation?.channel === 'whatsapp' ? (
+                            <>
+                                <p className="text-xs text-gray-500 text-center">
+                                    La ventana de 24 horas expiró. Solo puedes enviar plantillas aprobadas.
+                                </p>
+                                <button
+                                    onClick={onOpenTemplates}
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors"
+                                >
+                                    <FileText size={13} />
+                                    Enviar Plantilla
+                                </button>
+                            </>
+                        ) : (
+                            <p className="text-xs text-gray-500 text-center">
+                                Pasaron más de 24 horas desde el último mensaje del cliente. En {conversation?.channel === 'instagram' ? 'Instagram' : 'Messenger'} solo puedes volver a escribirle cuando él te escriba de nuevo.
+                            </p>
+                        )}
                     </div>
                 ) : (
                     /* Within 24h window — free text */
