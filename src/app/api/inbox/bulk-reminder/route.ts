@@ -6,6 +6,7 @@
 
 export const runtime = 'nodejs';
 
+import { REMINDER_TEMPLATE_NAME, reminderComponents } from '@/lib/reminder-template';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB, getAdminAuth } from '@/lib/firebase-admin';
 import { sendBulkTemplateMessages } from '@/lib/whatsapp-service';
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     const db = getAdminDB();
 
     // Fetch customer records from replenishment collection
-    const customers: Array<{ id: string; phone: string; name: string }> = [];
+    const customers: Array<{ id: string; phone: string; name: string; itemsSummary: string }> = [];
     const customerErrors: Array<{ customerId: string; phone: string; error: string }> = [];
 
     for (const cid of customerIds as string[]) {
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
             customerErrors.push({ customerId: cid, phone, error: 'Invalid phone number' });
             continue;
         }
-        customers.push({ id: cid, phone: `57${phone}`, name: data.customerName ?? '' });
+        customers.push({ id: cid, phone: `57${phone.slice(-10)}`, name: data.customerName ?? '', itemsSummary: data.itemsSummary ?? '' });
     }
 
     const total = customers.length;
@@ -84,7 +85,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Send bulk messages
-    const recipients = customers.map(c => ({ phone: c.phone }));
+    // The reminder template carries the customer's first name and last purchase as variables
+    const recipients = customers.map(c => ({
+        phone: c.phone,
+        components: templateName === REMINDER_TEMPLATE_NAME ? reminderComponents(c.name, c.itemsSummary) : undefined,
+    }));
     const { sent, failed, results } = await sendBulkTemplateMessages(
         phoneId,
         recipients,

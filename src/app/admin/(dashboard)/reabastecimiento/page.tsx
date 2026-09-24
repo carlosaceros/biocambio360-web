@@ -96,6 +96,23 @@ export default function ReabastecimientoBIAdminPage() {
             const phone = `57${cleanPhone.slice(-10)}`;
             const dueDateStr = new Date(r.nextOrderDueDate).toLocaleDateString('es-CO');
 
+            // 1) Approved template: works even when the customer has not written in the last 24 h
+            try {
+                const tplRes = await fetch('/api/inbox/bulk-reminder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        customerIds: [r.id],
+                        phoneId: BIOCAMBIO_PHONE_ID,
+                        templateName: 'reabastecimiento_recordatorio',
+                        templateType: 'marketing',
+                    }),
+                });
+                const tplData = await tplRes.json().catch(() => ({}));
+                if (tplRes.ok && tplData.sent === 1) return;
+            } catch { /* fall through to free text */ }
+
+            // 2) Free text (only valid inside the 24 h window), then 3) wa.me as last resort
             const res = await fetch('/api/inbox/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

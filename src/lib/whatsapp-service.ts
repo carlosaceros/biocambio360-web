@@ -206,13 +206,23 @@ export async function sendBulkTemplateMessages(
     for (let i = 0; i < recipients.length; i++) {
         const recipient = recipients[i];
         try {
-            const { messageId } = await sendTemplateMessage(
-                phoneNumberId,
-                recipient.phone,
-                templateName,
-                languageCode,
-                recipient.components as any
-            );
+            let messageId: string;
+            try {
+                ({ messageId } = await sendTemplateMessage(
+                    phoneNumberId,
+                    recipient.phone,
+                    templateName,
+                    languageCode,
+                    recipient.components as any
+                ));
+            } catch (firstErr: any) {
+                // 132000 = parameter count mismatch: the approved template has no variables, retry plain
+                if (recipient.components?.length && /132000/.test(String(firstErr?.message))) {
+                    ({ messageId } = await sendTemplateMessage(phoneNumberId, recipient.phone, templateName, languageCode));
+                } else {
+                    throw firstErr;
+                }
+            }
             results.push({ phone: recipient.phone, success: true, messageId });
             sent++;
         } catch (err: any) {
