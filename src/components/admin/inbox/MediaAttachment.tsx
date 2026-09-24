@@ -16,6 +16,7 @@ export default function MediaAttachment({ mediaId, type, mimeType, fileName }: M
     const [src, setSrc] = useState<string | null>(null);
     const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorText, setErrorText] = useState('');
+    const [progress, setProgress] = useState(0);
 
     useEffect(() => {
         let objectUrl: string | null = null;
@@ -32,14 +33,34 @@ export default function MediaAttachment({ mediaId, type, mimeType, fileName }: M
             try {
                 const token = await auth.currentUser?.getIdToken();
                 if (!token) throw new Error('Sin sesión');
-                const res = await fetch(`/api/inbox/media?id=${encodeURIComponent(mediaId)}`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(data.error ?? 'No se pudo cargar');
+                // Large files arrive in chunks (206): download them in order and reassemble
+                const CHUNK = 3.5 * 1024 * 1024;
+                const parts: ArrayBuffer[] = [];
+                let mime = mimeType ?? 'application/octet-stream';
+                let start = 0;
+                let total = Infinity;
+                while (start < total) {
+                    const res = await fetch(`/api/inbox/media?id=${encodeURIComponent(mediaId)}`, {
+                        headers: { Authorization: `Bearer ${token}`, Range: `bytes=${start}-${start + CHUNK - 1}` },
+                    });
+                    if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        throw new Error(data.error ?? 'No se pudo cargar');
+                    }
+                    mime = res.headers.get('Content-Type') ?? mime;
+                    const buf = await res.arrayBuffer();
+                    parts.push(buf);
+                    const match = /bytes (\d+)-(\d+)\/(\d+)/.exec(res.headers.get('Content-Range') ?? '');
+                    if (!match) {
+                        total = buf.byteLength; // whole file in one response
+                    } else {
+                        total = Number(match[3]);
+                        start = Number(match[2]) + 1;
+                        if (!cancelled) setProgress(Math.min(99, Math.round((start / total) * 100)));
+                    }
+                    if (cancelled) return;
                 }
-                const blob = await res.blob();
+                const blob = new Blob(parts, { type: mime });
                 if (cancelled) return;
                 objectUrl = URL.createObjectURL(blob);
                 setSrc(objectUrl);
@@ -60,7 +81,7 @@ export default function MediaAttachment({ mediaId, type, mimeType, fileName }: M
     if (state === 'loading') {
         return (
             <div className="flex items-center gap-2 text-xs opacity-70 py-2">
-                <Loader2 size={14} className="animate-spin" /> Cargando archivo...
+                <Loader2 size={14} className="animate-spin" /> Cargando archivo{progress > 0 ? ` (${progress}%)` : '...'}
             </div>
         );
     }

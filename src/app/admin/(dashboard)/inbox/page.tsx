@@ -11,6 +11,7 @@ import {
     markConversationAsRead,
     subscribeToAgentEnabled,
     setAgentEnabled,
+    fetchConversationsPage,
 } from '@/lib/inbox-service';
 import ConversationList from '@/components/admin/inbox/ConversationList';
 import ChatWindow from '@/components/admin/inbox/ChatWindow';
@@ -89,6 +90,8 @@ const STATUS_FILTERS: Array<{ key: StatusFilter; label: string; icon: React.Reac
     { key: 'cerrado', label: 'Cerrados', icon: <CheckCircle2 size={12} className="text-gray-400" /> },
 ];
 
+const PAGE_SIZE = 40;
+
 // ─── Page Component ───────────────────────────────────────────────────────────
 
 export default function InboxPage() {
@@ -101,10 +104,42 @@ export default function InboxPage() {
     const [loading, setLoading] = useState(true);
     const [totalUnread, setTotalUnread] = useState(0);
 
+    // History is loaded in pages: the newest PAGE_SIZE stay live, older ones load on scroll
+    const [older, setOlder] = useState<ConversationDoc[]>([]);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+
+    const allConversations = useMemo(() => {
+        const millis = (c: ConversationDoc) => {
+            const v = c.lastMessageAt as unknown as { toMillis?: () => number } | string | Date | undefined;
+            if (v && typeof v === 'object' && 'toMillis' in v && v.toMillis) return v.toMillis();
+            return v ? new Date(v as string | Date).getTime() : 0;
+        };
+        const byId = new Map<string, ConversationDoc>();
+        [...older, ...conversations].forEach(c => byId.set(c.id, c)); // live data wins over the static page
+        return [...byId.values()].sort((a, b) => millis(b) - millis(a));
+    }, [conversations, older]);
+
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        const oldest = allConversations[allConversations.length - 1];
+        if (!oldest) return;
+        setLoadingMore(true);
+        try {
+            const page = await fetchConversationsPage(oldest.lastMessageAt, PAGE_SIZE);
+            setOlder(prev => [...prev, ...page]);
+            if (page.length < PAGE_SIZE) setHasMore(false);
+        } catch {
+            setHasMore(false);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [allConversations, hasMore, loadingMore]);
+
     // Derived from the live list so status/assignment changes show up immediately
     const selectedConv = useMemo(
-        () => conversations.find(c => c.id === selectedConvId) ?? null,
-        [conversations, selectedConvId]
+        () => allConversations.find(c => c.id === selectedConvId) ?? null,
+        [allConversations, selectedConvId]
     );
 
     // Alerts (sound + browser notification) and action feedback
@@ -184,7 +219,7 @@ export default function InboxPage() {
                 }
             }
             prevUnreadRef.current = new Map(convs.map(c => [c.id, c.unreadCount]));
-        });
+        }, { maxResults: PAGE_SIZE });
         return unsub;
     }, []);
 
@@ -232,7 +267,7 @@ export default function InboxPage() {
 
     // ── Filtered conversations ────────────────────────────────────────────────
     const filteredConversations = useMemo(() => {
-        return conversations.filter(conv => {
+        return allConversations.filter(conv => {
             if (channelFilter !== 'all' && conv.channel !== channelFilter) return false;
             if (statusFilter !== 'all' && conv.status !== statusFilter) return false;
             if (accountFilter === 'biocambio360' && conv.accountKey !== 'biocambio360') return false;
@@ -247,7 +282,7 @@ export default function InboxPage() {
             }
             return true;
         });
-    }, [conversations, channelFilter, statusFilter, accountFilter, searchQuery]);
+    }, [allConversations, channelFilter, statusFilter, accountFilter, searchQuery]);
 
     // ── Badge counts per channel ──────────────────────────────────────────────
     const unreadByChannel = useMemo(() => {
@@ -493,7 +528,7 @@ export default function InboxPage() {
                     {/* Conversation count */}
                     <div className="px-4 py-1.5 flex items-center justify-between">
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            {filteredConversations.length} conversaciones
+                            {filteredConversations.length}{hasMore ? '+' : ''} conversaciones
                         </span>
                         {loading && (
                             <RefreshCw size={11} className="text-gray-400 animate-spin" />
@@ -507,6 +542,9 @@ export default function InboxPage() {
                             selectedId={selectedConv?.id ?? null}
                             onSelect={handleSelectConversation}
                             loading={loading}
+                            hasMore={hasMore}
+                            loadingMore={loadingMore}
+                            onLoadMore={loadMore}
                         />
                     </div>
                 </div>

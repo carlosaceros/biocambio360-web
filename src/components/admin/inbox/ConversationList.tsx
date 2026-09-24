@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { MessageSquare, Instagram, Facebook, CheckCheck, Check, Clock } from 'lucide-react';
@@ -11,6 +11,10 @@ interface ConversationListProps {
     selectedId: string | null;
     onSelect: (conv: ConversationDoc) => void;
     loading?: boolean;
+    /** More (older) conversations can be loaded */
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    onLoadMore?: () => void;
 }
 
 const CHANNEL_ICONS: Record<Channel, React.ReactNode> = {
@@ -62,7 +66,22 @@ export default function ConversationList({
     selectedId,
     onSelect,
     loading = false,
+    hasMore = false,
+    loadingMore = false,
+    onLoadMore,
 }: ConversationListProps) {
+    // Loads the next page automatically when the end of the list scrolls into view
+    const sentinelRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const el = sentinelRef.current;
+        if (!el || !hasMore || loadingMore || !onLoadMore) return;
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0]?.isIntersecting) onLoadMore();
+        }, { rootMargin: '200px' });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [hasMore, loadingMore, onLoadMore, conversations.length]);
+
     if (loading) {
         return (
             <div className="flex flex-col gap-2 p-3">
@@ -171,6 +190,18 @@ export default function ConversationList({
                     </button>
                 );
             })}
+
+            {(hasMore || loadingMore) && (
+                <div ref={sentinelRef} className="p-3 flex justify-center">
+                    <button
+                        onClick={onLoadMore}
+                        disabled={loadingMore}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 disabled:text-gray-400 cursor-pointer"
+                    >
+                        {loadingMore ? 'Cargando conversaciones…' : 'Cargar más conversaciones'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

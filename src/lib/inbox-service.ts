@@ -17,6 +17,7 @@ import {
     orderBy,
     limit,
     onSnapshot,
+    startAfter,
     serverTimestamp,
     increment,
     Timestamp,
@@ -354,4 +355,28 @@ export function subscribeToAgentEnabled(callback: (enabled: boolean) => void): U
 
 export async function setAgentEnabled(enabled: boolean): Promise<void> {
     await setDoc(doc(db, 'bot_config', 'ai_agent'), { enabled, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+
+/**
+ * Next page of older conversations (static read, no listener) after the given lastMessageAt cursor.
+ * The newest conversations stay live through subscribeToConversations; this loads the history on demand.
+ */
+export async function fetchConversationsPage(
+    cursor: ConversationDoc['lastMessageAt'] | undefined,
+    size: number = 40
+): Promise<ConversationDoc[]> {
+    const asAny = cursor as unknown as { toDate?: () => Date } | string | Date | undefined;
+    const ts =
+        cursor instanceof Timestamp
+            ? cursor
+            : asAny && typeof asAny === 'object' && 'toDate' in asAny && asAny.toDate
+            ? Timestamp.fromDate(asAny.toDate())
+            : asAny
+            ? Timestamp.fromDate(new Date(asAny as string | Date))
+            : null;
+    if (!ts) return [];
+    const q = query(conversationsRef(), orderBy('lastMessageAt', 'desc'), startAfter(ts), limit(size));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => docToConversation(d.id, d.data()));
 }
