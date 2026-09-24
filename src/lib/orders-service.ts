@@ -385,7 +385,13 @@ export async function updateOrderStatus(
 
     // Notificar al cliente y administradores por correo a través de la API del servidor (evita importar nodemailer en el cliente)
     if (typeof fetch !== 'undefined') {
-        fetch('/api/notifications/order-status', {
+        // Server-side callers (e.g. the 99 Envíos webhook) need an absolute URL: a relative fetch throws in Node
+        const notifyBase = typeof window === 'undefined'
+            ? (process.env.NEXT_PUBLIC_URL && !/localhost|127\.0\.0\.1/.test(process.env.NEXT_PUBLIC_URL)
+                ? process.env.NEXT_PUBLIC_URL.replace(/\/$/, '')
+                : 'https://biocambio360.com')
+            : '';
+        fetch(`${notifyBase}/api/notifications/order-status`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

@@ -8,6 +8,7 @@ import {
     Package, DollarSign, MapPin, Wifi, WifiOff, ArrowLeft, Key
 } from 'lucide-react';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
+import NinetyNineWebhookEvents from '@/components/admin/NinetyNineWebhookEvents';
 
 interface AuditLog {
     id: string;
@@ -257,6 +258,8 @@ export default function ShippingAuditPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+                <NinetyNineWebhookEvents />
+
                 {/* Cuota Spark Protegida / Fallback Activo */}
                 {quotaExceeded && (
                     <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">

@@ -7,6 +7,7 @@
  * Internal production data (recipes/BOM, costs, suppliers, lots, stock) is intentionally never included.
  */
 
+import { createHash } from 'crypto';
 import { adminGetAllProducts } from '@/lib/products-admin';
 import { PRODUCTOS, isDisallowedSize, type Product } from '@/lib/products';
 
@@ -48,6 +49,11 @@ async function load(): Promise<{ products: Product[]; catalog: string }> {
 
 export async function getCompactCatalog(): Promise<string> {
     return (await load()).catalog;
+}
+
+/** Short hash of the catalog (names + prices): changes whenever a price or product changes. */
+export async function getCatalogHash(): Promise<string> {
+    return createHash('sha256').update((await load()).catalog).digest('hex').slice(0, 12);
 }
 
 // ─── Relevant technical sheets ────────────────────────────────────────────────

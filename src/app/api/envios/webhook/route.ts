@@ -1,30 +1,21 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { updateOrderStatus } from '@/lib/orders-service';
-import { Order, OrderStatus } from '@/types/order';
+import { classifyShippingEvent } from '@/lib/99envios-status';
+import { Order } from '@/types/order';
+
+export const dynamic = 'force-dynamic';
 
 interface NinetyNineWebhookPayload {
-    event?: string;
-    eventType?: string;
-    tipoEvento?: string;
     guia?: string;
-    numeroGuia?: string;
-    shippingGuide?: string;
-    tracking_number?: string;
-    trackingNumber?: string;
     orderId?: string;
-    pedidoId?: string;
-    referencia?: string;
-    reference?: string;
     status?: string;
-    estado?: string;
+    event?: string;
     transportadora?: string;
-    carrier?: string;
     fechaEntrega?: string;
-    deliveredAt?: string;
     recibidoPor?: string;
     novedad?: string;
-    motivo?: string;
     raw?: any;
 }
 
@@ -46,14 +37,73 @@ function extractPayloadData(body: any): NinetyNineWebhookPayload {
     return {
         guia: guia ? String(guia).trim() : undefined,
         orderId: orderId ? String(orderId).trim() : undefined,
-        status: status ? String(status).toLowerCase().trim() : undefined,
-        event: event ? String(event).toLowerCase().trim() : undefined,
+        status: status ? String(status).trim() : undefined,
+        event: event ? String(event).trim() : undefined,
         transportadora: transportadora ? String(transportadora).trim() : undefined,
         fechaEntrega: fechaEntrega ? String(fechaEntrega).trim() : undefined,
         recibidoPor: recibidoPor ? String(recibidoPor).trim() : undefined,
         novedad: novedad ? String(novedad).trim() : undefined,
         raw: body,
     };
+}
+
+/**
+ * Secreto compartido opcional (NINETY_NINE_WEBHOOK_SECRET). Se acepta en `?token=`,
+ * en el header `x-webhook-secret` o como `Authorization: Bearer`.
+ * Si la variable no está configurada, se permite todo para no romper la integración
+ * existente (se deja una advertencia en logs).
+ */
+function isAuthorized(request: Request): boolean {
+    const secret = process.env.NINETY_NINE_WEBHOOK_SECRET;
+    if (!secret) {
+        console.warn('[99Envios Webhook] NINETY_NINE_WEBHOOK_SECRET no configurado: el endpoint acepta cualquier llamada.');
+        return true;
+    }
+    const url = new URL(request.url);
+    const provided =
+        url.searchParams.get('token') ||
+        request.headers.get('x-webhook-secret') ||
+        (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    if (!provided) return false;
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    return a.length === b.length && timingSafeEqual(a, b);
+}
+
+type Decision = 'entregado' | 'novedad' | 'informativo' | 'ignorado' | 'no_encontrado' | 'rechazado' | 'error';
+
+/** Guarda cada evento recibido para poder auditar qué envía 99 Envíos (nunca rompe el flujo). */
+async function logEvent(entry: {
+    decision: Decision;
+    guia?: string;
+    orderId?: string;
+    matchedOrderId?: string;
+    statusRaw?: string;
+    eventRaw?: string;
+    previousStatus?: string;
+    detail?: string;
+    payload?: unknown;
+}) {
+    try {
+        let preview = '';
+        try {
+            preview = JSON.stringify(entry.payload ?? {}).slice(0, 1500);
+        } catch { /* ignore */ }
+        await getAdminDB().collection('envios_webhook_events').add({
+            receivedAt: new Date().toISOString(),
+            decision: entry.decision,
+            guia: entry.guia ?? null,
+            orderId: entry.orderId ?? null,
+            matchedOrderId: entry.matchedOrderId ?? null,
+            statusRaw: entry.statusRaw ?? null,
+            eventRaw: entry.eventRaw ?? null,
+            previousStatus: entry.previousStatus ?? null,
+            detail: entry.detail ?? null,
+            payload: preview,
+        });
+    } catch (e) {
+        console.warn('[99Envios Webhook] No se pudo registrar el evento:', e);
+    }
 }
 
 /**
@@ -72,9 +122,14 @@ export async function GET() {
  */
 export async function POST(request: Request) {
     const startTime = Date.now();
+    let rawBody: any = {};
 
     try {
-        let rawBody: any = {};
+        if (!isAuthorized(request)) {
+            await logEvent({ decision: 'rechazado', detail: 'Token inválido o ausente' });
+            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+        }
+
         try {
             rawBody = await request.json();
         } catch {
@@ -83,8 +138,10 @@ export async function POST(request: Request) {
 
         const payload = extractPayloadData(rawBody);
         const { guia, orderId, status, event, transportadora, fechaEntrega, recibidoPor, novedad } = payload;
+        const base = { guia, orderId, statusRaw: status, eventRaw: event, payload: rawBody };
 
         if (!guia && !orderId) {
+            await logEvent({ ...base, decision: 'error', detail: 'Sin guía ni orderId' });
             return NextResponse.json(
                 { error: 'Faltan identificadores: se requiere guia o orderId en el payload de 99 Envíos' },
                 { status: 400 }
@@ -185,6 +242,7 @@ export async function POST(request: Request) {
 
         if (!targetOrderDoc || !matchedOrderId) {
             console.warn(`[99Envios Webhook] Pedido no encontrado para guía '${guia}' o ID '${orderId}'`);
+            await logEvent({ ...base, decision: 'no_encontrado', detail: 'No hay pedido con esa guía/ID' });
             return NextResponse.json(
                 {
                     error: 'Pedido no encontrado',
@@ -197,9 +255,11 @@ export async function POST(request: Request) {
 
         const orderData = targetOrderDoc.data() as Order;
         const currentStatus = orderData.status;
+        const logBase = { ...base, matchedOrderId, previousStatus: currentStatus };
 
-        // 3. Blindaje de Flota Propia: Si el pedido es atendido por mensajería propia, no se altera por 99 Envíos
+        // Blindaje de Flota Propia: si el pedido es atendido por mensajería propia, no se altera por 99 Envíos
         if (orderData.tipoEnvio === 'flota_propia') {
+            await logEvent({ ...logBase, decision: 'ignorado', detail: 'Pedido de flota propia' });
             return NextResponse.json({
                 success: false,
                 status: 'ignored',
@@ -208,33 +268,13 @@ export async function POST(request: Request) {
             });
         }
 
-        // 4. Evaluar si es un evento de ENTREGA EXITOSA
-        const statusStr = (status || '').toLowerCase();
-        const eventStr = (event || '').toLowerCase();
+        const kind = classifyShippingEvent(status, event);
 
-        const isDeliveryEvent =
-            statusStr === 'entregado' ||
-            statusStr === 'delivered' ||
-            statusStr === 'entrega_exitosa' ||
-            statusStr === 'entregada' ||
-            statusStr === 'finalizado' ||
-            eventStr.includes('deliver') ||
-            eventStr.includes('entregado');
-
-        // Evaluar si es un evento de NOVEDAD / FALLIDO
-        const isExceptionEvent =
-            statusStr === 'no_entregado' ||
-            statusStr === 'novedad' ||
-            statusStr === 'fallido' ||
-            statusStr === 'failed' ||
-            statusStr === 'devuelto' ||
-            eventStr.includes('exception') ||
-            eventStr.includes('novedad');
-
-        // 5. Procesamiento de Entrega Exitosa
-        if (isDeliveryEvent) {
+        // Procesamiento de Entrega Exitosa
+        if (kind === 'entregado') {
             // Idempotencia: Si ya está entregado, confirmamos sin duplicar
             if (currentStatus === 'entregado') {
+                await logEvent({ ...logBase, decision: 'ignorado', detail: 'Ya estaba entregado' });
                 return NextResponse.json({
                     success: true,
                     orderId: matchedOrderId,
@@ -243,10 +283,21 @@ export async function POST(request: Request) {
                 });
             }
 
+            // Un pedido cancelado no debe resucitar como entregado por un evento externo
+            if (currentStatus === 'cancelado') {
+                await logEvent({ ...logBase, decision: 'ignorado', detail: 'Pedido cancelado: no se marca entregado' });
+                return NextResponse.json({
+                    success: false,
+                    status: 'ignored',
+                    orderId: matchedOrderId,
+                    message: 'El pedido está cancelado; no se marca como entregado automáticamente.',
+                });
+            }
+
             const transNombre = transportadora || orderData.guiaTransportadora || '99 Envíos';
             const fechaTxt = fechaEntrega || new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
             const receptorTxt = recibidoPor ? ` Recibió: ${recibidoPor}.` : '';
-            
+
             const internalNote = `Actualización automática: 99 Envíos confirmó entrega exitosa de la guía ${guia || orderData.guiaTransportadora || 'N/A'}.${receptorTxt} Transportadora: ${transNombre}. Fecha de entrega: ${fechaTxt}`;
 
             // Ejecutar la actualización de estado oficial
@@ -288,6 +339,7 @@ export async function POST(request: Request) {
             await db.collection('orders').doc(matchedOrderId).set(patchPayload, { merge: true });
 
             console.log(`[99Envios Webhook] Pedido #${matchedOrderId} actualizado automáticamente a 'entregado'`);
+            await logEvent({ ...logBase, decision: 'entregado', detail: 'Pedido marcado como entregado' });
 
             return NextResponse.json({
                 success: true,
@@ -300,10 +352,21 @@ export async function POST(request: Request) {
             });
         }
 
-        // 6. Procesamiento de Novedad de Entrega
-        if (isExceptionEvent) {
-            const noteText = `Novedad reportada por 99 Envíos para la guía ${guia || 'N/A'}: ${novedad || statusStr}`;
-            
+        // Procesamiento de Novedad de Entrega
+        if (kind === 'novedad') {
+            // Un evento tardío o fuera de orden no debe revertir un pedido ya entregado o cancelado
+            if (currentStatus === 'entregado' || currentStatus === 'cancelado') {
+                await logEvent({ ...logBase, decision: 'ignorado', detail: `Novedad ignorada: pedido ya está '${currentStatus}'` });
+                return NextResponse.json({
+                    success: true,
+                    orderId: matchedOrderId,
+                    currentStatus,
+                    message: `Novedad ignorada: el pedido ya está '${currentStatus}'.`,
+                });
+            }
+
+            const noteText = `Novedad reportada por 99 Envíos para la guía ${guia || 'N/A'}: ${novedad || status || event}`;
+
             if (currentStatus !== 'no_entregado') {
                 await updateOrderStatus(
                     matchedOrderId,
@@ -317,6 +380,7 @@ export async function POST(request: Request) {
                 );
             }
 
+            await logEvent({ ...logBase, decision: 'novedad', detail: noteText });
             return NextResponse.json({
                 success: true,
                 orderId: matchedOrderId,
@@ -326,7 +390,8 @@ export async function POST(request: Request) {
             });
         }
 
-        // 7. Otros eventos informativos (en camino, recogida, etc.)
+        // Otros eventos informativos (en camino, recogida, etc.)
+        await logEvent({ ...logBase, decision: 'informativo', detail: 'Evento sin transición de estado' });
         return NextResponse.json({
             success: true,
             orderId: matchedOrderId,
@@ -336,6 +401,7 @@ export async function POST(request: Request) {
 
     } catch (err: any) {
         console.error('[99Envios Webhook] Error no controlado:', err);
+        await logEvent({ decision: 'error', detail: err?.message || String(err), payload: rawBody });
         return NextResponse.json(
             { error: 'Error interno del webhook', details: err?.message || String(err) },
             { status: 500 }

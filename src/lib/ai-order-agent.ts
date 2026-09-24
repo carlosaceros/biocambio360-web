@@ -16,7 +16,15 @@ import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { sendTextMessage, sendInteractiveButtons, sendInteractiveList } from '@/lib/whatsapp-service';
-import { getCompactCatalog, getRelevantProductSheets } from '@/lib/ai-agent-knowledge';
+import { getCompactCatalog, getCatalogHash, getRelevantProductSheets } from '@/lib/ai-agent-knowledge';
+import {
+    getPromptCacheName,
+    invalidatePromptCache,
+    cacheKeyFor,
+    getCachedReply,
+    storeCachedReply,
+    recordUsage,
+} from '@/lib/ai-agent-cache';
 import {
     sanitizeUserText,
     looksLikeInjection,
@@ -178,27 +186,39 @@ CATÁLOGO (producto: presentación $precio COP):
 ${catalog}`;
 }
 
+export interface GeminiUsage {
+    promptTokens: number;
+    cachedTokens: number;
+    outputTokens: number;
+}
+
 export async function callGemini(params: {
     history: Array<{ role: 'user' | 'model'; text: string }>;
     context: string;
     isFirstBotTurn: boolean;
-}): Promise<AgentOutput> {
+}): Promise<{ output: AgentOutput; usage: GeminiUsage }> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
 
-    const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        // Static prefix (rules + catalog) → eligible for implicit context caching between turns
-        systemInstruction: buildSystemPrompt(await getCompactCatalog()),
-        generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
-            temperature: 0.3,
-            maxOutputTokens: 700,
-            // No hidden "thinking" tokens: this is a short, rule-bound task
-            thinkingConfig: { thinkingBudget: 0 },
-        } as never,
-    });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const systemPrompt = buildSystemPrompt(await getCompactCatalog());
+    const generationConfig = {
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+        temperature: 0.3,
+        maxOutputTokens: 700,
+        // No hidden "thinking" tokens: this is a short, rule-bound task
+        thinkingConfig: { thinkingBudget: 0 },
+    } as never;
+
+    // The static prefix (rules + catalog) lives in a Gemini context cache when available
+    const makeModel = (cacheName: string | null) =>
+        cacheName
+            ? genAI.getGenerativeModelFromCachedContent(
+                  { name: cacheName, model: 'models/gemini-2.5-flash', contents: [] } as never,
+                  { generationConfig }
+              )
+            : genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction: systemPrompt, generationConfig });
 
     // Gemini needs alternating roles starting with a user turn.
     const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
@@ -218,8 +238,27 @@ export async function callGemini(params: {
             `[MENSAJE DEL CLIENTE]\n${last.parts[0].text}`;
     }
 
-    const result = await model.generateContent({ contents });
-    return JSON.parse(result.response.text()) as AgentOutput;
+    const cacheName = await getPromptCacheName(apiKey, systemPrompt);
+    let result;
+    try {
+        result = await makeModel(cacheName).generateContent({ contents });
+    } catch (err) {
+        if (!cacheName) throw err;
+        console.warn('[ai-agent] Cached request failed, retrying without cache:', err instanceof Error ? err.message.slice(0, 160) : err);
+        invalidatePromptCache();
+        result = await makeModel(null).generateContent({ contents });
+    }
+    const meta = result.response.usageMetadata as
+        | { promptTokenCount?: number; cachedContentTokenCount?: number; candidatesTokenCount?: number }
+        | undefined;
+    return {
+        output: JSON.parse(result.response.text()) as AgentOutput,
+        usage: {
+            promptTokens: meta?.promptTokenCount ?? 0,
+            cachedTokens: meta?.cachedContentTokenCount ?? 0,
+            outputTokens: meta?.candidatesTokenCount ?? 0,
+        },
+    };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -434,8 +473,48 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
         let preOrder: PreOrder | null = currentPreOrder;
         let pqrs: AgentOutput['pqrs'] | null = null;
 
+        // Response cache: only for the customer's very first, short message (stateless answer)
+        const customerMessages = history.filter(h => h.role === 'user').length;
+        const cacheKey =
+            botMessagesBefore === 0 && customerMessages === 1 && !currentPreOrder
+                ? cacheKeyFor(lastText, await getCatalogHash())
+                : null;
+        const cachedReply = cacheKey ? await getCachedReply(cacheKey) : null;
+
         try {
-            const output = await callGemini({ history, context, isFirstBotTurn: botMessagesBefore === 0 });
+            let output: AgentOutput;
+            if (cachedReply) {
+                console.log('[ai-agent] Response cache HIT (no model call)');
+                void recordUsage({ responseCacheHit: true });
+                output = {
+                    mensajes: cachedReply.mensajes,
+                    options: cachedReply.options,
+                    preOrder: { items: cachedReply.items, nombreCliente: '', direccion: '', ciudad: '', metodoPago: '', notas: '', horarioContacto: '' },
+                    pqrs: { tipo: '', descripcion: '', pedidoRef: '', producto: '' },
+                    listo: false,
+                };
+            } else {
+                const result = await callGemini({ history, context, isFirstBotTurn: botMessagesBefore === 0 });
+                output = result.output;
+                void recordUsage(result.usage);
+                console.log(`[ai-agent] Tokens: prompt=${result.usage.promptTokens} cached=${result.usage.cachedTokens} out=${result.usage.outputTokens}`);
+
+                const clean =
+                    !output.pqrs?.tipo &&
+                    !output.listo &&
+                    !output.preOrder?.nombreCliente &&
+                    !output.preOrder?.direccion &&
+                    !output.preOrder?.ciudad &&
+                    !output.preOrder?.horarioContacto &&
+                    !output.preOrder?.notas;
+                if (cacheKey && clean) {
+                    void storeCachedReply(cacheKey, {
+                        mensajes: (output.mensajes ?? []).map(m => String(m)),
+                        options: (output.options ?? []).map(o => String(o)),
+                        items: output.preOrder?.items ?? [],
+                    });
+                }
+            }
             const raw = (output.mensajes ?? []).map(m => String(m ?? '').trim()).filter(Boolean);
             if (raw.length === 0) throw new Error('Empty reply from model');
             options = (Array.isArray(output.options) ? output.options : []).map(o => String(o).trim()).filter(Boolean).slice(0, 10);
