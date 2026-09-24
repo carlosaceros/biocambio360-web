@@ -38,7 +38,7 @@ const MAX_TURNS_PER_NIGHT = 30;
 const MAX_STRIKES_PER_NIGHT = 3;
 const HISTORY_MESSAGES = 8;
 const NO_CLOSURE_TURN = 5;
-const HUMAN_ACTIVE_GRACE_MS = 3 * 60 * 60 * 1000;
+const HUMAN_ACTIVE_GRACE_MS = 20 * 60 * 1000; // the agent yields only while a human is actively replying
 const SITE_URL = 'https://biocambio360.com';
 const SEND_DELAY_MS = 700;
 
@@ -346,12 +346,18 @@ export interface AgentTurnInput {
 export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
     try {
         if (!isAfterHoursNow()) return;
-        if (!(await isAgentEnabled())) return;
+        if (!(await isAgentEnabled())) {
+            console.log('[ai-agent] Skipped: agent is paused');
+            return;
+        }
 
         const db = getAdminDB();
         const convRef = db.collection('conversations').doc(input.conversationId);
         const convSnap = await convRef.get();
-        if (!convSnap.exists) return;
+        if (!convSnap.exists) {
+            console.log(`[ai-agent] Skipped: conversation ${input.conversationId} not found`);
+            return;
+        }
         const conv = convSnap.data() ?? {};
 
         // Per-night counters (cost/loop/abuse protection)
@@ -359,7 +365,10 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
         const sameNight = conv.botWindowKey === key;
         const turns = sameNight ? Number(conv.botTurns ?? 0) : 0;
         const strikes = sameNight ? Number(conv.botStrikes ?? 0) : 0;
-        if (turns >= MAX_TURNS_PER_NIGHT || strikes >= MAX_STRIKES_PER_NIGHT) return;
+        if (turns >= MAX_TURNS_PER_NIGHT || strikes >= MAX_STRIKES_PER_NIGHT) {
+            console.log(`[ai-agent] Skipped: nightly cap reached (turns=${turns}, strikes=${strikes})`);
+            return;
+        }
 
         // Recent messages: history for the model + "a human is active" guard
         const msgSnap = await convRef.collection('messages').orderBy('timestamp', 'desc').limit(HISTORY_MESSAGES + 2).get();
@@ -369,11 +378,17 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
             if (m.direction !== 'outbound' || !m.agentUid || m.agentUid === AI_AGENT_ID) return false;
             return Date.now() - (m.timestamp?.toMillis?.() ?? 0) < HUMAN_ACTIVE_GRACE_MS;
         });
-        if (humanActive) return;
+        if (humanActive) {
+            console.log(`[ai-agent] Skipped: a human replied in the last ${HUMAN_ACTIVE_GRACE_MS / 60000} min`);
+            return;
+        }
 
         const usable = recent.filter(m => m.content && ['text', 'interactive', 'audio', 'image', 'document', 'video'].includes(m.type));
         const lastMsg = usable[usable.length - 1];
-        if (!lastMsg || lastMsg.direction !== 'inbound') return;
+        if (!lastMsg || lastMsg.direction !== 'inbound') {
+            console.log('[ai-agent] Skipped: last message is not from the customer');
+            return;
+        }
 
         const countersUpdate = { botTurns: turns + 1, botWindowKey: key, botStrikes: strikes };
         const finishCanned = async (text: string, strike: boolean) => {
