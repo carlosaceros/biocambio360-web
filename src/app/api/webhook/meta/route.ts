@@ -38,8 +38,6 @@ export async function GET(req: NextRequest) {
 // ─── POST: Inbound event handler ──────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-    // CRITICAL: Return 200 ASAP to Meta — timeouts cause retries
-    // We process async but respond immediately
     let body: any;
     try {
         body = await req.json();
@@ -47,10 +45,15 @@ export async function POST(req: NextRequest) {
         return new NextResponse('Bad Request', { status: 400 });
     }
 
-    // Process async — don't await so we return 200 immediately
-    processWebhookPayload(body).catch(err => {
+    // Await processing: serverless functions can be frozen right after responding, which would
+    // silently drop the writes. On failure return 500 so Meta retries delivery (handlers are
+    // idempotent), instead of losing the message.
+    try {
+        await processWebhookPayload(body);
+    } catch (err) {
         console.error('[webhook/meta] Processing error:', err);
-    });
+        return new NextResponse('Processing error', { status: 500 });
+    }
 
     return new NextResponse('EVENT_RECEIVED', { status: 200 });
 }
@@ -79,23 +82,177 @@ async function processWhatsAppPayload(body: any): Promise<void> {
     for (const entry of entries) {
         const changes: any[] = entry?.changes ?? [];
         for (const change of changes) {
-            if (change?.field !== 'messages') continue;
+            const field: string = change?.field ?? '';
             const value = change?.value ?? {};
-            const phoneNumberId: string = value?.metadata?.phone_number_id ?? '';
 
-            // Handle inbound messages
-            const messages: any[] = value?.messages ?? [];
-            for (const msg of messages) {
-                await handleWhatsAppInboundMessage(msg, value, phoneNumberId);
-            }
+            if (field === 'messages') {
+                const phoneNumberId: string = value?.metadata?.phone_number_id ?? '';
 
-            // Handle status updates (sent/delivered/read)
-            const statuses: any[] = value?.statuses ?? [];
-            for (const status of statuses) {
-                await handleWhatsAppStatusUpdate(status, phoneNumberId);
+                // Handle inbound messages
+                const messages: any[] = value?.messages ?? [];
+                for (const msg of messages) {
+                    await handleWhatsAppInboundMessage(msg, value, phoneNumberId);
+                }
+
+                // Handle status updates (sent/delivered/read)
+                const statuses: any[] = value?.statuses ?? [];
+                for (const status of statuses) {
+                    await handleWhatsAppStatusUpdate(status, phoneNumberId);
+                }
+            } else if (field === 'message_template_status_update') {
+                await handleTemplateStatusUpdate(value);
+            } else if (field === 'message_template_quality_update') {
+                await handleTemplateQualityUpdate(value);
+            } else if (field === 'phone_number_quality_update') {
+                await handlePhoneQualityUpdate(value);
+            } else {
+                console.log(`[webhook/meta] Unhandled WABA field: ${field}`);
             }
         }
     }
+}
+
+// ─── Operational alerts: templates & phone quality ───────────────────────────
+
+function resolveAccountKeyByPhoneId(phoneNumberId?: string): string | undefined {
+    if (!phoneNumberId) return undefined;
+    if (phoneNumberId === process.env.WHATSAPP_PHONE_ID_BIOCAMBIO) return 'biocambio360';
+    if (phoneNumberId === process.env.WHATSAPP_PHONE_ID_LIMPIEZA) return 'totalLimpieza';
+    return undefined;
+}
+
+function resolveAccountKeyByPhoneNumber(displayPhoneNumber?: string): string | undefined {
+    if (!displayPhoneNumber) return undefined;
+    const digits = displayPhoneNumber.replace(/\D/g, '');
+    if (digits.endsWith('1005353')) return 'biocambio360';
+    if (digits.endsWith('6045330')) return 'totalLimpieza';
+    return undefined;
+}
+
+async function createAlert(alert: {
+    type: 'template_status' | 'template_quality' | 'phone_quality';
+    severity: 'info' | 'warning' | 'critical';
+    title: string;
+    message: string;
+    phoneNumberId?: string;
+    accountKey?: string;
+    templateName?: string;
+    templateLanguage?: string;
+    templateId?: string;
+    event?: string;
+    previousValue?: string;
+    newValue?: string;
+    rawPayload: Record<string, unknown>;
+}): Promise<void> {
+    const db = getAdminDB();
+    await db.collection('whatsapp_alerts').add({
+        ...alert,
+        acknowledged: false,
+        createdAt: FieldValue.serverTimestamp(),
+    });
+    console.log(`[webhook/meta] Alert created: [${alert.severity}] ${alert.title}`);
+}
+
+/**
+ * message_template_status_update — fires when Meta approves/rejects/pauses/disables a template.
+ * Field names confirmed against real-world implementations: event, message_template_id,
+ * message_template_name, message_template_language, reason (present on REJECTED).
+ */
+async function handleTemplateStatusUpdate(value: any): Promise<void> {
+    const event: string = value?.event ?? 'UNKNOWN';
+    const templateName: string = value?.message_template_name ?? 'plantilla desconocida';
+    const templateLanguage: string | undefined = value?.message_template_language;
+    const templateId: string | undefined = value?.message_template_id ? String(value.message_template_id) : undefined;
+    const reason: string | undefined = value?.reason;
+
+    const severity: 'info' | 'warning' | 'critical' =
+        ['REJECTED', 'DISABLED', 'PAUSED'].includes(event) ? 'critical'
+        : ['PENDING', 'IN_APPEAL', 'PENDING_DELETION'].includes(event) ? 'warning'
+        : 'info';
+
+    const title = event === 'APPROVED'
+        ? `Plantilla aprobada: ${templateName}`
+        : event === 'REJECTED'
+        ? `Plantilla RECHAZADA: ${templateName}`
+        : `Plantilla "${templateName}" → ${event}`;
+
+    const message = reason
+        ? `Evento: ${event}${templateLanguage ? ` (${templateLanguage})` : ''}. Motivo: ${reason}`
+        : `Evento: ${event}${templateLanguage ? ` (${templateLanguage})` : ''}.`;
+
+    await createAlert({
+        type: 'template_status',
+        severity,
+        title,
+        message,
+        templateName,
+        templateLanguage,
+        templateId,
+        event,
+        rawPayload: value,
+    });
+}
+
+/**
+ * message_template_quality_update — fires when a template's quality score changes.
+ * Field names: new_quality_score (required), previous_quality_score (may be absent),
+ * plus message_template_id/name/language.
+ */
+async function handleTemplateQualityUpdate(value: any): Promise<void> {
+    const newScore: string = value?.new_quality_score ?? 'UNKNOWN';
+    const previousScore: string | undefined = value?.previous_quality_score;
+    const templateName: string = value?.message_template_name ?? 'plantilla desconocida';
+    const templateLanguage: string | undefined = value?.message_template_language;
+    const templateId: string | undefined = value?.message_template_id ? String(value.message_template_id) : undefined;
+
+    const severity: 'info' | 'warning' | 'critical' =
+        newScore === 'RED' ? 'critical' : newScore === 'YELLOW' ? 'warning' : 'info';
+
+    await createAlert({
+        type: 'template_quality',
+        severity,
+        title: `Calidad de plantilla "${templateName}": ${previousScore ? `${previousScore} → ` : ''}${newScore}`,
+        message: `La calidad de la plantilla${templateLanguage ? ` (${templateLanguage})` : ''} cambió a ${newScore}.${newScore === 'RED' ? ' Meta puede pausarla si no mejora.' : ''}`,
+        templateName,
+        templateLanguage,
+        templateId,
+        previousValue: previousScore,
+        newValue: newScore,
+        rawPayload: value,
+    });
+}
+
+/**
+ * phone_number_quality_update — fires when a phone number's quality rating or messaging
+ * limit changes. Field names vary slightly across Meta's docs/implementations, so we read
+ * every plausible key defensively and always keep the raw payload for verification.
+ */
+async function handlePhoneQualityUpdate(value: any): Promise<void> {
+    const displayPhoneNumber: string | undefined = value?.display_phone_number ?? value?.metadata?.display_phone_number;
+    const event: string = value?.event ?? value?.current_quality_rating ?? 'UNKNOWN';
+    const currentLimit: string | undefined = value?.current_limit;
+    const phoneNumberId: string | undefined = value?.phone_number_id ?? value?.metadata?.phone_number_id;
+
+    const accountKey = resolveAccountKeyByPhoneId(phoneNumberId) ?? resolveAccountKeyByPhoneNumber(displayPhoneNumber);
+    const accountLabel = accountKey === 'biocambio360' ? 'Biocambio360' : accountKey === 'totalLimpieza' ? 'Total Limpieza' : (displayPhoneNumber ?? 'número desconocido');
+
+    const eventUpper = String(event).toUpperCase();
+    const severity: 'info' | 'warning' | 'critical' =
+        eventUpper.includes('RED') || eventUpper.includes('FLAG') || eventUpper.includes('DOWNGRADE') ? 'critical'
+        : eventUpper.includes('YELLOW') ? 'warning'
+        : 'info';
+
+    await createAlert({
+        type: 'phone_quality',
+        severity,
+        title: `Calidad del número ${accountLabel}: ${event}`,
+        message: `Evento: ${event}.${currentLimit ? ` Límite de mensajería actual: ${currentLimit}.` : ''}`,
+        phoneNumberId,
+        accountKey,
+        event,
+        newValue: currentLimit,
+        rawPayload: value,
+    });
 }
 
 async function handleWhatsAppInboundMessage(
@@ -127,9 +284,26 @@ async function handleWhatsAppInboundMessage(
     const convRef = db.collection('conversations').doc(conversationId);
     const convSnap = await convRef.get();
 
-    // Upsert conversation
+    const messageData: Record<string, unknown> = {
+        direction: 'inbound',
+        type,
+        content,
+        metaMessageId: msgId,
+        timestamp: FieldValue.serverTimestamp(),
+        status: 'delivered',
+    };
+    if (mediaUrl) messageData.mediaUrl = mediaUrl;
+    if (mimeType) messageData.mimeType = mimeType;
+    if (fileName) messageData.fileName = fileName;
+
+    // Atomic + idempotent: the message doc id is Meta's wamid, so a Meta retry of an already
+    // stored message fails on create() (ALREADY_EXISTS) and never double-counts unread.
+    const msgRef = msgId ? convRef.collection('messages').doc(msgId) : convRef.collection('messages').doc();
+    const batch = db.batch();
+    batch.create(msgRef, messageData);
+
     if (convSnap.exists) {
-        await convRef.update({
+        batch.update(convRef, {
             lastMessage: content,
             lastMessageAt: FieldValue.serverTimestamp(),
             unreadCount: FieldValue.increment(1),
@@ -139,7 +313,7 @@ async function handleWhatsAppInboundMessage(
             status: 'abierto',
         });
     } else {
-        await convRef.set({
+        batch.set(convRef, {
             channel: 'whatsapp' as Channel,
             phoneId: phoneNumberId,
             accountKey,
@@ -156,20 +330,15 @@ async function handleWhatsAppInboundMessage(
         });
     }
 
-    // Add message to subcollection
-    const messageData: Record<string, unknown> = {
-        direction: 'inbound',
-        type,
-        content,
-        metaMessageId: msgId,
-        timestamp: FieldValue.serverTimestamp(),
-        status: 'delivered',
-    };
-    if (mediaUrl) messageData.mediaUrl = mediaUrl;
-    if (mimeType) messageData.mimeType = mimeType;
-    if (fileName) messageData.fileName = fileName;
-
-    await convRef.collection('messages').add(messageData);
+    try {
+        await batch.commit();
+    } catch (err: any) {
+        if (err?.code === 6) {
+            console.log(`[webhook/meta] Duplicate WA message ${msgId} ignored`);
+            return;
+        }
+        throw err;
+    }
 
     console.log(`[webhook/meta] WA inbound msg from ${from} → conv: ${conversationId}`);
 }

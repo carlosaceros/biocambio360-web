@@ -26,8 +26,13 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const workloads = await getAdvisorWorkloads();
-    return NextResponse.json({ workloads });
+    try {
+        const workloads = await getAdvisorWorkloads();
+        return NextResponse.json({ workloads });
+    } catch (err) {
+        console.error('[inbox/assign] Failed to load advisor workloads:', err);
+        return NextResponse.json({ workloads: [], error: 'Workloads unavailable' }, { status: 503 });
+    }
 }
 
 /** POST /api/inbox/assign — manual or auto assignment */

@@ -14,6 +14,7 @@ import ConversationList from '@/components/admin/inbox/ConversationList';
 import ChatWindow from '@/components/admin/inbox/ChatWindow';
 import ContactPanel from '@/components/admin/inbox/ContactPanel';
 import TemplatePickerModal from '@/components/admin/inbox/TemplatePickerModal';
+import WhatsAppAlertsBanner from '@/components/admin/inbox/WhatsAppAlertsBanner';
 import type { ConversationDoc, Channel, ConversationStatus } from '@/types/inbox';
 import { WHATSAPP_ACCOUNTS } from '@/types/inbox';
 import {
@@ -141,8 +142,6 @@ export default function InboxPage() {
             } catch { /* ignore */ }
         };
         fetchAdvisors();
-        const interval = setInterval(fetchAdvisors, 30000); // refresh every 30s
-        return () => clearInterval(interval);
     }, [canAssign]);
 
     // ── Filtered conversations ────────────────────────────────────────────────
@@ -258,6 +257,8 @@ export default function InboxPage() {
                     </button>
                 </div>
             </header>
+
+            <WhatsAppAlertsBanner />
 
             {/* Channel tabs */}
             <div className="bg-white border-b border-gray-100 px-4 flex items-center gap-1 shrink-0 overflow-x-auto">
