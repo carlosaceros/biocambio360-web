@@ -39,7 +39,7 @@ interface ContactPanelProps {
     canAssign: boolean; // true for superadmin, director, gestor
     advisors: Array<{ uid: string; nombre: string; openConversations?: number }>;
     onAssign: (advisorUid: string) => Promise<void>;
-    onAutoAssign: () => Promise<void>;
+    onAutoAssign: () => Promise<{ assigned: boolean; advisorName?: string; reason?: string; detail?: string } | null>;
 }
 
 export default function ContactPanel({
@@ -53,6 +53,8 @@ export default function ContactPanel({
     const [loading, setLoading] = useState(false);
     const [assigning, setAssigning] = useState(false);
     const [selectedAdvisor, setSelectedAdvisor] = useState('');
+    const [showHowItWorks, setShowHowItWorks] = useState(false);
+    const [autoAssignResult, setAutoAssignResult] = useState<{ advisorName?: string; detail?: string; assigned: boolean } | null>(null);
     const [saleAmount, setSaleAmount] = useState('');
     const [savingSale, setSavingSale] = useState(false);
     const [saleFeedback, setSaleFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -68,6 +70,8 @@ export default function ContactPanel({
     useEffect(() => {
         setSaleAmount('');
         setSaleFeedback(null);
+        setAutoAssignResult(null);
+        setSelectedAdvisor('');
     }, [conversation?.id]);
 
     const loadCustomerData = async (phone: string) => {
@@ -134,6 +138,8 @@ export default function ContactPanel({
         setAssigning(true);
         try {
             await onAssign(selectedAdvisor);
+            setSelectedAdvisor('');
+            setAutoAssignResult(null);
         } finally {
             setAssigning(false);
         }
@@ -142,7 +148,8 @@ export default function ContactPanel({
     const handleAutoAssign = async () => {
         setAssigning(true);
         try {
-            await onAutoAssign();
+            const result = await onAutoAssign();
+            if (result) setAutoAssignResult(result);
         } finally {
             setAssigning(false);
         }
@@ -220,7 +227,7 @@ export default function ContactPanel({
                 <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
                     Venta cerrada por WhatsApp
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <input
                         type="text"
                         inputMode="numeric"
@@ -228,7 +235,7 @@ export default function ContactPanel({
                         value={saleAmount}
                         onChange={e => setSaleAmount(e.target.value)}
                         disabled={savingSale}
-                        className="flex-1 text-xs border border-gray-200 rounded-xl px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-green-400 disabled:opacity-50"
+                        className="flex-1 min-w-[7rem] text-xs border border-gray-200 rounded-xl px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-green-400 disabled:opacity-50"
                     />
                     <button
                         onClick={handleMarkSaleClosed}
@@ -259,13 +266,7 @@ export default function ContactPanel({
                     {conversation.assignedTo ? (
                         <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 rounded-xl px-3 py-2">
                             <UserCheck size={13} />
-                            <span className="font-semibold">{conversation.assignedToName ?? 'Asesor'}</span>
-                            <button
-                                onClick={() => setSelectedAdvisor('')}
-                                className="ml-auto text-blue-400 hover:text-blue-600 font-bold"
-                            >
-                                Cambiar
-                            </button>
+                            <span>Asignada a <strong>{conversation.assignedToName ?? 'Asesor'}</strong></span>
                         </div>
                     ) : (
                         <div className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2 flex items-center gap-2">
@@ -274,49 +275,97 @@ export default function ContactPanel({
                         </div>
                     )}
 
-                    {/* Auto-assign button */}
+                    {/* Result of the last smart assignment: who and why */}
+                    {autoAssignResult && (
+                        <div className={`text-[11px] rounded-xl px-3 py-2 ${autoAssignResult.assigned ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
+                            {autoAssignResult.assigned ? (
+                                <>
+                                    <p className="font-bold">Asignada a {autoAssignResult.advisorName}</p>
+                                    <p className="opacity-90">{autoAssignResult.detail}</p>
+                                </>
+                            ) : (
+                                <p className="font-bold">No hay asesores activos para asignar. Crea usuarios con rol Asesor en Usuarios &amp; Auditoría.</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Smart assignment */}
                     <button
                         onClick={handleAutoAssign}
-                        disabled={assigning}
-                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                        disabled={assigning || advisors.length === 0}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                         {assigning ? (
                             <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (
                             <UserCheck size={12} />
                         )}
-                        Asignación Inteligente
+                        Asignar automáticamente
                     </button>
+                    <p className="text-[11px] text-gray-500 leading-snug">
+                        Elige al asesor que corresponde según su historial con este cliente y su carga de trabajo. Puedes reasignarla a mano después.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => setShowHowItWorks(v => !v)}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                    >
+                        {showHowItWorks ? 'Ocultar cómo decide' : '¿Cómo decide?'}
+                    </button>
+                    {showHowItWorks && (
+                        <ol className="text-[11px] text-gray-600 bg-indigo-50/60 rounded-xl px-3 py-2 space-y-1.5 list-decimal list-inside">
+                            <li>
+                                <strong>Historial:</strong> si este cliente ya fue atendido antes por un asesor activo, vuelve con el mismo.
+                            </li>
+                            <li>
+                                <strong>Carga:</strong> si no, elige al asesor con menos conversaciones abiertas o asignadas en este momento.
+                            </li>
+                            <li>
+                                <strong>Rotación:</strong> si hay empate, elige a quien lleva más tiempo sin recibir un cliente.
+                            </li>
+                            <li className="list-none -ml-4 pt-1 text-gray-500">
+                                Solo participan usuarios con rol Asesor en estado activo. No envía ningún mensaje al cliente.
+                            </li>
+                        </ol>
+                    )}
 
                     {/* Manual assign */}
-                    <div className="flex gap-2">
-                        <select
-                            value={selectedAdvisor}
-                            onChange={e => setSelectedAdvisor(e.target.value)}
-                            className="flex-1 text-xs border border-gray-200 rounded-xl px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-indigo-400"
-                        >
-                            <option value="">Asignar a...</option>
-                            {advisors.map(a => (
-                                <option key={a.uid} value={a.uid}>
-                                    {a.nombre}
-                                    {a.openConversations !== undefined ? ` (${a.openConversations} activas)` : ''}
-                                </option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={handleManualAssign}
-                            disabled={!selectedAdvisor || assigning}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-colors"
-                        >
-                            Asignar
-                        </button>
-                    </div>
+                    <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider pt-1">Asignar manualmente</p>
+                    {advisors.length === 0 ? (
+                        <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
+                            No hay asesores activos. Crea usuarios con rol <strong>Asesor</strong> (estado activo) en Usuarios &amp; Auditoría para poder asignar.
+                        </p>
+                    ) : (
+                        <div className="flex gap-2">
+                            <select
+                                value={selectedAdvisor}
+                                onChange={e => setSelectedAdvisor(e.target.value)}
+                                className="flex-1 min-w-0 text-xs border border-gray-200 rounded-xl px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-indigo-400"
+                            >
+                                <option value="">Elegir asesor...</option>
+                                {advisors.map(a => (
+                                    <option key={a.uid} value={a.uid}>
+                                        {a.nombre}
+                                        {a.openConversations !== undefined ? ` (${a.openConversations} activas)` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleManualAssign}
+                                disabled={!selectedAdvisor || assigning}
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                            >
+                                Asignar
+                            </button>
+                        </div>
+                    )}
 
                     {/* Advisor workload preview */}
                     {advisors.length > 0 && (
                         <div className="mt-1 space-y-1">
-                            {advisors.slice(0, 4).map(a => (
-                                <div key={a.uid} className="flex items-center justify-between text-[10px] text-gray-500">
+                            <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Carga actual</p>
+                            {advisors.slice(0, 6).map(a => (
+                                <div key={a.uid} className="flex items-center justify-between text-[11px] text-gray-500">
                                     <span>{a.nombre}</span>
                                     <span className={`font-bold ${(a.openConversations ?? 0) > 10 ? 'text-red-500' : 'text-green-600'}`}>
                                         {a.openConversations ?? 0} activas

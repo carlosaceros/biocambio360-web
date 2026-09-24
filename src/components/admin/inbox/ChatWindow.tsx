@@ -16,6 +16,7 @@ import {
     ChevronDown,
     MessageSquare,
 } from 'lucide-react';
+import EmojiPicker from './EmojiPicker';
 import type { ConversationDoc, MessageDoc, MessageStatus } from '@/types/inbox';
 import { subscribeToMessages, markConversationAsRead } from '@/lib/inbox-service';
 import { formatDistanceToNow } from 'date-fns';
@@ -92,6 +93,23 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    const insertEmoji = useCallback((emoji: string) => {
+        const el = inputRef.current;
+        if (!el) {
+            setInputText(prev => prev + emoji);
+            return;
+        }
+        const start = el.selectionStart ?? inputText.length;
+        const end = el.selectionEnd ?? inputText.length;
+        const next = inputText.slice(0, start) + emoji + inputText.slice(end);
+        setInputText(next);
+        requestAnimationFrame(() => {
+            el.focus();
+            const pos = start + emoji.length;
+            el.setSelectionRange(pos, pos);
+        });
+    }, [inputText]);
 
     const handleSend = useCallback(async () => {
         if (!inputText.trim() || !conversation || isSending) return;
@@ -272,6 +290,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                         >
                             <FileText size={18} />
                         </button>
+                        <EmojiPicker onSelect={insertEmoji} disabled={isSending} />
                         <textarea
                             ref={inputRef}
                             value={inputText}

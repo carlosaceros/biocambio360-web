@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
@@ -15,6 +15,14 @@ import ChatWindow from '@/components/admin/inbox/ChatWindow';
 import ContactPanel from '@/components/admin/inbox/ContactPanel';
 import TemplatePickerModal from '@/components/admin/inbox/TemplatePickerModal';
 import WhatsAppAlertsBanner from '@/components/admin/inbox/WhatsAppAlertsBanner';
+import {
+    getAlertsEnabled,
+    setAlertsEnabled,
+    getNotificationPermission,
+    requestNotificationPermission,
+    playNotificationSound,
+    showBrowserNotification,
+} from '@/lib/inbox-notifications';
 import type { ConversationDoc, Channel, ConversationStatus } from '@/types/inbox';
 import { WHATSAPP_ACCOUNTS } from '@/types/inbox';
 import {
@@ -35,6 +43,8 @@ import {
     Circle,
     Bot,
     UserCheck,
+    Bell,
+    BellOff,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -84,9 +94,29 @@ export default function InboxPage() {
 
     // Conversations state
     const [conversations, setConversations] = useState<ConversationDoc[]>([]);
-    const [selectedConv, setSelectedConv] = useState<ConversationDoc | null>(null);
+    const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [totalUnread, setTotalUnread] = useState(0);
+
+    // Derived from the live list so status/assignment changes show up immediately
+    const selectedConv = useMemo(
+        () => conversations.find(c => c.id === selectedConvId) ?? null,
+        [conversations, selectedConvId]
+    );
+
+    // Alerts (sound + browser notification) and action feedback
+    const [alertsOn, setAlertsOn] = useState(true);
+    const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
+    const alertsOnRef = useRef(true);
+    const prevUnreadRef = useRef<Map<string, number> | null>(null);
+    const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showToast = useCallback((text: string, type: 'success' | 'error' = 'success') => {
+        setToast({ text, type });
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setToast(null), 3500);
+    }, []);
 
     // Filters
     const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
@@ -111,13 +141,54 @@ export default function InboxPage() {
 
     // ── Real-time subscriptions ──────────────────────────────────────────────
     useEffect(() => {
+        const enabled = getAlertsEnabled();
+        setAlertsOn(enabled);
+        alertsOnRef.current = enabled;
+        setNotifPermission(getNotificationPermission());
+    }, []);
+
+    useEffect(() => {
         setLoading(true);
         const unsub = subscribeToConversations((convs) => {
             setConversations(convs);
             setLoading(false);
+
+            // New inbound message = a conversation whose unread counter went up.
+            // The first snapshot only seeds the baseline (no alert for existing unread).
+            const prev = prevUnreadRef.current;
+            if (prev && alertsOnRef.current) {
+                const fresh = convs.filter(c => c.unreadCount > (prev.get(c.id) ?? 0));
+                if (fresh.length > 0) {
+                    playNotificationSound();
+                    const first = fresh[0];
+                    showBrowserNotification(
+                        fresh.length > 1 ? `${fresh.length} mensajes nuevos` : `Nuevo mensaje de ${first.contactName}`,
+                        fresh.length > 1 ? 'Abre la bandeja para verlos' : (first.lastMessage || 'Mensaje nuevo'),
+                        'inbox-new-message'
+                    );
+                }
+            }
+            prevUnreadRef.current = new Map(convs.map(c => [c.id, c.unreadCount]));
         });
         return unsub;
     }, []);
+
+    useEffect(() => {
+        const base = 'Bandeja de Mensajes';
+        document.title = totalUnread > 0 ? `(${totalUnread}) ${base}` : base;
+        return () => { document.title = 'Biocambio360'; };
+    }, [totalUnread]);
+
+    const toggleAlerts = useCallback(async () => {
+        const next = !alertsOn;
+        setAlertsOn(next);
+        alertsOnRef.current = next;
+        setAlertsEnabled(next);
+        if (next) {
+            playNotificationSound();
+            setNotifPermission(await requestNotificationPermission());
+        }
+    }, [alertsOn]);
 
     useEffect(() => {
         const unsub = subscribeToUnreadCount(setTotalUnread);
@@ -177,49 +248,77 @@ export default function InboxPage() {
 
     // ── Handlers ─────────────────────────────────────────────────────────────
     const handleSelectConversation = useCallback((conv: ConversationDoc) => {
-        setSelectedConv(conv);
+        setSelectedConvId(conv.id);
         setShowMobileList(false);
         markConversationAsRead(conv.id).catch(() => {});
+    }, []);
+
+    const refreshAdvisors = useCallback(async (token: string) => {
+        const res = await fetch('/api/inbox/assign', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+            const data = await res.json();
+            setAdvisors(data.workloads ?? []);
+        }
     }, []);
 
     const handleAssign = useCallback(async (advisorUid: string) => {
         if (!selectedConv) return;
         const u = auth.currentUser;
         if (!u) return;
-        const token = await u.getIdToken();
-        await fetch('/api/inbox/assign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ conversationId: selectedConv.id, advisorUid, mode: 'manual' }),
-        });
-        // Refresh workloads
-        const res = await fetch('/api/inbox/assign', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (res.ok) {
-            const data = await res.json();
-            setAdvisors(data.workloads ?? []);
+        try {
+            const token = await u.getIdToken();
+            const res = await fetch('/api/inbox/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ conversationId: selectedConv.id, advisorUid, mode: 'manual' }),
+            });
+            if (!res.ok) throw new Error('assign failed');
+            const name = advisors.find(a => a.uid === advisorUid)?.nombre ?? 'el asesor';
+            showToast(`Conversación asignada a ${name}`);
+            await refreshAdvisors(token);
+        } catch {
+            showToast('No se pudo asignar la conversación', 'error');
         }
-    }, [selectedConv]);
+    }, [selectedConv, advisors, refreshAdvisors, showToast]);
 
     const handleAutoAssign = useCallback(async () => {
-        if (!selectedConv) return;
+        if (!selectedConv) return null;
         const u = auth.currentUser;
-        if (!u) return;
-        const token = await u.getIdToken();
-        await fetch('/api/inbox/assign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({
-                conversationId: selectedConv.id,
-                contactPhone: selectedConv.contactPhone,
-                mode: 'auto',
-            }),
-        });
-    }, [selectedConv]);
+        if (!u) return null;
+        try {
+            const token = await u.getIdToken();
+            const res = await fetch('/api/inbox/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    conversationId: selectedConv.id,
+                    contactPhone: selectedConv.contactPhone,
+                    mode: 'auto',
+                }),
+            });
+            if (!res.ok) throw new Error('auto assign failed');
+            const result = await res.json();
+            showToast(
+                result.assigned ? `Asignada a ${result.advisorName}` : 'No hay asesores activos disponibles',
+                result.assigned ? 'success' : 'error'
+            );
+            await refreshAdvisors(token);
+            return result as { assigned: boolean; advisorName?: string; reason?: string; detail?: string };
+        } catch {
+            showToast('No se pudo asignar la conversación', 'error');
+            return null;
+        }
+    }, [selectedConv, refreshAdvisors, showToast]);
 
     const handleStatusChange = useCallback(async (status: ConversationStatus) => {
-        if (!selectedConv) return;
-        await setConversationStatus(selectedConv.id, status);
-    }, [selectedConv]);
+        if (!selectedConv || selectedConv.status === status) return;
+        try {
+            await setConversationStatus(selectedConv.id, status);
+            showToast(`Estado cambiado a "${status}"`);
+        } catch {
+            showToast('No se pudo cambiar el estado', 'error');
+        }
+    }, [selectedConv, showToast]);
 
     const wabaId = process.env.NEXT_PUBLIC_META_APP_ID
         ? process.env.WHATSAPP_BUSINESS_ACCOUNT_ID
@@ -249,6 +348,22 @@ export default function InboxPage() {
                 )}
                 <div className="ml-auto flex items-center gap-2">
                     <button
+                        onClick={toggleAlerts}
+                        title={
+                            alertsOn
+                                ? notifPermission === 'granted'
+                                    ? 'Avisos activos: sonido y notificación en cada mensaje nuevo. Clic para silenciar.'
+                                    : 'Sonido activo. Clic en la campana otra vez tras permitir notificaciones del navegador.'
+                                : 'Avisos silenciados. Clic para activar sonido y notificaciones.'
+                        }
+                        className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold border rounded-xl transition-colors cursor-pointer ${
+                            alertsOn ? 'text-green-700 border-green-200 bg-green-50 hover:bg-green-100' : 'text-gray-500 border-gray-200 hover:text-gray-800'
+                        }`}
+                    >
+                        {alertsOn ? <Bell size={13} /> : <BellOff size={13} />}
+                        <span className="hidden sm:inline">{alertsOn ? 'Avisos activos' : 'Avisos silenciados'}</span>
+                    </button>
+                    <button
                         onClick={() => setShowContactPanel(v => !v)}
                         className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-xl transition-colors"
                     >
@@ -259,6 +374,15 @@ export default function InboxPage() {
             </header>
 
             <WhatsAppAlertsBanner />
+
+            {toast && (
+                <div className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-2xl shadow-xl font-bold text-xs text-white flex items-center gap-2 ${
+                    toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+                }`}>
+                    {toast.type === 'success' ? <CheckCircle2 size={15} /> : <X size={15} />}
+                    {toast.text}
+                </div>
+            )}
 
             {/* Channel tabs */}
             <div className="bg-white border-b border-gray-100 px-4 flex items-center gap-1 shrink-0 overflow-x-auto">
@@ -373,13 +497,17 @@ export default function InboxPage() {
                                 <button
                                     key={s}
                                     onClick={() => handleStatusChange(s)}
-                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-colors ${
+                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors cursor-pointer ${
                                         selectedConv.status === s
-                                            ? 'bg-green-100 text-green-700'
-                                            : 'text-gray-500 hover:bg-gray-100'
+                                            ? s === 'abierto'
+                                                ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                                                : s === 'asignado'
+                                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                                : 'bg-gray-700 text-white border-gray-700 shadow-sm'
+                                            : 'text-gray-500 border-transparent hover:bg-gray-100'
                                     }`}
                                 >
-                                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                                    {selectedConv.status === s ? '✓ ' : ''}{s.charAt(0).toUpperCase() + s.slice(1)}
                                 </button>
                             ))}
                             {/* Mobile: back to list */}
@@ -402,7 +530,7 @@ export default function InboxPage() {
 
                 {/* ── Right: Contact panel ───────────────────────────────────── */}
                 {showContactPanel && (
-                    <div className="hidden xl:flex w-72 border-l border-gray-100 bg-white flex-col overflow-hidden">
+                    <div className="hidden xl:flex w-96 border-l border-gray-100 bg-white flex-col overflow-hidden">
                         <ContactPanel
                             conversation={selectedConv}
                             canAssign={canAssign}

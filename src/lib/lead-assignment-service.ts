@@ -1,12 +1,15 @@
 /**
  * Smart Lead Assignment Service
- * 
+ *
  * Assigns incoming conversations to advisors (asesores) using:
  * 1. Historical loyalty — if the customer talked to a specific advisor before, re-assign to them
  * 2. Workload balance — assign to the advisor with the fewest open conversations
  * 3. Round-robin fallback — cycle through available advisors if workloads are equal
  *
  * Only users with role 'asesor' and status 'activo' are eligible for auto-assignment.
+ *
+ * Queries are intentionally single-filter (filtering/sorting in memory) so they never
+ * require Firestore composite indexes.
  */
 
 export const runtime = 'nodejs';
@@ -22,89 +25,116 @@ export interface AdvisorWorkload {
     lastAssignedAt?: Date;
 }
 
-/**
- * Core assignment logic: returns the best advisor UID for a new conversation.
- * Priority order:
- *  1. Same advisor as previous conversation with this contact (loyalty)
- *  2. Advisor with fewest open conversations (workload balance)
- *  3. Round-robin among tied advisors
- */
-export async function findBestAdvisor(
-    contactPhone: string,
-    excludeUids: string[] = []
-): Promise<AdvisorWorkload | null> {
-    const db = getAdminDB();
+export type AssignmentReason = 'lealtad' | 'carga' | 'rotacion';
 
-    // 1. Get all active asesores
+export interface AdvisorMatch extends AdvisorWorkload {
+    reason: AssignmentReason;
+    detail: string;
+}
+
+const OPEN_STATUSES = ['abierto', 'asignado'];
+
+async function loadActiveAdvisors(): Promise<AdvisorWorkload[]> {
+    const db = getAdminDB();
     const usersSnap = await db
         .collection('admin_users')
         .where('rol', '==', 'asesor')
         .where('estado', '==', 'activo')
         .get();
 
-    if (usersSnap.empty) return null;
+    return usersSnap.docs.map(d => ({
+        uid: d.id,
+        nombre: d.data().nombre ?? 'Asesor',
+        email: d.data().email ?? '',
+        openConversations: 0,
+        lastAssignedAt: d.data().lastAssignedAt?.toDate?.(),
+    }));
+}
 
-    const advisors: AdvisorWorkload[] = usersSnap.docs
-        .filter(d => !excludeUids.includes(d.id))
-        .map(d => ({
-            uid: d.id,
-            nombre: d.data().nombre ?? 'Asesor',
-            email: d.data().email ?? '',
-            openConversations: 0,
-            lastAssignedAt: d.data().lastAssignedAt?.toDate?.(),
-        }));
+/** Fills openConversations (status abierto/asignado) for each advisor. */
+async function countOpenConversations(advisors: AdvisorWorkload[]): Promise<void> {
+    const db = getAdminDB();
+    const ids = advisors.map(a => a.uid);
 
+    for (let i = 0; i < ids.length; i += 30) {
+        const chunk = ids.slice(i, i + 30);
+        const snap = await db.collection('conversations').where('assignedTo', 'in', chunk).get();
+        for (const convDoc of snap.docs) {
+            const data = convDoc.data();
+            if (!OPEN_STATUSES.includes(data.status)) continue;
+            const advisor = advisors.find(a => a.uid === data.assignedTo);
+            if (advisor) advisor.openConversations++;
+        }
+    }
+}
+
+/**
+ * Core assignment logic: returns the best advisor for a conversation plus the reason.
+ * Priority order:
+ *  1. Same advisor as previous conversation with this contact (loyalty)
+ *  2. Advisor with fewest open conversations (workload balance)
+ *  3. Round-robin among tied advisors (least recently assigned)
+ */
+export async function findBestAdvisor(
+    contactPhone: string,
+    excludeUids: string[] = []
+): Promise<AdvisorMatch | null> {
+    const db = getAdminDB();
+
+    const advisors = (await loadActiveAdvisors()).filter(a => !excludeUids.includes(a.uid));
     if (advisors.length === 0) return null;
 
-    // 2. Check for historical assignment with this contact
-    const historicalConvs = await db
+    // 1. Historical loyalty: most recent conversation of this contact that had an advisor
+    const historicalSnap = await db
         .collection('conversations')
         .where('contactPhone', '==', contactPhone)
-        .where('assignedTo', '!=', null)
-        .orderBy('assignedTo')
-        .orderBy('lastMessageAt', 'desc')
-        .limit(5)
         .get();
 
-    if (!historicalConvs.empty) {
-        // Find most recently assigned advisor for this contact
-        const recentlyAssigned = historicalConvs.docs[0].data().assignedTo as string;
-        const loyalAdvisor = advisors.find(a => a.uid === recentlyAssigned);
+    const pastAssigned = historicalSnap.docs
+        .map(d => d.data())
+        .filter(c => c.assignedTo)
+        .sort((a, b) => (b.lastMessageAt?.toMillis?.() ?? 0) - (a.lastMessageAt?.toMillis?.() ?? 0));
+
+    if (pastAssigned.length > 0) {
+        const loyalAdvisor = advisors.find(a => a.uid === pastAssigned[0].assignedTo);
         if (loyalAdvisor) {
-            console.log(`[lead-assignment] Loyalty match: reassigning to ${loyalAdvisor.nombre} for contact ${contactPhone}`);
-            return loyalAdvisor;
+            console.log(`[lead-assignment] Loyalty match: ${loyalAdvisor.nombre} for contact ${contactPhone}`);
+            return {
+                ...loyalAdvisor,
+                reason: 'lealtad',
+                detail: `${loyalAdvisor.nombre} ya atendió antes a este cliente.`,
+            };
         }
     }
 
-    // 3. Count open conversations per advisor (workload)
-    const openConvsSnap = await db
-        .collection('conversations')
-        .where('status', 'in', ['abierto', 'asignado'])
-        .where('assignedTo', '!=', null)
-        .get();
+    // 2. Workload
+    await countOpenConversations(advisors);
 
-    for (const convDoc of openConvsSnap.docs) {
-        const assignedUid = convDoc.data().assignedTo as string;
-        const advisor = advisors.find(a => a.uid === assignedUid);
-        if (advisor) {
-            advisor.openConversations++;
-        }
-    }
-
-    // 4. Sort by workload (ascending), then by lastAssignedAt (ascending) for round-robin tiebreak
+    // 3. Sort by workload, then least recently assigned (round-robin tiebreak)
     advisors.sort((a, b) => {
         if (a.openConversations !== b.openConversations) {
             return a.openConversations - b.openConversations;
         }
-        // Tiebreak: assign to the one who was assigned least recently
         if (!a.lastAssignedAt) return -1;
         if (!b.lastAssignedAt) return 1;
         return a.lastAssignedAt.getTime() - b.lastAssignedAt.getTime();
     });
 
     const best = advisors[0];
-    console.log(`[lead-assignment] Workload assignment: → ${best.nombre} (${best.openConversations} open convs)`);
-    return best;
+    const tied = advisors.length > 1 && advisors[1].openConversations === best.openConversations;
+    console.log(`[lead-assignment] ${tied ? 'Rotation' : 'Workload'} assignment → ${best.nombre} (${best.openConversations} open)`);
+
+    return tied
+        ? {
+            ...best,
+            reason: 'rotacion',
+            detail: `Varios asesores tenían la misma carga (${best.openConversations} conversaciones abiertas); se eligió a ${best.nombre}, quien lleva más tiempo sin recibir un cliente.`,
+        }
+        : {
+            ...best,
+            reason: 'carga',
+            detail: `${best.nombre} es quien tiene menos conversaciones abiertas (${best.openConversations}).`,
+        };
 }
 
 /**
@@ -114,7 +144,13 @@ export async function findBestAdvisor(
 export async function autoAssignConversation(
     conversationId: string,
     contactPhone: string
-): Promise<{ assigned: boolean; advisorName?: string; advisorUid?: string }> {
+): Promise<{
+    assigned: boolean;
+    advisorName?: string;
+    advisorUid?: string;
+    reason?: AssignmentReason;
+    detail?: string;
+}> {
     const db = getAdminDB();
     const advisor = await findBestAdvisor(contactPhone);
 
@@ -136,7 +172,13 @@ export async function autoAssignConversation(
     });
 
     console.log(`[lead-assignment] Conversation ${conversationId} → ${advisor.nombre}`);
-    return { assigned: true, advisorName: advisor.nombre, advisorUid: advisor.uid };
+    return {
+        assigned: true,
+        advisorName: advisor.nombre,
+        advisorUid: advisor.uid,
+        reason: advisor.reason,
+        detail: advisor.detail,
+    };
 }
 
 /**
@@ -171,35 +213,9 @@ export async function manualAssignConversation(
  * Used by the coordinator/dashboard to visualize advisor loads.
  */
 export async function getAdvisorWorkloads(): Promise<AdvisorWorkload[]> {
-    const db = getAdminDB();
-
-    const usersSnap = await db
-        .collection('admin_users')
-        .where('rol', '==', 'asesor')
-        .where('estado', '==', 'activo')
-        .get();
-
-    const advisors: AdvisorWorkload[] = usersSnap.docs.map(d => ({
-        uid: d.id,
-        nombre: d.data().nombre ?? 'Asesor',
-        email: d.data().email ?? '',
-        openConversations: 0,
-        lastAssignedAt: d.data().lastAssignedAt?.toDate?.(),
-    }));
-
+    const advisors = await loadActiveAdvisors();
     if (advisors.length === 0) return [];
 
-    const openConvsSnap = await db
-        .collection('conversations')
-        .where('status', 'in', ['abierto', 'asignado'])
-        .where('assignedTo', '!=', null)
-        .get();
-
-    for (const doc of openConvsSnap.docs) {
-        const uid = doc.data().assignedTo as string;
-        const advisor = advisors.find(a => a.uid === uid);
-        if (advisor) advisor.openConversations++;
-    }
-
+    await countOpenConversations(advisors);
     return advisors.sort((a, b) => a.openConversations - b.openConversations);
 }
