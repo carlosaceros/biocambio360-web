@@ -80,6 +80,8 @@ export async function sendTemplateMessage(
     languageCode: string = 'es',
     components?: Array<{
         type: 'header' | 'body' | 'button';
+        sub_type?: 'url' | 'quick_reply';
+        index?: string;
         parameters: Array<{
             type: 'text' | 'image' | 'video' | 'document';
             text?: string;
@@ -218,7 +220,14 @@ export async function sendBulkTemplateMessages(
             } catch (firstErr: any) {
                 // 132000 = parameter count mismatch: the approved template has no variables, retry plain
                 if (recipient.components?.length && /132000/.test(String(firstErr?.message))) {
-                    ({ messageId } = await sendTemplateMessage(phoneNumberId, recipient.phone, templateName, languageCode));
+                    // Retry without the URL button param, then without any variable
+                    const bodyOnly = (recipient.components as Array<{ type: string }>).filter(c => c.type === 'body');
+                    try {
+                        if (bodyOnly.length === 0 || bodyOnly.length === recipient.components.length) throw firstErr;
+                        ({ messageId } = await sendTemplateMessage(phoneNumberId, recipient.phone, templateName, languageCode, bodyOnly as any));
+                    } catch {
+                        ({ messageId } = await sendTemplateMessage(phoneNumberId, recipient.phone, templateName, languageCode));
+                    }
                 } else {
                     throw firstErr;
                 }

@@ -38,8 +38,8 @@ export function reminderProduct(itemsSummary: string | undefined): string {
     return first.length > 60 ? `${first.slice(0, 57).trimEnd()}...` : first;
 }
 
-export function reminderComponents(customerName: string | undefined, itemsSummary: string | undefined) {
-    return [
+export function reminderComponents(customerName: string | undefined, itemsSummary: string | undefined, buttonToken?: string) {
+    const components: Array<Record<string, unknown>> = [
         {
             type: 'body' as const,
             parameters: [
@@ -48,4 +48,9 @@ export function reminderComponents(customerName: string | undefined, itemsSummar
             ],
         },
     ];
+    if (buttonToken) {
+        // Dynamic URL button: https://biocambio360.com/checkout?recovery_token={{1}}
+        components.push({ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: buttonToken }] });
+    }
+    return components;
 }

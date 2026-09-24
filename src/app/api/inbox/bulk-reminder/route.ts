@@ -7,6 +7,7 @@
 export const runtime = 'nodejs';
 
 import { REMINDER_TEMPLATE_NAME, reminderComponents } from '@/lib/reminder-template';
+import { createReminderCart, FALLBACK_BUTTON_TOKEN } from '@/lib/reminder-cart';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB, getAdminAuth } from '@/lib/firebase-admin';
 import { sendBulkTemplateMessages } from '@/lib/whatsapp-service';
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     const db = getAdminDB();
 
     // Fetch customer records from replenishment collection
-    const customers: Array<{ id: string; phone: string; name: string; itemsSummary: string }> = [];
+    const customers: Array<{ id: string; phone: string; name: string; itemsSummary: string; email: string; city: string; lastOrderId: string }> = [];
     const customerErrors: Array<{ customerId: string; phone: string; error: string }> = [];
 
     for (const cid of customerIds as string[]) {
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
             customerErrors.push({ customerId: cid, phone, error: 'Invalid phone number' });
             continue;
         }
-        customers.push({ id: cid, phone: `57${phone.slice(-10)}`, name: data.customerName ?? '', itemsSummary: data.itemsSummary ?? '' });
+        customers.push({ id: cid, phone: `57${phone.slice(-10)}`, name: data.customerName ?? '', itemsSummary: data.itemsSummary ?? '', email: data.customerEmail ?? '', city: data.customerCity ?? '', lastOrderId: data.lastOrderId ?? '' });
     }
 
     const total = customers.length;
@@ -86,10 +87,16 @@ export async function POST(req: NextRequest) {
 
     // Send bulk messages
     // The reminder template carries the customer's first name and last purchase as variables
-    const recipients = customers.map(c => ({
-        phone: c.phone,
-        components: templateName === REMINDER_TEMPLATE_NAME ? reminderComponents(c.name, c.itemsSummary) : undefined,
-    }));
+    // and a pre-built cart (last order + their data) behind the "Pedir en la web" button
+    const recipients: Array<{ phone: string; components?: unknown[] }> = [];
+    for (const c of customers) {
+        if (templateName !== REMINDER_TEMPLATE_NAME) {
+            recipients.push({ phone: c.phone });
+            continue;
+        }
+        const token = await createReminderCart({ name: c.name, email: c.email, phone: c.phone.slice(-10), city: c.city, lastOrderId: c.lastOrderId });
+        recipients.push({ phone: c.phone, components: reminderComponents(c.name, c.itemsSummary, token ?? FALLBACK_BUTTON_TOKEN) });
+    }
     const { sent, failed, results } = await sendBulkTemplateMessages(
         phoneId,
         recipients,
