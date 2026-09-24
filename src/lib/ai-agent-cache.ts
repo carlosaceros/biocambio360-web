@@ -83,6 +83,7 @@ export interface CachedAgentReply {
     mensajes: string[];
     options: string[];
     items: Array<{ producto: string; presentacion: string; cantidad: number }>;
+    botonWeb?: boolean;
 }
 
 function normalizeQuestion(text: string): string {
@@ -109,7 +110,7 @@ export async function getCachedReply(key: string): Promise<CachedAgentReply | nu
         const data = snap.data();
         if (!data || Date.parse(data.expiresAt) < Date.now()) return null;
         ref.update({ hits: FieldValue.increment(1), lastHitAt: new Date().toISOString() }).catch(() => undefined);
-        return { mensajes: data.mensajes ?? [], options: data.options ?? [], items: data.items ?? [] };
+        return { mensajes: data.mensajes ?? [], options: data.options ?? [], items: data.items ?? [], botonWeb: !!data.botonWeb };
     } catch {
         return null;
     }

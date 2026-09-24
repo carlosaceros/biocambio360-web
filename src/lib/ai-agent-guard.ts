@@ -92,7 +92,7 @@ export function leaksSensitive(reply: string): boolean {
 }
 
 const MAX_CHARS_PER_MESSAGE = 180; // ≈ 2 lines in WhatsApp
-const MAX_MESSAGES = 4;
+const MAX_MESSAGES = 6;
 
 /**
  * Splits a reply into short messages: each one at most 2 lines (~180 chars).
@@ -142,7 +142,7 @@ export function splitIntoShortMessages(text: string): string[] {
 
     if (messages.length > MAX_MESSAGES) {
         const head = messages.slice(0, MAX_MESSAGES - 1);
-        head.push(messages.slice(MAX_MESSAGES - 1).join(' ').slice(0, 300));
+        head.push(messages.slice(MAX_MESSAGES - 1).join('\n').slice(0, 600));
         return head;
     }
     return messages;
@@ -161,4 +161,33 @@ export function stripPromises(message: string): string | null {
         .map(s => s.trim())
         .filter(s => s && !PROMISE_PATTERN.test(s));
     return kept.length > 0 ? kept.join(' ') : null;
+}
+
+const SITE_URL_PATTERN = /(https?:\/\/)?(www\.)?biocambio360\.com[^\s]*/gi;
+
+/** True when the text mentions the store website. */
+export function mentionsSite(text: string): boolean {
+    return /biocambio360\.com/i.test(text);
+}
+
+/** Replaces the raw URL with a natural phrase: the link is delivered as a WhatsApp button instead. */
+export function stripSiteUrl(text: string): string {
+    return text
+        .replace(/(en|por|desde|a través de|via|vía)\s+(https?:\/\/)?(www\.)?biocambio360\.com[^\s]*/gi, '$1 nuestra web')
+        .replace(SITE_URL_PATTERN, 'nuestra web')
+        .replace(/nuestra web\s+nuestra web/gi, 'nuestra web')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+}
+
+/**
+ * Inserts the price list (one product per line, packed 2 lines per WhatsApp message) before the
+ * agent's last message, so the closing question still comes last.
+ */
+export function injectPriceList(messages: string[], header: string, matches: string): string[] {
+    const lines = matches.split('\n').map(l => l.replace(/^-\s*/, '').trim()).filter(Boolean);
+    const priceMessages = splitIntoShortMessages([header, ...lines].join('\n'));
+    const head = messages.length > 1 ? messages.slice(0, -1) : [];
+    const tail = messages.length > 1 ? messages.slice(-1) : messages;
+    return [...head, ...priceMessages, ...tail].slice(0, 9);
 }

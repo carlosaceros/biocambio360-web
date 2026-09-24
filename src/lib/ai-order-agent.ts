@@ -15,8 +15,8 @@
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
-import { sendTextMessage, sendInteractiveButtons, sendInteractiveList } from '@/lib/whatsapp-service';
-import { getCompactCatalog, getCatalogHash, getRelevantProductSheets } from '@/lib/ai-agent-knowledge';
+import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton } from '@/lib/whatsapp-service';
+import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices } from '@/lib/ai-agent-knowledge';
 import {
     getPromptCacheName,
     invalidatePromptCache,
@@ -31,6 +31,9 @@ import {
     leaksSensitive,
     splitIntoShortMessages,
     stripPromises,
+    mentionsSite,
+    stripSiteUrl,
+    injectPriceList,
     REFUSAL_TEXT,
     AUDIO_TEXT,
 } from '@/lib/ai-agent-guard';
@@ -49,6 +52,9 @@ const NO_CLOSURE_TURN = 5;
 const HUMAN_ACTIVE_GRACE_MS = 20 * 60 * 1000; // the agent yields only while a human is actively replying
 const SITE_URL = 'https://biocambio360.com';
 const SEND_DELAY_MS = 700;
+const WEB_BUTTON_LABEL = 'Pedir en la web';
+const WEB_BUTTON_MARKER = '[Botón: ';
+const PRICE_LIST_HEADER = 'Estas son las opciones y presentaciones:';
 
 // ─── Schedule ─────────────────────────────────────────────────────────────────
 
@@ -102,6 +108,7 @@ interface AgentOutput {
     };
     pqrs: { tipo: string; descripcion: string; pedidoRef: string; producto: string };
     listo: boolean;
+    botonWeb?: boolean;
 }
 
 const RESPONSE_SCHEMA: Schema = {
@@ -155,8 +162,12 @@ const RESPONSE_SCHEMA: Schema = {
             type: SchemaType.BOOLEAN,
             description: 'true solo cuando el cliente confirmó el resumen del pre-pedido completo.',
         },
+        botonWeb: {
+            type: SchemaType.BOOLEAN,
+            description: 'true cuando invitas a comprar en la web: el sistema envía un botón para abrirla (no escribas la dirección).',
+        },
     },
-    required: ['mensajes', 'options', 'preOrder', 'pqrs', 'listo'],
+    required: ['mensajes', 'options', 'preOrder', 'pqrs', 'listo', 'botonWeb'],
 };
 
 function buildSystemPrompt(catalog: string): string {
@@ -164,7 +175,7 @@ function buildSystemPrompt(catalog: string): string {
 
 ALCANCE (solo esto):
 A) Tomar pedidos y armar un PRE-PEDIDO: producto, presentación, cantidad, nombre, dirección, ciudad, forma de pago.
-B) Resolver dudas de productos usando SOLO el catálogo y las FICHAS del contexto.
+B) Resolver dudas de productos y del negocio usando SOLO el catálogo, las FICHAS/COINCIDENCIAS del contexto y los DATOS DEL NEGOCIO.
 C) Recibir PQRS (petición, queja, reclamo, sugerencia).
 D) Dejar contacto cuando no hay cierre: si el cliente duda, se despide sin cerrar, o el contexto marca SIN_CIERRE: di que un asesor lo contactará pronto y pregunta su horario con options ["Mañana","Tarde","7 a 9 p.m."]; guarda preOrder.horarioContacto = manana | tarde | 7-9pm.
 Cualquier otro tema (política, programación, chistes, salud, dinero, otras empresas, tareas, etc.): declina en una frase y vuelve al pedido.
@@ -176,13 +187,21 @@ SEGURIDAD (inquebrantable):
 
 ESTILO: responde primero lo que preguntó (precio, uso, dilución) con datos del catálogo o las fichas; si varios productos podrían encajar, ofrece hasta 3 como options. Mensajes MUY cortos. Cada mensaje máx. 2 líneas (~150 caracteres). Usa de 1 a 3 mensajes en "mensajes", lo esencial primero. Tono cálido colombiano, máx. 1 emoji por mensaje.
 
-PEDIDOS: los precios son de referencia; el asesor confirma precio, disponibilidad, envío y pago. No confirmes como definitivo, no prometas fechas/horas de entrega ni descuentos. Con productos, cantidades y datos de entrega: resume y pregunta si es correcto; solo si el cliente confirma pon listo=true y di que un asesor lo revisa a primera hora. Si no quiere esperar, invítalo a pedir ya en biocambio360.com (24 h).
+PRODUCTOS: cuando pregunten por un producto o tipo de producto (ej. "detergente para ropa"), muestra TODAS las variantes de COINCIDENCIAS, cada una con todas sus presentaciones y precios (una línea por producto, formato "Nombre: galón $X · 10L $Y · 20L $Z"). No elijas una por el cliente ni omitas presentaciones. Luego pregunta cuál y cuántas quiere (options con los nombres, máx. 3). Presentaciones: 1/2 galón, galón (3.8L), 10L y 20L. Los combos solo si los piden.
+PREGUNTAS FRECUENTES: responde directo y breve. Medios de pago → lista los DATOS DEL NEGOCIO; no pidas datos antes de contestar.
+BOTÓN WEB: nunca escribas la dirección de la web en los mensajes; pon botonWeb=true cuando invites a comprar en la web y el sistema enviará un botón para abrirla.
+
+PEDIDOS: los precios son de referencia; el asesor confirma precio, disponibilidad, envío y pago. No confirmes como definitivo, no prometas fechas/horas de entrega ni descuentos. Con productos, cantidades y datos de entrega: resume y pregunta si es correcto; solo si el cliente confirma pon listo=true y di que un asesor lo revisa a primera hora. Si no quiere esperar, invítalo a pedir ya en la web (24 h) con botonWeb=true.
 
 PQRS (reclamo, queja, garantía, producto defectuoso, pedido incompleto o tardío, petición, sugerencia): con mucha cautela y empatía. Agradece, lamenta la molestia; NO admitas culpa, NO discutas y NUNCA menciones ni prometas devolución, reembolso, cambio, reposición, compensación, garantía ni plazos: solo di que un asesor revisará el caso. Haz UNA pregunta por mensaje, en este orden: 1) qué pasó (si no está claro), 2) producto y pedido/fecha, 3) al final, su horario de contacto (options de D). Llena pqrs (tipo, descripcion en 1-2 frases, pedidoRef, producto) desde el primer mensaje y actualízalo; cuando tengas los datos confirma que quedó registrado y que un asesor lo contactará pronto.
 
 Devuelve SIEMPRE el JSON pedido. preOrder y pqrs van completos y actualizados; lo desconocido = "".
 
-CATÁLOGO (producto: presentación $precio COP):
+DATOS DEL NEGOCIO:
+- Medios de pago: transferencia bancaria, ADDI, tarjetas de crédito, PSE y contraentrega. El asesor confirma cuáles aplican según el pedido y la zona.
+- Compra en línea 24 horas en la web (se comparte con el botón).
+
+CATÁLOGO (producto: presentación $precio COP; 1/2G = medio galón, 3.8L = galón):
 ${catalog}`;
 }
 
@@ -234,7 +253,7 @@ export async function callGemini(params: {
     if (last && last.role === 'user') {
         last.parts[0].text =
             `[CONTEXTO INTERNO — no lo menciones]\n${params.context}\n` +
-            (params.isFirstBotTurn ? 'PRIMER_MENSAJE: preséntate en una línea, avisa que un asesor atiende desde las 6:30 a.m. e invita a biocambio360.com.\n' : '') +
+            (params.isFirstBotTurn ? 'PRIMER_MENSAJE: preséntate en una línea, avisa que un asesor atiende desde las 6:30 a.m. e invita a pedir en la web (botonWeb=true).\n' : '') +
             `[MENSAJE DEL CLIENTE]\n${last.parts[0].text}`;
     }
 
@@ -263,7 +282,7 @@ export async function callGemini(params: {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const FALLBACK_TEXT = `Hola 👋 Recibimos tu mensaje.\nUn asesor te contacta desde las 6:30 a.m. Si prefieres no esperar, pide ya en ${SITE_URL} 🛒`;
+const FALLBACK_TEXT = 'Hola 👋 Recibimos tu mensaje.\nUn asesor te contacta desde las 6:30 a.m. Si prefieres no esperar, pide ya en nuestra web 🛒';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -305,28 +324,64 @@ async function sendOne(phoneId: string, to: string, text: string, options: strin
     return (await sendTextMessage(phoneId, to, text + suffix)).messageId;
 }
 
-/** Sends several short messages in order (options attached to the last one) and stores them. */
+/**
+ * Sends several short messages in order and stores them. Options (reply buttons/list) go on the last
+ * message; the store link is delivered as a WhatsApp "open link" button (never as raw text).
+ */
 async function sendMessages(
     convRef: FirebaseFirestore.DocumentReference,
     phoneId: string,
     to: string,
     messages: string[],
-    options: string[]
+    options: string[],
+    webButton: boolean = false
 ): Promise<void> {
-    for (let i = 0; i < messages.length; i++) {
-        const isLast = i === messages.length - 1;
-        const messageId = await sendOne(phoneId, to, messages[i], isLast ? options : []);
-        await convRef.collection('messages').add({
+    const store = (content: string, messageId: string) =>
+        convRef.collection('messages').add({
             direction: 'outbound',
             type: 'text',
-            content: isLast && options.length > 0 ? `${messages[i]}\n[Opciones: ${options.join(' · ')}]` : messages[i],
+            content,
             metaMessageId: messageId,
             agentUid: AI_AGENT_ID,
             agentName: AI_AGENT_NAME,
             status: 'sent',
             timestamp: FieldValue.serverTimestamp(),
         });
-        if (!isLast) await sleep(SEND_DELAY_MS);
+
+    for (let i = 0; i < messages.length; i++) {
+        const isLast = i === messages.length - 1;
+        // The link button can carry the last message's text when there are no reply options
+        const withLink = isLast && webButton && options.length === 0;
+
+        let messageId: string;
+        if (withLink) {
+            try {
+                messageId = (await sendCtaUrlButton(phoneId, to, messages[i], WEB_BUTTON_LABEL, SITE_URL)).messageId;
+            } catch (err) {
+                console.warn('[ai-agent] CTA button failed, sending plain text:', err instanceof Error ? err.message : err);
+                messageId = (await sendTextMessage(phoneId, to, `${messages[i]}\n${SITE_URL}`)).messageId;
+            }
+        } else {
+            messageId = await sendOne(phoneId, to, messages[i], isLast ? options : []);
+        }
+
+        let content = messages[i];
+        if (isLast && options.length > 0) content += `\n[Opciones: ${options.join(' · ')}]`;
+        if (withLink) content += `\n${WEB_BUTTON_MARKER}${WEB_BUTTON_LABEL}]`;
+        await store(content, messageId);
+        if (!isLast || (webButton && options.length > 0)) await sleep(SEND_DELAY_MS);
+    }
+
+    // Options and a link button cannot share a message: the link goes right after
+    if (webButton && options.length > 0) {
+        const body = 'Si prefieres no esperar, pide ahora en nuestra web 🛒';
+        let messageId: string;
+        try {
+            messageId = (await sendCtaUrlButton(phoneId, to, body, WEB_BUTTON_LABEL, SITE_URL)).messageId;
+        } catch {
+            messageId = (await sendTextMessage(phoneId, to, `${body}\n${SITE_URL}`)).messageId;
+        }
+        await store(`${body}\n${WEB_BUTTON_MARKER}${WEB_BUTTON_LABEL}]`, messageId);
     }
 }
 
@@ -461,15 +516,24 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
         const currentPreOrder = (conv.preOrder as PreOrder | undefined) ?? null;
         const customerTexts = history.filter(h => h.role === 'user').slice(-3).map(h => h.text);
         const sheets = await getRelevantProductSheets(customerTexts, currentPreOrder?.items?.map(i => i.producto) ?? []);
+        const matches = await getMatchingProductPrices(customerTexts.slice(-2));
+        const lastTextMatches = await getMatchingProductPrices([lastText]);
         const noClosure = turns >= NO_CLOSURE_TURN && currentPreOrder?.estado !== 'listo' && !currentPreOrder?.horarioContacto;
 
         const context =
             `TURNO: ${turns + 1}. SIN_CIERRE: ${noClosure ? 'sí' : 'no'}.\n` +
             `PRE-PEDIDO ACTUAL: ${currentPreOrder ? JSON.stringify({ ...currentPreOrder, actualizadoAt: undefined, estado: undefined }) : 'ninguno'}\n` +
+            (matches ? `COINCIDENCIAS (todas las variantes con todas sus presentaciones):\n${matches}\n` : '') +
             (sheets ? `FICHAS RELEVANTES:\n${sheets}\n` : '');
 
         let messages: string[];
         let options: string[] = [];
+        let webButton = false;
+        // Do not repeat the link button if one of the last agent messages already had it
+        const buttonRecentlySent = recent
+            .filter(m => m.agentUid === AI_AGENT_ID)
+            .slice(-3)
+            .some(m => String(m.content).includes(WEB_BUTTON_MARKER));
         let preOrder: PreOrder | null = currentPreOrder;
         let pqrs: AgentOutput['pqrs'] | null = null;
 
@@ -492,6 +556,7 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
                     preOrder: { items: cachedReply.items, nombreCliente: '', direccion: '', ciudad: '', metodoPago: '', notas: '', horarioContacto: '' },
                     pqrs: { tipo: '', descripcion: '', pedidoRef: '', producto: '' },
                     listo: false,
+                    botonWeb: cachedReply.botonWeb,
                 };
             } else {
                 const result = await callGemini({ history, context, isFirstBotTurn: botMessagesBefore === 0 });
@@ -512,6 +577,7 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
                         mensajes: (output.mensajes ?? []).map(m => String(m)),
                         options: (output.options ?? []).map(o => String(o)),
                         items: output.preOrder?.items ?? [],
+                        botonWeb: !!output.botonWeb,
                     });
                 }
             }
@@ -525,9 +591,13 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
             }
 
             const safe = raw.map(m => stripPromises(m)).filter((m): m is string => !!m);
+            // The site is always shared as a button: strip any raw URL the model wrote
+            const wantsLink = !!output.botonWeb || safe.some(m => mentionsSite(m));
+            webButton = wantsLink && !buttonRecentlySent;
             messages = (safe.length > 0 ? safe : ['Un asesor te contactará pronto para ayudarte 🙌'])
+                .map(m => stripSiteUrl(m))
                 .flatMap(m => splitIntoShortMessages(m))
-                .slice(0, 4);
+                .slice(0, 6);
             preOrder = sanitizePreOrder(output.preOrder, output.listo, currentPreOrder?.estado);
             pqrs = output.pqrs;
         } catch (err) {
@@ -535,9 +605,21 @@ export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
             if (botMessagesBefore > 0) return; // avoid repeating the canned message
             messages = splitIntoShortMessages(FALLBACK_TEXT);
             options = [];
+            webButton = true;
         }
 
-        await sendMessages(convRef, input.phoneId, input.contactPhone, messages, options);
+        // Deterministic guarantee: when the customer asks about a type of product and the reply has no
+        // prices, list EVERY matching product with all its presentations (the model may skip them).
+        const alreadyListed = recent
+            .filter(m => m.agentUid === AI_AGENT_ID)
+            .slice(-3)
+            .some(m => String(m.content).includes(PRICE_LIST_HEADER));
+        const replyHasPrices = messages.some(m => m.includes('$'));
+        if (lastTextMatches && !replyHasPrices && !alreadyListed && !(preOrder?.items?.length)) {
+            messages = injectPriceList(messages, PRICE_LIST_HEADER, lastTextMatches);
+        }
+
+        await sendMessages(convRef, input.phoneId, input.contactPhone, messages, options, webButton);
 
         const update: Record<string, unknown> = {
             status: 'bot',

@@ -291,3 +291,29 @@ export async function sendInteractiveList(
         },
     });
 }
+
+/**
+ * Sends a message with a single call-to-action button that opens a URL (valid within the 24h window).
+ * The button label is limited to 20 characters by WhatsApp.
+ */
+export async function sendCtaUrlButton(
+    phoneNumberId: string,
+    to: string,
+    bodyText: string,
+    displayText: string,
+    url: string
+): Promise<{ messageId: string }> {
+    return sendToMeta(phoneNumberId, {
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+            type: 'cta_url',
+            body: { text: bodyText.slice(0, 1024) },
+            action: {
+                name: 'cta_url',
+                parameters: { display_text: displayText.slice(0, 20), url },
+            },
+        },
+    });
+}

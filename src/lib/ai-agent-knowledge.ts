@@ -13,6 +13,10 @@ import { PRODUCTOS, isDisallowedSize, type Product } from '@/lib/products';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
+const money = (n: number) => `$${String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+const SIZE_LABEL: Record<string, string> = { '1/2G': '1/2 galón', '3.8L': 'galón', '10L': '10L', '20L': '20L', COMBO: 'combo', DEFAULT: 'única' };
+const sizeLabel = (size: string) => SIZE_LABEL[size] ?? size;
+
 let cache: { at: number; products: Product[]; catalog: string } | null = null;
 
 function isSellable(p: Product): boolean {
@@ -37,7 +41,7 @@ async function load(): Promise<{ products: Product[]; catalog: string }> {
         .map(p => {
             const sizes = Object.entries(p.precios ?? {})
                 .filter(([size, price]) => !isDisallowedSize(size) && Number(price) > 0)
-                .map(([size, price]) => `${size} $${Number(price)}`)
+                .map(([size, price]) => `${size} ${money(Number(price))}`)
                 .join(' | ');
             return `${p.nombre}: ${sizes}`;
         })
@@ -63,7 +67,7 @@ const STOPWORDS = new Set([
     'garrafa', 'garrafas', 'pimpina', 'cuanto', 'cuesta', 'precio', 'precios', 'hola', 'gracias', 'buenas', 'buenos',
     'noches', 'favor', 'pedido', 'pedir', 'comprar', 'cotizar', 'ayuda', 'informacion', 'como', 'sirve', 'este',
     'esta', 'ese', 'esa', 'unas', 'unos', 'para', 'sobre', 'entre', 'desde', 'hasta', 'donde', 'cual', 'cuales',
-    'entrega', 'envio', 'pago', 'bogota', 'soacha', 'mañana', 'tarde',
+    'entrega', 'envio', 'pago', 'bogota', 'soacha', 'mañana', 'tarde', 'tardes', 'dias', 'dia', 'noche', 'saludos', 'quiero', 'busco', 'tienen', 'venden', 'manejan', 'vale', 'valor', 'cuestan', 'medios', 'confirmar',
 ]);
 
 function normalize(text: string): string {
@@ -77,6 +81,12 @@ function tokens(text: string): string[] {
     return normalize(text)
         .split(/[^a-z0-9]+/)
         .filter(t => t.length >= 4 && !STOPWORDS.has(t));
+}
+
+/** Two words match when they share a stem (up to 7 leading letters): "limpiapisos" ≠ "limpiajuntas". */
+function stemMatch(a: string, b: string): boolean {
+    const n = Math.min(7, a.length, b.length);
+    return n >= 4 && a.slice(0, n) === b.slice(0, n);
 }
 
 function trim(text: string | undefined, max: number): string {
@@ -127,7 +137,7 @@ export async function getRelevantProductSheets(
             const nameWords = tokens(p.nombre);
             let score = 0;
             for (const q of queryTokens) {
-                if (nameWords.some(w => w.startsWith(q.slice(0, 5)) || q.startsWith(w.slice(0, 5)))) score += 3;
+                if (nameWords.some(w => stemMatch(w, q))) score += 3;
                 else if (normalize(`${p.categoria ?? ''} ${p.subcategoria ?? ''}`).includes(q)) score += 1;
             }
             if (inOrder.has(normalize(p.nombre))) score += 4;
@@ -138,4 +148,45 @@ export async function getRelevantProductSheets(
         .slice(0, max);
 
     return scored.map(s => describe(s.p)).join('\n\n');
+}
+
+/**
+ * All single products (not combos) that match what the customer is asking for, each with EVERY
+ * presentation and price. Computed server-side so the model never "picks one" by itself
+ * (e.g. asking for "detergente para ropa" lists every laundry detergent).
+ */
+export async function getMatchingProductPrices(customerTexts: string[], max: number = 5): Promise<string> {
+    const { products } = await load();
+    // The head noun is the first significant word that actually exists in the catalog
+    // ("detergente" in "detergente para ropa"). Products must match it; the other words only rank
+    // them, so laundry detergents come before other detergents.
+    const ordered = tokens(customerTexts.join(' '));
+    const singles = products.filter(p => !Object.keys(p.precios ?? {}).every(k => k.toUpperCase() === 'COMBO'));
+    const matchesToken = (nameWords: string[], q: string) => nameWords.some(w => stemMatch(w, q));
+    const head = ordered.find(q => singles.some(p => matchesToken(tokens(p.nombre), q)));
+    if (!head) return '';
+    const rest = new Set(ordered.filter(q => q !== head));
+
+    const scored = singles
+        .map(p => {
+            const nameWords = tokens(p.nombre);
+            if (!matchesToken(nameWords, head)) return { p, score: 0 };
+            let score = 4;
+            for (const q of rest) if (matchesToken(nameWords, q)) score += 2;
+            return { p, score };
+        })
+        .filter(s => s.score > 0)
+        .sort((a, b) => b.score - a.score || a.p.nombre.localeCompare(b.p.nombre))
+        .slice(0, max);
+
+    return scored
+        .map(({ p }) => {
+            const sizes = Object.entries(p.precios ?? {})
+                .filter(([size, price]) => !isDisallowedSize(size) && Number(price) > 0)
+                .sort((a, b) => Number(a[1]) - Number(b[1]))
+                .map(([size, price]) => `${sizeLabel(size)} ${money(Number(price))}`)
+                .join(' · ');
+            return `- ${p.nombre}: ${sizes}`;
+        })
+        .join('\n');
 }
