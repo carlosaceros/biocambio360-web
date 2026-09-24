@@ -9,12 +9,14 @@
  */
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { buildConversationId } from '@/lib/inbox-service';
 import type { Channel, MessageType } from '@/types/inbox';
 import { FieldValue } from 'firebase-admin/firestore';
+import { isAfterHoursNow, runOrderAgentTurn } from '@/lib/ai-order-agent';
 
 // ─── GET: Webhook verification ────────────────────────────────────────────────
 
@@ -310,7 +312,7 @@ async function handleWhatsAppInboundMessage(
             contactName,
             lastInboundAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
-            status: 'abierto',
+            status: convSnap.data()?.status === 'bot' ? 'bot' : 'abierto',
         });
     } else {
         batch.set(convRef, {
@@ -341,6 +343,11 @@ async function handleWhatsAppInboundMessage(
     }
 
     console.log(`[webhook/meta] WA inbound msg from ${from} → conv: ${conversationId}`);
+
+    // After-hours AI agent: runs after the response is sent so Meta is never kept waiting.
+    if (type !== 'reaction' && isAfterHoursNow()) {
+        after(() => runOrderAgentTurn({ conversationId, phoneId: phoneNumberId, contactPhone: from }));
+    }
 }
 
 function extractWhatsAppContent(msg: any): {

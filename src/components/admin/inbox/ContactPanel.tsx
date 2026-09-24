@@ -15,11 +15,13 @@ import {
     UserCheck,
     AlertCircle,
     CheckCircle2,
+    Sparkles,
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import type { ConversationDoc } from '@/types/inbox';
 import Link from 'next/link';
+import { confirmPreOrder } from '@/lib/inbox-service';
 
 interface CustomerData {
     name: string;
@@ -55,6 +57,7 @@ export default function ContactPanel({
     const [selectedAdvisor, setSelectedAdvisor] = useState('');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [autoAssignResult, setAutoAssignResult] = useState<{ advisorName?: string; detail?: string; assigned: boolean } | null>(null);
+    const [confirmingPreOrder, setConfirmingPreOrder] = useState(false);
     const [saleAmount, setSaleAmount] = useState('');
     const [savingSale, setSavingSale] = useState(false);
     const [saleFeedback, setSaleFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -155,6 +158,16 @@ export default function ContactPanel({
         }
     };
 
+    const handleConfirmPreOrder = async () => {
+        if (!conversation) return;
+        setConfirmingPreOrder(true);
+        try {
+            await confirmPreOrder(conversation.id);
+        } finally {
+            setConfirmingPreOrder(false);
+        }
+    };
+
     const handleMarkSaleClosed = async () => {
         if (!conversation?.contactPhone) return;
         const value = Number(saleAmount.replace(/[^\d]/g, ''));
@@ -221,6 +234,52 @@ export default function ContactPanel({
                     </div>
                 </div>
             </div>
+
+            {/* Pre-order drafted by the AI agent (after hours) */}
+            {conversation.preOrder && conversation.preOrder.items?.length > 0 && (
+                <div className="p-4 border-b border-gray-100 space-y-2 bg-violet-50/40">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-extrabold uppercase text-violet-700 tracking-wider flex items-center gap-1">
+                            <Sparkles size={11} /> Pre-pedido del Asistente IA
+                        </p>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            conversation.preOrder.estado === 'confirmado'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : conversation.preOrder.estado === 'listo'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-amber-100 text-amber-700'
+                        }`}>
+                            {conversation.preOrder.estado === 'confirmado' ? 'Confirmado' : conversation.preOrder.estado === 'listo' ? 'Listo para confirmar' : 'Borrador'}
+                        </span>
+                    </div>
+                    <ul className="text-xs text-gray-700 space-y-0.5">
+                        {conversation.preOrder.items.map((it, i) => (
+                            <li key={i} className="flex justify-between gap-2">
+                                <span className="truncate">{it.producto}{it.presentacion ? ` · ${it.presentacion}` : ''}</span>
+                                <span className="font-black shrink-0">x{it.cantidad}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    <div className="text-[11px] text-gray-500 space-y-0.5">
+                        {conversation.preOrder.nombreCliente && <p><strong>Cliente:</strong> {conversation.preOrder.nombreCliente}</p>}
+                        {(conversation.preOrder.direccion || conversation.preOrder.ciudad) && (
+                            <p><strong>Entrega:</strong> {[conversation.preOrder.direccion, conversation.preOrder.ciudad].filter(Boolean).join(', ')}</p>
+                        )}
+                        {conversation.preOrder.metodoPago && <p><strong>Pago:</strong> {conversation.preOrder.metodoPago}</p>}
+                        {conversation.preOrder.notas && <p><strong>Notas:</strong> {conversation.preOrder.notas}</p>}
+                    </div>
+                    <p className="text-[10px] text-gray-400">Precios y disponibilidad los confirma el asesor.</p>
+                    {conversation.preOrder.estado !== 'confirmado' && (
+                        <button
+                            onClick={handleConfirmPreOrder}
+                            disabled={confirmingPreOrder}
+                            className="w-full py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                        >
+                            {confirmingPreOrder ? 'Confirmando...' : 'Confirmar pre-pedido'}
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Mark closed sale (reports Purchase to Meta Conversions API) */}
             <div className="p-4 border-b border-gray-100 space-y-2">

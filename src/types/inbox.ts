@@ -28,6 +28,24 @@ export const WHATSAPP_ACCOUNTS = {
 
 export type WhatsAppAccountKey = keyof typeof WHATSAPP_ACCOUNTS;
 
+export interface PreOrderItem {
+    producto: string;
+    presentacion: string;
+    cantidad: number;
+}
+
+/** Pre-order built by the after-hours AI agent; a human advisor only confirms it. */
+export interface PreOrder {
+    items: PreOrderItem[];
+    nombreCliente: string;
+    direccion: string;
+    ciudad: string;
+    metodoPago: string;
+    notas: string;
+    estado: 'borrador' | 'listo' | 'confirmado';
+    actualizadoAt: string;
+}
+
 export interface ConversationDoc {
     id: string;
     channel: Channel;
@@ -52,6 +70,8 @@ export interface ConversationDoc {
     lastInboundAt?: Timestamp | Date | string;
     /** Custom tags */
     tags?: string[];
+    /** Pre-order drafted by the AI agent (after hours) */
+    preOrder?: PreOrder;
     createdAt?: Timestamp | Date | string;
     updatedAt?: Timestamp | Date | string;
 }

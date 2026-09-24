@@ -230,3 +230,64 @@ export async function sendBulkTemplateMessages(
 
     return { sent, failed, results };
 }
+
+/**
+ * Sends up to 3 quick-reply buttons (valid within the 24h window).
+ * Button titles are limited to 20 characters by WhatsApp.
+ */
+export async function sendInteractiveButtons(
+    phoneNumberId: string,
+    to: string,
+    bodyText: string,
+    options: string[]
+): Promise<{ messageId: string }> {
+    return sendToMeta(phoneNumberId, {
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+            type: 'button',
+            body: { text: bodyText },
+            action: {
+                buttons: options.slice(0, 3).map((title, i) => ({
+                    type: 'reply',
+                    reply: { id: `opt_${i + 1}`, title: title.slice(0, 20) },
+                })),
+            },
+        },
+    });
+}
+
+/**
+ * Sends a list picker with up to 10 rows (valid within the 24h window).
+ * Row titles are limited to 24 characters by WhatsApp.
+ */
+export async function sendInteractiveList(
+    phoneNumberId: string,
+    to: string,
+    bodyText: string,
+    options: string[],
+    buttonLabel: string = 'Ver opciones'
+): Promise<{ messageId: string }> {
+    return sendToMeta(phoneNumberId, {
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+            type: 'list',
+            body: { text: bodyText },
+            action: {
+                button: buttonLabel.slice(0, 20),
+                sections: [
+                    {
+                        title: 'Opciones',
+                        rows: options.slice(0, 10).map((title, i) => ({
+                            id: `opt_${i + 1}`,
+                            title: title.slice(0, 24),
+                        })),
+                    },
+                ],
+            },
+        },
+    });
+}

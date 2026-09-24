@@ -59,6 +59,7 @@ function docToConversation(id: string, data: DocumentData): ConversationDoc {
         assignedToName: data.assignedToName,
         lastInboundAt: data.lastInboundAt,
         tags: data.tags ?? [],
+        preOrder: data.preOrder,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
     };
@@ -325,4 +326,28 @@ export async function getConversation(id: string): Promise<ConversationDoc | nul
     const snap = await getDoc(doc(db, 'conversations', id));
     if (!snap.exists()) return null;
     return docToConversation(snap.id, snap.data());
+}
+
+
+// ─── AI agent (after-hours pre-orders) ───────────────────────────────────────
+
+/** Marks the AI pre-order as confirmed by a human advisor. */
+export async function confirmPreOrder(conversationId: string): Promise<void> {
+    await updateDoc(doc(db, 'conversations', conversationId), {
+        'preOrder.estado': 'confirmado',
+        updatedAt: serverTimestamp(),
+    });
+}
+
+/** Live on/off switch of the after-hours AI agent (default: on). */
+export function subscribeToAgentEnabled(callback: (enabled: boolean) => void): Unsubscribe {
+    return onSnapshot(
+        doc(db, 'bot_config', 'ai_agent'),
+        (snap) => callback(snap.exists() ? snap.data()?.enabled !== false : true),
+        () => callback(true)
+    );
+}
+
+export async function setAgentEnabled(enabled: boolean): Promise<void> {
+    await setDoc(doc(db, 'bot_config', 'ai_agent'), { enabled, updatedAt: serverTimestamp() }, { merge: true });
 }

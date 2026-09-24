@@ -9,6 +9,8 @@ import {
     subscribeToUnreadCount,
     setConversationStatus,
     markConversationAsRead,
+    subscribeToAgentEnabled,
+    setAgentEnabled,
 } from '@/lib/inbox-service';
 import ConversationList from '@/components/admin/inbox/ConversationList';
 import ChatWindow from '@/components/admin/inbox/ChatWindow';
@@ -45,6 +47,7 @@ import {
     UserCheck,
     Bell,
     BellOff,
+    Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -107,6 +110,7 @@ export default function InboxPage() {
     // Alerts (sound + browser notification) and action feedback
     const [alertsOn, setAlertsOn] = useState(true);
     const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
+    const [agentEnabled, setAgentEnabledState] = useState(true);
     const alertsOnRef = useRef(true);
     const prevUnreadRef = useRef<Map<string, number> | null>(null);
     const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -140,6 +144,17 @@ export default function InboxPage() {
     const canModerate = isSuperAdmin || isDirector;
 
     // ── Real-time subscriptions ──────────────────────────────────────────────
+    useEffect(() => subscribeToAgentEnabled(setAgentEnabledState), []);
+
+    const toggleAgent = useCallback(async () => {
+        try {
+            await setAgentEnabled(!agentEnabled);
+            showToast(!agentEnabled ? 'Agente IA activado (9:30 p.m. – 6:30 a.m.)' : 'Agente IA pausado');
+        } catch {
+            showToast('No se pudo cambiar el agente IA', 'error');
+        }
+    }, [agentEnabled, showToast]);
+
     useEffect(() => {
         const enabled = getAlertsEnabled();
         setAlertsOn(enabled);
@@ -347,6 +362,18 @@ export default function InboxPage() {
                     </span>
                 )}
                 <div className="ml-auto flex items-center gap-2">
+                    {canModerate && (
+                        <button
+                            onClick={toggleAgent}
+                            title="Agente IA nocturno: toma pedidos de 9:30 p.m. a 6:30 a.m. y arma un pre-pedido para el asesor. Clic para activar/pausar."
+                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold border rounded-xl transition-colors cursor-pointer ${
+                                agentEnabled ? 'text-violet-700 border-violet-200 bg-violet-50 hover:bg-violet-100' : 'text-gray-500 border-gray-200 hover:text-gray-800'
+                            }`}
+                        >
+                            <Sparkles size={13} />
+                            <span className="hidden sm:inline">{agentEnabled ? 'Agente IA activo' : 'Agente IA pausado'}</span>
+                        </button>
+                    )}
                     <button
                         onClick={toggleAlerts}
                         title={
