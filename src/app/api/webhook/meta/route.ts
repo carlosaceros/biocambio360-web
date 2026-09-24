@@ -101,6 +101,8 @@ async function processWhatsAppPayload(body: any): Promise<void> {
                 for (const status of statuses) {
                     await handleWhatsAppStatusUpdate(status, phoneNumberId);
                 }
+            } else if (field === 'smb_message_echoes' || field === 'message_echoes') {
+                await handleMessageEchoes(value);
             } else if (field === 'message_template_status_update') {
                 await handleTemplateStatusUpdate(value);
             } else if (field === 'message_template_quality_update') {
@@ -129,6 +131,79 @@ function resolveAccountKeyByPhoneNumber(displayPhoneNumber?: string): string | u
     if (digits.endsWith('1005353')) return 'biocambio360';
     if (digits.endsWith('6045330')) return 'totalLimpieza';
     return undefined;
+}
+
+/**
+ * Messages sent from the business number by ANOTHER app (e.g. an advisor answering from Kommo or the
+ * WhatsApp Business app). Meta reports them as echoes; they are stored as outbound messages so the
+ * inbox shows the whole conversation. Idempotent by message id.
+ */
+async function handleMessageEchoes(value: any): Promise<void> {
+    const db = getAdminDB();
+    const phoneNumberId: string = value?.metadata?.phone_number_id ?? '';
+    const echoes: any[] = value?.message_echoes ?? [];
+
+    for (const echo of echoes) {
+        const to: string = String(echo?.to ?? '');
+        const msgId: string = String(echo?.id ?? '');
+        if (!to || !msgId) continue;
+
+        const conversationId = buildConversationId('whatsapp', phoneNumberId, to);
+        const convRef = db.collection('conversations').doc(conversationId);
+
+        // Messages sent by this app were already stored when sent
+        const dup = await convRef.collection('messages').where('metaMessageId', '==', msgId).limit(1).get();
+        if (!dup.empty) continue;
+
+        const { type, content, mediaUrl, mimeType, fileName } = extractWhatsAppContent(echo);
+        const convSnap = await convRef.get();
+
+        const batch = db.batch();
+        const messageData: Record<string, unknown> = {
+            direction: 'outbound',
+            type,
+            content,
+            metaMessageId: msgId,
+            agentUid: 'external-app',
+            agentName: 'Asesor (Kommo / app externa)',
+            status: 'sent',
+            timestamp: FieldValue.serverTimestamp(),
+        };
+        if (mediaUrl) messageData.mediaUrl = mediaUrl;
+        if (mimeType) messageData.mimeType = mimeType;
+        if (fileName) messageData.fileName = fileName;
+        batch.create(convRef.collection('messages').doc(msgId), messageData);
+
+        if (convSnap.exists) {
+            batch.update(convRef, {
+                lastMessage: content,
+                lastMessageAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+            });
+        } else {
+            batch.set(convRef, {
+                channel: 'whatsapp' as Channel,
+                phoneId: phoneNumberId,
+                accountKey: resolveAccountKeyByPhoneId(phoneNumberId),
+                contactPhone: /^\d{7,15}$/.test(to) ? to : null,
+                contactName: /^\d{7,15}$/.test(to) ? `+${to}` : 'Usuario de WhatsApp',
+                lastMessage: content,
+                lastMessageAt: FieldValue.serverTimestamp(),
+                unreadCount: 0,
+                status: 'abierto',
+                assignedTo: null,
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+            });
+        }
+
+        try {
+            await batch.commit();
+            console.log(`[webhook/meta] Echo stored (external app) → conv: ${conversationId}`);
+        } catch (err: any) {
+            if (err?.code !== 6) throw err; // 6 = ALREADY_EXISTS: duplicate echo, ignore
+        }
+    }
 }
 
 async function createAlert(alert: {
@@ -297,6 +372,22 @@ async function handleWhatsAppInboundMessage(
     const convRef = db.collection('conversations').doc(conversationId);
     const convSnap = await convRef.get();
 
+    // Click-to-WhatsApp ad that started the chat (only present on the first message)
+    const referral = msg.referral;
+    const adReferral = referral
+        ? {
+            sourceId: referral.source_id ? String(referral.source_id) : null,
+            sourceType: referral.source_type ?? null,
+            sourceUrl: referral.source_url ?? null,
+            headline: referral.headline ?? null,
+            body: referral.body ?? null,
+            mediaType: referral.media_type ?? null,
+            ctwaClid: referral.ctwa_clid ?? null,
+            receivedAt: new Date().toISOString(),
+        }
+        : null;
+    if (adReferral) console.log('[webhook/meta] Ad referral:', JSON.stringify(adReferral).slice(0, 600));
+
     const messageData: Record<string, unknown> = {
         direction: 'inbound',
         type,
@@ -324,6 +415,7 @@ async function handleWhatsAppInboundMessage(
             lastInboundAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
             status: convSnap.data()?.status === 'bot' ? 'bot' : 'abierto',
+            ...(adReferral ? { adReferral } : {}),
         });
     } else {
         batch.set(convRef, {
@@ -341,6 +433,7 @@ async function handleWhatsAppInboundMessage(
             lastInboundAt: FieldValue.serverTimestamp(),
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
+            ...(adReferral ? { adReferral } : {}),
         });
     }
 
@@ -355,6 +448,19 @@ async function handleWhatsAppInboundMessage(
     }
 
     console.log(`[webhook/meta] WA inbound msg from ${contactKey} → conv: ${conversationId}`);
+
+    if (adReferral && (adReferral.sourceId || adReferral.headline)) {
+        const adDocId = adReferral.sourceId || `url_${Buffer.from(String(adReferral.sourceUrl ?? adReferral.headline)).toString('base64url').slice(0, 40)}`;
+        db.collection('ad_referrals').doc(adDocId).set({
+            sourceId: adReferral.sourceId,
+            headline: adReferral.headline,
+            body: adReferral.body,
+            sourceUrl: adReferral.sourceUrl,
+            mediaType: adReferral.mediaType,
+            lastSeenAt: new Date().toISOString(),
+            conversations: FieldValue.increment(1),
+        }, { merge: true }).catch(e => console.warn('[webhook/meta] ad registry failed:', e?.message));
+    }
 
     // After-hours AI agent: runs after the response is sent so Meta is never kept waiting.
     if (type !== 'reaction' && isAfterHoursNow()) {
@@ -402,6 +508,13 @@ function extractWhatsAppContent(msg: any): {
                 mediaUrl: msg.document?.id,
                 mimeType: msg.document?.mime_type,
                 fileName: msg.document?.filename,
+            };
+        case 'sticker':
+            return {
+                type: 'sticker',
+                content: '🖼️ Sticker',
+                mediaUrl: msg.sticker?.id,
+                mimeType: msg.sticker?.mime_type,
             };
         case 'location':
             return {

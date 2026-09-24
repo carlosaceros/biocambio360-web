@@ -18,7 +18,7 @@ function normalize(text: string): string {
 }
 
 const EXCEPTION =
-    /\b(no entregad[oa]s?|no se pudo entregar|no fue entregad[oa]|fallid[oa]s?|failed|devuelt[oa]s?|devolucion|returned|rechazad[oa]s?|undeliver\w*|exception|novedad(es)?|siniestro|extraviad[oa]s?|perdid[oa]s?)\b/;
+    /\b(no entregad[oa]s?|no se entrega|no se pudo entregar|no fue entregad[oa]|fallid[oa]s?|failed|devuelt[oa]s?|devolucion|returned|rechazad[oa]s?|undeliver\w*|exception|novedad(es)?|siniestro|extraviad[oa]s?|perdid[oa]s?)\b/;
 
 const DELIVERED =
     /\b(entregad[oa]s?|entrega exitosa|entrega efectiva|delivered|finalizad[oa]s?)\b/;

@@ -17,6 +17,7 @@ import {
     MessageSquare,
 } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
+import MediaAttachment from './MediaAttachment';
 import type { ConversationDoc, MessageDoc, MessageStatus } from '@/types/inbox';
 import { subscribeToMessages, markConversationAsRead } from '@/lib/inbox-service';
 import { formatDistanceToNow } from 'date-fns';
@@ -216,24 +217,31 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                                         : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
                                 }`}
                             >
-                                {/* Media preview */}
-                                {msg.type === 'image' && msg.mediaUrl && (
+                                {/* Media preview: image / audio / video / document */}
+                                {msg.mediaUrl && ['image', 'audio', 'video', 'document', 'sticker'].includes(msg.type) ? (
                                     <div className="mb-1">
-                                        <Image size={16} className="inline mr-1" />
-                                        <span className="text-xs opacity-80">Imagen</span>
+                                        <MediaAttachment
+                                            mediaId={msg.mediaUrl}
+                                            type={msg.type}
+                                            mimeType={msg.mimeType}
+                                            fileName={msg.fileName}
+                                        />
                                     </div>
-                                )}
-                                {msg.type === 'document' && (
-                                    <div className="flex items-center gap-1 mb-1 text-xs opacity-80">
-                                        <FileText size={12} />
-                                        {msg.fileName ?? 'Documento'}
-                                    </div>
-                                )}
-                                {msg.type === 'audio' && (
-                                    <div className="flex items-center gap-1 text-xs opacity-80">
-                                        <Mic size={12} />
-                                        Nota de voz
-                                    </div>
+                                ) : (
+                                    <>
+                                        {msg.type === 'document' && (
+                                            <div className="flex items-center gap-1 mb-1 text-xs opacity-80">
+                                                <FileText size={12} />
+                                                {msg.fileName ?? 'Documento'}
+                                            </div>
+                                        )}
+                                        {msg.type === 'audio' && (
+                                            <div className="flex items-center gap-1 text-xs opacity-80">
+                                                <Mic size={12} />
+                                                Nota de voz
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                                 {msg.type === 'template' && (
                                     <span className="text-xs opacity-75 italic">📋 </span>
@@ -246,7 +254,9 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                                     const options = msg.options ?? (legacy ? legacy[1].split(' · ') : []);
                                     return (
                                         <>
-                                            <p className="whitespace-pre-wrap break-words">{text}</p>
+                                            {(!msg.mediaUrl || !/^(📷 Imagen|🎤 Nota de voz|🎥 Video|📄 .*)$/.test(text)) && (
+                                                <p className="whitespace-pre-wrap break-words">{text}</p>
+                                            )}
                                             {options.length > 0 && (
                                                 <div className="mt-2 flex flex-col gap-1">
                                                     {options.map((opt, i) => (

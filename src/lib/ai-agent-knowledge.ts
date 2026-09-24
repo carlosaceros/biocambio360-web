@@ -190,3 +190,22 @@ export async function getMatchingProductPrices(customerTexts: string[], max: num
         })
         .join('\n');
 }
+
+/** Price line of one catalog product by its exact name ("- Name: galón $X · 10L $Y"), or '' if unknown. */
+export async function getProductLineByName(name: string): Promise<string> {
+    const { products } = await load();
+    const wanted = normalize(name).trim();
+    const p = products.find(x => normalize(x.nombre).trim() === wanted);
+    if (!p) return '';
+    const sizes = Object.entries(p.precios ?? {})
+        .filter(([size, price]) => !isDisallowedSize(size) && Number(price) > 0)
+        .sort((a, b) => Number(a[1]) - Number(b[1]))
+        .map(([size, price]) => `${sizeLabel(size)} ${money(Number(price))}`)
+        .join(' · ');
+    return `- ${p.nombre}: ${sizes}`;
+}
+
+/** Sellable product names (for pickers in the admin UI). */
+export async function getCatalogNames(): Promise<string[]> {
+    return (await load()).products.map(p => p.nombre).sort((a, b) => a.localeCompare(b));
+}

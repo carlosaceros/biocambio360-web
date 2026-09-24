@@ -97,10 +97,10 @@ function normalizeQuestion(text: string): string {
 }
 
 /** Only short, stateless first messages are cacheable (no personal data can be inside them). */
-export function cacheKeyFor(message: string, catalogHash: string): string | null {
+export function cacheKeyFor(message: string, catalogHash: string, extra: string = ''): string | null {
     const normalized = normalizeQuestion(message);
     if (normalized.length < 2 || normalized.length > 80) return null;
-    return sha(`${catalogHash}|${normalized}`, 32);
+    return sha(`${catalogHash}|${extra}|${normalized}`, 32);
 }
 
 export async function getCachedReply(key: string): Promise<CachedAgentReply | null> {

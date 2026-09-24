@@ -235,6 +235,20 @@ export default function ContactPanel({
                 </div>
             </div>
 
+            {/* Ad that started this conversation */}
+            {conversation.adReferral && (conversation.adReferral.headline || conversation.adReferral.body || conversation.adReferral.sourceId) && (
+                <div className="px-4 py-3 border-b border-gray-100 bg-amber-50/50 space-y-0.5">
+                    <p className="text-[10px] font-extrabold uppercase text-amber-700 tracking-wider">Origen: anuncio de Meta</p>
+                    {conversation.adReferral.headline && <p className="text-xs font-bold text-gray-800">{conversation.adReferral.headline}</p>}
+                    {conversation.adReferral.body && <p className="text-[11px] text-gray-500 line-clamp-2">{conversation.adReferral.body}</p>}
+                    {conversation.adReferral.sourceUrl && (
+                        <a href={conversation.adReferral.sourceUrl} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-indigo-600 hover:underline">
+                            Ver anuncio
+                        </a>
+                    )}
+                </div>
+            )}
+
             {/* Pre-order drafted by the AI agent (after hours) */}
             {conversation.preOrder && (conversation.preOrder.items?.length > 0 || !!conversation.preOrder.horarioContacto) && (
                 <div className="p-4 border-b border-gray-100 space-y-2 bg-violet-50/40">

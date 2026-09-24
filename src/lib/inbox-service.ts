@@ -60,6 +60,7 @@ function docToConversation(id: string, data: DocumentData): ConversationDoc {
         lastInboundAt: data.lastInboundAt,
         tags: data.tags ?? [],
         preOrder: data.preOrder,
+        adReferral: data.adReferral,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
     };

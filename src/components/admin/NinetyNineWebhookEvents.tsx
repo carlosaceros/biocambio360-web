@@ -47,17 +47,17 @@ export default function NinetyNineWebhookEvents() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-xs p-4">
             <h2 className="text-sm font-black text-gray-900 flex items-center gap-2 mb-1">
                 <Radio size={15} className="text-indigo-600" />
-                Eventos recibidos de 99 Envíos (entrega automática)
+                Historial de entregas actualizadas automáticamente
             </h2>
             <p className="text-[11px] text-gray-500 mb-3">
-                Cada aviso de 99 Envíos queda registrado aquí con lo que hizo el sistema. Si esta lista siempre está vacía, 99 Envíos no está llamando al webhook.
+                Cada cambio de estado hecho desde el reporte de 99 Envíos (o desde un webhook, si 99 Envíos lo habilita) queda registrado aquí.
             </p>
 
             {!loaded ? (
                 <p className="text-xs text-gray-400">Cargando...</p>
             ) : events.length === 0 ? (
                 <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
-                    Aún no ha llegado ningún evento. Configura en 99 Envíos la URL de notificaciones de cambio de estado hacia <strong>/api/envios/webhook</strong>.
+                    Aún no hay actualizaciones automáticas. Sube el reporte “Envíos Completos” de 99 Envíos arriba para actualizar las entregas.
                 </p>
             ) : (
                 <div className="overflow-x-auto">

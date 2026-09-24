@@ -48,6 +48,18 @@ export interface PreOrder {
     actualizadoAt: string;
 }
 
+/** Click-to-WhatsApp ad that started the conversation (Meta `referral` object). */
+export interface AdReferral {
+    sourceId?: string;
+    sourceType?: string;
+    sourceUrl?: string;
+    headline?: string;
+    body?: string;
+    mediaType?: string;
+    ctwaClid?: string;
+    receivedAt?: string;
+}
+
 export interface ConversationDoc {
     id: string;
     channel: Channel;
@@ -74,6 +86,8 @@ export interface ConversationDoc {
     tags?: string[];
     /** Pre-order drafted by the AI agent (after hours) */
     preOrder?: PreOrder;
+    /** Ad that originated this conversation, if any */
+    adReferral?: AdReferral;
     createdAt?: Timestamp | Date | string;
     updatedAt?: Timestamp | Date | string;
 }

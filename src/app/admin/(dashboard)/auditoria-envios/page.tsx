@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
 import NinetyNineWebhookEvents from '@/components/admin/NinetyNineWebhookEvents';
+import NinetyNineReportImport from '@/components/admin/NinetyNineReportImport';
 
 interface AuditLog {
     id: string;
@@ -258,6 +259,7 @@ export default function ShippingAuditPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+                <NinetyNineReportImport />
                 <NinetyNineWebhookEvents />
 
                 {/* Cuota Spark Protegida / Fallback Activo */}

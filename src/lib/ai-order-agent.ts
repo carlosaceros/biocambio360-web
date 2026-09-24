@@ -16,7 +16,8 @@ import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton } from '@/lib/whatsapp-service';
-import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices } from '@/lib/ai-agent-knowledge';
+import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getProductLineByName } from '@/lib/ai-agent-knowledge';
+import { loadTrainingSnapshot, rulesPromptBlock, examplesPromptBlock, pickExamples, verifyAdConfig } from '@/lib/ai-agent-training';
 import {
     getPromptCacheName,
     invalidatePromptCache,
@@ -175,7 +176,7 @@ const RESPONSE_SCHEMA: Schema = {
     required: ['mensajes', 'options', 'preOrder', 'pqrs', 'listo', 'botonWeb'],
 };
 
-function buildSystemPrompt(catalog: string): string {
+function buildSystemPrompt(catalog: string, rules: string[] = []): string {
     return `Eres el "Asistente de Biocambio360" por WhatsApp (fábrica de aseo y limpieza en Soacha; vende a hogares y empresas). Atiendes de 9:30 p.m. a 6:30 a.m.; un asesor humano continúa en la mañana.
 
 ALCANCE (solo esto):
@@ -197,13 +198,15 @@ PRODUCTOS: cuando pregunten por un producto o tipo de producto (ej. "detergente 
 PREGUNTAS FRECUENTES: responde directo y breve. Medios de pago → lista los DATOS DEL NEGOCIO; no pidas datos antes de contestar.
 BOTÓN WEB: nunca escribas la dirección de la web en los mensajes; pon botonWeb=true cuando invites a comprar en la web y el sistema enviará un botón para abrirla.
 
-PEDIDOS: los precios son de referencia; el asesor confirma precio, disponibilidad, envío y pago. No confirmes como definitivo, no prometas fechas/horas de entrega ni descuentos. Con productos, cantidades y datos de entrega: resume y pregunta si es correcto; solo si el cliente confirma pon listo=true y di que un asesor lo revisa a primera hora. Si no quiere esperar, invítalo a pedir ya en la web (24 h) con botonWeb=true.
+PEDIDOS: si calculas un total, di que es de referencia y sin envío. Los precios son de referencia; el asesor confirma precio, disponibilidad, envío y pago. No confirmes como definitivo, no prometas fechas/horas de entrega ni descuentos. Con productos, cantidades y datos de entrega: resume y pregunta si es correcto; solo si el cliente confirma pon listo=true y di que un asesor lo revisa a primera hora. Si no quiere esperar, invítalo a pedir ya en la web (24 h) con botonWeb=true.
 
 PQRS (reclamo, queja, garantía, producto defectuoso, pedido incompleto o tardío, petición, sugerencia): con mucha cautela y empatía. Agradece, lamenta la molestia; NO admitas culpa, NO discutas y NUNCA menciones ni prometas devolución, reembolso, cambio, reposición, compensación, garantía ni plazos: solo di que un asesor revisará el caso. Haz UNA pregunta por mensaje, en este orden: 1) qué pasó (si no está claro), 2) producto y pedido/fecha, 3) al final, su horario de contacto (options de D). Llena pqrs (tipo, descripcion en 1-2 frases, pedidoRef, producto) desde el primer mensaje y actualízalo; cuando tengas los datos confirma que quedó registrado y que un asesor lo contactará pronto.
 
 Devuelve SIEMPRE el JSON pedido. preOrder y pqrs van completos y actualizados; lo desconocido = "".
 
-DATOS DEL NEGOCIO:
+ANUNCIO: si el contexto trae ORIGEN (anuncio de Meta), el cliente YA vio el anuncio: no le preguntes qué producto busca, no repitas lo que dice el anuncio ni te presentes largo. Confirma el producto del anuncio (usa PRODUCTO DEL ANUNCIO si viene), da las presentaciones y precios y enfócate en CERRAR: cantidad, dirección/ciudad de entrega y forma de pago.
+
+${rulesPromptBlock(rules)}DATOS DEL NEGOCIO:
 - Medios de pago: transferencia bancaria, ADDI, tarjetas de crédito, PSE y contraentrega. El asesor confirma cuáles aplican según el pedido y la zona.
 - Compra en línea 24 horas en la web (se comparte con el botón).
 
@@ -221,12 +224,14 @@ export async function callGemini(params: {
     history: Array<{ role: 'user' | 'model'; text: string }>;
     context: string;
     isFirstBotTurn: boolean;
+    adMode?: boolean;
 }): Promise<{ output: AgentOutput; usage: GeminiUsage }> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const systemPrompt = buildSystemPrompt(await getCompactCatalog());
+    const training = await loadTrainingSnapshot();
+    const systemPrompt = buildSystemPrompt(await getCompactCatalog(), training.rules);
     const generationConfig = {
         responseMimeType: 'application/json',
         responseSchema: RESPONSE_SCHEMA,
@@ -259,7 +264,11 @@ export async function callGemini(params: {
     if (last && last.role === 'user') {
         last.parts[0].text =
             `[CONTEXTO INTERNO — no lo menciones]\n${params.context}\n` +
-            (params.isFirstBotTurn ? 'PRIMER_MENSAJE: preséntate en una línea, avisa que un asesor atiende desde las 6:30 a.m. e invita a pedir en la web (botonWeb=true).\n' : '') +
+            (params.isFirstBotTurn
+                ? params.adMode
+                    ? 'PRIMER_MENSAJE (cliente de anuncio): saluda en una línea, confirma el producto del anuncio con su precio y presentaciones (PRODUCTO DEL ANUNCIO / COINCIDENCIAS) y pregunta cuántas unidades necesita y para qué ciudad es. Di brevemente que un asesor confirma en la mañana. No listes otros productos ni preguntes qué busca.\n'
+                    : 'PRIMER_MENSAJE: preséntate en una línea, avisa que un asesor atiende desde las 6:30 a.m. e invita a pedir en la web (botonWeb=true).\n'
+                : '') +
             `[MENSAJE DEL CLIENTE]\n${last.parts[0].text}`;
     }
 
@@ -463,6 +472,177 @@ export interface AgentTurnInput {
  * Runs one agent turn for the latest inbound message of a conversation.
  * Safe to call fire-and-forget: it never throws.
  */
+// ─── Reusable brain (WhatsApp turns and the training sandbox) ────────────────
+
+export interface AdContextInput {
+    sourceId?: string | null;
+    headline?: string | null;
+    body?: string | null;
+    sourceUrl?: string | null;
+    mediaType?: string | null;
+    /** Catalog product this ad promotes (set by the team in the training screen) */
+    productName?: string | null;
+    /** Team notes about the ad (offer, conditions) */
+    notes?: string | null;
+}
+
+/** Merges the conversation's ad referral with the team's ad configuration (product/notes). */
+export async function resolveAd(referral?: {
+    sourceId?: string | null; headline?: string | null; body?: string | null; sourceUrl?: string | null; mediaType?: string | null;
+} | null): Promise<AdContextInput | null> {
+    if (!referral || (!referral.sourceId && !referral.headline && !referral.body)) return null;
+    let productName: string | null = null;
+    let notes: string | null = null;
+    if (referral.sourceId) {
+        try {
+            const snap = await getAdminDB().collection('ad_referrals').doc(referral.sourceId).get();
+            const data = snap.data();
+            // Only team-approved (signed) mapping is trusted: the database itself is open
+            if (data && verifyAdConfig(referral.sourceId, data)) {
+                productName = data.productName || null;
+                notes = data.notes || null;
+            }
+        } catch { /* optional */ }
+    }
+    return { ...referral, productName, notes };
+}
+
+export interface BrainInput {
+    history: Array<{ role: 'user' | 'model'; text: string }>;
+    lastText: string;
+    preOrder: PreOrder | null;
+    turns: number;
+    botMessagesBefore: number;
+    ad?: AdContextInput | null;
+    useResponseCache: boolean;
+    buttonRecentlySent: boolean;
+    alreadyListed: boolean;
+}
+
+export interface BrainResult {
+    kind: 'reply' | 'refusal' | 'model_failure';
+    messages: string[];
+    options: string[];
+    webButton: boolean;
+    preOrder: PreOrder | null;
+    pqrs: AgentOutput['pqrs'] | null;
+    error?: string;
+}
+
+/**
+ * Produces the agent's reply for a conversation state, WITHOUT any I/O on the conversation itself
+ * (no sending, no persistence). Used by real WhatsApp turns and by the training simulator.
+ */
+export async function generateAgentReply(input: BrainInput): Promise<BrainResult> {
+    const { history, lastText, ad, turns, botMessagesBefore } = input;
+    const empty = { messages: [] as string[], options: [] as string[], webButton: false, preOrder: input.preOrder, pqrs: null };
+
+    if (looksLikeInjection(lastText)) return { kind: 'refusal', ...empty, messages: [REFUSAL_TEXT] };
+
+    const training = await loadTrainingSnapshot();
+    const customerTexts = history.filter(h => h.role === 'user').slice(-3).map(h => h.text);
+    const adTexts = ad?.headline ? [ad.headline] : [];
+    const productNames = input.preOrder?.items?.map(i => i.producto) ?? [];
+
+    const sheets = await getRelevantProductSheets(ad?.productName ? [ad.productName, ...customerTexts] : [...adTexts, ...customerTexts], productNames);
+    const adProductLine = ad?.productName ? await getProductLineByName(ad.productName) : '';
+    const matches = adProductLine ? '' : await getMatchingProductPrices([...adTexts, ...customerTexts.slice(-2)]);
+    // With an ad the goal is closing, so the generic "list every variant" guarantee only applies without one
+    const lastTextMatches = ad ? '' : await getMatchingProductPrices([lastText]);
+    const noClosure = turns >= NO_CLOSURE_TURN && input.preOrder?.estado !== 'listo' && !input.preOrder?.horarioContacto;
+    const examples = examplesPromptBlock(pickExamples(training.examples, lastText));
+
+    const adBlock = ad
+        ? `ORIGEN: anuncio de Meta${ad.headline ? ` "${String(ad.headline).slice(0, 120)}"` : ''}${ad.body ? ` — ${String(ad.body).slice(0, 220)}` : ''}.\n` +
+          (adProductLine ? `PRODUCTO DEL ANUNCIO (nombre y precios de catálogo; úsalos tal cual):\n${adProductLine}\n` : '') +
+          (ad.notes ? `NOTAS DEL ANUNCIO (del equipo): ${String(ad.notes).slice(0, 300)}\n` : '')
+        : '';
+
+    const context =
+        `TURNO: ${turns + 1}. SIN_CIERRE: ${noClosure ? 'sí' : 'no'}.\n` +
+        adBlock +
+        `PRE-PEDIDO ACTUAL: ${input.preOrder ? JSON.stringify({ ...input.preOrder, actualizadoAt: undefined, estado: undefined }) : 'ninguno'}\n` +
+        (matches ? `COINCIDENCIAS (todas las variantes con todas sus presentaciones):\n${matches}\n` : '') +
+        examples +
+        (sheets ? `FICHAS RELEVANTES:\n${sheets}\n` : '');
+
+    // Response cache: only the very first, short, stateless customer message
+    const customerMessages = history.filter(h => h.role === 'user').length;
+    const cacheKey =
+        input.useResponseCache && botMessagesBefore === 0 && customerMessages === 1 && !input.preOrder
+            ? cacheKeyFor(lastText, await getCatalogHash(), `${ad?.sourceId ?? ''}|${ad?.productName ?? ''}|${training.hash}`)
+            : null;
+    const cachedReply = cacheKey ? await getCachedReply(cacheKey) : null;
+
+    try {
+        let output: AgentOutput;
+        if (cachedReply) {
+            console.log('[ai-agent] Response cache HIT (no model call)');
+            void recordUsage({ responseCacheHit: true });
+            output = {
+                mensajes: cachedReply.mensajes,
+                options: cachedReply.options,
+                preOrder: { items: cachedReply.items, nombreCliente: '', direccion: '', ciudad: '', metodoPago: '', notas: '', horarioContacto: '' },
+                pqrs: { tipo: '', descripcion: '', pedidoRef: '', producto: '' },
+                listo: false,
+                botonWeb: cachedReply.botonWeb,
+            };
+        } else {
+            const result = await callGemini({ history, context, isFirstBotTurn: botMessagesBefore === 0, adMode: !!ad });
+            output = result.output;
+            void recordUsage(result.usage);
+            console.log(`[ai-agent] Tokens: prompt=${result.usage.promptTokens} cached=${result.usage.cachedTokens} out=${result.usage.outputTokens}`);
+
+            const clean =
+                !output.pqrs?.tipo && !output.listo && !output.preOrder?.nombreCliente && !output.preOrder?.direccion &&
+                !output.preOrder?.ciudad && !output.preOrder?.horarioContacto && !output.preOrder?.notas;
+            if (cacheKey && clean) {
+                void storeCachedReply(cacheKey, {
+                    mensajes: (output.mensajes ?? []).map(m => String(m)),
+                    options: (output.options ?? []).map(o => String(o)),
+                    items: output.preOrder?.items ?? [],
+                    botonWeb: !!output.botonWeb,
+                });
+            }
+        }
+
+        const raw = (output.mensajes ?? []).map(m => String(m ?? '').trim()).filter(Boolean);
+        if (raw.length === 0) throw new Error('Empty reply from model');
+        const options = (Array.isArray(output.options) ? output.options : []).map(o => String(o).trim()).filter(Boolean).slice(0, 10);
+
+        if (leaksSensitive([...raw, ...options].join('\n'))) {
+            console.warn('[ai-agent] Blocked model output (possible leak)');
+            return { kind: 'refusal', ...empty, messages: [REFUSAL_TEXT] };
+        }
+
+        const safe = raw.map(m => stripPromises(m)).filter((m): m is string => !!m);
+        // The site is always shared as a button: strip any raw URL the model wrote
+        const wantsLink = !!output.botonWeb || safe.some(m => mentionsSite(m));
+        let messages = (safe.length > 0 ? safe : ['Un asesor te contactará pronto para ayudarte 🙌'])
+            .map(m => stripSiteUrl(m))
+            .flatMap(m => splitIntoShortMessages(m))
+            .slice(0, 6);
+        const preOrder = sanitizePreOrder(output.preOrder, output.listo, input.preOrder);
+
+        // Deterministic guarantee: a question about a type of product must list EVERY matching variant
+        if (lastTextMatches && !messages.some(m => m.includes('$')) && !input.alreadyListed && !preOrder.items.length) {
+            messages = injectPriceList(messages, PRICE_LIST_HEADER, lastTextMatches);
+        }
+
+        return {
+            kind: 'reply',
+            messages,
+            options,
+            webButton: wantsLink && !input.buttonRecentlySent,
+            preOrder,
+            pqrs: output.pqrs,
+        };
+    } catch (err) {
+        console.error('[ai-agent] Model failure:', err);
+        return { kind: 'model_failure', ...empty, error: err instanceof Error ? err.message : String(err) };
+    }
+}
+
 async function acquireLock(convRef: FirebaseFirestore.DocumentReference): Promise<boolean> {
     return convRef.firestore.runTransaction(async tx => {
         const snap = await tx.get(convRef);
@@ -616,95 +796,34 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
             await convRef.update({ preOrder: currentPreOrder });
             console.log(`[ai-agent] Contact window saved: ${chosenWindow}`);
         }
-        const customerTexts = history.filter(h => h.role === 'user').slice(-3).map(h => h.text);
-        const sheets = await getRelevantProductSheets(customerTexts, currentPreOrder?.items?.map(i => i.producto) ?? []);
-        const matches = await getMatchingProductPrices(customerTexts.slice(-2));
-        const lastTextMatches = await getMatchingProductPrices([lastText]);
-        const noClosure = turns >= NO_CLOSURE_TURN && currentPreOrder?.estado !== 'listo' && !currentPreOrder?.horarioContacto;
+        // Do not repeat the link button / the price list if one of the last agent messages already had it
+        const lastAgentMessages = recent.filter(m => m.agentUid === AI_AGENT_ID).slice(-3);
+        const buttonRecentlySent = lastAgentMessages.some(m => !!m.cta || String(m.content).includes(WEB_BUTTON_MARKER));
+        const alreadyListed = lastAgentMessages.some(m => String(m.content).includes(PRICE_LIST_HEADER));
 
-        const context =
-            `TURNO: ${turns + 1}. SIN_CIERRE: ${noClosure ? 'sí' : 'no'}.\n` +
-            `PRE-PEDIDO ACTUAL: ${currentPreOrder ? JSON.stringify({ ...currentPreOrder, actualizadoAt: undefined, estado: undefined }) : 'ninguno'}\n` +
-            (matches ? `COINCIDENCIAS (todas las variantes con todas sus presentaciones):\n${matches}\n` : '') +
-            (sheets ? `FICHAS RELEVANTES:\n${sheets}\n` : '');
+        const ad = await resolveAd(conv.adReferral);
+        const result = await generateAgentReply({
+            history,
+            lastText,
+            preOrder: currentPreOrder,
+            turns,
+            botMessagesBefore,
+            ad,
+            useResponseCache: true,
+            buttonRecentlySent,
+            alreadyListed,
+        });
+
+        if (result.kind === 'refusal') return void (await finishCanned(REFUSAL_TEXT, true));
 
         let messages: string[];
         let options: string[] = [];
         let webButton = false;
-        // Do not repeat the link button if one of the last agent messages already had it
-        const buttonRecentlySent = recent
-            .filter(m => m.agentUid === AI_AGENT_ID)
-            .slice(-3)
-            .some(m => !!m.cta || String(m.content).includes(WEB_BUTTON_MARKER));
         let preOrder: PreOrder | null = currentPreOrder;
         let pqrs: AgentOutput['pqrs'] | null = null;
         let holdUsed = false;
 
-        // Response cache: only for the customer's very first, short message (stateless answer)
-        const customerMessages = history.filter(h => h.role === 'user').length;
-        const cacheKey =
-            botMessagesBefore === 0 && customerMessages === 1 && !currentPreOrder
-                ? cacheKeyFor(lastText, await getCatalogHash())
-                : null;
-        const cachedReply = cacheKey ? await getCachedReply(cacheKey) : null;
-
-        try {
-            let output: AgentOutput;
-            if (cachedReply) {
-                console.log('[ai-agent] Response cache HIT (no model call)');
-                void recordUsage({ responseCacheHit: true });
-                output = {
-                    mensajes: cachedReply.mensajes,
-                    options: cachedReply.options,
-                    preOrder: { items: cachedReply.items, nombreCliente: '', direccion: '', ciudad: '', metodoPago: '', notas: '', horarioContacto: '' },
-                    pqrs: { tipo: '', descripcion: '', pedidoRef: '', producto: '' },
-                    listo: false,
-                    botonWeb: cachedReply.botonWeb,
-                };
-            } else {
-                const result = await callGemini({ history, context, isFirstBotTurn: botMessagesBefore === 0 });
-                output = result.output;
-                void recordUsage(result.usage);
-                console.log(`[ai-agent] Tokens: prompt=${result.usage.promptTokens} cached=${result.usage.cachedTokens} out=${result.usage.outputTokens}`);
-
-                const clean =
-                    !output.pqrs?.tipo &&
-                    !output.listo &&
-                    !output.preOrder?.nombreCliente &&
-                    !output.preOrder?.direccion &&
-                    !output.preOrder?.ciudad &&
-                    !output.preOrder?.horarioContacto &&
-                    !output.preOrder?.notas;
-                if (cacheKey && clean) {
-                    void storeCachedReply(cacheKey, {
-                        mensajes: (output.mensajes ?? []).map(m => String(m)),
-                        options: (output.options ?? []).map(o => String(o)),
-                        items: output.preOrder?.items ?? [],
-                        botonWeb: !!output.botonWeb,
-                    });
-                }
-            }
-            const raw = (output.mensajes ?? []).map(m => String(m ?? '').trim()).filter(Boolean);
-            if (raw.length === 0) throw new Error('Empty reply from model');
-            options = (Array.isArray(output.options) ? output.options : []).map(o => String(o).trim()).filter(Boolean).slice(0, 10);
-
-            if (leaksSensitive([...raw, ...options].join('\n'))) {
-                console.warn('[ai-agent] Blocked model output (possible leak)');
-                return void (await finishCanned(REFUSAL_TEXT, true));
-            }
-
-            const safe = raw.map(m => stripPromises(m)).filter((m): m is string => !!m);
-            // The site is always shared as a button: strip any raw URL the model wrote
-            const wantsLink = !!output.botonWeb || safe.some(m => mentionsSite(m));
-            webButton = wantsLink && !buttonRecentlySent;
-            messages = (safe.length > 0 ? safe : ['Un asesor te contactará pronto para ayudarte 🙌'])
-                .map(m => stripSiteUrl(m))
-                .flatMap(m => splitIntoShortMessages(m))
-                .slice(0, 6);
-            preOrder = sanitizePreOrder(output.preOrder, output.listo, currentPreOrder);
-            pqrs = output.pqrs;
-        } catch (err) {
-            console.error('[ai-agent] Model failure:', err);
+        if (result.kind === 'model_failure') {
             if (botMessagesBefore > 0) {
                 // Never leave a customer in silence, but tell them only once per night
                 if (conv.botHoldNight === key) return;
@@ -713,19 +832,13 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
             } else {
                 messages = splitIntoShortMessages(FALLBACK_TEXT);
             }
-            options = [];
             webButton = !buttonRecentlySent;
-        }
-
-        // Deterministic guarantee: when the customer asks about a type of product and the reply has no
-        // prices, list EVERY matching product with all its presentations (the model may skip them).
-        const alreadyListed = recent
-            .filter(m => m.agentUid === AI_AGENT_ID)
-            .slice(-3)
-            .some(m => String(m.content).includes(PRICE_LIST_HEADER));
-        const replyHasPrices = messages.some(m => m.includes('$'));
-        if (lastTextMatches && !replyHasPrices && !alreadyListed && !(preOrder?.items?.length)) {
-            messages = injectPriceList(messages, PRICE_LIST_HEADER, lastTextMatches);
+        } else {
+            messages = result.messages;
+            options = result.options;
+            webButton = result.webButton;
+            preOrder = result.preOrder;
+            pqrs = result.pqrs;
         }
 
         await sendMessages(convRef, input.phoneId, input.contactPhone, messages, options, webButton);

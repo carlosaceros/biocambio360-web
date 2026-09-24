@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/bot-handoff",
       "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/cron/sync-99envios-novedades",
+      "schedule": "0 */6 * * *"
     }
   ]
 }

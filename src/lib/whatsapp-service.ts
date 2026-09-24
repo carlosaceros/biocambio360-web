@@ -317,3 +317,24 @@ export async function sendCtaUrlButton(
         },
     });
 }
+
+/**
+ * Downloads a media file received from a customer (image, audio, video, document, sticker).
+ * Meta serves it in two steps: resolve a short-lived URL from the media id, then fetch it with the token.
+ * Media ids stay valid for about 30 days.
+ */
+export async function downloadMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string; fileSize: number }> {
+    const meta = await fetch(`${GRAPH_API_BASE}/${encodeURIComponent(mediaId)}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    const info = await meta.json();
+    if (!meta.ok || !info?.url) {
+        throw new Error(`Media lookup failed (${meta.status}): ${info?.error?.message ?? 'no url'}`);
+    }
+
+    const file = await fetch(info.url, { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (!file.ok) throw new Error(`Media download failed (${file.status})`);
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    return { buffer, mimeType: info.mime_type ?? file.headers.get('content-type') ?? 'application/octet-stream', fileSize: buffer.length };
+}
