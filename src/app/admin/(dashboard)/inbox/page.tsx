@@ -184,7 +184,7 @@ export default function InboxPage() {
     const toggleAgent = useCallback(async () => {
         try {
             await setAgentEnabled(!agentEnabled);
-            showToast(!agentEnabled ? 'Agente IA activado (9:30 p.m. – 6:30 a.m.)' : 'Agente IA pausado');
+            showToast(!agentEnabled ? 'Agente IA activado (atiende cuando no hay asesores en línea)' : 'Agente IA pausado');
         } catch {
             showToast('No se pudo cambiar el agente IA', 'error');
         }
@@ -400,7 +400,7 @@ export default function InboxPage() {
                     {canModerate && (
                         <button
                             onClick={toggleAgent}
-                            title="Agente IA nocturno: toma pedidos de 9:30 p.m. a 6:30 a.m. y arma un pre-pedido para el asesor. Clic para activar/pausar."
+                            title="Agente IA: atiende fuera del horario del equipo (L-M 6am-9pm, J 6am-8pm, V 6am-7pm, S 7am-7pm, D y festivos 9am-6pm), toma pedidos y arma un pre-pedido. Clic para activar/pausar."
                             className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold border rounded-xl transition-colors cursor-pointer ${
                                 agentEnabled ? 'text-violet-700 border-violet-200 bg-violet-50 hover:bg-violet-100' : 'text-gray-500 border-gray-200 hover:text-gray-800'
                             }`}

@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     const modelTurns = history.filter(h => h.role === 'model').length;
+    const mode = ['nuevo', 'continuacion', 'demanda'].includes(body.mode) ? (body.mode as 'nuevo' | 'continuacion' | 'demanda') : 'nuevo';
     const result = await generateAgentReply({
         history,
         lastText,
@@ -57,6 +58,9 @@ export async function POST(req: NextRequest) {
         useResponseCache: false,
         buttonRecentlySent: false,
         alreadyListed: false,
+        mode,
+        advisorName: mode === 'continuacion' ? 'Fernando' : null,
+        noticePending: mode === 'continuacion' && modelTurns === 0,
     });
 
     return NextResponse.json({ ...result, preOrder: result.preOrder ?? preOrder });

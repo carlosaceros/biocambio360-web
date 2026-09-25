@@ -17,7 +17,9 @@ import { getAdminDB } from '@/lib/firebase-admin';
 import { buildConversationId } from '@/lib/inbox-service';
 import type { Channel, MessageType } from '@/types/inbox';
 import { FieldValue } from 'firebase-admin/firestore';
-import { isAfterHoursNow, runOrderAgentTurn } from '@/lib/ai-order-agent';
+import { runOrderAgentTurn } from '@/lib/ai-order-agent';
+import { isHumanOnline } from '@/lib/business-hours';
+import { recordNewInboundConversation } from '@/lib/ai-agent-insights';
 import { fetchSocialProfile } from '@/lib/meta-social-service';
 
 // ─── GET: Webhook verification ────────────────────────────────────────────────
@@ -481,8 +483,13 @@ async function handleWhatsAppInboundMessage(
         }, { merge: true }).catch(e => console.warn('[webhook/meta] ad registry failed:', e?.message));
     }
 
-    // After-hours AI agent: runs after the response is sent so Meta is never kept waiting.
-    if (type !== 'reaction' && isAfterHoursNow()) {
+    if (!convSnap.exists) {
+        void recordNewInboundConversation({ channel: 'whatsapp', adSourceId: adReferral?.sourceId, humanOnline: isHumanOnline() });
+    }
+
+    // AI agent: it decides by itself whether to answer (no human online, or switched on for this
+    // conversation). It runs after the response is sent so Meta is never kept waiting.
+    if (type !== 'reaction') {
         after(() => runOrderAgentTurn({ conversationId, phoneId: phoneNumberId, contactPhone: hasPhone ? from : '' }));
     }
 }

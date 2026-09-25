@@ -1,8 +1,10 @@
 /**
- * Cron: 6:30 a.m. (America/Bogota) hand-off of the after-hours AI agent.
- * Runs daily (11:30 UTC). For every conversation still in status "bot":
+ * Cron: hand-off of the AI agent to the human team. Runs every 10 minutes and acts only while the
+ * team is online (schedule in business-hours.ts), so it fires right after each opening.
+ * For every conversation still in status "bot" (except those a human switched the agent on for):
+ *  - continued conversation with an advisor → back to that advisor, customer told the messages were passed on
  *  - with a pre-order → auto-assign to a human advisor and tell the customer who takes it
- *  - without a pre-order → just reopen it so the team sees it
+ *  - otherwise → just reopen it so the team sees it
  * Idempotent: it only touches conversations whose status is "bot".
  */
 
@@ -15,7 +17,27 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { autoAssignConversation } from '@/lib/lead-assignment-service';
 import { sendTextMessage } from '@/lib/whatsapp-service';
-import { AI_AGENT_ID, AI_AGENT_NAME, isAfterHoursNow } from '@/lib/ai-order-agent';
+import { AI_AGENT_ID, AI_AGENT_NAME, isForcedActive } from '@/lib/ai-order-agent';
+import { isHumanOnline } from '@/lib/business-hours';
+
+async function notifyCustomer(ref: FirebaseFirestore.DocumentReference, conv: FirebaseFirestore.DocumentData, text: string): Promise<void> {
+    try {
+        const { messageId } = await sendTextMessage(conv.phoneId, conv.contactPhone, text);
+        await ref.collection('messages').add({
+            direction: 'outbound',
+            type: 'text',
+            content: text,
+            metaMessageId: messageId,
+            agentUid: AI_AGENT_ID,
+            agentName: AI_AGENT_NAME,
+            status: 'sent',
+            timestamp: FieldValue.serverTimestamp(),
+        });
+        await ref.update({ lastMessage: text.split('\n')[0], lastMessageAt: FieldValue.serverTimestamp() });
+    } catch (err) {
+        console.warn(`[cron/bot-handoff] Could not notify customer of ${ref.id}:`, err);
+    }
+}
 
 export async function GET(req: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
@@ -25,10 +47,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Never hand off while the agent is still working (e.g. a manual call at 11 p.m.)
-    if (isAfterHoursNow() && req.nextUrl.searchParams.get('force') !== '1') {
-        return NextResponse.json({ skipped: 'still after hours' });
+    // Never hand off while the agent is still the one on duty
+    if (!isHumanOnline() && req.nextUrl.searchParams.get('force') !== '1') {
+        return NextResponse.json({ skipped: 'team offline' });
     }
+    const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Bogota', hour: '2-digit', hour12: false }).format(new Date())) % 24;
+    const greeting = hour < 12 ? '¡Buenos días! ☀️' : '¡Hola! 👋';
 
     const db = getAdminDB();
     const snap = await db.collection('conversations').where('status', '==', 'bot').limit(200).get();
@@ -40,13 +64,27 @@ export async function GET(req: NextRequest) {
     for (const doc of snap.docs) {
         const conv = doc.data();
         try {
+            if (isForcedActive(conv)) continue;
+
             const pre = conv.preOrder ?? {};
+            const continued = conv.botMode === 'continuacion' && Number(conv.botTurns ?? 0) > 0;
+            if (continued && conv.assignedTo && conv.contactPhone) {
+                await doc.ref.update({ status: 'abierto', updatedAt: FieldValue.serverTimestamp() });
+                reopened++;
+                const advisor = conv.assignedToName ? String(conv.assignedToName) : 'tu asesor';
+                await notifyCustomer(doc.ref, conv, `${greeting} Ya le pasé tus mensajes a ${advisor}, quien te acompañaba, para continuar contigo.`);
+                continue;
+            }
+
             const hasLead =
                 (Array.isArray(pre.items) && pre.items.length > 0) || !!pre.horarioContacto || !!conv.hasPqrs;
 
             if (!hasLead || !conv.contactPhone) {
                 await doc.ref.update({ status: 'abierto', updatedAt: FieldValue.serverTimestamp() });
                 reopened++;
+                if (continued && conv.contactPhone) {
+                    await notifyCustomer(doc.ref, conv, `${greeting} Ya pasé tus mensajes al equipo de Biocambio360; te responden en breve.`);
+                }
                 continue;
             }
 
@@ -63,24 +101,9 @@ export async function GET(req: NextRequest) {
             const cuando = franja[pre.horarioContacto as string];
             const what = conv.hasPqrs ? 'tu solicitud' : 'tu pre-pedido';
             const text =
-                `¡Buenos días! ☀️ Ya pasé ${what} a ${result.advisorName}, del equipo de Biocambio360.\n` +
+                `${greeting} Ya pasé ${what} a ${result.advisorName}, del equipo de Biocambio360.\n` +
                 (cuando ? `Te contactará ${cuando}.` : 'En breve te contacta para confirmar los detalles.');
-            try {
-                const { messageId } = await sendTextMessage(conv.phoneId, conv.contactPhone, text);
-                await doc.ref.collection('messages').add({
-                    direction: 'outbound',
-                    type: 'text',
-                    content: text,
-                    metaMessageId: messageId,
-                    agentUid: AI_AGENT_ID,
-                    agentName: AI_AGENT_NAME,
-                    status: 'sent',
-                    timestamp: FieldValue.serverTimestamp(),
-                });
-                await doc.ref.update({ lastMessage: text.split('\n')[0], lastMessageAt: FieldValue.serverTimestamp() });
-            } catch (err) {
-                console.warn(`[cron/bot-handoff] Could not notify customer of ${doc.id}:`, err);
-            }
+            await notifyCustomer(doc.ref, conv, text);
         } catch (err) {
             failed++;
             console.error(`[cron/bot-handoff] Failed for ${doc.id}:`, err);

@@ -21,7 +21,7 @@ import { db, auth } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import type { ConversationDoc } from '@/types/inbox';
 import Link from 'next/link';
-import { confirmPreOrder } from '@/lib/inbox-service';
+import { confirmPreOrder, setConversationAgentForced } from '@/lib/inbox-service';
 
 interface CustomerData {
     name: string;
@@ -58,6 +58,7 @@ export default function ContactPanel({
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [autoAssignResult, setAutoAssignResult] = useState<{ advisorName?: string; detail?: string; assigned: boolean } | null>(null);
     const [confirmingPreOrder, setConfirmingPreOrder] = useState(false);
+    const [togglingAgent, setTogglingAgent] = useState(false);
     const [saleAmount, setSaleAmount] = useState('');
     const [savingSale, setSavingSale] = useState(false);
     const [saleFeedback, setSaleFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -248,6 +249,45 @@ export default function ContactPanel({
                     )}
                 </div>
             )}
+
+            {/* On-demand AI agent for this conversation */}
+            {conversation.channel === 'whatsapp' && conversation.contactPhone && (() => {
+                const forcedAt = Date.parse(String(conversation.agentForcedAt ?? ''));
+                const forcedOn = conversation.agentForced === true && Number.isFinite(forcedAt) && Date.now() - forcedAt < 6 * 60 * 60 * 1000;
+                return (
+                    <div className="px-4 py-3 border-b border-gray-100 bg-violet-50/30 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-extrabold uppercase text-violet-700 tracking-wider flex items-center gap-1">
+                                <Sparkles size={11} /> Agente IA
+                            </p>
+                            <button
+                                disabled={togglingAgent}
+                                onClick={async () => {
+                                    setTogglingAgent(true);
+                                    try {
+                                        await setConversationAgentForced(conversation.id, !forcedOn);
+                                    } finally {
+                                        setTogglingAgent(false);
+                                    }
+                                }}
+                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer disabled:opacity-50 ${
+                                    forcedOn ? 'bg-violet-600 text-white border-violet-600' : 'text-violet-700 border-violet-200 bg-white hover:bg-violet-50'
+                                }`}
+                            >
+                                {forcedOn ? 'Desactivar en este chat' : 'Activar en este chat'}
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-gray-500">
+                            {forcedOn
+                                ? 'El agente responde este chat aunque haya asesores en línea (se apaga solo a las 6 h o si un asesor responde).'
+                                : 'Responde solo fuera del horario del equipo. Actívalo aquí si quieres que atienda este chat ahora.'}
+                        </p>
+                        {conversation.agentSummary && (
+                            <p className="text-[11px] text-gray-700"><strong>Nota del agente:</strong> {conversation.agentSummary}</p>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Pre-order drafted by the AI agent (after hours) */}
             {conversation.preOrder && (conversation.preOrder.items?.length > 0 || !!conversation.preOrder.horarioContacto) && (

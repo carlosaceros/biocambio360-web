@@ -353,6 +353,16 @@ export function subscribeToAgentEnabled(callback: (enabled: boolean) => void): U
     );
 }
 
+/** Switches the AI agent on/off for ONE conversation, even while human advisors are online. */
+export async function setConversationAgentForced(conversationId: string, enabled: boolean): Promise<void> {
+    await updateDoc(doc(db, 'conversations', conversationId), {
+        agentForced: enabled,
+        agentForcedAt: enabled ? new Date().toISOString() : null,
+        ...(enabled ? {} : { status: 'abierto' }),
+        updatedAt: serverTimestamp(),
+    });
+}
+
 export async function setAgentEnabled(enabled: boolean): Promise<void> {
     await setDoc(doc(db, 'bot_config', 'ai_agent'), { enabled, updatedAt: serverTimestamp() }, { merge: true });
 }

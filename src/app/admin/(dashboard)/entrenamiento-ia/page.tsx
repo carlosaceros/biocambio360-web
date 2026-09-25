@@ -133,6 +133,7 @@ export default function EntrenamientoIAPage() {
     const [input, setInput] = useState('');
     const [busy, setBusy] = useState(false);
     const [adMode, setAdMode] = useState<string>('none'); // none | custom | <ad id>
+    const [simMode, setSimMode] = useState<'nuevo' | 'continuacion' | 'demanda'>('nuevo');
     const [customAd, setCustomAd] = useState({ headline: '', body: '', productName: '', notes: '' });
     const [correcting, setCorrecting] = useState<{ index: number; ideal: string; note: string } | null>(null);
     const endRef = useRef<HTMLDivElement>(null);
@@ -170,7 +171,7 @@ export default function EntrenamientoIAPage() {
                     : { sourceId: adMode, headline: ads.find(a => a.id === adMode)?.headline, body: ads.find(a => a.id === adMode)?.body };
             const res = await api<{ messages: string[]; options?: string[]; webButton?: boolean; kind: string; preOrder?: PreOrderView }>('/api/ai-training/simulate', {
                 method: 'POST',
-                body: JSON.stringify({ history: payloadHistory, preOrder, ad }),
+                body: JSON.stringify({ history: payloadHistory, preOrder, ad, mode: simMode }),
             });
             setTurns(prev => [...prev, { role: 'model', messages: res.messages, options: res.options ?? [], webButton: !!res.webButton, kind: res.kind }]);
             if (res.preOrder) setPreOrder(res.preOrder);
@@ -297,6 +298,11 @@ export default function EntrenamientoIAPage() {
                                 <option value="none">Cliente sin anuncio</option>
                                 <option value="custom">Anuncio personalizado…</option>
                                 {ads.map(a => <option key={a.id} value={a.id}>Anuncio: {(a.headline || a.id).slice(0, 50)}</option>)}
+                            </select>
+                            <select value={simMode} onChange={e => { setSimMode(e.target.value as typeof simMode); reset(); }} className="text-xs border border-gray-200 rounded-xl px-2 py-1.5 bg-white">
+                                <option value="nuevo">Cliente nuevo (fuera de horario)</option>
+                                <option value="continuacion">Conversación en curso con un asesor</option>
+                                <option value="demanda">Activado a demanda</option>
                             </select>
                             <button onClick={reset} className="ml-auto text-xs font-bold text-gray-500 hover:text-gray-900 flex items-center gap-1 cursor-pointer">
                                 <RotateCcw size={12} /> Reiniciar

@@ -86,6 +86,13 @@ export interface ConversationDoc {
     tags?: string[];
     /** Pre-order drafted by the AI agent (after hours) */
     preOrder?: PreOrder;
+    /** A human switched the AI agent on for this conversation (expires after 6 h) */
+    agentForced?: boolean;
+    agentForcedAt?: string;
+    /** One-line note for the advisor written by the AI agent */
+    agentSummary?: string;
+    /** 'nuevo' | 'continuacion' | 'demanda' — how the agent is treating the conversation */
+    botMode?: string;
     /** Ad that originated this conversation, if any */
     adReferral?: AdReferral;
     createdAt?: Timestamp | Date | string;
