@@ -18,7 +18,7 @@
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
-import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton } from '@/lib/whatsapp-service';
+import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton, isReplyableId } from '@/lib/whatsapp-service';
 import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getProductLineByName } from '@/lib/ai-agent-knowledge';
 import { loadTrainingSnapshot, rulesPromptBlock, examplesPromptBlock, pickExamples, verifyAdConfig } from '@/lib/ai-agent-training';
 import {
@@ -39,6 +39,7 @@ import {
     stripSiteUrl,
     injectPriceList,
     reformatPriceMessages,
+    priceLineToBlock,
     stripSizeEnumeration,
     ensurePaymentList,
     fixDayPart,
@@ -60,6 +61,8 @@ export const AI_AGENT_NAME = 'Asistente IA';
 const MAX_TURNS_PER_NIGHT = 30;
 const MAX_STRIKES_PER_NIGHT = 3;
 const HISTORY_MESSAGES = 14;
+/** Bump when the prompt/presentation changes so cached first replies are regenerated. */
+const AGENT_VERSION = 'v3';
 const NO_CLOSURE_TURN = 5;
 const HUMAN_ACTIVE_GRACE_MS = 20 * 60 * 1000; // the agent yields only while a human is actively replying
 const SITE_URL = 'https://biocambio360.com';
@@ -205,7 +208,8 @@ SEGURIDAD (inquebrantable):
 
 ESTILO: eres una asistente mujer, cálida y proactiva. Saluda solo al inicio de la conversación con el SALUDO del contexto. Responde primero lo que preguntó (precio, uso, dilución) con datos del catálogo o las fichas; si varios productos podrían encajar, ofrece hasta 3 como options. Mensajes MUY cortos. Cada mensaje máx. 2 líneas (~150 caracteres). Usa de 1 a 3 mensajes en "mensajes", lo esencial primero. Tono cálido colombiano, máx. 1 emoji por mensaje. TERMINA SIEMPRE con una pregunta amable que avance la conversación (qué producto, cuántas unidades, dirección, forma de pago…). Cuando el cliente cierre o ya no falte nada, pregunta si desea algo más y di que estarás atenta a resolver sus inquietudes o solicitudes. No te despidas con frases tipo "que tengas un lindo día": ajusta cualquier deseo a la HORA del contexto (de noche nunca "día").
 
-PRODUCTOS: cuando pregunten por un producto o tipo de producto (ej. "detergente para ropa"), muestra TODAS las variantes de COINCIDENCIAS, cada una con todas sus presentaciones y precios (una línea por producto, formato "Nombre: galón $X · 10L $Y · 20L $Z"). No elijas una por el cliente ni omitas presentaciones. El sistema imprime las presentaciones y precios como lista con ✅: tú NO vuelvas a enumerar presentaciones ni precios en tus mensajes (menciónalas una sola vez). Luego pregunta cuál y cuántas quiere, sin repetir las presentaciones (options con los nombres, máx. 3). Presentaciones: 1/2 galón, galón (3.8L), 10L y 20L. Los combos solo si los piden.
+PRODUCTOS: cuando pregunten por un producto o tipo de producto (ej. "detergente para ropa"), muestra TODAS las variantes de COINCIDENCIAS, cada una con todas sus presentaciones y precios (una línea por producto, formato "Nombre: galón $X · 10L $Y · 20L $Z"). No elijas una por el cliente ni omitas presentaciones. El sistema imprime las presentaciones y precios como lista con ✅: tú NO vuelvas a enumerar presentaciones ni precios en tus mensajes (menciónalas una sola vez). Nunca escribas listas con ✅ ni precios de varias presentaciones tú mismo. Luego pregunta cuál y cuántas quiere, sin repetir las presentaciones (options con los nombres, máx. 3). Presentaciones: 1/2 galón, galón (3.8L), 10L y 20L. Los combos solo si los piden.
+PRECIO SIN PRODUCTO: si el cliente pide precio o información sin decir qué producto (p. ej. "precio x fa", "info") y no hay ANUNCIO, no te limites a presentarte: saluda y pregunta qué producto necesita, con options ["Detergente","Suavizante","Desengrasante"]; si ya dijo el producto, dale todas las presentaciones con precio.
 PREGUNTAS FRECUENTES: responde directo y breve. Medios de pago: el sistema imprime la lista con ✅; tú solo pregunta cuál prefiere. No pidas datos antes de contestar.
 BOTÓN WEB: nunca escribas la dirección de la web en los mensajes; pon botonWeb=true cuando invites a comprar en la web y el sistema enviará un botón para abrirla.
 
@@ -220,7 +224,7 @@ MODO (viene en el contexto):
 
 Devuelve SIEMPRE el JSON pedido. preOrder y pqrs van completos y actualizados; lo desconocido = "". resumen: 1 línea para el asesor (qué necesita y qué falta). intencion: compra | consulta_precio | consulta_producto | pqrs | otro.
 
-ANUNCIO: si el contexto trae ORIGEN (anuncio de Meta), el cliente YA vio el anuncio: no le preguntes qué producto busca, no repitas lo que dice el anuncio ni te presentes largo. Confirma el producto del anuncio (usa PRODUCTO DEL ANUNCIO si viene), da las presentaciones y precios y enfócate en CERRAR: cantidad, dirección/ciudad de entrega y forma de pago.
+ANUNCIO: si el contexto trae ORIGEN (anuncio de Meta), el cliente YA vio el anuncio: no le preguntes qué producto busca, no repitas lo que dice el anuncio ni te presentes largo. Confirma el producto del anuncio (usa PRODUCTO DEL ANUNCIO si viene), da las presentaciones y precios y enfócate en CERRAR: cantidad, dirección/ciudad de entrega y forma de pago. Si el anuncio o sus NOTAS mencionan una presentación (p. ej. bidón de 20 litros), da primero el precio de esa presentación y luego pregunta cuántas unidades quiere y la ciudad.
 
 ${rulesPromptBlock(rules)}DATOS DEL NEGOCIO:
 - Medios de pago: transferencia bancaria, ADDI, tarjetas de crédito, PSE y contraentrega. El asesor confirma cuáles aplican según el pedido y la zona.
@@ -283,7 +287,7 @@ export async function callGemini(params: {
             `[CONTEXTO INTERNO — no lo menciones]\n${params.context}\n` +
             (params.isFirstBotTurn && params.newMode !== false
                 ? params.adMode
-                    ? 'PRIMER_MENSAJE (cliente de anuncio): saluda en una línea, confirma el producto del anuncio con su precio y presentaciones (PRODUCTO DEL ANUNCIO / COINCIDENCIAS) y pregunta cuántas unidades necesita y para qué ciudad es. Di brevemente que un asesor confirma cuando abra el equipo (APERTURA). No listes otros productos ni preguntes qué busca.\n'
+                    ? 'PRIMER_MENSAJE (cliente de anuncio): saluda en una línea, confirma el producto del anuncio y el precio de la presentación que promociona (el sistema imprime después la lista completa de presentaciones: NO la escribas ni repitas otros precios) y pregunta cuántas unidades necesita y para qué ciudad es. Di brevemente que un asesor confirma cuando abra el equipo (APERTURA). No listes otros productos ni preguntes qué busca.\n'
                     : 'PRIMER_MENSAJE: preséntate en una línea, avisa que un asesor atiende según la APERTURA del contexto e invita a pedir en la web (botonWeb=true).\n'
                 : '') +
             `[MENSAJE DEL CLIENTE]\n${last.parts[0].text}`;
@@ -607,7 +611,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
     const customerMessages = history.filter(h => h.role === 'user').length;
     const cacheKey =
         input.useResponseCache && botMessagesBefore === 0 && customerMessages === 1 && !input.preOrder && mode === 'nuevo' && !input.memory
-            ? cacheKeyFor(lastText, await getCatalogHash(), `${ad?.sourceId ?? ''}|${ad?.productName ?? ''}|${training.hash}|${opening.label}|${dp.part}`)
+            ? cacheKeyFor(lastText, await getCatalogHash(), `${ad?.sourceId ?? ''}|${ad?.productName ?? ''}|${training.hash}|${opening.label}|${dp.part}|${AGENT_VERSION}`)
             : null;
     const cachedReply = cacheKey ? await getCachedReply(cacheKey) : null;
 
@@ -652,7 +656,9 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
             return { kind: 'refusal', ...empty, messages: [REFUSAL_TEXT] };
         }
 
-        const safe = raw.map(m => stripPromises(m)).filter((m): m is string => !!m);
+        // The system prints price lists itself: drop any list the model improvised on a single line
+        const inlineChecklist = (m: string) => (m.match(/✅/g) ?? []).length >= 2 && !m.includes('\n');
+        const safe = raw.filter(m => !inlineChecklist(m)).map(m => stripPromises(m)).filter((m): m is string => !!m);
         // The site is always shared as a button: strip any raw URL the model wrote
         const wantsLink = !!output.botonWeb || safe.some(m => mentionsSite(m));
         let messages = (safe.length > 0 ? safe : ['Un asesor te contactará pronto para ayudarte 🙌'])
@@ -663,13 +669,26 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
 
         // ── Deterministic presentation (the model's wording is normalized, never trusted) ──
         messages = messages.map(m => fixDayPart(m, dp.part));
+
+        // When the system prints the catalog prices itself, the model's own price lines are dropped
+        // (they could be incomplete or wrong)
+        const priceLines = lastTextMatches || adProductLine;
+        const willList = !!priceLines && !input.alreadyListed && !preOrder.items.length && (!!lastTextMatches || turns === 0);
+        if (willList) {
+            const multiPrice = (m: string) => (m.match(/\$\s*\d/g) ?? []).length >= 2;
+            messages = messages
+                .filter(m => !m.split('\n').some(l => priceLineToBlock(l)) && !multiPrice(m))
+                .map(m => m.replace(/\s*(?:y\s+)?tambi[eé]n[^.!?:]*:\s*$/i, '').trim())
+                .filter(Boolean);
+        }
+
         const reformatted = reformatPriceMessages(messages);
         messages = reformatted.messages;
         let pricesShown = reformatted.hadBlocks || input.alreadyListed;
 
         // A question about a type of product must list EVERY matching variant
-        if (lastTextMatches && !messages.some(m => m.includes('$') || m.includes('✅')) && !input.alreadyListed && !preOrder.items.length) {
-            messages = injectPriceList(messages, PRICE_LIST_HEADER, lastTextMatches);
+        if (willList && !messages.some(m => m.includes('✅'))) {
+            messages = injectPriceList(messages, PRICE_LIST_HEADER, priceLines);
             pricesShown = true;
         }
         if (pricesShown) messages = stripSizeEnumeration(messages);
@@ -740,8 +759,8 @@ async function hasInboundSince(convRef: FirebaseFirestore.DocumentReference, sin
  */
 export async function runOrderAgentTurn(input: AgentTurnInput): Promise<void> {
     try {
-        if (!/^\d{7,15}$/.test(input.contactPhone)) {
-            console.log('[ai-agent] Skipped: contact has no phone number (cannot reply)');
+        if (!isReplyableId(input.contactPhone)) {
+            console.log('[ai-agent] Skipped: contact has neither a phone number nor a valid WhatsApp user ID (cannot reply)');
             return;
         }
         const convRef = getAdminDB().collection('conversations').doc(input.conversationId);

@@ -22,7 +22,7 @@ import { isHumanOnline } from '@/lib/business-hours';
 
 async function notifyCustomer(ref: FirebaseFirestore.DocumentReference, conv: FirebaseFirestore.DocumentData, text: string): Promise<void> {
     try {
-        const { messageId } = await sendTextMessage(conv.phoneId, conv.contactPhone, text);
+        const { messageId } = await sendTextMessage(conv.phoneId, conv.contactPhone || conv.contactUserId, text);
         await ref.collection('messages').add({
             direction: 'outbound',
             type: 'text',
@@ -65,10 +65,11 @@ export async function GET(req: NextRequest) {
         const conv = doc.data();
         try {
             if (isForcedActive(conv)) continue;
+            const contactId: string = conv.contactPhone || conv.contactUserId || '';
 
             const pre = conv.preOrder ?? {};
             const continued = conv.botMode === 'continuacion' && Number(conv.botTurns ?? 0) > 0;
-            if (continued && conv.assignedTo && conv.contactPhone) {
+            if (continued && conv.assignedTo && contactId) {
                 await doc.ref.update({ status: 'abierto', updatedAt: FieldValue.serverTimestamp() });
                 reopened++;
                 const advisor = conv.assignedToName ? String(conv.assignedToName) : 'tu asesor';
@@ -79,16 +80,16 @@ export async function GET(req: NextRequest) {
             const hasLead =
                 (Array.isArray(pre.items) && pre.items.length > 0) || !!pre.horarioContacto || !!conv.hasPqrs;
 
-            if (!hasLead || !conv.contactPhone) {
+            if (!hasLead || !contactId) {
                 await doc.ref.update({ status: 'abierto', updatedAt: FieldValue.serverTimestamp() });
                 reopened++;
-                if (continued && conv.contactPhone) {
+                if (continued && contactId) {
                     await notifyCustomer(doc.ref, conv, `${greeting} Ya pasé tus mensajes al equipo de Biocambio360; te responden en breve.`);
                 }
                 continue;
             }
 
-            const result = await autoAssignConversation(doc.id, conv.contactPhone);
+            const result = await autoAssignConversation(doc.id, contactId);
             if (!result.assigned) {
                 await doc.ref.update({ status: 'abierto', updatedAt: FieldValue.serverTimestamp() });
                 reopened++;

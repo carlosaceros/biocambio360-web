@@ -490,7 +490,7 @@ async function handleWhatsAppInboundMessage(
     // AI agent: it decides by itself whether to answer (no human online, or switched on for this
     // conversation). It runs after the response is sent so Meta is never kept waiting.
     if (type !== 'reaction') {
-        after(() => runOrderAgentTurn({ conversationId, phoneId: phoneNumberId, contactPhone: hasPhone ? from : '' }));
+        after(() => runOrderAgentTurn({ conversationId, phoneId: phoneNumberId, contactPhone: hasPhone ? from : contactKey }));
     }
 }
 

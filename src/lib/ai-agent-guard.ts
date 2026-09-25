@@ -249,9 +249,10 @@ export function injectPriceList(messages: string[], header: string, matches: str
         .split('\n')
         .map(l => priceLineToBlock(l) ?? l.replace(/^-\s*/, '').trim())
         .filter(Boolean);
-    const head = messages.length > 1 ? messages.slice(0, -1) : [];
-    const tail = messages.length > 1 ? messages.slice(-1) : messages;
-    return [...head, header, ...blocks, ...tail].slice(0, 10);
+    // The list goes right before the first question (or before the last message), so the question still closes
+    const asks = messages.findIndex(m => m.includes('?'));
+    const at = asks >= 0 ? asks : Math.max(0, messages.length - 1);
+    return [...messages.slice(0, at), header, ...blocks, ...messages.slice(at)].slice(0, 10);
 }
 
 export const PAYMENT_BLOCK = '💳 Medios de pago:\n✅ Transferencia bancaria\n✅ ADDI\n✅ Tarjeta de crédito\n✅ PSE\n✅ Contraentrega';

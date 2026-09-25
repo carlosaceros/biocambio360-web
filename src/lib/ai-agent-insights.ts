@@ -13,6 +13,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { TIMEZONE } from '@/lib/business-hours';
+import { isReplyableId } from '@/lib/whatsapp-service';
 import type { PreOrder } from '@/types/inbox';
 
 export const INTENTS = ['compra', 'consulta_precio', 'consulta_producto', 'pqrs', 'otro'] as const;
@@ -100,7 +101,7 @@ export async function recordNewInboundConversation(info: { channel: string; adSo
 
 export async function loadCustomerMemory(phone: string): Promise<CustomerMemory | null> {
     try {
-        if (!/^\d{7,15}$/.test(phone)) return null;
+        if (!isReplyableId(phone)) return null;
         const snap = await getAdminDB().collection('customer_memory').doc(phone).get();
         return snap.exists ? (snap.data() as CustomerMemory) : null;
     } catch {
@@ -113,7 +114,7 @@ export async function saveCustomerMemory(
     update: { preOrder: PreOrder | null; resumen?: string; intent?: Intent; isNewConversation: boolean }
 ): Promise<void> {
     try {
-        if (!/^\d{7,15}$/.test(phone)) return;
+        if (!isReplyableId(phone)) return;
         const pre = update.preOrder;
         const data: Record<string, unknown> = { ultimaVez: new Date().toISOString() };
         if (pre?.nombreCliente) data.nombre = pre.nombreCliente;

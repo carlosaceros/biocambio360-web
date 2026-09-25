@@ -133,7 +133,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                 body: JSON.stringify({
                     conversationId: conversation.id,
                     channel: conversation.channel,
-                    to: conversation.contactPhone ?? conversation.contactPsid ?? '',
+                    to: conversation.contactPhone ?? conversation.contactUserId ?? conversation.contactPsid ?? '',
                     phoneId: conversation.phoneId,
                     type: 'text',
                     text,
@@ -181,7 +181,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                 <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-900 text-sm truncate">{conversation.contactName}</p>
                     <p className="text-xs text-gray-400 truncate">
-                        {conversation.contactPhone ? `+${conversation.contactPhone}` : conversation.contactPsid}
+                        {conversation.contactPhone ? `+${conversation.contactPhone}` : conversation.contactUserId ? 'Usuario de WhatsApp (sin número)' : conversation.contactPsid}
                         {conversation.accountKey === 'totalLimpieza' && (
                             <span className="ml-2 text-[10px] bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-full font-semibold">
                                 Total Limpieza

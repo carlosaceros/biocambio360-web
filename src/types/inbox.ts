@@ -69,6 +69,8 @@ export interface ConversationDoc {
     accountKey?: WhatsAppAccountKey;
     /** Contact's phone (E.164 without +) — only for WhatsApp */
     contactPhone?: string;
+    /** WhatsApp business-scoped user ID (contacts that use a username have no phone) */
+    contactUserId?: string | null;
     /** PSID — only for Messenger/Instagram */
     contactPsid?: string;
     contactName: string;

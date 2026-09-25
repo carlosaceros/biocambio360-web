@@ -22,7 +22,23 @@ function getToken(): string {
 /**
  * Core function: sends any message payload to Meta Graph API.
  */
-async function sendToMeta(phoneNumberId: string, payload: Record<string, unknown>): Promise<{ messageId: string }> {
+/** Business-scoped user ID ("CO.1234…"): contacts that use a WhatsApp username have no phone number. */
+export function isBsuid(id: string): boolean {
+    return /^[A-Z]{2}\.(ENT\.)?[A-Za-z0-9]{8,}$/.test(id);
+}
+
+/** True when we can reply to this id: a phone number or a BSUID. */
+export function isReplyableId(id: string): boolean {
+    return /^\d{7,15}$/.test(id) || isBsuid(id);
+}
+
+async function sendToMeta(phoneNumberId: string, rawPayload: Record<string, unknown>): Promise<{ messageId: string }> {
+    // BSUID recipients go in `recipient` instead of `to`
+    const payload = { ...rawPayload };
+    if (typeof payload.to === 'string' && isBsuid(payload.to)) {
+        payload.recipient = payload.to;
+        delete payload.to;
+    }
     const url = `${GRAPH_API_BASE}/${phoneNumberId}/messages`;
     const res = await fetch(url, {
         method: 'POST',
