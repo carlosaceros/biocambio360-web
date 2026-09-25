@@ -658,6 +658,27 @@ export default function AdminDashboard() {
                                     </motion.button>
                                 )}
 
+                                {/* KPIs del Agente IA y marketing (directores) */}
+                                {hasCap('mensajeria') && (role as string) === 'director' && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/kpis-ia')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-violet-200 text-left hover:border-violet-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center mb-3 group-hover:bg-violet-600 group-hover:text-white transition-colors">
+                                            <BarChart3 size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Tablero de KPIs</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Conversaciones, anuncios, embudo de ventas, asesores y costo del agente.
+                                        </p>
+                                        <span className="text-xs font-bold text-violet-700 flex items-center gap-1">
+                                            Ver KPIs <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
+
                                 {/* TPV Mostrador Soacha */}
                                 {hasCap('pos') && (
                                     <motion.button
@@ -1088,6 +1109,17 @@ export default function AdminDashboard() {
                                     <Zap className="text-violet-600 mb-3" size={24} />
                                     <p className="font-black text-gray-900 mb-1">Entrenar Agente IA</p>
                                     <p className="text-xs text-gray-600">Simulador, correcciones y reglas del negocio.</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/kpis-ia')}
+                                    className="bg-white rounded-xl p-6 shadow-md border-2 border-violet-200 text-left hover:border-violet-400 transition-colors"
+                                >
+                                    <BarChart3 className="text-violet-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">KPIs Agente IA y Marketing</p>
+                                    <p className="text-xs text-gray-600">Embudo, anuncios, asesores, intenciones y costo.</p>
                                 </motion.button>
 
                                 <motion.button
