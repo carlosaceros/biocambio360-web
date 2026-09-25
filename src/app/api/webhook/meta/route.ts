@@ -20,6 +20,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { runOrderAgentTurn } from '@/lib/ai-order-agent';
 import { isHumanOnline } from '@/lib/business-hours';
 import { recordNewInboundConversation } from '@/lib/ai-agent-insights';
+import { sendTextMessage } from '@/lib/whatsapp-service';
+import { isOptOutText, registerOptOut, OPTOUT_CONFIRMATION } from '@/lib/wa-optout';
 import { fetchSocialProfile } from '@/lib/meta-social-service';
 
 // ─── GET: Webhook verification ────────────────────────────────────────────────
@@ -487,6 +489,22 @@ async function handleWhatsAppInboundMessage(
         void recordNewInboundConversation({ channel: 'whatsapp', adSourceId: adReferral?.sourceId, humanOnline: isHumanOnline() });
     }
 
+    // Marketing opt-out ("Detener promociones"): record it, confirm, and do not run the agent
+    if (hasPhone && type !== 'reaction' && isOptOutText(content)) {
+        try {
+            await registerOptOut(from, conversationId);
+            const { messageId } = await sendTextMessage(phoneNumberId, from, OPTOUT_CONFIRMATION);
+            await convRef.collection('messages').add({
+                direction: 'outbound', type: 'text', content: OPTOUT_CONFIRMATION, metaMessageId: messageId,
+                agentUid: 'system-optout', agentName: 'Sistema', status: 'sent', timestamp: FieldValue.serverTimestamp(),
+            });
+            await convRef.update({ tags: FieldValue.arrayUnion('sin-promociones'), lastMessage: OPTOUT_CONFIRMATION, lastMessageAt: FieldValue.serverTimestamp() });
+        } catch (err) {
+            console.warn('[webhook/meta] opt-out handling failed:', err instanceof Error ? err.message : err);
+        }
+        return;
+    }
+
     // AI agent: it decides by itself whether to answer (no human online, or switched on for this
     // conversation). It runs after the response is sent so Meta is never kept waiting.
     if (type !== 'reaction') {
@@ -552,6 +570,9 @@ function extractWhatsAppContent(msg: any): {
                 type: 'reaction',
                 content: msg.reaction?.emoji ?? '👍',
             };
+        case 'button':
+            // quick-reply button of a template message
+            return { type: 'text', content: msg.button?.text ?? msg.button?.payload ?? '📲 Respuesta de botón' };
         case 'interactive':
             const interactiveReply = msg.interactive?.button_reply?.title
                 ?? msg.interactive?.list_reply?.title

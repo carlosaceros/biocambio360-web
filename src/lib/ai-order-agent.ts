@@ -544,6 +544,8 @@ export interface BrainInput {
     /** continuation notice ("advisor is resting…") still has to be said */
     noticePending?: boolean;
     memory?: CustomerMemory | null;
+    /** customer is answering our abandoned-cart reminder */
+    cartNote?: string | null;
     now?: Date;
 }
 
@@ -601,6 +603,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
             : '') +
         '.\n' +
         memoryPromptBlock(input.memory ?? null) +
+        (input.cartNote ? `CARRITO ABANDONADO: el cliente dejó pendiente ${input.cartNote} y responde a nuestro recordatorio. Ayúdale a terminar: resuelve su duda, confirma lo que tenía y anímalo a finalizar (botonWeb=true) o toma el pedido.\n` : '') +
         adBlock +
         `PRE-PEDIDO ACTUAL: ${input.preOrder ? JSON.stringify({ ...input.preOrder, actualizadoAt: undefined, estado: undefined }) : 'ninguno'}\n` +
         (matches ? `COINCIDENCIAS (todas las variantes con todas sus presentaciones):\n${matches}\n` : '') +
@@ -943,6 +946,7 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
             advisorName,
             noticePending,
             memory,
+            cartNote: conv.cartToken && conv.cartSummary ? `${conv.cartSummary} (total $${Number(conv.cartTotal || 0).toLocaleString('es-CO')})` : null,
         });
 
         if (result.kind === 'refusal') return void (await finishCanned(REFUSAL_TEXT, true));

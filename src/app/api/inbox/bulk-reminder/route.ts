@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB, getAdminAuth } from '@/lib/firebase-admin';
 import { sendBulkTemplateMessages } from '@/lib/whatsapp-service';
 import { FieldValue } from 'firebase-admin/firestore';
+import { isOptedOut } from '@/lib/wa-optout';
 
 // Cost estimate per marketing conversation (Colombia +57) in USD
 const MARKETING_COST_USD = 0.0125;
@@ -63,6 +64,10 @@ export async function POST(req: NextRequest) {
         const phone = (data.customerPhone as string ?? '').replace(/\D/g, '');
         if (!phone || phone.length < 10) {
             customerErrors.push({ customerId: cid, phone, error: 'Invalid phone number' });
+            continue;
+        }
+        if (await isOptedOut(`57${phone.slice(-10)}`)) {
+            customerErrors.push({ customerId: cid, phone, error: 'El cliente pidió no recibir promociones' });
             continue;
         }
         customers.push({ id: cid, phone: `57${phone.slice(-10)}`, name: data.customerName ?? '', itemsSummary: data.itemsSummary ?? '', email: data.customerEmail ?? '', city: data.customerCity ?? '', lastOrderId: data.lastOrderId ?? '' });

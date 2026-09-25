@@ -18,7 +18,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, onSnapshot } from 'firebase/firestore';
 import type { ConversationDoc } from '@/types/inbox';
 import Link from 'next/link';
 import { confirmPreOrder, setConversationAgentForced } from '@/lib/inbox-service';
@@ -59,6 +59,22 @@ export default function ContactPanel({
     const [autoAssignResult, setAutoAssignResult] = useState<{ advisorName?: string; detail?: string; assigned: boolean } | null>(null);
     const [confirmingPreOrder, setConfirmingPreOrder] = useState(false);
     const [togglingAgent, setTogglingAgent] = useState(false);
+    const [cartDoc, setCartDoc] = useState<{
+        status?: string;
+        total?: number;
+        items?: Array<{ nombre: string; size: string; cantidad: number }>;
+        sent?: Record<string, { ok?: boolean; skipped?: string }>;
+        recoveredOrderId?: string;
+        clickCount?: number;
+        openCount?: number;
+    } | null>(null);
+
+    useEffect(() => {
+        setCartDoc(null);
+        const token = conversation?.cartToken;
+        if (!token) return;
+        return onSnapshot(doc(db, 'abandoned_carts', token), snap => setCartDoc(snap.exists() ? (snap.data() as never) : null), () => undefined);
+    }, [conversation?.cartToken]);
     const [saleAmount, setSaleAmount] = useState('');
     const [savingSale, setSavingSale] = useState(false);
     const [saleFeedback, setSaleFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -247,6 +263,36 @@ export default function ContactPanel({
                             Ver anuncio
                         </a>
                     )}
+                </div>
+            )}
+
+            {/* Abandoned cart linked to this conversation */}
+            {conversation.cartToken && (
+                <div className="px-4 py-3 border-b border-gray-100 bg-amber-50/50 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-extrabold uppercase text-amber-700 tracking-wider">🛒 Carrito abandonado</p>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cartDoc?.status === 'recovered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                            {cartDoc?.status === 'recovered' ? 'Recuperado' : 'Sin comprar'}
+                        </span>
+                    </div>
+                    {(cartDoc?.items ?? []).map((it, i) => (
+                        <p key={i} className="text-xs text-gray-700">{it.cantidad}× {it.nombre} <span className="text-gray-400">({it.size})</span></p>
+                    ))}
+                    {!cartDoc?.items && conversation.cartSummary && <p className="text-xs text-gray-700">{conversation.cartSummary}</p>}
+                    <p className="text-xs font-bold text-gray-900">Total: ${Number(cartDoc?.total ?? conversation.cartTotal ?? 0).toLocaleString('es-CO')}</p>
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                        {[1, 2, 3].map(n => {
+                            const e = cartDoc?.sent?.[`email_${n}`];
+                            return e ? <span key={`e${n}`} className={`text-[10px] px-1.5 py-0.5 rounded ${e.ok ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>✉ Correo {n}{e.ok ? '' : ' ✗'}</span> : null;
+                        })}
+                        {[1, 2, 3].map(n => {
+                            const w = cartDoc?.sent?.[`wa_${n}`];
+                            return w ? <span key={`w${n}`} className={`text-[10px] px-1.5 py-0.5 rounded ${w.ok ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`} title={w.skipped}>💬 WhatsApp {n}{w.ok ? '' : ' ✗'}</span> : null;
+                        })}
+                        {(cartDoc?.openCount ?? 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">Abrió correo</span>}
+                        {(cartDoc?.clickCount ?? 0) > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700">Hizo clic</span>}
+                    </div>
+                    {cartDoc?.recoveredOrderId && <p className="text-[11px] text-emerald-700 font-semibold">Pedido #{cartDoc.recoveredOrderId.slice(-6)}</p>}
                 </div>
             )}
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import CartAutomationPanel from '@/components/admin/CartAutomationPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingCart,
@@ -367,6 +368,8 @@ export default function CarritosAbandonadosPage() {
                         </div>
                     </div>
                 </div>
+
+                <CartAutomationPanel />
 
                 {/* Notification Alert */}
                 {actionMessage && (

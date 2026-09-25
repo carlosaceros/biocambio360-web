@@ -739,6 +739,7 @@ export default function CheckoutPage() {
                                             maxLength={10}
                                         />
                                         {errors.celular && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.celular}</p>}
+                                        <p className="text-gray-500 text-xs mt-1.5">Usaremos tu celular para avisarte de tu pedido por WhatsApp. Puedes pedir que dejemos de escribirte cuando quieras.</p>
                                     </div>
 
                                     <div className="md:col-span-2">

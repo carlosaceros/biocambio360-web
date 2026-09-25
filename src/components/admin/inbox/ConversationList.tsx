@@ -169,6 +169,14 @@ export default function ConversationList({
                                         </span>
                                     </>
                                 )}
+                                {conv.tags?.includes('carrito-abandonado') && (
+                                    <>
+                                        <span className="text-[10px] text-gray-300">·</span>
+                                        <span className="text-[10px] bg-amber-50 text-amber-700 px-1 rounded font-semibold" title="Carrito abandonado">
+                                            🛒 Carrito
+                                        </span>
+                                    </>
+                                )}
                                 {conv.preOrder?.horarioContacto && (
                                     <>
                                         <span className="text-[10px] text-gray-300">·</span>

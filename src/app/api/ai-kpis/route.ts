@@ -38,12 +38,14 @@ export async function GET(req: NextRequest) {
     const sinceDay = bogotaDay(since);
     const db = getAdminDB();
 
-    const [dailySnap, usageSnap, convSnap, pqrsSnap, adsSnap] = await Promise.all([
+    const [dailySnap, usageSnap, convSnap, pqrsSnap, adsSnap, cartSnap, cartConvSnap] = await Promise.all([
         db.collection('analytics_daily').where('__name__', '>=', sinceDay).get(),
         db.collection('ai_usage').where('__name__', '>=', sinceDay).get(),
         db.collection('conversations').where('createdAt', '>=', since).limit(4000).get(),
         db.collection('pqrs').where('createdAt', '>=', since).limit(1000).get(),
         db.collection('ad_referrals').limit(500).get(),
+        db.collection('abandoned_carts').where('createdAt', '>=', since).limit(3000).get(),
+        db.collection('conversations').where('tags', 'array-contains', 'carrito-abandonado').limit(1500).get(),
     ]);
 
     // ── Daily counters ───────────────────────────────────────────────────────
@@ -140,6 +142,61 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    // ── Abandoned carts ──────────────────────────────────────────────────────
+    const cartConvByToken = new Map<string, FirebaseFirestore.DocumentData>();
+    cartConvSnap.docs.forEach(d => {
+        const x = d.data();
+        if (x.cartToken) cartConvByToken.set(String(x.cartToken), x);
+    });
+    const carts = {
+        total: 0,
+        recovered: 0,
+        abandoned: 0,
+        recoveredValue: 0,
+        lostValue: 0,
+        withEmail: 0,
+        withPhone: 0,
+        recoveredAfterClick: 0,
+        recoveredOnTheirOwn: 0,
+        steps: [1, 2, 3].map(step => ({ step, emailSent: 0, emailOpened: 0, emailClicked: 0, waSent: 0, waReplied: 0, recovered: 0 })),
+        waConversations: cartConvSnap.size,
+    };
+    for (const d of cartSnap.docs) {
+        const c = d.data();
+        carts.total++;
+        const value = num(c.total);
+        const recovered = c.status === 'recovered';
+        if (recovered) {
+            carts.recovered++;
+            carts.recoveredValue += value;
+            if (toMs(c.clickedAt) > 0) carts.recoveredAfterClick++;
+            else carts.recoveredOnTheirOwn++;
+        } else if (c.status === 'abandoned') {
+            carts.abandoned++;
+            carts.lostValue += value;
+        }
+        if (c.customerEmail) carts.withEmail++;
+        if (c.customerPhone) carts.withPhone++;
+
+        const sent = (c.sent ?? {}) as Record<string, { ok?: boolean; at?: string }>;
+        const legacy = !c.sent && c.customerEmail; // carts processed before the step log existed
+        for (const s of carts.steps) {
+            const email = sent[`email_${s.step}`];
+            if ((email && email.ok) || (legacy && num(c.notificationCount) >= s.step)) s.emailSent++;
+            const wa = sent[`wa_${s.step}`];
+            if (wa?.ok) {
+                s.waSent++;
+                const conv = cartConvByToken.get(String(c.cartToken ?? d.id));
+                if (conv && toMs(conv.lastInboundAt) > (Date.parse(wa.at ?? '') || 0)) s.waReplied++;
+            }
+            if (recovered && num(c.lastContactClicked) === s.step) s.recovered++;
+        }
+        const openedStep = num(c.lastContactOpened);
+        const clickedStep = num(c.lastContactClicked);
+        if (openedStep >= 1 && openedStep <= 3) carts.steps[openedStep - 1].emailOpened++;
+        if (clickedStep >= 1 && clickedStep <= 3) carts.steps[clickedStep - 1].emailClicked++;
+    }
+
     // ── PQRS ─────────────────────────────────────────────────────────────────
     const pqrsState: Counter = {};
     for (const d of pqrsSnap.docs) {
@@ -179,6 +236,7 @@ export async function GET(req: NextRequest) {
         channelFunnel,
         ads: [...ads.values()].sort((a, b) => b.conversations - a.conversations).slice(0, 25),
         advisors: [...advisors.values()].sort((a, b) => b.revenue - a.revenue || b.assigned - a.assigned),
+        carts,
         usage: { ...usage, estimatedCostUsd, savedByCacheUsd: Math.max(0, withoutCacheUsd - estimatedCostUsd) },
         truncated: convSnap.size >= 4000,
     });

@@ -88,6 +88,12 @@ export interface ConversationDoc {
     tags?: string[];
     /** Pre-order drafted by the AI agent (after hours) */
     preOrder?: PreOrder;
+    /** Abandoned-cart reminder that started/tagged this conversation */
+    cartToken?: string;
+    cartTotal?: number;
+    cartSummary?: string;
+    cartStep?: number;
+    cartSentAt?: string;
     /** A human switched the AI agent on for this conversation (expires after 6 h) */
     agentForced?: boolean;
     agentForcedAt?: string;

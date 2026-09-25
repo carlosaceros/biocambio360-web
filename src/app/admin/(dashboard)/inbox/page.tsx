@@ -161,6 +161,7 @@ export default function InboxPage() {
     const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
     const [accountFilter, setAccountFilter] = useState<AccountFilter>('all');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+    const [cartsOnly, setCartsOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     // UI state
@@ -270,6 +271,7 @@ export default function InboxPage() {
         return allConversations.filter(conv => {
             if (channelFilter !== 'all' && conv.channel !== channelFilter) return false;
             if (statusFilter !== 'all' && conv.status !== statusFilter) return false;
+            if (cartsOnly && !conv.tags?.includes('carrito-abandonado')) return false;
             if (accountFilter === 'biocambio360' && conv.accountKey !== 'biocambio360') return false;
             if (accountFilter === 'totalLimpieza' && conv.accountKey !== 'totalLimpieza') return false;
             if (searchQuery.trim()) {
@@ -282,7 +284,9 @@ export default function InboxPage() {
             }
             return true;
         });
-    }, [allConversations, channelFilter, statusFilter, accountFilter, searchQuery]);
+    }, [allConversations, channelFilter, statusFilter, cartsOnly, accountFilter, searchQuery]);
+
+    const cartCount = useMemo(() => allConversations.filter(c => c.tags?.includes('carrito-abandonado')).length, [allConversations]);
 
     // ── Badge counts per channel ──────────────────────────────────────────────
     const unreadByChannel = useMemo(() => {
@@ -522,6 +526,15 @@ export default function InboxPage() {
                                     {f.label}
                                 </button>
                             ))}
+                            <button
+                                onClick={() => setCartsOnly(v => !v)}
+                                title="Conversaciones de carritos abandonados (recordatorios por WhatsApp y respuestas)"
+                                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-lg whitespace-nowrap transition-colors ${
+                                    cartsOnly ? 'bg-amber-100 text-amber-800' : 'text-gray-500 hover:bg-gray-100'
+                                }`}
+                            >
+                                🛒 Carritos{cartCount > 0 ? ` (${cartCount})` : ''}
+                            </button>
                         </div>
                     </div>
 

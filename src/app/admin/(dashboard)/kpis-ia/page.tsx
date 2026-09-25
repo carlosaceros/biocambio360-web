@@ -36,6 +36,19 @@ interface Kpis {
     channelFunnel: Counter;
     ads: Array<{ id: string; headline: string; conversations: number; preOrders: number; sales: number; revenue: number }>;
     advisors: Array<{ name: string; assigned: number; sales: number; revenue: number }>;
+    carts: {
+        total: number;
+        recovered: number;
+        abandoned: number;
+        recoveredValue: number;
+        lostValue: number;
+        withEmail: number;
+        withPhone: number;
+        recoveredAfterClick: number;
+        recoveredOnTheirOwn: number;
+        waConversations: number;
+        steps: Array<{ step: number; emailSent: number; emailOpened: number; emailClicked: number; waSent: number; waReplied: number; recovered: number }>;
+    };
     usage: { llmCalls: number; responseCacheHits: number; promptTokens: number; cachedTokens: number; outputTokens: number; estimatedCostUsd: number; savedByCacheUsd: number };
     truncated: boolean;
 }
@@ -290,6 +303,44 @@ export default function KpisIaPage() {
                         <Section title="PQRS por tipo"><Bars data={data.byPqrs} colorClass="bg-red-500" /></Section>
                         <Section title="PQRS por estado"><Bars data={data.pqrsState} colorClass="bg-orange-500" /></Section>
                     </div>
+
+                    <Section title="Carritos abandonados y recordatorios">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-4">
+                            <div><p className="text-gray-500">Carritos con datos de contacto</p><p className="text-lg font-black">{int(data.carts.total)}</p><p className="text-gray-400">{int(data.carts.withEmail)} con correo · {int(data.carts.withPhone)} con celular</p></div>
+                            <div><p className="text-gray-500">Recuperados</p><p className="text-lg font-black text-emerald-700">{int(data.carts.recovered)} <span className="text-sm">({pct(data.carts.recovered, data.carts.total)})</span></p><p className="text-gray-400">{money(data.carts.recoveredValue)}</p></div>
+                            <div><p className="text-gray-500">Siguen sin comprar</p><p className="text-lg font-black text-amber-700">{int(data.carts.abandoned)}</p><p className="text-gray-400">{money(data.carts.lostValue)} en juego</p></div>
+                            <div><p className="text-gray-500">Recuperados tras clic en recordatorio</p><p className="text-lg font-black">{int(data.carts.recoveredAfterClick)}</p><p className="text-gray-400">{int(data.carts.recoveredOnTheirOwn)} volvieron por su cuenta</p></div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="text-left text-gray-500 border-b border-gray-100">
+                                        <th className="py-1.5 pr-2 font-bold">Recordatorio</th>
+                                        <th className="py-1.5 px-2 font-bold text-right">Correos enviados</th>
+                                        <th className="py-1.5 px-2 font-bold text-right">Abiertos</th>
+                                        <th className="py-1.5 px-2 font-bold text-right">Clics</th>
+                                        <th className="py-1.5 px-2 font-bold text-right">WhatsApp enviados</th>
+                                        <th className="py-1.5 px-2 font-bold text-right">Respondieron</th>
+                                        <th className="py-1.5 pl-2 font-bold text-right">Recuperados</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.carts.steps.map(s => (
+                                        <tr key={s.step} className="border-b border-gray-50">
+                                            <td className="py-1.5 pr-2 text-gray-800">{({ 1: 'A las 2 h', 2: 'A las 8 h', 3: 'A las 24 h' } as Record<number, string>)[s.step]}</td>
+                                            <td className="py-1.5 px-2 text-right">{int(s.emailSent)}</td>
+                                            <td className="py-1.5 px-2 text-right">{int(s.emailOpened)} <span className="text-gray-400">({pct(s.emailOpened, s.emailSent)})</span></td>
+                                            <td className="py-1.5 px-2 text-right">{int(s.emailClicked)} <span className="text-gray-400">({pct(s.emailClicked, s.emailSent)})</span></td>
+                                            <td className="py-1.5 px-2 text-right">{int(s.waSent)}</td>
+                                            <td className="py-1.5 px-2 text-right">{int(s.waReplied)} <span className="text-gray-400">({pct(s.waReplied, s.waSent)})</span></td>
+                                            <td className="py-1.5 pl-2 text-right font-bold">{int(s.recovered)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-2">Las conversaciones de carritos están en el Inbox con el filtro 🛒 Carritos ({int(data.carts.waConversations)}). &quot;Recuperados&quot; por recordatorio cuenta el último enlace en el que hizo clic el cliente.</p>
+                    </Section>
 
                     <Section title="Asesores (conversaciones asignadas y ventas)">
                         {data.advisors.length === 0 ? (
