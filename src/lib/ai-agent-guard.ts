@@ -180,16 +180,136 @@ export function stripSiteUrl(text: string): string {
         .trim();
 }
 
+// ─── Presentation: price lists, payment methods, day part, closing question ──
+
+const SIZE_NAMES: Array<[RegExp, string]> = [
+    [/^(1\/2\s*g\b|1\/2\s*gal|medio)/i, '1/2 galón'],
+    [/^(3\.8\s*l|gal[oó]n)/i, 'Galón'],
+    [/^[uú]nica/i, 'Presentación única'],
+];
+
+function sizeName(raw: string): string {
+    const t = raw.trim();
+    for (const [re, name] of SIZE_NAMES) if (re.test(t)) return name;
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** "Name: 1/2 galón $19.000 · galón $34.000" → "*Name*\n✅ 1/2 galón: $19.000\n✅ Galón: $34.000" (null if not a price line). */
+export function priceLineToBlock(line: string): string | null {
+    const m = line.match(/^\s*[-•]?\s*\**([^:$✅]{2,120}?)\**:\s*(.+\$.+)$/);
+    if (!m) return null;
+    const items: string[] = [];
+    for (const seg of m[2].split(/\s*[·|]\s*/)) {
+        const mm = seg.trim().replace(/[.,;]$/, '').match(/^(.+?)\s*\$\s*([\d.,]+)$/);
+        if (!mm) return null;
+        items.push(`✅ ${sizeName(mm[1])}: $${mm[2]}`);
+    }
+    return items.length > 0 ? `*${m[1].trim()}*\n${items.join('\n')}` : null;
+}
+
+/** Rewrites every price line as a checkmark list, one message per product. */
+export function reformatPriceMessages(messages: string[]): { messages: string[]; hadBlocks: boolean } {
+    const out: string[] = [];
+    let hadBlocks = false;
+    for (const message of messages) {
+        let text: string[] = [];
+        const flush = () => {
+            if (text.length > 0) out.push(text.join('\n'));
+            text = [];
+        };
+        for (const line of message.split('\n')) {
+            const block = priceLineToBlock(line);
+            if (block) {
+                flush();
+                out.push(block);
+                hadBlocks = true;
+            } else {
+                text.push(line);
+            }
+        }
+        flush();
+    }
+    return { messages: out, hadBlocks: hadBlocks || messages.some(m => m.includes('✅')) };
+}
+
+/** Removes sentences that list the sizes again ("Tenemos 1/2 galón, galón, 10L y 20L.") once prices were shown. */
+export function stripSizeEnumeration(messages: string[]): string[] {
+    const enumerates = (s: string) => /(1\/2\s*gal[oó]n|medio\s+gal[oó]n|1\/2\s*g\b)/i.test(s) && /10\s*l/i.test(s) && /20\s*l/i.test(s) && !/\$/.test(s);
+    return messages
+        .map(m => (m.includes('✅') ? m : m.split(/(?<=[.!?])\s+/).filter(sentence => !enumerates(sentence)).join(' ').trim()))
+        .filter(Boolean);
+}
+
 /**
- * Inserts the price list (one product per line, packed 2 lines per WhatsApp message) before the
- * agent's last message, so the closing question still comes last.
+ * Inserts the price list (one checkmark block per product) before the agent's last message,
+ * so the closing question still comes last.
  */
 export function injectPriceList(messages: string[], header: string, matches: string): string[] {
-    const lines = matches.split('\n').map(l => l.replace(/^-\s*/, '').trim()).filter(Boolean);
-    const priceMessages = splitIntoShortMessages([header, ...lines].join('\n'));
+    const blocks = matches
+        .split('\n')
+        .map(l => priceLineToBlock(l) ?? l.replace(/^-\s*/, '').trim())
+        .filter(Boolean);
     const head = messages.length > 1 ? messages.slice(0, -1) : [];
     const tail = messages.length > 1 ? messages.slice(-1) : messages;
-    return [...head, ...priceMessages, ...tail].slice(0, 9);
+    return [...head, header, ...blocks, ...tail].slice(0, 10);
+}
+
+export const PAYMENT_BLOCK = '💳 Medios de pago:\n✅ Transferencia bancaria\n✅ ADDI\n✅ Tarjeta de crédito\n✅ PSE\n✅ Contraentrega';
+const PAYMENT_NOTE = 'El asesor confirma cuáles aplican según tu pedido y zona.';
+
+const PAYMENT_KEYWORDS = /transferencia|addi|tarjeta|\bpse\b|contraentrega|contra entrega/gi;
+
+/** Payment methods are always shown as a checkmark list, and offered when the agent asks how to pay. */
+export function ensurePaymentList(messages: string[], alreadyShown: boolean): string[] {
+    const listed = (m: string) => m.includes('✅') && /\bpse\b/i.test(m);
+
+    const inline = messages.findIndex(m => !listed(m) && new Set((m.match(PAYMENT_KEYWORDS) ?? []).map(k => k.toLowerCase())).size >= 3);
+    if (inline >= 0) {
+        const questions = messages[inline].split(/(?<=[.!?])\s+/).filter(x => x.includes('?'));
+        const replacement = [`${PAYMENT_BLOCK}\n${PAYMENT_NOTE}`, ...(questions.length ? [questions.join(' ')] : [])];
+        return [...messages.slice(0, inline), ...replacement, ...messages.slice(inline + 1)];
+    }
+
+    if (alreadyShown || messages.some(listed)) return messages;
+    const asks = messages.findIndex(m => m.includes('?') && /(forma|medio|m[eé]todo)s?\s+de\s+pago|c[oó]mo\s+(te\s+)?(gustar[ií]a|prefieres|quieres|deseas)\s+pagar|con\s+qu[eé]\s+(medio\s+)?(pagar|pagas)/i.test(m));
+    if (asks < 0) return messages;
+    return [...messages.slice(0, asks), PAYMENT_BLOCK, ...messages.slice(asks)];
+}
+
+const ADJ_FEM: Record<string, string> = { lindo: 'linda', buen: 'buena', hermoso: 'hermosa', excelente: 'excelente', feliz: 'feliz', maravilloso: 'maravillosa', bonito: 'bonita' };
+
+/** Makes greetings and wishes coherent with the real time ("lindo día" is never said at night). */
+export function fixDayPart(text: string, part: 'manana' | 'tarde' | 'noche'): string {
+    const noun = part === 'manana' ? 'día' : part === 'tarde' ? 'tarde' : 'noche';
+    const greeting = part === 'manana' ? 'buenos días' : part === 'tarde' ? 'buenas tardes' : 'buenas noches';
+    const keepCase = (orig: string, next: string) => (orig.charAt(0) === orig.charAt(0).toUpperCase() ? next.charAt(0).toUpperCase() + next.slice(1) : next);
+    return text
+        .replace(/\b(buenos\s+d[ií]as|buenas\s+tardes|buenas\s+noches)\b/gi, m => keepCase(m, greeting))
+        .replace(/\b(un|una)\s+(lindo|linda|buen|buena|hermoso|hermosa|excelente|maravilloso|maravillosa|bonito|bonita)\s+(d[ií]a|tarde|noche)\b/gi, (_m, _art, adj: string) => {
+            const base = adj.toLowerCase().replace(/[ao]$/, m => (m === 'a' ? 'o' : m)).replace(/^linda$/, 'lindo').replace(/^buena$/, 'buen').replace(/^hermosa$/, 'hermoso').replace(/^maravillosa$/, 'maravilloso').replace(/^bonita$/, 'bonito');
+            const masc = part === 'manana';
+            const word = masc ? (base === 'buen' ? 'buen' : base) : ADJ_FEM[base] ?? base;
+            return `${masc ? 'un' : 'una'} ${word} ${noun}`;
+        })
+        .replace(/\bfeliz\s+(d[ií]a|tarde|noche)\b/gi, m => keepCase(m, `feliz ${noun}`));
+}
+
+/** Drops "¡Que tengas un lindo día!"-style sentences: the closing question replaces the farewell. */
+export function stripFarewell(messages: string[]): string[] {
+    const farewell = /(?<=^|[.!?]\s*)¡?\s*que\s+(tengas|pases|descanses|disfrutes|tenga|pase)\b[^.!?\n]*[.!?]*[\s\p{Extended_Pictographic}\uFE0F]*/giu;
+    return messages.map(m => m.replace(farewell, ' ').replace(/\s{2,}/g, ' ').trim()).filter(m => /[\p{L}\d]/u.test(m));
+}
+
+export const CLOSING_QUESTION = '¿Hay algo más en lo que pueda ayudarte? Estaré atenta a resolver tus inquietudes o solicitudes 😊';
+
+/** Every reply ends with a friendly, proactive question. */
+export function ensureClosingQuestion(messages: string[]): string[] {
+    const last = messages[messages.length - 1] ?? '';
+    return last.includes('?') ? messages : [...messages, CLOSING_QUESTION];
+}
+
+export function startsWithGreeting(text: string): boolean {
+    return /^[\s¡!]*(hola|buen[oa]s|saludos)/i.test(text);
 }
 
 /** Automatic replies from other businesses/bots ("gracias por tu mensaje, te responderemos pronto"). */

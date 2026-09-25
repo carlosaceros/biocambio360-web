@@ -141,3 +141,13 @@ export function shiftKey(date: Date = new Date()): string {
     const day = now.minutes >= open ? utc(now) : utc(now, -1);
     return day.toISOString().slice(0, 10);
 }
+
+export type DayPart = 'manana' | 'tarde' | 'noche';
+
+/** Part of the day in Bogotá, with the matching greeting (used so a "good day" is never said at night). */
+export function dayPartNow(date: Date = new Date()): { part: DayPart; greeting: string; noun: string } {
+    const hour = Math.floor(bogotaNow(date).minutes / 60);
+    if (hour >= 5 && hour < 12) return { part: 'manana', greeting: '¡Buenos días!', noun: 'día' };
+    if (hour >= 12 && hour < 19) return { part: 'tarde', greeting: '¡Buenas tardes!', noun: 'tarde' };
+    return { part: 'noche', greeting: '¡Buenas noches!', noun: 'noche' };
+}
