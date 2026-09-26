@@ -215,6 +215,7 @@ export default function CheckoutPage() {
                             nombre: res.cart.customerName || prev.nombre,
                             email: res.cart.customerEmail || prev.email,
                             celular: res.cart.customerPhone || prev.celular,
+                            cedula: res.cart.customerCedula || prev.cedula,
                             ciudad: res.cart.ciudad || prev.ciudad,
                             direccion: res.cart.direccion || prev.direccion,
                         }));
@@ -278,6 +279,7 @@ export default function CheckoutPage() {
                     customerEmail: formData.email,
                     customerName: formData.nombre,
                     customerPhone: formData.celular,
+                    cedula: formData.cedula,
                     ciudad: formData.ciudad,
                     direccion: formData.direccion,
                     items: cart.map(i => ({
@@ -296,7 +298,7 @@ export default function CheckoutPage() {
         }, 1500);
 
         return () => clearTimeout(timer);
-    }, [cartToken, formData.email, formData.nombre, formData.celular, formData.ciudad, formData.direccion, cart, subtotal, shippingCost, total]);
+    }, [cartToken, formData.email, formData.nombre, formData.celular, formData.cedula, formData.ciudad, formData.direccion, cart, subtotal, shippingCost, total]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;

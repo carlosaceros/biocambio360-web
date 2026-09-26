@@ -163,6 +163,8 @@ export async function GET(req: NextRequest) {
     };
     for (const d of cartSnap.docs) {
         const c = d.data();
+        // Replenishment reminders reuse the cart mechanism but are not abandoned carts
+        if (c.status === 'reminder') continue;
         carts.total++;
         const value = num(c.total);
         const recovered = c.status === 'recovered';

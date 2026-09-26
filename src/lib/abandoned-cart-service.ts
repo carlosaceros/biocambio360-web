@@ -25,6 +25,7 @@ export interface AbandonedCartRecord {
     customerEmail?: string;
     customerName?: string;
     customerPhone?: string;
+    customerCedula?: string;
     ciudad?: string;
     direccion?: string;
     items: AbandonedCartItem[];
@@ -56,6 +57,7 @@ export async function saveAbandonedCartSession(data: {
     customerEmail?: string;
     customerName?: string;
     customerPhone?: string;
+    cedula?: string;
     ciudad?: string;
     direccion?: string;
     items: AbandonedCartItem[];
@@ -77,6 +79,7 @@ export async function saveAbandonedCartSession(data: {
             customerEmail: data.customerEmail || existing.customerEmail || '',
             customerName: data.customerName || existing.customerName || '',
             customerPhone: data.customerPhone || existing.customerPhone || '',
+            customerCedula: data.cedula || existing.customerCedula || '',
             ciudad: data.ciudad || existing.ciudad || '',
             direccion: data.direccion || existing.direccion || '',
             items: data.items,
@@ -91,6 +94,7 @@ export async function saveAbandonedCartSession(data: {
             customerEmail: data.customerEmail || '',
             customerName: data.customerName || '',
             customerPhone: data.customerPhone || '',
+            customerCedula: data.cedula || '',
             ciudad: data.ciudad || '',
             direccion: data.direccion || '',
             items: data.items,

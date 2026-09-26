@@ -9,6 +9,7 @@ export async function POST(request: Request) {
             customerEmail,
             customerName,
             customerPhone,
+            cedula,
             ciudad,
             direccion,
             items,
@@ -17,8 +18,9 @@ export async function POST(request: Request) {
             total,
         } = body;
 
-        if (!cartToken || !customerEmail || !items || items.length === 0) {
-            return NextResponse.json({ error: 'cartToken, customerEmail, and items are required' }, { status: 400 });
+        // Email is optional at checkout: a cart is recoverable with either an email or a phone number
+        if (!cartToken || (!customerEmail && !customerPhone) || !items || items.length === 0) {
+            return NextResponse.json({ error: 'cartToken, a contact (email or phone) and items are required' }, { status: 400 });
         }
 
         await saveAbandonedCartSession({
@@ -26,6 +28,7 @@ export async function POST(request: Request) {
             customerEmail,
             customerName,
             customerPhone,
+            cedula,
             ciudad,
             direccion,
             items,
