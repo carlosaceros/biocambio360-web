@@ -301,6 +301,33 @@ export function stripFarewell(messages: string[]): string[] {
     return messages.map(m => m.replace(farewell, ' ').replace(/\s{2,}/g, ' ').trim()).filter(m => /[\p{L}\d]/u.test(m));
 }
 
+/** Short "no thanks / ok / thanks" answers that end a conversation. */
+export function isClosingAck(text: string): boolean {
+    const t = String(text ?? '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z\p{Extended_Pictographic} ]+/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!t) return false;
+    if (/^[\p{Extended_Pictographic}\s]+$/u.test(t)) return true; // only emojis (👍 🙏 😊)
+    if (t.length > 40) return false;
+    return /^(no+|nop|nada|ninguno|no por ahora|por ahora no|no gracias|no muchas gracias|no nada mas|nada mas|eso es todo|es todo|todo bien|gracias|muchas gracias|mil gracias|muy amable|ok|okey|okay|vale|listo|bueno|perfecto|de acuerdo|entendido|excelente|super|genial|dale|chao|adios|hasta luego|hasta pronto|bye|de nada|con gusto|igualmente|igual|buenas noches|buenas tardes|buenos dias|buen dia|feliz noche|feliz dia|feliz tarde|que descanses)( muchas gracias| gracias| igualmente| para ti| tambien| amiga| amigo)?( [\p{Extended_Pictographic}])*$/u.test(t);
+}
+
+/** One friendly goodbye matching the time of day. */
+export function farewellText(part: 'manana' | 'tarde' | 'noche'): string {
+    return part === 'manana' ? 'Gracias por escribirnos 🙌 ¡Feliz día! ☀️' : part === 'tarde' ? 'Gracias por escribirnos 🙌 ¡Feliz tarde! 🌤️' : 'Gracias por escribirnos 🙌 ¡Feliz noche! 🌙';
+}
+
+/** Removes every "¿algo más…?" style question (the closing question is asked only once). */
+export function stripMoreHelpQuestion(messages: string[]): string[] {
+    return messages
+        .map(m => m.split(/(?<=[.!?])\s+/).filter(s => !/algo m[aá]s|estar[eé] atenta|en qu[eé] m[aá]s (puedo|te)/i.test(s)).join(' ').trim())
+        .filter(m => /[\p{L}\d]/u.test(m));
+}
+
 export const CLOSING_QUESTION = '¿Hay algo más en lo que pueda ayudarte? Estaré atenta a resolver tus inquietudes o solicitudes 😊';
 
 /** Every reply ends with a friendly, proactive question. */

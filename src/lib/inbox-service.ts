@@ -146,21 +146,67 @@ export function subscribeToConversations(
 /**
  * Subscribes to the messages of a single conversation, ordered by timestamp asc.
  */
+export interface MessagesStatus {
+    /** true until the server (not just the local cache) has answered */
+    loading: boolean;
+    error?: string;
+}
+
+/**
+ * Live messages of a conversation: the NEWEST `maxMessages`, oldest first.
+ * If the live listener fails, it falls back to polling so the chat is never left blank, and the
+ * failure is reported through `onStatus`.
+ */
 export function subscribeToMessages(
     conversationId: string,
     callback: (messages: MessageDoc[]) => void,
-    maxMessages: number = 100
+    maxMessages: number = 200,
+    onStatus?: (status: MessagesStatus) => void
 ): Unsubscribe {
-    const q = query(
-        messagesRef(conversationId),
-        orderBy('timestamp', 'asc'),
-        limit(maxMessages)
+    const q = query(messagesRef(conversationId), orderBy('timestamp', 'desc'), limit(maxMessages));
+    const toMessages = (docs: Array<{ id: string; data: () => DocumentData }>) =>
+        docs.map(d => docToMessage(d.id, d.data())).reverse();
+
+    let poll: ReturnType<typeof setInterval> | null = null;
+    let closed = false;
+
+    const pollOnce = async () => {
+        try {
+            const snap = await getDocs(q);
+            if (closed) return;
+            callback(toMessages(snap.docs));
+            onStatus?.({ loading: false, error: 'La actualización en vivo falló; se actualiza cada pocos segundos.' });
+        } catch (err) {
+            if (!closed) onStatus?.({ loading: false, error: `No se pudo cargar la conversación (${(err as { code?: string })?.code ?? 'error'}).` });
+        }
+    };
+
+    const unsub = onSnapshot(
+        q,
+        snapshot => {
+            // An empty answer from the local cache is not "no messages": wait for the server
+            if (snapshot.metadata.fromCache && snapshot.empty) return;
+            callback(toMessages(snapshot.docs));
+            onStatus?.({ loading: false });
+        },
+        err => {
+            console.error('[inbox] messages listener failed:', err);
+            void pollOnce();
+            poll = setInterval(pollOnce, 5000);
+        }
     );
 
-    return onSnapshot(q, (snapshot) => {
-        const messages = snapshot.docs.map(d => docToMessage(d.id, d.data()));
-        callback(messages);
-    });
+    // Safety net: a brand-new conversation may really have no messages
+    const emptyTimer = setTimeout(() => {
+        if (!closed) onStatus?.({ loading: false });
+    }, 4000);
+
+    return () => {
+        closed = true;
+        clearTimeout(emptyTimer);
+        if (poll) clearInterval(poll);
+        unsub();
+    };
 }
 
 /**

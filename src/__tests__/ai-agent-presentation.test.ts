@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+    isClosingAck, farewellText, stripMoreHelpQuestion,
     priceLineToBlock, reformatPriceMessages, stripSizeEnumeration, ensurePaymentList, fixDayPart, stripFarewell, ensureClosingQuestion, injectPriceList, PAYMENT_BLOCK,
 } from '@/lib/ai-agent-guard';
 
@@ -41,6 +42,16 @@ describe('agent presentation', () => {
         expect(msgs[1]).toContain('Estaré atenta');
         expect(stripFarewell(['Espero que tengas un buen día con tu pedido.'])).toHaveLength(1);
         expect(ensureClosingQuestion(['¿Cuántas unidades?'])).toHaveLength(1);
+    });
+    it('detects closing acknowledgements', () => {
+        for (const t of ['No muchas gracias', 'Bueno', 'ok', 'Gracias!', 'Listo 👍', '👍', 'No, gracias', 'Igualmente', 'Buenas noches']) expect(isClosingAck(t), t).toBe(true);
+        for (const t of ['Quiero 2 galones de suavizante', '¿Cuánto cuesta el desengrasante?', 'no me llegó mi pedido', 'Sí, mi dirección es calle 5 # 3-2']) expect(isClosingAck(t), t).toBe(false);
+    });
+    it('farewell by time of day and no repeated "algo más"', () => {
+        expect(farewellText('noche')).toContain('Feliz noche');
+        expect(farewellText('manana')).toContain('Feliz día');
+        expect(stripMoreHelpQuestion(['De acuerdo, estaré atenta si necesitas algo más.', '¿Hay algo más en lo que pueda ayudarte? Estaré atenta a resolver tus inquietudes o solicitudes 😊'])).toEqual([]);
+        expect(stripMoreHelpQuestion(['Listo, un asesor te contactará. ¿Hay algo más en lo que pueda ayudarte?'])).toEqual(['Listo, un asesor te contactará.']);
     });
     it('inject price list keeps question last', () => {
         const out = injectPriceList(['Hola', '¿Cuál?'], 'Opciones:', '- A: 10L $1.000 · 20L $2.000');

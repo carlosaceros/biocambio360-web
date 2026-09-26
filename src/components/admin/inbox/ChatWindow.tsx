@@ -19,7 +19,7 @@ import {
 import EmojiPicker from './EmojiPicker';
 import MediaAttachment from './MediaAttachment';
 import type { ConversationDoc, MessageDoc, MessageStatus } from '@/types/inbox';
-import { subscribeToMessages, markConversationAsRead } from '@/lib/inbox-service';
+import { subscribeToMessages, markConversationAsRead, type MessagesStatus } from '@/lib/inbox-service';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -65,6 +65,8 @@ function isWithin24hWindow(lastInboundAt: any): boolean {
 
 export default function ChatWindow({ conversation, onOpenTemplates, currentUserName }: ChatWindowProps) {
     const [messages, setMessages] = useState<MessageDoc[]>([]);
+    const [msgStatus, setMsgStatus] = useState<MessagesStatus>({ loading: true });
+    const [reloadKey, setReloadKey] = useState(0);
     const [inputText, setInputText] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [sendError, setSendError] = useState<string | null>(null);
@@ -75,20 +77,19 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
 
     // Subscribe to messages in real-time
     useEffect(() => {
-        if (!conversation?.id) {
-            setMessages([]);
-            return;
-        }
+        setMessages([]);
+        setMsgStatus({ loading: true });
+        if (!conversation?.id) return;
 
         const unsub = subscribeToMessages(conversation.id, (msgs) => {
             setMessages(msgs);
-        });
+        }, 200, setMsgStatus);
 
         // Mark as read when opening
         markConversationAsRead(conversation.id).catch(() => {});
 
         return unsub;
-    }, [conversation?.id]);
+    }, [conversation?.id, reloadKey]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -198,9 +199,15 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-gray-50/50">
+                {msgStatus.error && (
+                    <div className="mx-auto max-w-sm text-center text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2">
+                        {msgStatus.error}{' '}
+                        <button className="font-bold underline cursor-pointer" onClick={() => setReloadKey(k => k + 1)}>Reintentar</button>
+                    </div>
+                )}
                 {messages.length === 0 && (
-                    <div className="text-center py-8 text-xs text-gray-400">
-                        Sin mensajes aún
+                    <div className="text-center py-8 text-xs text-gray-500">
+                        {msgStatus.loading ? 'Cargando conversación…' : msgStatus.error ? '' : 'Sin mensajes aún'}
                     </div>
                 )}
                 {messages.map((msg) => {
