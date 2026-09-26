@@ -284,10 +284,10 @@ export default function AsesoresCockpitPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 pb-28 relative">
+        <div className="min-h-screen bg-slate-50 text-slate-900 pb-28 relative overflow-x-clip">
             {/* Top Bar */}
             <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs" data-tour="asesor-header">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => router.push('/admin')}
@@ -310,33 +310,7 @@ export default function AsesoresCockpitPage() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        {/* Selector de Asesor Activo (Oculto o bloqueado para rol asesor individual) */}
-                        <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-                            <span className="text-xs font-bold text-slate-500 pl-2">Asesor:</span>
-                            {isRestrictedAdvisor ? (
-                                <span className="px-3 py-1.5 bg-white text-indigo-700 font-black text-xs rounded-xl shadow-xs">
-                                    {selectedAdvisor}
-                                </span>
-                            ) : (
-                                <div className="flex gap-1 overflow-x-auto no-scrollbar">
-                                    {advisorsList.map(adv => (
-                                        <button
-                                            key={adv}
-                                            onClick={() => setSelectedAdvisor(adv)}
-                                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                                selectedAdvisor === adv
-                                                    ? 'bg-white text-indigo-600 shadow-xs'
-                                                    : 'text-slate-600 hover:text-slate-900'
-                                            }`}
-                                        >
-                                            {adv}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
+                    <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
                         {/* Botón Banco de Textos (Word 2025) */}
                         <button
                             onClick={() => router.push('/admin/banco-textos')}
@@ -372,6 +346,32 @@ export default function AsesoresCockpitPage() {
                             <span className="text-[10px] bg-indigo-800 text-indigo-200 px-1.5 py-0.5 rounded-md">Ctrl+N</span>
                         </button>
                     </div>
+                        {/* Selector de Asesor Activo (Oculto o bloqueado para rol asesor individual) */}
+                        <div className="basis-full min-w-0 flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                            <span className="text-xs font-bold text-slate-500 pl-2">Asesor:</span>
+                            {isRestrictedAdvisor ? (
+                                <span className="px-3 py-1.5 bg-white text-indigo-700 font-black text-xs rounded-xl shadow-xs">
+                                    {selectedAdvisor}
+                                </span>
+                            ) : (
+                                <div className="flex gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1">
+                                    {advisorsList.map(adv => (
+                                        <button
+                                            key={adv}
+                                            onClick={() => setSelectedAdvisor(adv)}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                                selectedAdvisor === adv
+                                                    ? 'bg-white text-indigo-600 shadow-xs'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            {adv}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
                 </div>
             </header>
 
@@ -504,8 +504,8 @@ export default function AsesoresCockpitPage() {
                 )}
 
                 {/* Selector de Pestañas: Tareas Diarias vs Mis Pedidos del Mes */}
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                    <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
                         <button
                             data-tour="asesor-clientes-prioritarios"
                             onClick={() => setActiveTab('tareas')}
