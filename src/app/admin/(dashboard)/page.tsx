@@ -679,6 +679,23 @@ export default function AdminDashboard() {
                                     </motion.button>
                                 )}
 
+                                {/* Calendario de entregas de flota propia */}
+                                {(hasCap('pos') || hasCap('mensajeria') || (role as string) === 'director') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/rutas-entrega')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-indigo-200 text-left hover:border-indigo-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                            <Truck size={22} />
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Calendario de Entregas</h3>
+                                        <p className="text-xs text-gray-500 mb-2">Rutas, zonas y días de entrega de la flota propia. Alimenta al agente de IA.</p>
+                                        <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">Administrar rutas <ArrowUpRight size={14} /></span>
+                                    </motion.button>
+                                )}
+
                                 {/* TPV Mostrador Soacha */}
                                 {hasCap('pos') && (
                                     <motion.button
@@ -1120,6 +1137,17 @@ export default function AdminDashboard() {
                                     <BarChart3 className="text-violet-600 mb-3" size={24} />
                                     <p className="font-black text-gray-900 mb-1">KPIs Agente IA y Marketing</p>
                                     <p className="text-xs text-gray-600">Embudo, anuncios, asesores, intenciones y costo.</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/rutas-entrega')}
+                                    className="bg-white rounded-xl p-6 shadow-md border-2 border-indigo-200 text-left hover:border-indigo-400 transition-colors"
+                                >
+                                    <Truck className="text-indigo-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Calendario de Entregas</p>
+                                    <p className="text-xs text-gray-600">Rutas, zonas y días de la flota propia; alimenta al agente.</p>
                                 </motion.button>
 
                                 <motion.button

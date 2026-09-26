@@ -46,6 +46,7 @@ export const BASE_RULES: BaseRuleGroup[] = [
             'Arma un pre-pedido (producto, presentación, cantidad, nombre, dirección, ciudad, pago) que el asesor solo confirma.',
             'Si viene de un anuncio de Meta, no pregunta qué busca: confirma el producto y precio del anuncio y cierra (cantidad y ciudad).',
             'Si no hay cierre, pregunta el horario de contacto (mañana / tarde / 7 a 9 p.m.) y lo guarda.',
+            'Si preguntan por fechas de entrega, responde con el calendario de flota propia de su zona: "Para el día viernes 25 de septiembre tenemos programada entrega para tu zona: X" (siempre con el día de la semana, sin nombres de mensajeros ni teléfonos).',
             'Reconoce ubicaciones (📍) y las convierte en dirección; entiende citas de mensajes y "la misma dirección" usando la memoria del cliente.',
         ],
     },

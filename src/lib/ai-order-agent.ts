@@ -57,6 +57,7 @@ import {
 import { isHumanOnline, nextOpening, shiftKey, dayPartNow } from '@/lib/business-hours';
 import { recordAnalytics, loadCustomerMemory, saveCustomerMemory, memoryPromptBlock, INTENTS, type Intent, type CustomerMemory } from '@/lib/ai-agent-insights';
 import { reverseGeocode, mapsLink } from '@/lib/geocode';
+import { deliveryContextFor } from '@/lib/delivery-schedule-server';
 import type { PreOrder } from '@/types/inbox';
 
 export const AI_AGENT_ID = 'ai-agent';
@@ -66,7 +67,7 @@ const MAX_TURNS_PER_NIGHT = 30;
 const MAX_STRIKES_PER_NIGHT = 3;
 const HISTORY_MESSAGES = 14;
 /** Bump when the prompt/presentation changes so cached first replies are regenerated. */
-const AGENT_VERSION = 'v5';
+const AGENT_VERSION = 'v6';
 const NO_CLOSURE_TURN = 5;
 const HUMAN_ACTIVE_GRACE_MS = 20 * 60 * 1000; // the agent yields only while a human is actively replying
 const SITE_URL = 'https://biocambio360.com';
@@ -235,6 +236,7 @@ DUDA DE PRECIO O COBRO: si el cliente compara con un precio de una compra anteri
 PREGUNTAS FRECUENTES: responde directo y breve. Medios de pago: el sistema imprime la lista con ✅; tú solo pregunta cuál prefiere. No pidas datos antes de contestar.
 BOTÓN WEB: nunca escribas la dirección de la web en los mensajes; pon botonWeb=true cuando invites a comprar en la web y el sistema enviará un botón para abrirla.
 
+FECHAS DE ENTREGA: si preguntan cuándo llega o se entrega su pedido, usa ENTREGAS PROGRAMADAS del contexto. Responde: "Para el día {día de la semana + fecha, p. ej. viernes 25 de septiembre} tenemos programada entrega para tu zona: {zona}". SIEMPRE incluye el día de la semana junto con la fecha. Si vienen varias fechas, menciona hasta las 2 más próximas. Nunca menciones mensajeros, teléfonos ni datos internos, y no prometas hora ni garantía: el asesor confirma el horario. Si la zona no está identificada, pregunta su localidad o municipio; si está fuera de las zonas listadas, di que un asesor confirma.
 ASESOR: primero toma el pedido (producto, cantidad, dirección, pago). NO te apresures a decir que un asesor confirmará al día siguiente ni lo repitas en cada mensaje; menciónalo UNA sola vez, al final del pedido, para coordinar el envío. Habla antes del asesor solo si el cliente lo pide, hay un reclamo o algo que no sabes.
 PEDIDOS: si calculas un total, di que es de referencia y sin envío. Los precios son de referencia; el asesor confirma precio, disponibilidad, envío y pago. No confirmes como definitivo, no prometas fechas/horas de entrega ni descuentos. Con productos, cantidades y datos de entrega: resume y pregunta si es correcto; solo si el cliente confirma pon listo=true y en ese momento (solo al final) dile que un asesor se comunicará para coordinar el envío (puedes indicar cuándo con la APERTURA). Si no quiere esperar, invítalo a pedir ya en la web (24 h) con botonWeb=true.
 
@@ -661,6 +663,13 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
           (ad.notes ? `NOTAS DEL ANUNCIO (del equipo): ${String(ad.notes).slice(0, 300)}\n` : '')
         : '';
 
+    const deliveryBlock = await deliveryContextFor({
+        lastText,
+        customerTexts: history.filter(h => h.role === 'user').slice(-4).map(h => h.text),
+        lastAgentText: [...history].reverse().find(h => h.role === 'model')?.text,
+        placeText: `${input.preOrder?.ciudad ?? ''} ${input.preOrder?.direccion ?? ''}`,
+        orderReady: input.preOrder?.estado === 'listo',
+    });
     const mode = input.mode ?? 'nuevo';
     const opening = nextOpening(input.now);
     const dp = dayPartNow(input.now);
@@ -674,6 +683,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
             : '') +
         '.\n' +
         memoryPromptBlock(input.memory ?? null) +
+        (deliveryBlock ? `ENTREGAS PROGRAMADAS (información pública):\n${deliveryBlock}\n` : '') +
         (input.locationNote ? `UBICACIÓN COMPARTIDA (pin de WhatsApp): ${input.locationNote}. Ya es la dirección de entrega: NO la pidas de nuevo ni digas que no la entiendes; confírmala en una línea y pide solo detalles (casa/apto/torre/referencia) si faltan.\n` : '') +
         (input.cartNote ? `CARRITO ABANDONADO: el cliente dejó pendiente ${input.cartNote} y responde a nuestro recordatorio. Ayúdale a terminar: resuelve su duda, confirma lo que tenía y anímalo a finalizar (botonWeb=true) o toma el pedido.\n` : '') +
         adBlock +
@@ -685,7 +695,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
     // Response cache: only the very first, short, stateless customer message
     const customerMessages = history.filter(h => h.role === 'user').length;
     const cacheKey =
-        input.useResponseCache && botMessagesBefore === 0 && customerMessages === 1 && !input.preOrder && mode === 'nuevo' && !input.memory && !input.images?.length
+        input.useResponseCache && botMessagesBefore === 0 && customerMessages === 1 && !input.preOrder && mode === 'nuevo' && !input.memory && !input.images?.length && !deliveryBlock
             ? cacheKeyFor(lastText, await getCatalogHash(), `${ad?.sourceId ?? ''}|${ad?.productName ?? ''}|${training.hash}|${opening.label}|${dp.part}|${AGENT_VERSION}`)
             : null;
     const cachedReply = cacheKey ? await getCachedReply(cacheKey) : null;
