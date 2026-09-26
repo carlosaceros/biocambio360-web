@@ -220,6 +220,21 @@ export default function CheckoutPage() {
                             direccion: res.cart.direccion || prev.direccion,
                         }));
 
+                        // Resolve the saved city to its shipping code, so the shipping cost is quoted and the
+                        // order can be confirmed without searching the city again
+                        const wanted = String(res.cart.ciudad || '').toUpperCase().trim();
+                        const wantedDep = String(res.cart.departamento || '').toUpperCase().trim();
+                        if (wanted) {
+                            const match =
+                                ALL_CITIES_99.find(c => c.ciudad.toUpperCase() === wanted && (!wantedDep || c.departamento.toUpperCase() === wantedDep)) ??
+                                ALL_CITIES_99.find(c => c.ciudad.toUpperCase() === wanted);
+                            if (match) {
+                                const norm = normalizeDepartmentAndCity(match.departamento, match.ciudad);
+                                setFormData(prev => ({ ...prev, ciudad: norm.ciudad, departamento: norm.departamento }));
+                                setDestinoCodigo(match.codigo);
+                            }
+                        }
+
                         // Reconstruct and restore cart items into context
                         if (Array.isArray(res.cart.items) && res.cart.items.length > 0) {
                             const reconstructed = res.cart.items.map((item: any) => ({
@@ -281,6 +296,7 @@ export default function CheckoutPage() {
                     customerPhone: formData.celular,
                     cedula: formData.cedula,
                     ciudad: formData.ciudad,
+                    departamento: formData.departamento,
                     direccion: formData.direccion,
                     items: cart.map(i => ({
                         id: i.product.id,
@@ -298,7 +314,7 @@ export default function CheckoutPage() {
         }, 1500);
 
         return () => clearTimeout(timer);
-    }, [cartToken, formData.email, formData.nombre, formData.celular, formData.cedula, formData.ciudad, formData.direccion, cart, subtotal, shippingCost, total]);
+    }, [cartToken, formData.email, formData.nombre, formData.celular, formData.cedula, formData.ciudad, formData.departamento, formData.direccion, cart, subtotal, shippingCost, total]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
