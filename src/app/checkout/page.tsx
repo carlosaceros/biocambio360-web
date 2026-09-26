@@ -215,7 +215,8 @@ export default function CheckoutPage() {
                             nombre: res.cart.customerName || prev.nombre,
                             email: res.cart.customerEmail || prev.email,
                             celular: res.cart.customerPhone || prev.celular,
-                            cedula: res.cart.customerCedula || prev.cedula,
+                            // a saved ID with symbols is a typo: leave it empty so the customer types it again
+                            cedula: /^\d{6,10}$/.test(String(res.cart.customerCedula || '')) ? res.cart.customerCedula : prev.cedula,
                             ciudad: res.cart.ciudad || prev.ciudad,
                             direccion: res.cart.direccion || prev.direccion,
                         }));
@@ -317,7 +318,9 @@ export default function CheckoutPage() {
     }, [cartToken, formData.email, formData.nombre, formData.celular, formData.cedula, formData.ciudad, formData.departamento, formData.direccion, cart, subtotal, shippingCost, total]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
+        const { name } = e.target;
+        // ID and phone accept digits only (a mistyped symbol such as "&" used to slip into saved orders)
+        const value = name === 'cedula' || name === 'celular' ? e.target.value.replace(/\D/g, '') : e.target.value;
         setFormData(prev => ({ ...prev, [name]: value }));
         // Clear error for this field
         if (errors[name]) {
@@ -733,6 +736,7 @@ export default function CheckoutPage() {
                                             id="field-cedula"
                                             type="text"
                                             name="cedula"
+                                            inputMode="numeric"
                                             value={formData.cedula}
                                             onChange={handleInputChange}
                                             className={`w-full px-4 py-3 rounded-lg border-2 ${errors.cedula ? 'border-red-500 bg-red-50/20 ring-2 ring-red-200' : 'border-gray-200'} focus:border-red-600 focus:outline-none transition-colors bg-white text-gray-900 placeholder:text-gray-400`}

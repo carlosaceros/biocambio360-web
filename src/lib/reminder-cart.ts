@@ -67,7 +67,7 @@ export async function createReminderCart(customer: ReminderCustomer): Promise<st
             customerName: cliente.nombre || customer.name || '',
             customerEmail: cliente.email || customer.email || '',
             customerPhone: cliente.celular || customer.phone || '',
-            customerCedula: cliente.cedula || cliente.documento || '',
+            customerCedula: /^\d{6,10}$/.test(String(cliente.cedula || '')) ? String(cliente.cedula) : '',
             ciudad: cliente.ciudad || customer.city || '',
             departamento: cliente.departamento || '',
             direccion: cliente.direccion || '',
