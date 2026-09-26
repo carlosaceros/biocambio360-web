@@ -265,14 +265,29 @@ export async function getAdvisorAlertsData(advisorName: string): Promise<Advisor
         );
         const ordersSnap = await getDocs(qOrders);
 
+        // Orders explicitly scheduled for tomorrow (any active status) come first
+        const tomorrow = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date(Date.now() + 86400000));
+        const scheduledSnap = await getDocs(query(ordersRef, where('fechaProgramadaEntrega', '==', tomorrow), limit(200)));
+        const seen = new Set<string>();
+
         const entregasDiaSiguiente: (Order & { id: string })[] = [];
+        const addOrder = (d: { id: string; data: () => unknown }) => {
+            if (seen.has(d.id)) return;
+            const raw = d.data() as Order;
+            if (['entregado', 'cancelado', 'borrador', 'no_entregado'].includes(String(raw.status))) return;
+            seen.add(d.id);
+            entregasDiaSiguiente.push({ ...raw, id: d.id } as Order & { id: string });
+        };
+        scheduledSnap.forEach(d => addOrder(d));
         if (ordersSnap && typeof (ordersSnap as any).forEach === 'function') {
             ordersSnap.forEach(d => {
+                if (seen.has(d.id)) return;
                 const ord = { id: d.id, ...d.data() } as Order & { id: string };
                 const ordAdvisor = ord.asesorNombre || (ord as any).asesor || (ord as any).advisorName || (ord as any).assignedToAdvisor || '';
                 const isUniversal = !advisorName || advisorName.toLowerCase() === 'todos' || advisorName === 'Diego' || advisorName === 'Fernando' || advisorName === 'Julián' || advisorName === 'Danilo';
 
                 if (isUniversal || !ordAdvisor || ordAdvisor.toLowerCase() === advisorName.toLowerCase()) {
+                    seen.add(d.id);
                     entregasDiaSiguiente.push(ord);
                 }
             });

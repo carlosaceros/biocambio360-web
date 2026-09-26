@@ -190,6 +190,9 @@ export interface Order {
     alertaEntregaEnviada?: boolean;
     alertaEntregaEnviadaAt?: string;
     alertaEntregaEnviadaPor?: string;
+    entregaConfirmadaPorCliente?: boolean;
+    entregaModificacionSolicitada?: boolean;
+    ubicacionEntrega?: { lat: number; lng: number; name?: string; address?: string; mapsUrl?: string; at?: string };
     pruebaEntrega?: {
         recibidoPor: string;
         documentoRecibido?: string;

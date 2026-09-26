@@ -1387,9 +1387,15 @@ export default function AsesoresCockpitPage() {
                                                     <div className="space-y-3">
                                                         <div className="flex items-center justify-between">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
-                                                                    <Truck size={11} /> Entrega Mañana
-                                                                </span>
+                                                                {ord.fechaProgramadaEntrega === new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date(Date.now() + 86400000)) ? (
+                                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
+                                                                        <Truck size={11} /> Entrega Mañana
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1" title="Pedido en despacho sin fecha de entrega programada">
+                                                                        <Truck size={11} /> Sin fecha
+                                                                    </span>
+                                                                )}
                                                                 {isAlerted ? (
                                                                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
                                                                         <Check size={10} /> Alertado
@@ -1413,6 +1419,21 @@ export default function AsesoresCockpitPage() {
                                                                 <MapPin size={12} className="text-slate-400" />
                                                                 {ord.cliente?.ciudad}, {ord.cliente?.direccion}
                                                             </p>
+                                                            {ord.fechaProgramadaEntrega !== new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date(Date.now() + 86400000)) && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={async () => {
+                                                                        const { doc: fsDoc, updateDoc: fsUpdate } = await import('firebase/firestore');
+                                                                        const { db: fsDb } = await import('@/lib/firebase');
+                                                                        const tomorrow = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date(Date.now() + 86400000));
+                                                                        await fsUpdate(fsDoc(fsDb, 'orders', ord.id), { fechaProgramadaEntrega: tomorrow });
+                                                                        await loadData(selectedAdvisor);
+                                                                    }}
+                                                                    className="mt-2 w-full px-2 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold cursor-pointer"
+                                                                >
+                                                                    🚚 Marcar entrega para mañana
+                                                                </button>
+                                                            )}
                                                             <div className="mt-2 bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
                                                                 <span className="text-[10px] font-bold text-slate-400 uppercase">A Cobrar Efectivo:</span>
                                                                 <span className="font-black text-emerald-700 text-sm">{totalFormatted}</span>

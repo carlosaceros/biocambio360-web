@@ -191,6 +191,13 @@ function getOriginBadge(origen?: Order['origen']) {
     );
 }
 
+const bogotaDayOffset = (offset: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date(Date.now() + offset * 86400000));
+const deliveryLabel = (ymd: string) => {
+    if (ymd === bogotaDayOffset(0)) return 'hoy';
+    if (ymd === bogotaDayOffset(1)) return 'mañana';
+    return new Date(`${ymd}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+};
+
 function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
     const config = ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG['pendiente'];
     const timeAgo = formatDistanceToNow(safeToDate(order.createdAt), {
@@ -308,6 +315,24 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap">
+                    {order.fechaProgramadaEntrega ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-800 border border-indigo-200" title={`Entrega programada: ${order.fechaProgramadaEntrega}${order.alertaEntregaEnviada ? ' · alerta enviada' : ''}`}>
+                            🚚 Entrega {deliveryLabel(order.fechaProgramadaEntrega)}{order.alertaEntregaEnviada ? ' ✓' : ''}
+                        </span>
+                    ) : ['confirmado', 'preparacion', 'enviado'].includes(order.status) ? (
+                        <button
+                            type="button"
+                            onPointerDown={e => e.stopPropagation()}
+                            onClick={e => {
+                                e.stopPropagation();
+                                updateDoc(doc(db, 'orders', order.id), { fechaProgramadaEntrega: bogotaDayOffset(1) }).catch(() => alert('No se pudo programar la entrega'));
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 cursor-pointer"
+                            title="Programar la entrega para mañana (el cliente recibirá la alerta por WhatsApp)"
+                        >
+                            🚚 Entrega mañana
+                        </button>
+                    ) : null}
                     {getOriginBadge(order.origen)}
                     {order.guiaTransportadora ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200" title={`Guía: ${order.guiaTransportadora} (${order.transportadora || '99 Envíos'})`}>
@@ -1607,6 +1632,46 @@ export default function PedidosPage() {
                                                 <Truck className="text-blue-600" size={18} />
                                                 Despacho & Guía de Transporte
                                             </h3>
+
+                                            {/* Fecha programada de entrega (alimenta la alerta automática "mañana se entrega tu pedido") */}
+                                            <div className="mb-3 p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl space-y-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-xs font-black text-indigo-900">🚚 Fecha de entrega programada</span>
+                                                    {[['Hoy', 0], ['Mañana', 1], ['Pasado mañana', 2]].map(([label, off]) => (
+                                                        <button
+                                                            key={label as string}
+                                                            type="button"
+                                                            onClick={() => updateDoc(doc(db, 'orders', activeOrder.id), { fechaProgramadaEntrega: bogotaDayOffset(off as number) }).then(() => setActiveOrder(prev => (prev ? { ...prev, fechaProgramadaEntrega: bogotaDayOffset(off as number) } : prev)))}
+                                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer ${activeOrder.fechaProgramadaEntrega === bogotaDayOffset(off as number) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'}`}
+                                                        >
+                                                            {label as string}
+                                                        </button>
+                                                    ))}
+                                                    <input
+                                                        type="date"
+                                                        value={activeOrder.fechaProgramadaEntrega ?? ''}
+                                                        onChange={e => {
+                                                            const value = e.target.value;
+                                                            updateDoc(doc(db, 'orders', activeOrder.id), { fechaProgramadaEntrega: value || null }).then(() => setActiveOrder(prev => (prev ? { ...prev, fechaProgramadaEntrega: value || undefined } : prev)));
+                                                        }}
+                                                        className="px-2 py-1 border border-indigo-200 rounded-lg text-xs bg-white"
+                                                    />
+                                                    {activeOrder.fechaProgramadaEntrega && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateDoc(doc(db, 'orders', activeOrder.id), { fechaProgramadaEntrega: null }).then(() => setActiveOrder(prev => (prev ? { ...prev, fechaProgramadaEntrega: undefined } : prev)))}
+                                                            className="text-xs text-red-600 underline cursor-pointer"
+                                                        >
+                                                            Quitar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-indigo-900/80">
+                                                    {activeOrder.alertaEntregaEnviada
+                                                        ? `Alerta enviada al cliente${activeOrder.entregaConfirmadaPorCliente ? ' · el cliente CONFIRMÓ' : ''}${activeOrder.entregaModificacionSolicitada ? ' · el cliente pidió MODIFICAR' : ''}${activeOrder.ubicacionEntrega ? ' · compartió su ubicación' : ''}.`
+                                                        : 'El día anterior a las 4:00 p.m. el cliente recibe por WhatsApp el aviso de que su pedido llega mañana (si la alerta automática está activada en Asesores > Entregas).'}
+                                                </p>
+                                            </div>
 
                                             {/* Alerta si está 'En Camino' sin guía ni mensajero */}
                                             {activeOrder.status === 'en_camino' && !activeOrder.guiaTransportadora && !activeOrder.mensajeroId && activeOrder.tipoEnvio !== 'recogida_mostrador' && (
