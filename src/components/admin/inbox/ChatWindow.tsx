@@ -18,7 +18,10 @@ import {
     ChevronLeft,
 } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
-import MediaAttachment from './MediaAttachment';
+import dynamic from 'next/dynamic';
+
+// Loaded only in the browser: it bundles a WebAssembly audio decoder that must not be compiled for the server
+const MediaAttachment = dynamic(() => import('./MediaAttachment'), { ssr: false });
 import type { ConversationDoc, MessageDoc, MessageStatus } from '@/types/inbox';
 import { subscribeToMessages, markConversationAsRead, type MessagesStatus } from '@/lib/inbox-service';
 import { formatDistanceToNow } from 'date-fns';
