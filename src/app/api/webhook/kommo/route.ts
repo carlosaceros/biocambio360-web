@@ -13,7 +13,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { buildConversationId } from '@/lib/inbox-service';
 import { toWhatsappId } from '@/lib/abandoned-cart-config';
-import { extractOutgoing, kommoContactPhone, parseBracketForm } from '@/lib/kommo';
+import { extractOutgoing, kommoContactPhone, kommoLeadContactId, parseBracketForm } from '@/lib/kommo';
 
 const MAIN_PHONE_ID = process.env.WHATSAPP_PHONE_ID_BIOCAMBIO || '236893662847270';
 
@@ -31,12 +31,30 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Bad body' }, { status: 400 });
     }
 
-    const events = extractOutgoing(body);
-    if (events.length === 0) {
-        // Useful while connecting: see what Kommo actually sends for other event types
-        console.log('[webhook/kommo] No outgoing chat message in payload:', raw.slice(0, 500));
-        return NextResponse.json({ ok: true, stored: 0 });
+    // A lead moved to "Closed – won" (Kommo's fixed status id 142) is a closed sale
+    const statusChanges = Object.values(((body.leads as Record<string, unknown> | undefined)?.status as Record<string, Record<string, string>> | undefined) ?? {});
+    for (const change of statusChanges) {
+        if (String(change?.status_id) !== '142') continue;
+        try {
+            const contactId = await kommoLeadContactId(String(change.id));
+            const waId = contactId ? toWhatsappId((await kommoContactPhone(contactId)) ?? '') : null;
+            if (!waId) continue;
+            const convRef = getAdminDB().collection('conversations').doc(buildConversationId('whatsapp', MAIN_PHONE_ID, waId));
+            const conv = await convRef.get();
+            if (!conv.exists) continue;
+            const price = Number(change.price) || 0;
+            await convRef.update({
+                kommoWonAt: FieldValue.serverTimestamp(),
+                // the manual "Marcar venta cerrada" button keeps priority
+                ...(conv.data()?.lastSaleAt ? {} : { lastSaleAt: FieldValue.serverTimestamp(), lastSaleValue: price, tags: FieldValue.arrayUnion('venta-cerrada') }),
+            });
+        } catch (err) {
+            console.error('[webhook/kommo] won-lead handling failed:', err instanceof Error ? err.message : err);
+        }
     }
+
+    const events = extractOutgoing(body);
+    if (events.length === 0) return NextResponse.json({ ok: true, stored: 0 });
 
     const db = getAdminDB();
     let stored = 0;

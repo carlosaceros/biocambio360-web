@@ -70,3 +70,65 @@ export async function kommoContactPhone(contactId: string): Promise<string | nul
         return null;
     }
 }
+
+// ─── Kommo REST API helpers (private integration, long-lived token) ──────────
+
+async function kommoGet<T>(path: string): Promise<T | null> {
+    const host = process.env.KOMMO_HOST;
+    const token = process.env.KOMMO_TOKEN;
+    if (!host || !token) return null;
+    try {
+        const res = await fetch(`https://${host}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.status === 204) return null;
+        if (!res.ok) {
+            console.warn(`[kommo] GET ${path.split('?')[0]} → ${res.status}`);
+            return null;
+        }
+        return (await res.json()) as T;
+    } catch (err) {
+        console.warn('[kommo] request failed:', err instanceof Error ? err.message : err);
+        return null;
+    }
+}
+
+let usersCache: { at: number; map: Map<number, string> } | null = null;
+
+/** Kommo users (advisors): id → name, cached 30 min. */
+export async function kommoUserNames(): Promise<Map<number, string>> {
+    if (usersCache && Date.now() - usersCache.at < 30 * 60 * 1000) return usersCache.map;
+    const data = await kommoGet<{ _embedded?: { users?: Array<{ id: number; name: string }> } }>('/api/v4/users?limit=250');
+    const map = new Map<number, string>((data?._embedded?.users ?? []).map(u => [u.id, u.name]));
+    if (map.size > 0) usersCache = { at: Date.now(), map };
+    return map;
+}
+
+/** First contact id linked to a lead. */
+export async function kommoLeadContactId(leadId: string): Promise<string | null> {
+    const data = await kommoGet<{ _embedded?: { contacts?: Array<{ id: number }> } }>(`/api/v4/leads/${encodeURIComponent(leadId)}?with=contacts`);
+    const id = data?._embedded?.contacts?.[0]?.id;
+    return id ? String(id) : null;
+}
+
+export interface KommoChatEvent {
+    id: string;
+    entityId: string;
+    entityType: string;
+    createdBy: number;
+    createdAt: number;
+}
+
+/** Outgoing chat message events since `fromSec` (unix seconds), oldest first. */
+export async function kommoOutgoingEvents(fromSec: number, maxPages = 5): Promise<KommoChatEvent[]> {
+    const out: KommoChatEvent[] = [];
+    for (let page = 1; page <= maxPages; page++) {
+        const data = await kommoGet<{ _embedded?: { events?: Array<Record<string, unknown>> } }>(
+            `/api/v4/events?filter[type][]=outgoing_chat_message&filter[created_at][from]=${fromSec}&limit=100&page=${page}`
+        );
+        const events = data?._embedded?.events ?? [];
+        for (const e of events) {
+            out.push({ id: String(e.id), entityId: String(e.entity_id), entityType: String(e.entity_type), createdBy: Number(e.created_by) || 0, createdAt: Number(e.created_at) || 0 });
+        }
+        if (events.length < 100) break;
+    }
+    return out.sort((a, b) => a.createdAt - b.createdAt);
+}
