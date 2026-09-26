@@ -176,7 +176,7 @@ export default function RutasEntregaPage() {
 
                 {/* Day detail */}
                 <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs">
-                    <h2 className="text-sm font-black text-gray-900 mb-2 capitalize">{selectedDay ? formatDayEs(selectedDay) : 'Selecciona un día'}</h2>
+                    <h2 className="text-sm font-black text-gray-900 mb-2 first-letter:uppercase">{selectedDay ? formatDayEs(selectedDay) : 'Selecciona un día'}</h2>
                     {dayRoutes.length === 0 ? (
                         <p className="text-xs text-gray-400">Sin entregas programadas este día.</p>
                     ) : (
