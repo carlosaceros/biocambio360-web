@@ -27,6 +27,7 @@
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "nodemailer": "^9.0.3",
+    "ogg-opus-decoder": "^1.7.5",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

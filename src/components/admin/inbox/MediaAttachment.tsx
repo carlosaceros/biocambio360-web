@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { FileText, Loader2, ImageOff } from 'lucide-react';
 import { auth } from '@/lib/firebase';
+import { browserPlaysOggOpus, oggOpusToWav } from '@/lib/audio-fallback';
 
 interface MediaAttachmentProps {
     mediaId: string;
@@ -60,7 +61,15 @@ export default function MediaAttachment({ mediaId, type, mimeType, fileName }: M
                     }
                     if (cancelled) return;
                 }
-                const blob = new Blob(parts, { type: mime });
+                let blob = new Blob(parts, { type: mime });
+                // Voice notes are Ogg/Opus: Safari cannot play them, so they are decoded locally to WAV
+                if (type === 'audio' && /ogg|opus/i.test(mime) && !browserPlaysOggOpus()) {
+                    try {
+                        blob = await oggOpusToWav(await blob.arrayBuffer());
+                    } catch (err) {
+                        console.warn('[MediaAttachment] Could not convert the voice note:', err);
+                    }
+                }
                 if (cancelled) return;
                 objectUrl = URL.createObjectURL(blob);
                 setSrc(objectUrl);
