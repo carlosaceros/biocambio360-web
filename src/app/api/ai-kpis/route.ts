@@ -12,6 +12,7 @@ export const maxDuration = 60;
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTrainer } from '@/lib/ai-training-auth';
 import { getAdminDB } from '@/lib/firebase-admin';
+import { computeMetrics, median, percentile, average, type ConvMetrics } from '@/lib/response-metrics';
 
 type Counter = Record<string, number>;
 
@@ -142,6 +143,105 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    // ── Advisor management times ──────────────────────────────────────────────
+    // Metrics live on each conversation (`metrics`, `metricsAt`); the stale or missing ones are computed
+    // now (max 100 per request, the rest on the next load) and stored so later loads are cheap.
+    const metricsOf = new Map<string, ConvMetrics>();
+    const stale: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    for (const d of convSnap.docs) {
+        const c = d.data();
+        if (c.metrics && (Date.parse(String(c.metricsAt ?? '')) || 0) >= toMs(c.lastMessageAt)) metricsOf.set(d.id, c.metrics as ConvMetrics);
+        else stale.push(d);
+    }
+    for (let i = 0; i < Math.min(stale.length, 100); i += 10) {
+        await Promise.all(
+            stale.slice(i, i + 10).map(async d => {
+                const ms = await d.ref.collection('messages').select('direction', 'type', 'timestamp', 'agentUid', 'agentName', 'metaMessageId').get();
+                const metrics = computeMetrics(
+                    ms.docs.map(m => {
+                        const x = m.data();
+                        return { direction: x.direction, ts: toMs(x.timestamp), agentUid: x.agentUid, agentName: x.agentName, metaMessageId: x.metaMessageId, type: x.type };
+                    })
+                );
+                metricsOf.set(d.id, metrics);
+                await d.ref.update({ metrics, metricsAt: new Date().toISOString() }).catch(() => undefined);
+            })
+        );
+    }
+    const sla = (() => {
+        const leadsAll = convSnap.docs.filter(d => metricsOf.get(d.id)?.lead);
+        const answered = leadsAll.filter(d => metricsOf.get(d.id)?.firstResponseBizMin !== undefined);
+        const firstBiz = answered.map(d => metricsOf.get(d.id)?.firstResponseBizMin as number);
+        const firstWall = answered.map(d => metricsOf.get(d.id)?.firstResponseWallMin as number).filter(v => v !== undefined);
+        const bucketOf = (m: number) => (m < 5 ? 'lt5' : m < 15 ? 'm5_15' : m < 60 ? 'm15_60' : m < 240 ? 'h1_4' : 'gt4h');
+        const buckets: Counter = {};
+        firstBiz.forEach(m => (buckets[bucketOf(m)] = (buckets[bucketOf(m)] ?? 0) + 1));
+
+        type Adv = { name: string; first: number[]; pairs: number[]; sales: number; closeHours: number[] };
+        const byAdvisor = new Map<string, Adv>();
+        const adv = (name: string) => byAdvisor.get(name) ?? (byAdvisor.set(name, { name, first: [], pairs: [], sales: 0, closeHours: [] }), byAdvisor.get(name) as Adv);
+        const allPairs: number[] = [];
+        for (const d of convSnap.docs) {
+            const m = metricsOf.get(d.id);
+            if (!m) continue;
+            if (m.firstResponder && m.lead && m.firstResponseBizMin !== undefined) adv(m.firstResponder).first.push(m.firstResponseBizMin);
+            for (const [biz, , by] of m.pairs) {
+                allPairs.push(biz);
+                adv(by).pairs.push(biz);
+            }
+        }
+        const closeFromContact: number[] = [];
+        const closeFromReply: number[] = [];
+        for (const d of convSnap.docs) {
+            const c = d.data();
+            const m = metricsOf.get(d.id);
+            const sold = toMs(c.lastSaleAt);
+            if (!sold || !m) continue;
+            const owner = String(c.assignedToName || m.firstResponder || 'Sin asesor');
+            adv(owner).sales++;
+            if (m.firstInboundAt && sold > m.firstInboundAt) {
+                const h = (sold - m.firstInboundAt) / 3600000;
+                closeFromContact.push(h);
+                adv(owner).closeHours.push(h);
+            }
+            if (m.firstHumanReplyAt && sold > m.firstHumanReplyAt) closeFromReply.push((sold - m.firstHumanReplyAt) / 3600000);
+        }
+        return {
+            leads: leadsAll.length,
+            answered: answered.length,
+            unanswered: leadsAll.length - answered.length,
+            pending: stale.length > 100 ? stale.length - 100 : 0,
+            firstResponse: {
+                medianBizMin: median(firstBiz),
+                avgBizMin: average(firstBiz),
+                p90BizMin: percentile(firstBiz, 90),
+                medianWallMin: median(firstWall),
+                pctWithin15: firstBiz.length ? firstBiz.filter(v => v <= 15).length / firstBiz.length : null,
+                pctWithin60: firstBiz.length ? firstBiz.filter(v => v <= 60).length / firstBiz.length : null,
+            },
+            buckets,
+            betweenMessages: { count: allPairs.length, medianBizMin: median(allPairs), avgBizMin: average(allPairs), p90BizMin: percentile(allPairs, 90) },
+            close: {
+                sales: closeFromContact.length,
+                medianHoursFromContact: median(closeFromContact),
+                avgHoursFromContact: average(closeFromContact),
+                medianHoursFromFirstReply: median(closeFromReply),
+            },
+            byAdvisor: [...byAdvisor.values()]
+                .map(a => ({
+                    name: a.name,
+                    firstResponses: a.first.length,
+                    medianFirstBizMin: median(a.first),
+                    replies: a.pairs.length + a.first.length,
+                    medianBetweenBizMin: median(a.pairs),
+                    sales: a.sales,
+                    medianCloseHours: median(a.closeHours),
+                }))
+                .filter(a => a.replies > 0 || a.sales > 0)
+                .sort((a, b) => b.replies - a.replies),
+        };
+    })();
+
     // ── Abandoned carts ──────────────────────────────────────────────────────
     const cartConvByToken = new Map<string, FirebaseFirestore.DocumentData>();
     cartConvSnap.docs.forEach(d => {
@@ -238,6 +338,7 @@ export async function GET(req: NextRequest) {
         channelFunnel,
         ads: [...ads.values()].sort((a, b) => b.conversations - a.conversations).slice(0, 25),
         advisors: [...advisors.values()].sort((a, b) => b.revenue - a.revenue || b.assigned - a.assigned),
+        sla,
         carts,
         usage: { ...usage, estimatedCostUsd, savedByCacheUsd: Math.max(0, withoutCacheUsd - estimatedCostUsd) },
         truncated: convSnap.size >= 4000,

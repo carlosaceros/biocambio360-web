@@ -380,9 +380,9 @@ export default function InboxPage() {
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+        <div className="flex flex-col h-screen supports-[height:100dvh]:h-dvh bg-gray-50 overflow-hidden">
             {/* Top bar */}
-            <header className="bg-white border-b border-gray-100 shadow-xs px-4 py-3 flex items-center gap-3 shrink-0 z-10">
+            <header className={`bg-white border-b border-gray-100 shadow-xs px-4 py-3 items-center gap-3 shrink-0 z-10 ${showMobileList ? 'flex' : 'hidden lg:flex'}`}>
                 <Link href="/admin" className="text-gray-500 hover:text-gray-800 transition-colors">
                     <ArrowLeft size={18} />
                 </Link>
@@ -439,7 +439,9 @@ export default function InboxPage() {
                 </div>
             </header>
 
-            <WhatsAppAlertsBanner />
+            <div className={showMobileList ? '' : 'hidden lg:block'}>
+                <WhatsAppAlertsBanner />
+            </div>
 
             {toast && (
                 <div className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-2xl shadow-xl font-bold text-xs text-white flex items-center gap-2 ${
@@ -451,7 +453,7 @@ export default function InboxPage() {
             )}
 
             {/* Channel tabs */}
-            <div className="bg-white border-b border-gray-100 px-4 flex items-center gap-1 shrink-0 overflow-x-auto">
+            <div className={`bg-white border-b border-gray-100 px-4 items-center gap-1 shrink-0 overflow-x-auto ${showMobileList ? 'flex' : 'hidden lg:flex'}`}>
                 {CHANNEL_TABS.map(tab => {
                     const badge = unreadByChannel[tab.key] ?? 0;
                     return (
@@ -564,13 +566,13 @@ export default function InboxPage() {
 
                 {/* ── Center: Chat window ────────────────────────────────────── */}
                 <div className={`
-                    flex-1 flex flex-col overflow-hidden
+                    flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden
                     ${showMobileList ? 'hidden lg:flex' : 'flex'}
                 `}>
                     {/* Status change toolbar (for selected conv) */}
                     {selectedConv && canModerate && (
-                        <div className="bg-white border-b border-gray-100 px-4 py-2 flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">Estado:</span>
+                        <div className="bg-white border-b border-gray-100 px-3 sm:px-4 py-1.5 sm:py-2 flex items-center gap-1.5 sm:gap-2 shrink-0 overflow-x-auto">
+                            <span className="hidden sm:inline text-[10px] font-bold text-gray-400 uppercase">Estado:</span>
                             {(['abierto', 'asignado', 'cerrado'] as ConversationStatus[]).map(s => (
                                 <button
                                     key={s}
@@ -588,14 +590,6 @@ export default function InboxPage() {
                                     {selectedConv.status === s ? '✓ ' : ''}{s.charAt(0).toUpperCase() + s.slice(1)}
                                 </button>
                             ))}
-                            {/* Mobile: back to list */}
-                            <button
-                                onClick={() => setShowMobileList(true)}
-                                className="ml-auto lg:hidden flex items-center gap-1 text-xs text-gray-500"
-                            >
-                                <ArrowLeft size={14} />
-                                Volver
-                            </button>
                         </div>
                     )}
 
@@ -603,6 +597,7 @@ export default function InboxPage() {
                         conversation={selectedConv}
                         onOpenTemplates={() => setIsTemplateModalOpen(true)}
                         currentUserName={userProfile?.nombre ?? user?.email ?? undefined}
+                        onBack={() => setShowMobileList(true)}
                     />
                 </div>
 

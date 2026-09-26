@@ -151,3 +151,27 @@ export function dayPartNow(date: Date = new Date()): { part: DayPart; greeting: 
     if (hour >= 12 && hour < 19) return { part: 'tarde', greeting: '¡Buenas tardes!', noun: 'tarde' };
     return { part: 'noche', greeting: '¡Buenas noches!', noun: 'noche' };
 }
+
+const LOCAL_OFFSET_MS = 5 * 60 * 60 * 1000; // Bogotá is UTC-5 all year
+const DAY_MS = 86400000;
+
+/**
+ * Minutes the human team was scheduled to be online between two instants (business-hours minutes),
+ * so a night-time wait is not counted as slow service. Capped at 45 days.
+ */
+export function businessMinutesBetween(startMs: number, endMs: number): number {
+    if (!(endMs > startMs)) return 0;
+    const localStart = startMs - LOCAL_OFFSET_MS;
+    const localEnd = endMs - LOCAL_OFFSET_MS;
+    const firstDay = Math.floor(localStart / DAY_MS);
+    const lastDay = Math.min(Math.floor(localEnd / DAY_MS), firstDay + 45);
+    let total = 0;
+    for (let day = firstDay; day <= lastDay; day++) {
+        const dayStart = day * DAY_MS;
+        const [open, close] = hoursOn(new Date(dayStart));
+        const from = Math.max(localStart, dayStart + open * 60000);
+        const to = Math.min(localEnd, dayStart + close * 60000);
+        if (to > from) total += (to - from) / 60000;
+    }
+    return total;
+}

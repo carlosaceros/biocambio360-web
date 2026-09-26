@@ -36,6 +36,17 @@ interface Kpis {
     channelFunnel: Counter;
     ads: Array<{ id: string; headline: string; conversations: number; preOrders: number; sales: number; revenue: number }>;
     advisors: Array<{ name: string; assigned: number; sales: number; revenue: number }>;
+    sla: {
+        leads: number;
+        answered: number;
+        unanswered: number;
+        pending: number;
+        firstResponse: { medianBizMin: number | null; avgBizMin: number | null; p90BizMin: number | null; medianWallMin: number | null; pctWithin15: number | null; pctWithin60: number | null };
+        buckets: Counter;
+        betweenMessages: { count: number; medianBizMin: number | null; avgBizMin: number | null; p90BizMin: number | null };
+        close: { sales: number; medianHoursFromContact: number | null; avgHoursFromContact: number | null; medianHoursFromFirstReply: number | null };
+        byAdvisor: Array<{ name: string; firstResponses: number; medianFirstBizMin: number | null; replies: number; medianBetweenBizMin: number | null; sales: number; medianCloseHours: number | null }>;
+    };
     carts: {
         total: number;
         recovered: number;
@@ -81,6 +92,13 @@ const LABELS: Record<string, string> = {
     agente: 'Fuera de horario (agente)',
 };
 const label = (k: string) => LABELS[k] ?? pretty(k);
+
+/** Business-hours minutes → "12 min" / "3,5 h hábiles" */
+const fmtBiz = (m: number | null | undefined) => (m === null || m === undefined ? '—' : m < 1 ? '<1 min' : m < 60 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1).replace('.', ',')} h háb.`);
+/** Wall-clock hours → "45 min" / "6,2 h" / "3,4 días" */
+const fmtHours = (h: number | null | undefined) => (h === null || h === undefined ? '—' : h < 1 ? `${Math.round(h * 60)} min` : h < 48 ? `${h.toFixed(1).replace('.', ',')} h` : `${(h / 24).toFixed(1).replace('.', ',')} días`);
+const pctOf = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${Math.round(v * 100)}%`);
+const BUCKET_LABELS: Record<string, string> = { lt5: 'Menos de 5 min', m5_15: '5 a 15 min', m15_60: '15 a 60 min', h1_4: '1 a 4 h hábiles', gt4h: 'Más de 4 h hábiles' };
 
 function Card({ icon, title, value, sub, tone = 'violet' }: { icon: React.ReactNode; title: string; value: string; sub?: string; tone?: 'violet' | 'emerald' | 'amber' | 'sky' }) {
     const tones = { violet: 'bg-violet-100 text-violet-700', emerald: 'bg-emerald-100 text-emerald-700', amber: 'bg-amber-100 text-amber-700', sky: 'bg-sky-100 text-sky-700' };
@@ -340,6 +358,58 @@ export default function KpisIaPage() {
                             </table>
                         </div>
                         <p className="text-[11px] text-gray-400 mt-2">Las conversaciones de carritos están en el Inbox con el filtro 🛒 Carritos ({int(data.carts.waConversations)}). &quot;Recuperados&quot; por recordatorio cuenta el último enlace en el que hizo clic el cliente.</p>
+                    </Section>
+
+                    <Section title="Gestión de asesores: tiempos de respuesta y cierre">
+                        <p className="text-[11px] text-gray-500 mb-3">
+                            Los tiempos se miden solo dentro del horario del equipo (las noches, domingos fuera de horario y festivos no cuentan contra el asesor; ahí responde el agente IA). Las respuestas del agente IA y de las automatizaciones no cuentan como respuesta humana.
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-4">
+                            <div><p className="text-gray-500">1ª respuesta a un lead (mediana)</p><p className="text-lg font-black">{fmtBiz(data.sla.firstResponse.medianBizMin)}</p><p className="text-gray-400">promedio {fmtBiz(data.sla.firstResponse.avgBizMin)} · p90 {fmtBiz(data.sla.firstResponse.p90BizMin)}</p></div>
+                            <div><p className="text-gray-500">Respondidos en ≤ 15 min</p><p className="text-lg font-black text-emerald-700">{pctOf(data.sla.firstResponse.pctWithin15)}</p><p className="text-gray-400">≤ 60 min: {pctOf(data.sla.firstResponse.pctWithin60)}</p></div>
+                            <div><p className="text-gray-500">Leads sin respuesta humana</p><p className="text-lg font-black text-amber-700">{int(data.sla.unanswered)}</p><p className="text-gray-400">de {int(data.sla.leads)} leads · {int(data.sla.answered)} respondidos</p></div>
+                            <div><p className="text-gray-500">Respuesta durante la conversación</p><p className="text-lg font-black">{fmtBiz(data.sla.betweenMessages.medianBizMin)}</p><p className="text-gray-400">promedio {fmtBiz(data.sla.betweenMessages.avgBizMin)} · p90 {fmtBiz(data.sla.betweenMessages.p90BizMin)} · {int(data.sla.betweenMessages.count)} respuestas</p></div>
+                            <div><p className="text-gray-500">Cierre de venta desde el 1er mensaje</p><p className="text-lg font-black">{fmtHours(data.sla.close.medianHoursFromContact)}</p><p className="text-gray-400">promedio {fmtHours(data.sla.close.avgHoursFromContact)} · {int(data.sla.close.sales)} ventas</p></div>
+                            <div><p className="text-gray-500">Cierre desde la 1ª respuesta del asesor</p><p className="text-lg font-black">{fmtHours(data.sla.close.medianHoursFromFirstReply)}</p><p className="text-gray-400">mediana</p></div>
+                            <div className="md:col-span-2"><p className="text-gray-500">1ª respuesta en tiempo de reloj (incluye noches)</p><p className="text-lg font-black">{fmtHours(data.sla.firstResponse.medianWallMin === null ? null : data.sla.firstResponse.medianWallMin / 60)}</p><p className="text-gray-400">mediana</p></div>
+                        </div>
+                        {data.sla.pending > 0 && <p className="text-[11px] text-amber-700 mb-3">Faltan calcular {int(data.sla.pending)} conversaciones: recarga para completar.</p>}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div>
+                                <p className="text-xs font-bold text-gray-700 mb-2">Distribución de la 1ª respuesta</p>
+                                <Bars data={Object.fromEntries(['lt5', 'm5_15', 'm15_60', 'h1_4', 'gt4h'].map(k => [BUCKET_LABELS[k], data.sla.buckets[k] ?? 0]))} colorClass="bg-sky-500" top={5} />
+                            </div>
+                            <div className="lg:col-span-2 overflow-x-auto">
+                                {data.sla.byAdvisor.length === 0 ? (
+                                    <p className="text-xs text-gray-400">Sin respuestas de asesores en este periodo.</p>
+                                ) : (
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="text-left text-gray-500 border-b border-gray-100">
+                                                <th className="py-1.5 pr-2 font-bold">Asesor</th>
+                                                <th className="py-1.5 px-2 font-bold text-right">1ª resp. (mediana)</th>
+                                                <th className="py-1.5 px-2 font-bold text-right">Respuestas</th>
+                                                <th className="py-1.5 px-2 font-bold text-right">Entre mensajes</th>
+                                                <th className="py-1.5 px-2 font-bold text-right">Ventas</th>
+                                                <th className="py-1.5 pl-2 font-bold text-right">Cierre (mediana)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {data.sla.byAdvisor.map(a => (
+                                                <tr key={a.name} className="border-b border-gray-50">
+                                                    <td className="py-1.5 pr-2 text-gray-800">{a.name}</td>
+                                                    <td className="py-1.5 px-2 text-right">{fmtBiz(a.medianFirstBizMin)}</td>
+                                                    <td className="py-1.5 px-2 text-right">{int(a.replies)}</td>
+                                                    <td className="py-1.5 px-2 text-right">{fmtBiz(a.medianBetweenBizMin)}</td>
+                                                    <td className="py-1.5 px-2 text-right">{int(a.sales)}</td>
+                                                    <td className="py-1.5 pl-2 text-right font-bold">{fmtHours(a.medianCloseHours)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
                     </Section>
 
                     <Section title="Asesores (conversaciones asignadas y ventas)">

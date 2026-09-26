@@ -15,6 +15,7 @@ import {
     Mic,
     ChevronDown,
     MessageSquare,
+    ChevronLeft,
 } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import MediaAttachment from './MediaAttachment';
@@ -27,6 +28,8 @@ interface ChatWindowProps {
     conversation: ConversationDoc | null;
     onOpenTemplates?: () => void;
     currentUserName?: string;
+    /** mobile: go back to the conversation list */
+    onBack?: () => void;
 }
 
 const STATUS_ICONS: Record<MessageStatus, React.ReactNode> = {
@@ -63,7 +66,7 @@ function isWithin24hWindow(lastInboundAt: any): boolean {
     }
 }
 
-export default function ChatWindow({ conversation, onOpenTemplates, currentUserName }: ChatWindowProps) {
+export default function ChatWindow({ conversation, onOpenTemplates, currentUserName, onBack }: ChatWindowProps) {
     const [messages, setMessages] = useState<MessageDoc[]>([]);
     const [msgStatus, setMsgStatus] = useState<MessagesStatus>({ loading: true });
     const [reloadKey, setReloadKey] = useState(0);
@@ -175,7 +178,18 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
     return (
         <div className="flex flex-col h-full">
             {/* Chat Header */}
-            <div className="border-b border-gray-100 px-4 py-3 flex items-center gap-3 bg-white">
+            <div className="border-b border-gray-100 px-2 sm:px-4 py-2 sm:py-3 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 bg-white shrink-0">
+                {onBack && (
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        aria-label="Volver a la lista de chats"
+                        className="lg:hidden flex items-center gap-0.5 -ml-1 pl-1 pr-2 h-10 rounded-xl text-green-700 font-bold text-sm active:bg-green-50 cursor-pointer"
+                    >
+                        <ChevronLeft size={22} />
+                        Chats
+                    </button>
+                )}
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-100 to-teal-100 flex items-center justify-center font-bold text-green-700 text-sm uppercase">
                     {conversation.contactName?.charAt(0) ?? '?'}
                 </div>
@@ -191,14 +205,14 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                     </p>
                 </div>
                 {!withinWindow && (
-                    <div className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-lg font-semibold">
+                    <div className="basis-full sm:basis-auto text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-lg font-semibold">
                         {conversation?.channel === 'whatsapp' ? '⏱ Ventana 24h expirada — usa plantilla' : '⏱ Ventana 24h expirada — solo el cliente puede reabrir el chat'}
                     </div>
                 )}
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-gray-50/50">
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-2 bg-gray-50/50">
                 {msgStatus.error && (
                     <div className="mx-auto max-w-sm text-center text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2">
                         {msgStatus.error}{' '}
@@ -218,7 +232,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                             className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}
                         >
                             <div
-                                className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm leading-relaxed shadow-xs ${
+                                className={`max-w-[88%] sm:max-w-[75%] px-3 py-2 rounded-2xl text-sm leading-relaxed shadow-xs ${
                                     isOutbound
                                         ? 'bg-green-600 text-white rounded-br-sm'
                                         : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
@@ -316,7 +330,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
             )}
 
             {/* Input area */}
-            <div className="border-t border-gray-100 bg-white p-3">
+            <div className="border-t border-gray-100 bg-white px-2 sm:px-3 pt-2 sm:pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] shrink-0">
                 {!withinWindow ? (
                     /* Outside 24h window — must use template */
                     <div className="flex flex-col items-center gap-2 py-2">
@@ -355,8 +369,8 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                             value={inputText}
                             onChange={e => setInputText(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Escribe un mensaje... (Enter para enviar)"
-                            className="flex-1 resize-none border border-gray-200 rounded-2xl px-3 py-2 text-sm focus:outline-none focus:border-green-400 max-h-28 min-h-[40px]"
+                            placeholder="Escribe un mensaje…"
+                            className="flex-1 min-w-0 resize-none border border-gray-200 rounded-2xl px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-green-400 max-h-28 min-h-[40px]"
                             rows={1}
                         />
                         <button
