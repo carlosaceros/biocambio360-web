@@ -58,3 +58,12 @@ describe('agent presentation', () => {
         expect(out).toEqual(['Hola', 'Opciones:', '*A*\n✅ 10L: $1.000\n✅ 20L: $2.000', '¿Cuál?']);
     });
 });
+
+import { expandCustomerQuery } from '@/lib/ai-agent-knowledge';
+describe('customer wording', () => {
+    it('jabón para ropa means detergente, jabón de manos does not', () => {
+        expect(expandCustomerQuery('me traen un jabón de 20 litros para ropa')).toMatch(/detergente$/);
+        expect(expandCustomerQuery('jabón líquido de manos')).toBe('jabón líquido de manos');
+        expect(expandCustomerQuery('quiero detergente')).toBe('quiero detergente');
+    });
+});

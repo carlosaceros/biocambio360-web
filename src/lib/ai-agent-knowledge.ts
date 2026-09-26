@@ -77,6 +77,16 @@ function normalize(text: string): string {
         .replace(/[̀-ͯ]/g, '');
 }
 
+/**
+ * Customer wording that means a catalog term: "jabón para ropa" is a laundry detergent.
+ * Applied to the CUSTOMER's text only (never to product names, which may really contain "jabón").
+ */
+export function expandCustomerQuery(text: string): string {
+    const t = normalize(text);
+    if (/\bjabon(es)?\b/.test(t) && /\b(ropa|lavar|lavadora|prendas|lavado)\b/.test(t)) return `${text} detergente`;
+    return text;
+}
+
 function tokens(text: string): string[] {
     return normalize(text)
         .split(/[^a-z0-9]+/)
@@ -129,7 +139,7 @@ export async function getRelevantProductSheets(
     max: number = 3
 ): Promise<string> {
     const { products } = await load();
-    const queryTokens = new Set(tokens(customerTexts.join(' ')));
+    const queryTokens = new Set(tokens(expandCustomerQuery(customerTexts.join(' '))));
     const inOrder = new Set(preOrderProductNames.map(normalize));
 
     const scored = products
@@ -160,7 +170,7 @@ export async function getMatchingProductPrices(customerTexts: string[], max: num
     // The head noun is the first significant word that actually exists in the catalog
     // ("detergente" in "detergente para ropa"). Products must match it; the other words only rank
     // them, so laundry detergents come before other detergents.
-    const ordered = tokens(customerTexts.join(' '));
+    const ordered = tokens(expandCustomerQuery(customerTexts.join(' ')));
     const singles = products.filter(p => !Object.keys(p.precios ?? {}).every(k => k.toUpperCase() === 'COMBO'));
     const matchesToken = (nameWords: string[], q: string) => nameWords.some(w => stemMatch(w, q));
     const head = ordered.find(q => singles.some(p => matchesToken(tokens(p.nombre), q)));
@@ -178,6 +188,12 @@ export async function getMatchingProductPrices(customerTexts: string[], max: num
         .filter(s => s.score > 0)
         .sort((a, b) => b.score - a.score || a.p.nombre.localeCompare(b.p.nombre))
         .slice(0, max);
+
+    // A customer who names ONE specific product ("suavizante floral") gets just that product;
+    // a generic request ("detergente para ropa") still lists every variant
+    const best = scored[0]?.score ?? 0;
+    const top = scored.filter(s => s.score === best);
+    if (best > 4 && top.length === 1) scored.splice(1);
 
     return scored
         .map(({ p }) => {

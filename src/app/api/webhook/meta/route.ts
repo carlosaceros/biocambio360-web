@@ -383,7 +383,7 @@ async function handleWhatsAppInboundMessage(
 
     // Determine conversation ID and message type
     const conversationId = buildConversationId('whatsapp', phoneNumberId, contactKey);
-    const { type, content, mediaUrl, mimeType, fileName } = extractWhatsAppContent(msg);
+    const { type, content, mediaUrl, mimeType, fileName, location } = extractWhatsAppContent(msg);
 
     // Determine which account this is
     const accountKey = phoneNumberId === process.env.WHATSAPP_PHONE_ID_BIOCAMBIO
@@ -422,6 +422,9 @@ async function handleWhatsAppInboundMessage(
     if (mediaUrl) messageData.mediaUrl = mediaUrl;
     if (mimeType) messageData.mimeType = mimeType;
     if (fileName) messageData.fileName = fileName;
+    if (location) messageData.location = location;
+    // The customer replied to (quoted) an earlier message: keep its id so the agent can read it
+    if (msg.context?.id) messageData.replyToId = String(msg.context.id);
 
     // Atomic + idempotent: the message doc id is Meta's wamid, so a Meta retry of an already
     // stored message fails on create() (ALREADY_EXISTS) and never double-counts unread.
@@ -518,6 +521,7 @@ function extractWhatsAppContent(msg: any): {
     mediaUrl?: string;
     mimeType?: string;
     fileName?: string;
+    location?: { lat: number; lng: number; name?: string; address?: string };
 } {
     const msgType: string = msg.type ?? 'text';
 
@@ -563,7 +567,13 @@ function extractWhatsAppContent(msg: any): {
         case 'location':
             return {
                 type: 'text',
-                content: `📍 Ubicación: lat ${msg.location?.latitude}, lng ${msg.location?.longitude}`,
+                content: `📍 Ubicación${msg.location?.name ? `: ${msg.location.name}` : ''}${msg.location?.address ? ` (${msg.location.address})` : ''} — lat ${msg.location?.latitude}, lng ${msg.location?.longitude}`,
+                location: {
+                    lat: Number(msg.location?.latitude),
+                    lng: Number(msg.location?.longitude),
+                    ...(msg.location?.name ? { name: String(msg.location.name) } : {}),
+                    ...(msg.location?.address ? { address: String(msg.location.address) } : {}),
+                },
             };
         case 'reaction':
             return {
