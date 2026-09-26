@@ -21,6 +21,7 @@ import { runOrderAgentTurn } from '@/lib/ai-order-agent';
 import { isHumanOnline } from '@/lib/business-hours';
 import { recordNewInboundConversation } from '@/lib/ai-agent-insights';
 import { sendTextMessage } from '@/lib/whatsapp-service';
+import { handleDeliveryReply } from '@/lib/delivery-alerts';
 import { isOptOutText, registerOptOut, OPTOUT_CONFIRMATION } from '@/lib/wa-optout';
 import { fetchSocialProfile } from '@/lib/meta-social-service';
 
@@ -490,6 +491,24 @@ async function handleWhatsAppInboundMessage(
 
     if (!convSnap.exists) {
         void recordNewInboundConversation({ channel: 'whatsapp', adSourceId: adReferral?.sourceId, humanOnline: isHumanOnline() });
+    }
+
+    // Answers to the "your order arrives tomorrow" alert: Confirmar / Modificar buttons and a location pin
+    if (hasPhone && type !== 'reaction') {
+        try {
+            const reply = await handleDeliveryReply({ from, text: content, location: location && Number.isFinite(location.lat) ? location : undefined, conversationId });
+            if (reply) {
+                const { messageId } = await sendTextMessage(phoneNumberId, from, reply);
+                await convRef.collection('messages').add({
+                    direction: 'outbound', type: 'text', content: reply, metaMessageId: messageId,
+                    agentUid: 'delivery-alerts', agentName: 'Alerta de entrega', status: 'sent', timestamp: FieldValue.serverTimestamp(),
+                });
+                await convRef.update({ lastMessage: reply, lastMessageAt: FieldValue.serverTimestamp() });
+                return;
+            }
+        } catch (err) {
+            console.warn('[webhook/meta] delivery reply handling failed:', err instanceof Error ? err.message : err);
+        }
     }
 
     // Marketing opt-out ("Detener promociones"): record it, confirm, and do not run the agent

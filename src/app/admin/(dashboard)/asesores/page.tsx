@@ -1,5 +1,6 @@
 'use client';
 
+import DeliveryAlertsPanel from '@/components/admin/DeliveryAlertsPanel';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -1284,6 +1285,7 @@ export default function AsesoresCockpitPage() {
 
                             return (
                                 <div className="space-y-5">
+                                    <DeliveryAlertsPanel />
                                     {/* CONSOLIDADO GENERAL PARA COORDINADORES Y EQUIPO */}
                                     <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xs space-y-4">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
