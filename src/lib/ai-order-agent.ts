@@ -19,7 +19,7 @@ import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton, isReplyableId, downloadMedia } from '@/lib/whatsapp-service';
-import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getProductLineByName } from '@/lib/ai-agent-knowledge';
+import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getProductLineByName, correctPriceLines } from '@/lib/ai-agent-knowledge';
 import { loadTrainingSnapshot, rulesPromptBlock, examplesPromptBlock, pickExamples, verifyAdConfig } from '@/lib/ai-agent-training';
 import {
     getPromptCacheName,
@@ -744,6 +744,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
 
         // ── Deterministic presentation (the model's wording is normalized, never trusted) ──
         messages = messages.map(m => fixDayPart(m, dp.part));
+        messages = await correctPriceLines(messages);
 
         // When the system prints the catalog prices itself, the model's own price lines are dropped
         // (they could be incomplete or wrong)
@@ -758,7 +759,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
         }
 
         const reformatted = reformatPriceMessages(messages);
-        messages = reformatted.messages;
+        messages = reformatted.messages.filter((m, i, all) => all.indexOf(m) === i);
         let pricesShown = reformatted.hadBlocks || input.alreadyListed;
 
         // A question about a type of product must list EVERY matching variant

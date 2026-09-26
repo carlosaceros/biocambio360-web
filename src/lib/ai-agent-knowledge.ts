@@ -10,6 +10,7 @@
 import { createHash } from 'crypto';
 import { adminGetAllProducts } from '@/lib/products-admin';
 import { PRODUCTOS, isDisallowedSize, type Product } from '@/lib/products';
+import { priceLineToBlock } from '@/lib/ai-agent-guard';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -219,6 +220,59 @@ export async function getProductLineByName(name: string): Promise<string> {
         .map(([size, price]) => `${sizeLabel(size)} ${money(Number(price))}`)
         .join(' · ');
     return `- ${p.nombre}: ${sizes}`;
+}
+
+/** Catalog line of a product by name: exact match, else a unique partial match. '' if unknown. */
+async function lookupProductLine(name: string): Promise<string> {
+    const exact = await getProductLineByName(name);
+    if (exact) return exact;
+    const wanted = normalize(name).trim();
+    if (wanted.length < 6) return '';
+    const { products } = await load();
+    const hits = products.filter(p => {
+        const n = normalize(p.nombre).trim();
+        return n.includes(wanted) || wanted.includes(n);
+    });
+    return hits.length === 1 ? getProductLineByName(hits[0].nombre) : '';
+}
+
+/**
+ * The model must never show a price it wrote itself: every product price line or ✅ block in its reply
+ * is rebuilt from the catalog (all presentations, real prices). Lines of unknown products are kept as they are.
+ */
+export async function correctPriceLines(messages: string[]): Promise<string[]> {
+    const out: string[] = [];
+    for (const message of messages) {
+        if (!/\$\s*\d/.test(message)) {
+            out.push(message);
+            continue;
+        }
+        const kept: string[] = [];
+        const lines = message.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (priceLineToBlock(line)) {
+                const name = line.replace(/^\s*[-•]?\s*\**/, '').split(':')[0].replace(/\*+$/, '').trim();
+                const real = await lookupProductLine(name);
+                kept.push(real ? real.replace(/^-\s*/, '') : line);
+                continue;
+            }
+            const head = line.match(/^\*([^*]+)\*$/);
+            if (head && lines[i + 1]?.includes('✅')) {
+                let j = i + 1;
+                while (j < lines.length && lines[j].includes('✅')) j++;
+                const real = await lookupProductLine(head[1].trim());
+                if (real) kept.push(real.replace(/^-\s*/, ''));
+                else kept.push(...lines.slice(i, j));
+                i = j - 1;
+                continue;
+            }
+            kept.push(line);
+        }
+        const text = kept.join('\n').trim();
+        if (text) out.push(text);
+    }
+    return out;
 }
 
 /** Sellable product names (for pickers in the admin UI). */
