@@ -6,11 +6,12 @@
 
 export const runtime = 'nodejs';
 
-import { REMINDER_TEMPLATE_NAME, reminderComponents } from '@/lib/reminder-template';
+import { REMINDER_TEMPLATE_NAME, reminderComponents, reminderProduct } from '@/lib/reminder-template';
+import { buildConversationId } from '@/lib/inbox-service';
 import { createReminderCart, FALLBACK_BUTTON_TOKEN } from '@/lib/reminder-cart';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB, getAdminAuth } from '@/lib/firebase-admin';
-import { sendBulkTemplateMessages } from '@/lib/whatsapp-service';
+import { sendBulkTemplateMessages, findTemplate } from '@/lib/whatsapp-service';
 import { FieldValue } from 'firebase-admin/firestore';
 import { isOptedOut } from '@/lib/wa-optout';
 
@@ -97,8 +98,10 @@ export async function POST(req: NextRequest) {
 
     // Dry run: return estimate without sending
     if (dryRun) {
+        const found = await findTemplate(templateName).catch(() => []);
         return NextResponse.json({
             dryRun: true,
+            template: { name: templateName, found: found.length > 0, languages: found.map(f => `${f.language} (${f.status})`) },
             total,
             skipped: customerErrors.length,
             estimatedCostUsd,
@@ -126,6 +129,36 @@ export async function POST(req: NextRequest) {
         templateName,
         templateLanguage
     );
+
+    // Every delivered reminder is recorded in the inbox, so the customer's reply lands in the same chat
+    const reminderTag = templateName === REMINDER_TEMPLATE_NAME ? 'reabastecimiento' : null;
+    for (let i = 0; i < results.length; i++) {
+        if (!results[i].success || !customers[i]) continue;
+        try {
+            const c = customers[i];
+            const convRef = db.collection('conversations').doc(buildConversationId('whatsapp', phoneId, c.phone));
+            const existing = await convRef.get();
+            const preview = `📋 Plantilla: ${templateName}${c.itemsSummary ? ` · ${reminderProduct(c.itemsSummary)}` : ''}`;
+            if (existing.exists) {
+                await convRef.update({ lastMessage: preview, lastMessageAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), ...(reminderTag ? { tags: FieldValue.arrayUnion(reminderTag) } : {}) });
+            } else {
+                await convRef.set({
+                    channel: 'whatsapp', phoneId,
+                    accountKey: phoneId === process.env.WHATSAPP_PHONE_ID_BIOCAMBIO ? 'biocambio360' : null,
+                    contactPhone: c.phone, contactUserId: null, contactName: c.name || `+${c.phone}`,
+                    lastMessage: preview, lastMessageAt: FieldValue.serverTimestamp(), unreadCount: 0, status: 'abierto', assignedTo: null,
+                    tags: reminderTag ? [reminderTag] : [], createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+                });
+            }
+            await convRef.collection('messages').add({
+                direction: 'outbound', type: 'template', content: preview, templateName,
+                metaMessageId: results[i].messageId ?? 'unknown', agentUid: decoded.uid, agentName: 'Recordatorio de reabastecimiento',
+                status: 'sent', timestamp: FieldValue.serverTimestamp(),
+            });
+        } catch (err) {
+            console.warn('[bulk-reminder] Could not record the message in the inbox:', err instanceof Error ? err.message : err);
+        }
+    }
 
     // Update lastReminderSentAt in Firestore for successful sends
     const now = FieldValue.serverTimestamp();

@@ -122,12 +122,31 @@ export async function POST(req: NextRequest) {
 
         await convRef.collection('messages').add(msgData);
 
-        // Update conversation's last message
-        await convRef.update({
-            lastMessage: content,
-            lastMessageAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-        });
+        // Update the conversation's last message (a first outbound message creates the conversation)
+        const existing = await convRef.get();
+        if (existing.exists) {
+            await convRef.update({
+                lastMessage: content,
+                lastMessageAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+            });
+        } else {
+            await convRef.set({
+                channel: channel ?? 'whatsapp',
+                phoneId,
+                accountKey: phoneId === process.env.WHATSAPP_PHONE_ID_BIOCAMBIO ? 'biocambio360' : phoneId === process.env.WHATSAPP_PHONE_ID_LIMPIEZA ? 'totalLimpieza' : null,
+                contactPhone: (channel ?? 'whatsapp') === 'whatsapp' ? to : null,
+                contactUserId: null,
+                contactName: typeof payload.contactName === 'string' && payload.contactName ? payload.contactName : `+${to}`,
+                lastMessage: content,
+                lastMessageAt: FieldValue.serverTimestamp(),
+                unreadCount: 0,
+                status: 'abierto',
+                assignedTo: null,
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+            });
+        }
 
         return NextResponse.json({ success: true, messageId: metaMessageId });
     } catch (err: any) {

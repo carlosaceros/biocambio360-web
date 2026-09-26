@@ -151,6 +151,8 @@ export interface WhatsAppTemplate {
 }
 
 export interface SendMessagePayload {
+    /** Name used when this first message creates the conversation */
+    contactName?: string;
     conversationId: string;
     channel: Channel;
     to: string;              // phone (WA) or PSID (messenger/ig)

@@ -60,7 +60,7 @@ export default function ReabastecimientoBIAdminPage() {
     // Bulk campaign modal
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [bulkLoading, setBulkLoading] = useState(false);
-    const [bulkDryRun, setBulkDryRun] = useState<{ total: number; estimatedCostUsd: number } | null>(null);
+    const [bulkDryRun, setBulkDryRun] = useState<{ total: number; estimatedCostUsd: number; template?: { name: string; found: boolean; languages: string[] } } | null>(null);
     const [bulkResult, setBulkResult] = useState<{ sent: number; failed: number; estimatedCostUsd: number } | null>(null);
 
     useEffect(() => {
@@ -118,6 +118,8 @@ export default function ReabastecimientoBIAdminPage() {
             const phone = `57${cleanPhone.slice(-10)}`;
             const dueDateStr = new Date(r.nextOrderDueDate).toLocaleDateString('es-CO');
 
+            let templateError = '';
+
             // 1) Approved template: works even when the customer has not written in the last 24 h
             try {
                 const tplRes = await fetch('/api/inbox/bulk-reminder', {
@@ -136,7 +138,10 @@ export default function ReabastecimientoBIAdminPage() {
                     await markSent();
                     return;
                 }
-            } catch { /* fall through to free text */ }
+                templateError = tplData.results?.[0]?.error || tplData.errors?.[0]?.error || tplData.error || `Error ${tplRes.status}`;
+            } catch (e) {
+                templateError = e instanceof Error ? e.message : 'Error de red';
+            }
 
             // 2) Free text (only valid inside the 24 h window), then 3) wa.me as last resort
             const res = await fetch('/api/inbox/send', {
@@ -144,6 +149,7 @@ export default function ReabastecimientoBIAdminPage() {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     conversationId: `wa_${BIOCAMBIO_PHONE_ID}_${phone}`,
+                    contactName: r.customerName,
                     channel: 'whatsapp',
                     to: phone,
                     phoneId: BIOCAMBIO_PHONE_ID,
@@ -154,18 +160,15 @@ export default function ReabastecimientoBIAdminPage() {
                 }),
             });
 
-            if (res.ok) await markSent();
-            if (!res.ok) {
-                // Fallback: open wa.me in new tab
-                const msg = `Hola ${r.customerName} 👋. Tu próximo reabastecimiento de *${r.itemsSummary}* es el ${dueDateStr}. 👉 https://biocambio360.com/`;
-                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            if (res.ok) {
+                await markSent();
+            } else {
+                const detail = await res.json().catch(() => ({}));
+                alert(`No se pudo enviar el WhatsApp desde la plataforma.\n\nPlantilla: ${templateError}\nTexto libre: ${detail.error ?? res.status}`);
             }
         } catch (err: any) {
             console.error('[reabastecimiento] Reminder error:', err);
-            // Fallback to wa.me
-            const cleanPhone = r.customerPhone.replace(/\D/g, '');
-            const msg = `Hola ${r.customerName} 👋. Tu próximo reabastecimiento de *${r.itemsSummary}* es próximamente. 👉 https://biocambio360.com/`;
-            window.open(`https://wa.me/57${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+            alert(`No se pudo enviar el recordatorio: ${err instanceof Error ? err.message : 'error desconocido'}`);
         } finally {
             setSendingId(null);
         }
@@ -195,7 +198,7 @@ export default function ReabastecimientoBIAdminPage() {
                 }),
             });
             const data = await res.json();
-            setBulkDryRun({ total: data.total, estimatedCostUsd: data.estimatedCostUsd });
+            setBulkDryRun({ total: data.total, estimatedCostUsd: data.estimatedCostUsd, template: data.template });
         } catch (err) {
             console.error('[bulk-dry-run]', err);
         } finally {
@@ -514,6 +517,14 @@ export default function ReabastecimientoBIAdminPage() {
 
                             {bulkDryRun && !bulkResult && !bulkLoading && (
                                 <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
+                                    {bulkDryRun.template && !bulkDryRun.template.found && (
+                                        <div className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                                            ⚠️ La plantilla &quot;{bulkDryRun.template.name}&quot; no existe en la cuenta de WhatsApp Business de este número (+57 324 1005353). Créala en esa cuenta antes de enviar.
+                                        </div>
+                                    )}
+                                    {bulkDryRun.template?.found && (
+                                        <div className="text-[11px] text-green-800">✓ Plantilla encontrada: {bulkDryRun.template.languages.join(', ')}</div>
+                                    )}
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-600">Mensajes a enviar</span>
                                         <span className="font-black text-gray-900">{bulkDryRun.total}</span>

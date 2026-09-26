@@ -185,6 +185,17 @@ export async function markMessageAsRead(
     });
 }
 
+/** Looks a template up (by exact name) in the WhatsApp Business Account of the sending number. */
+export async function findTemplate(name: string): Promise<Array<{ language: string; status: string }>> {
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    if (!wabaId) return [];
+    const res = await fetch(`${GRAPH_API_BASE}/${wabaId}/message_templates?name=${encodeURIComponent(name)}&fields=name,language,status`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    return (data?.data ?? []).filter((t: { name: string }) => t.name === name).map((t: { language: string; status: string }) => ({ language: t.language, status: t.status }));
+}
+
 /**
  * Fetches the list of approved templates for a WhatsApp Business Account.
  */
