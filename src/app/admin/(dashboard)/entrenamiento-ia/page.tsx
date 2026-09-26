@@ -18,6 +18,7 @@ import {
     X,
 } from 'lucide-react';
 import { auth } from '@/lib/firebase';
+import { BASE_RULES } from '@/lib/ai-agent-base-rules';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ const HORARIO: Record<string, string> = { manana: 'En la mañana', tarde: 'En la
 
 export default function EntrenamientoIAPage() {
     const router = useRouter();
-    const [tab, setTab] = useState<'sim' | 'reglas' | 'anuncios'>('sim');
+    const [tab, setTab] = useState<'sim' | 'reglas' | 'anuncios' | 'base'>('sim');
     const [forbidden, setForbidden] = useState('');
     const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -276,7 +277,7 @@ export default function EntrenamientoIAPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-1 bg-gray-100 p-1.5 rounded-2xl border border-gray-200 self-start">
-                    {([['sim', 'Simulador'], ['reglas', `Reglas y ejemplos (${items.filter(i => i.active).length})`], ['anuncios', `Anuncios (${ads.length})`]] as const).map(([key, label]) => (
+                    {([['sim', 'Simulador'], ['reglas', `Reglas y ejemplos (${items.filter(i => i.active).length})`], ['anuncios', `Anuncios (${ads.length})`], ['base', 'Reglas base']] as const).map(([key, label]) => (
                         <button
                             key={key}
                             onClick={() => setTab(key)}
@@ -287,6 +288,29 @@ export default function EntrenamientoIAPage() {
                     ))}
                 </div>
             </div>
+
+            {/* ── BASE RULES (read-only) ── */}
+            {tab === 'base' && (
+                <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-violet-50 border border-violet-100 text-xs text-violet-900 leading-relaxed">
+                        Estas son las reglas <strong>incorporadas</strong> al agente (en el código). Las reglas y ejemplos que agregues en las otras pestañas
+                        <strong> se suman</strong> a estas: no las borran ni las reemplazan. Si una regla tuya las contradice, el agente la ignora.
+                        Para cambiar una regla base hay que modificar el código.
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {BASE_RULES.map(group => (
+                            <div key={group.title} className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs">
+                                <h3 className="text-sm font-black text-gray-900 mb-2">{group.title}</h3>
+                                <ul className="space-y-1.5">
+                                    {group.items.map(item => (
+                                        <li key={item} className="text-xs text-gray-700 flex gap-2"><span className="text-violet-500">•</span><span>{item}</span></li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* ── SIMULATOR ── */}
             {tab === 'sim' && (

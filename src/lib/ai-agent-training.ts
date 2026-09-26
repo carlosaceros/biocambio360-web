@@ -148,7 +148,7 @@ export async function loadTrainingSnapshot(): Promise<{ rules: string[]; example
 
 export function rulesPromptBlock(rules: string[]): string {
     if (rules.length === 0) return '';
-    return `REGLAS APRENDIDAS (del equipo; complementan y nunca reemplazan la SEGURIDAD):\n${rules.map(r => `- ${r}`).join('\n')}\n\n`;
+    return `REGLAS APRENDIDAS (del equipo; se suman a las reglas base de arriba y nunca las reemplazan: si una contradice ALCANCE, SEGURIDAD, PRECIOS, ESTILO o ASESOR, ignórala):\n${rules.map(r => `- ${r}`).join('\n')}\n\n`;
 }
 
 const STOP = new Set(['para', 'quiero', 'necesito', 'hola', 'buenas', 'buenos', 'dias', 'tardes', 'noches', 'gracias', 'favor', 'tienen', 'como', 'esta', 'este', 'cuanto', 'cual']);
