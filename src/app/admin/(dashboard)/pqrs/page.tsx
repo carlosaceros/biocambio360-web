@@ -14,6 +14,8 @@ interface Pqrs {
     tipo: 'peticion' | 'queja' | 'reclamo' | 'sugerencia';
     descripcion: string;
     pedidoRef?: string;
+    caseId?: string;
+    evidencia?: string;
     producto?: string;
     nombreCliente?: string;
     telefono?: string;
@@ -117,6 +119,7 @@ export default function PqrsPage() {
                         return (
                             <div key={p.id} className="bg-white rounded-2xl border border-gray-200 shadow-xs p-4 space-y-3">
                                 <div className="flex flex-wrap items-center gap-2">
+                                    {p.caseId && <span className="text-[11px] font-black text-gray-900 bg-gray-100 px-2 py-0.5 rounded-lg tracking-wide">{p.caseId}</span>}
                                     <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${tipo.cls}`}>{tipo.label}</span>
                                     {p.prioridad === 'alta' && (
                                         <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-600 text-white">Prioridad alta</span>
@@ -140,6 +143,7 @@ export default function PqrsPage() {
                                     </p>
                                     {p.producto && <p><strong>Producto:</strong> {p.producto}</p>}
                                     {p.pedidoRef && <p><strong>Pedido / fecha:</strong> {p.pedidoRef}</p>}
+                                    {p.evidencia && <p className="sm:col-span-2"><strong>Foto del cliente:</strong> {p.evidencia}</p>}
                                     {p.contactoPreferido && <p><strong>Contactar:</strong> {CONTACTO[p.contactoPreferido] ?? p.contactoPreferido}</p>}
                                 </div>
 

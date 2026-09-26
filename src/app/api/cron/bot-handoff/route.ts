@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
 
             const franja: Record<string, string> = { manana: 'en la mañana', tarde: 'en la tarde', '7-9pm': 'entre 7 y 9 p.m.' };
             const cuando = franja[pre.horarioContacto as string];
-            const what = conv.hasPqrs ? 'tu solicitud' : 'tu pre-pedido';
+            const what = conv.hasPqrs ? (conv.caseId ? `tu caso ${conv.caseId}` : 'tu solicitud') : 'tu pre-pedido';
             const text =
                 `${greeting} Ya pasé ${what} a ${result.advisorName}, del equipo de Biocambio360.\n` +
                 (cuando ? `Te contactará ${cuando}.` : 'En breve te contacta para confirmar los detalles.');
