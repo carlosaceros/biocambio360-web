@@ -402,6 +402,15 @@ export default function InboxPage() {
                 )}
                 <div className="ml-auto flex items-center gap-2">
                     {canModerate && (
+                        <Link
+                            href="/admin/multimedia"
+                            title="Multimedia: archivos guardados y política de retención"
+                            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold border rounded-xl text-gray-600 border-gray-200 hover:text-gray-900"
+                        >
+                            🗂 Multimedia
+                        </Link>
+                    )}
+                    {canModerate && (
                         <button
                             onClick={toggleAgent}
                             title="Agente IA: atiende fuera del horario del equipo (L-M 6am-9pm, J 6am-8pm, V 6am-7pm, S 7am-7pm, D y festivos 9am-6pm), toma pedidos y arma un pre-pedido. Clic para activar/pausar."

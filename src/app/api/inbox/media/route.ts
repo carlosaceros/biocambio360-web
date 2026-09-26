@@ -11,9 +11,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
-import { downloadMedia } from '@/lib/whatsapp-service';
+import { loadMedia, persistMediaBuffer, MediaDeletedError } from '@/lib/media-store';
 
 const CHUNK = 3.5 * 1024 * 1024;
 const MAX_FILE = 40 * 1024 * 1024;
@@ -28,7 +28,9 @@ async function getFile(id: string) {
     const hit = recent.get(id);
     if (hit) return hit;
 
-    const { buffer, mimeType } = await downloadMedia(id);
+    const { buffer, mimeType, fromStorage } = await loadMedia(id);
+    // A file still reachable only through Meta is saved now, before its id expires (~30 days)
+    if (!fromStorage) after(() => persistMediaBuffer({ mediaId: id, buffer, mimeType }));
     if (buffer.length <= MAX_FILE) {
         if (recent.size >= 3) recent.delete(recent.keys().next().value as string);
         recent.set(id, { at: now, buffer, mimeType });
@@ -82,6 +84,9 @@ export async function GET(req: NextRequest) {
             headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${total}`, 'Content-Length': String(slice.length) },
         });
     } catch (err) {
+        if (err instanceof MediaDeletedError) {
+            return NextResponse.json({ error: 'Archivo eliminado por la política de retención de multimedia.', archived: true }, { status: 410 });
+        }
         console.warn('[inbox/media] Failed:', err instanceof Error ? err.message : err);
         return NextResponse.json({ error: 'No se pudo cargar el archivo (puede haber caducado).' }, { status: 502 });
     }

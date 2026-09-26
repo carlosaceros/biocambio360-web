@@ -22,6 +22,7 @@ import { isHumanOnline } from '@/lib/business-hours';
 import { recordNewInboundConversation } from '@/lib/ai-agent-insights';
 import { sendTextMessage } from '@/lib/whatsapp-service';
 import { handleDeliveryReply } from '@/lib/delivery-alerts';
+import { persistMedia } from '@/lib/media-store';
 import { isOptOutText, registerOptOut, OPTOUT_CONFIRMATION } from '@/lib/wa-optout';
 import { fetchSocialProfile } from '@/lib/meta-social-service';
 
@@ -491,6 +492,11 @@ async function handleWhatsAppInboundMessage(
 
     if (!convSnap.exists) {
         void recordNewInboundConversation({ channel: 'whatsapp', adSourceId: adReferral?.sourceId, humanOnline: isHumanOnline() });
+    }
+
+    // Keep a copy of the customer's media (Meta only keeps it ~30 days)
+    if (mediaUrl && ['image', 'audio', 'video', 'document', 'sticker'].includes(type)) {
+        after(() => persistMedia({ mediaId: String(mediaUrl), conversationId, messageId: msgId }));
     }
 
     // Answers to the "your order arrives tomorrow" alert: Confirmar / Modificar buttons and a location pin
