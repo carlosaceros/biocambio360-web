@@ -186,8 +186,7 @@ export async function markMessageAsRead(
 }
 
 /** Looks a template up (by exact name) in the WhatsApp Business Account of the sending number. */
-export async function findTemplate(name: string): Promise<Array<{ language: string; status: string }>> {
-    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+export async function findTemplate(name: string, wabaId: string = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? ''): Promise<Array<{ language: string; status: string }>> {
     if (!wabaId) return [];
     const res = await fetch(`${GRAPH_API_BASE}/${wabaId}/message_templates?name=${encodeURIComponent(name)}&fields=name,language,status`, {
         headers: { Authorization: `Bearer ${getToken()}` },

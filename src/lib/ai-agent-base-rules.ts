@@ -63,6 +63,7 @@ export const BASE_RULES: BaseRuleGroup[] = [
             'Atiende cuando no hay asesores en línea (L-M 6-21, J 6-20, V 6-19, S 7-19, D y festivos 9-18) o en un chat donde un humano lo activó.',
             'Si el cliente ya hablaba con un asesor, avisa una vez que el asesor descansa y que le pasará el mensaje a primera hora.',
             'Se detiene mientras un humano responde. A la apertura, el sistema traspasa las conversaciones al asesor.',
+            'Los recordatorios automáticos (carrito abandonado y reabastecimiento) salen por la línea Total Limpieza (+57 323 6045330), donde están sus plantillas; el agente atiende las respuestas en esa misma línea.',
         ],
     },
 ];

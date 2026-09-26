@@ -8,6 +8,7 @@ import { getAdminDB } from '@/lib/firebase-admin';
 import { sendTemplateMessage } from '@/lib/whatsapp-service';
 import { buildConversationId } from '@/lib/inbox-service';
 import { isOptedOut } from '@/lib/wa-optout';
+import { REMINDER_PHONE_ID } from '@/lib/whatsapp-sender';
 import {
     CART_TAG,
     cartFirstName,
@@ -32,8 +33,7 @@ export type CartWhatsappResult = { ok: true; conversationId: string } | { ok: fa
 export async function sendCartWhatsapp(cart: CartLike, step: number, template: string): Promise<CartWhatsappResult> {
     const to = toWhatsappId(cart.customerPhone);
     if (!to) return { ok: false, skipped: 'sin celular válido' };
-    const phoneId = process.env.WHATSAPP_PHONE_ID_BIOCAMBIO;
-    if (!phoneId) return { ok: false, skipped: 'WHATSAPP_PHONE_ID_BIOCAMBIO no configurado' };
+    const phoneId = REMINDER_PHONE_ID;
     if (await isOptedOut(to)) return { ok: false, skipped: 'el cliente pidió no recibir promociones' };
 
     const name = cartFirstName(cart.customerName);
@@ -71,7 +71,7 @@ export async function sendCartWhatsapp(cart: CartLike, step: number, template: s
             await convRef.set({
                 channel: 'whatsapp',
                 phoneId,
-                accountKey: 'biocambio360',
+                accountKey: 'totalLimpieza',
                 contactPhone: to,
                 contactUserId: null,
                 contactName: cart.customerName || `+${to}`,

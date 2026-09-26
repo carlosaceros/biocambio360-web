@@ -34,7 +34,8 @@ import {
 import { formatCurrency } from '@/lib/checkout-utils';
 import { auth } from '@/lib/firebase';
 
-const BIOCAMBIO_PHONE_ID = '236893662847270';
+// Reminder line: Biocambio360 Total Limpieza (+57 323 6045330); the approved templates live in its account
+const BIOCAMBIO_PHONE_ID = '879282705263185';
 const COST_PER_MARKETING_MSG = 0.0125; // USD — Colombia +57, Meta pricing 2025
 
 export default function ReabastecimientoBIAdminPage() {

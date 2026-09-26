@@ -82,7 +82,7 @@ export default function CartAutomationPanel() {
                         ))}
                     </div>
                     <p className="text-[11px] text-gray-500">
-                        Requiere la plantilla <code className="bg-gray-100 px-1 rounded">{cfg.whatsappTemplate}</code> aprobada en Meta. Respeta a quien pidió &quot;Detener promociones&quot;.
+                        Se envía desde la línea Total Limpieza (+57 323 6045330) con la plantilla <code className="bg-gray-100 px-1 rounded">{cfg.whatsappTemplate}</code>, aprobada en esa cuenta. Respeta a quien pidió &quot;Detener promociones&quot;.
                     </p>
                 </div>
             </div>

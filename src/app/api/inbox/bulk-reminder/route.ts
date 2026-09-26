@@ -8,6 +8,7 @@ export const runtime = 'nodejs';
 
 import { REMINDER_TEMPLATE_NAME, reminderComponents, reminderProduct } from '@/lib/reminder-template';
 import { buildConversationId } from '@/lib/inbox-service';
+import { REMINDER_PHONE_ID, REMINDER_WABA_ID } from '@/lib/whatsapp-sender';
 import { createReminderCart, FALLBACK_BUTTON_TOKEN } from '@/lib/reminder-cart';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB, getAdminAuth } from '@/lib/firebase-admin';
@@ -35,13 +36,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
         customerIds,
-        phoneId,
+        phoneId: requestedPhoneId,
         templateName,
         templateLanguage = 'es',
         templateType = 'marketing', // 'marketing' | 'utility'
         dryRun = false, // if true, only returns cost estimate without sending
         customers: provided, // records computed by the page (they have no Firestore document until a reminder is sent)
     } = body;
+
+    // The replenishment template is sent from the reminder line (its templates live in that line's account)
+    const isReminder = templateName === REMINDER_TEMPLATE_NAME;
+    const phoneId: string = isReminder ? REMINDER_PHONE_ID : requestedPhoneId;
 
     if (!customerIds?.length || !phoneId || !templateName) {
         return NextResponse.json(
@@ -98,7 +103,7 @@ export async function POST(req: NextRequest) {
 
     // Dry run: return estimate without sending
     if (dryRun) {
-        const found = await findTemplate(templateName).catch(() => []);
+        const found = await findTemplate(templateName, isReminder ? REMINDER_WABA_ID : undefined).catch(() => []);
         return NextResponse.json({
             dryRun: true,
             template: { name: templateName, found: found.length > 0, languages: found.map(f => `${f.language} (${f.status})`) },
@@ -144,7 +149,7 @@ export async function POST(req: NextRequest) {
             } else {
                 await convRef.set({
                     channel: 'whatsapp', phoneId,
-                    accountKey: phoneId === process.env.WHATSAPP_PHONE_ID_BIOCAMBIO ? 'biocambio360' : null,
+                    accountKey: phoneId === process.env.WHATSAPP_PHONE_ID_LIMPIEZA ? 'totalLimpieza' : phoneId === process.env.WHATSAPP_PHONE_ID_BIOCAMBIO ? 'biocambio360' : null,
                     contactPhone: c.phone, contactUserId: null, contactName: c.name || `+${c.phone}`,
                     lastMessage: preview, lastMessageAt: FieldValue.serverTimestamp(), unreadCount: 0, status: 'abierto', assignedTo: null,
                     tags: reminderTag ? [reminderTag] : [], createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
