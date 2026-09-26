@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
         templateLanguage = 'es',
         templateType = 'marketing', // 'marketing' | 'utility'
         dryRun = false, // if true, only returns cost estimate without sending
+        customers: provided, // records computed by the page (they have no Firestore document until a reminder is sent)
     } = body;
 
     if (!customerIds?.length || !phoneId || !templateName) {
@@ -54,13 +55,30 @@ export async function POST(req: NextRequest) {
     const customers: Array<{ id: string; phone: string; name: string; itemsSummary: string; email: string; city: string; lastOrderId: string }> = [];
     const customerErrors: Array<{ customerId: string; phone: string; error: string }> = [];
 
+    const str = (v: unknown, max = 300) => String(v ?? '').slice(0, max);
+    const providedById = new Map<string, Record<string, unknown>>(
+        (Array.isArray(provided) ? provided : []).map((c: Record<string, unknown>) => [str(c?.id, 80), c] as [string, Record<string, unknown>])
+    );
     for (const cid of customerIds as string[]) {
-        const snap = await db.collection('customer_replenishments').doc(cid).get();
-        if (!snap.exists) {
-            customerErrors.push({ customerId: cid, phone: '', error: 'Not found in replenishment records' });
-            continue;
+        const fromPage = providedById.get(cid);
+        let data: FirebaseFirestore.DocumentData;
+        if (fromPage) {
+            data = {
+                customerPhone: str(fromPage.customerPhone, 30),
+                customerName: str(fromPage.customerName, 120),
+                itemsSummary: str(fromPage.itemsSummary, 400),
+                customerEmail: str(fromPage.customerEmail, 120),
+                customerCity: str(fromPage.customerCity, 80),
+                lastOrderId: str(fromPage.lastOrderId, 80),
+            };
+        } else {
+            const snap = await db.collection('customer_replenishments').doc(cid).get();
+            if (!snap.exists) {
+                customerErrors.push({ customerId: cid, phone: '', error: 'Not found in replenishment records' });
+                continue;
+            }
+            data = snap.data()!;
         }
-        const data = snap.data()!;
         const phone = (data.customerPhone as string ?? '').replace(/\D/g, '');
         if (!phone || phone.length < 10) {
             customerErrors.push({ customerId: cid, phone, error: 'Invalid phone number' });
@@ -113,11 +131,11 @@ export async function POST(req: NextRequest) {
     const now = FieldValue.serverTimestamp();
     for (let i = 0; i < results.length; i++) {
         if (results[i].success && customers[i]) {
-            await db.collection('customer_replenishments').doc(customers[i].id).update({
-                lastReminderSentAt: now,
-                lastWhatsappReminderAt: now,
+            await db.collection('customer_replenishments').doc(customers[i].id).set({
+                lastReminderSentAt: new Date().toISOString(),
+                lastWhatsappReminderAt: new Date().toISOString(),
                 lastWhatsappReminderTemplate: templateName,
-            });
+            }, { merge: true });
         }
     }
 

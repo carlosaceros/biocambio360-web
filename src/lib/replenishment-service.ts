@@ -268,10 +268,10 @@ export async function getAllReplenishmentRecords(): Promise<CustomerReplenishmen
  */
 export async function markReminderSent(id: string): Promise<void> {
     try {
+        // The record is computed from orders and its document may not exist yet: create it if needed,
+        // otherwise the 7-day guard never sees the timestamp and the same customer is emailed every day
         const docRef = doc(db, 'customer_replenishments', id);
-        await updateDoc(docRef, {
-            lastReminderSentAt: new Date().toISOString()
-        });
+        await setDoc(docRef, { lastReminderSentAt: new Date().toISOString() }, { merge: true });
     } catch (e) {
         console.error('Error marking reminder sent:', e);
     }

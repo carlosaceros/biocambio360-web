@@ -28,6 +28,14 @@ export async function GET(request: Request) {
             }
         }
 
+        // The automatic e-mail can be paused from the Reabastecimiento screen (WhatsApp is separate)
+        const { getAdminDB } = await import('@/lib/firebase-admin');
+        const config = (await getAdminDB().collection('bot_config').doc('replenishment').get()).data();
+        if (config?.emailEnabled === false) {
+            console.log('[Cron/Recompra] Automatic e-mail is paused');
+            return NextResponse.json({ status: 'paused' });
+        }
+
         // Dynamic imports para evitar problemas de bundling
         const { getAllReplenishmentRecords, markReminderSent } = await import('@/lib/replenishment-service');
         const { sendRecompraAlertaTempranaEmail, sendRecompraCriticoEmail } = await import('@/lib/recompra-emails');

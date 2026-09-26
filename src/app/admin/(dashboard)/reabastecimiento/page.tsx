@@ -23,6 +23,8 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { doc as fsDoc, onSnapshot as fsOnSnapshot, setDoc as fsSetDoc, serverTimestamp as fsServerTimestamp } from 'firebase/firestore';
+import { db as fsDb } from '@/lib/firebase';
 import {
     getAllReplenishmentRecords,
     markReminderSent,
@@ -45,6 +47,15 @@ export default function ReabastecimientoBIAdminPage() {
 
     // 1-clic individual
     const [sendingId, setSendingId] = useState<string | null>(null);
+    const [emailAuto, setEmailAuto] = useState(true);
+
+    // Daily automatic e-mail (9 a.m.) can be paused; the WhatsApp buttons are independent
+    useEffect(
+        () => fsOnSnapshot(fsDoc(fsDb, 'bot_config', 'replenishment'), snap => setEmailAuto(snap.data()?.emailEnabled !== false), () => undefined),
+        []
+    );
+    const toggleEmailAuto = (enabled: boolean) =>
+        fsSetDoc(fsDoc(fsDb, 'bot_config', 'replenishment'), { emailEnabled: enabled, updatedAt: fsServerTimestamp() }, { merge: true });
 
     // Bulk campaign modal
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -79,6 +90,16 @@ export default function ReabastecimientoBIAdminPage() {
      * Envía recordatorio 1-clic vía WhatsApp Cloud API (plantilla aprobada).
      * Fallback: abre wa.me si no hay token configurado.
      */
+    const toPayload = (r: CustomerReplenishment) => ({
+        id: r.id,
+        customerName: r.customerName,
+        customerPhone: r.customerPhone,
+        customerEmail: r.customerEmail,
+        customerCity: r.customerCity,
+        itemsSummary: r.itemsSummary,
+        lastOrderId: r.lastOrderId,
+    });
+
     const handleSendReminder = async (r: CustomerReplenishment) => {
         if (!r.id || !r.customerPhone) return;
         setSendingId(r.id);
@@ -87,9 +108,10 @@ export default function ReabastecimientoBIAdminPage() {
             if (!user) throw new Error('No autenticado');
             const token = await user.getIdToken();
 
-            // Mark reminder in Firestore
-            await markReminderSent(r.id);
-            setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, lastReminderSentAt: new Date().toISOString() } : rec));
+            const markSent = async () => {
+                await markReminderSent(r.id as string);
+                setRecords(prev => prev.map(rec => rec.id === r.id ? { ...rec, lastReminderSentAt: new Date().toISOString() } : rec));
+            };
 
             // Try API first — sends via Cloud API with template
             const cleanPhone = r.customerPhone.replace(/\D/g, '');
@@ -103,13 +125,17 @@ export default function ReabastecimientoBIAdminPage() {
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({
                         customerIds: [r.id],
+                        customers: [toPayload(r)],
                         phoneId: BIOCAMBIO_PHONE_ID,
                         templateName: 'reabastecimiento_recordatorio',
                         templateType: 'marketing',
                     }),
                 });
                 const tplData = await tplRes.json().catch(() => ({}));
-                if (tplRes.ok && tplData.sent === 1) return;
+                if (tplRes.ok && tplData.sent === 1) {
+                    await markSent();
+                    return;
+                }
             } catch { /* fall through to free text */ }
 
             // 2) Free text (only valid inside the 24 h window), then 3) wa.me as last resort
@@ -128,6 +154,7 @@ export default function ReabastecimientoBIAdminPage() {
                 }),
             });
 
+            if (res.ok) await markSent();
             if (!res.ok) {
                 // Fallback: open wa.me in new tab
                 const msg = `Hola ${r.customerName} 👋. Tu próximo reabastecimiento de *${r.itemsSummary}* es el ${dueDateStr}. 👉 https://biocambio360.com/`;
@@ -160,6 +187,7 @@ export default function ReabastecimientoBIAdminPage() {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     customerIds: criticalCustomers.map(r => r.id).filter(Boolean),
+                    customers: criticalCustomers.map(toPayload),
                     phoneId: BIOCAMBIO_PHONE_ID,
                     templateName: 'reabastecimiento_recordatorio',
                     templateType: 'marketing',
@@ -189,6 +217,7 @@ export default function ReabastecimientoBIAdminPage() {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     customerIds: criticalCustomers.map(r => r.id).filter(Boolean),
+                    customers: criticalCustomers.map(toPayload),
                     phoneId: BIOCAMBIO_PHONE_ID,
                     templateName: 'reabastecimiento_recordatorio',
                     templateType: 'marketing',
@@ -253,6 +282,13 @@ export default function ReabastecimientoBIAdminPage() {
                 </div>
 
                 <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <label
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 cursor-pointer"
+                        title="Correo automático diario a las 9 a.m. a clientes en alerta o críticos (máx. 1 cada 7 días). Los botones de WhatsApp son independientes."
+                    >
+                        <input type="checkbox" checked={emailAuto} onChange={e => toggleEmailAuto(e.target.checked)} className="w-3.5 h-3.5 accent-blue-600" />
+                        ✉ Correo automático (9 a.m.)
+                    </label>
                     <button
                         onClick={() => { setShowBulkModal(true); handleBulkDryRun(); }}
                         className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm"
