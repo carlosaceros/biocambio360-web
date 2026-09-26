@@ -62,8 +62,10 @@ describe('agent presentation', () => {
 import { expandCustomerQuery } from '@/lib/ai-agent-knowledge';
 describe('customer wording', () => {
     it('jabón para ropa means detergente, jabón de manos does not', () => {
-        expect(expandCustomerQuery('me traen un jabón de 20 litros para ropa')).toMatch(/detergente$/);
+        expect(expandCustomerQuery('me traen un jabón de 20 litros para ropa')).toBe('me traen un detergente de 20 litros para ropa');
         expect(expandCustomerQuery('jabón líquido de manos')).toBe('jabón líquido de manos');
         expect(expandCustomerQuery('quiero detergente')).toBe('quiero detergente');
+        expect(expandCustomerQuery('me vende jabón tipo rey de 20 litros')).toBe('me vende detergente multiusos de 20 litros');
+        expect(expandCustomerQuery('jabon rey')).toBe('detergente multiusos');
     });
 });

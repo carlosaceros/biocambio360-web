@@ -84,7 +84,10 @@ function normalize(text: string): string {
  */
 export function expandCustomerQuery(text: string): string {
     const t = normalize(text);
-    if (/\bjabon(es)?\b/.test(t) && /\b(ropa|lavar|lavadora|prendas|lavado)\b/.test(t)) return `${text} detergente`;
+    // "jabón (tipo) rey" is how customers call the Detergente Líquido Multiusos (id detergente-liquido-multiusos)
+    // The phrase is REPLACED (not appended) so the word "jabón" no longer points the search at hand soaps
+    if (/\bjabon(es)?\s+(tipo\s+)?rey\b/.test(t)) return text.replace(/jab[oó]n(es)?\s+(tipo\s+)?rey/gi, 'detergente multiusos');
+    if (/\bjabon(es)?\b/.test(t) && /\b(ropa|lavar|lavadora|prendas|lavado)\b/.test(t)) return text.replace(/jab[oó]n(es)?/gi, 'detergente');
     return text;
 }
 

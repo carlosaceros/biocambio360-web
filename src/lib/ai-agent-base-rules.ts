@@ -34,7 +34,7 @@ export const BASE_RULES: BaseRuleGroup[] = [
         items: [
             'Todos los precios salen del catálogo real: si el modelo escribe un precio distinto, el sistema lo corrige.',
             'Si piden un tipo de producto ("detergente para ropa") muestra todas las variantes con todas sus presentaciones, en lista con ✅. Si nombran un producto concreto, muestra solo ese.',
-            'No repite las presentaciones varias veces. "Jabón para ropa" se entiende como detergente; el estándar es el Detergente Líquido Multiusos (el Industrial es otra línea).',
+            'No repite las presentaciones varias veces. "Jabón para ropa" se entiende como detergente y "jabón (tipo) rey" es el Detergente Líquido Multiusos, nunca un jabón de manos; el estándar es el Detergente Líquido Multiusos (el Industrial es otra línea).',
             'Una duda de precio ("¿por qué me cobraron 86?") no es reclamo: aclara con el catálogo.',
             'Medios de pago: transferencia, ADDI, tarjetas, PSE y contraentrega, en lista con ✅.',
             'La web se comparte solo con el botón "Pedir en la web", nunca como texto.',
