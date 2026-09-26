@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FileText, Loader2, ImageOff } from 'lucide-react';
 import { auth } from '@/lib/firebase';
-import { browserPlaysOggOpus, oggOpusToWav } from '@/lib/audio-fallback';
+import { shouldConvertOgg, oggOpusToWav } from '@/lib/audio-fallback';
 
 interface MediaAttachmentProps {
     mediaId: string;
@@ -18,6 +18,8 @@ export default function MediaAttachment({ mediaId, type, mimeType, fileName }: M
     const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
     const [errorText, setErrorText] = useState('');
     const [progress, setProgress] = useState(0);
+    const rawBlob = useRef<Blob | null>(null);
+    const converted = useRef(false);
 
     useEffect(() => {
         let objectUrl: string | null = null;
@@ -62,10 +64,12 @@ export default function MediaAttachment({ mediaId, type, mimeType, fileName }: M
                     if (cancelled) return;
                 }
                 let blob = new Blob(parts, { type: mime });
-                // Voice notes are Ogg/Opus: Safari cannot play them, so they are decoded locally to WAV
-                if (type === 'audio' && /ogg|opus/i.test(mime) && !browserPlaysOggOpus()) {
+                rawBlob.current = blob;
+                // Voice notes are Ogg/Opus: Safari and iOS browsers cannot play them, so they are decoded locally to WAV
+                if (type === 'audio' && /ogg|opus/i.test(mime) && shouldConvertOgg()) {
                     try {
                         blob = await oggOpusToWav(await blob.arrayBuffer());
+                        converted.current = true;
                     } catch (err) {
                         console.warn('[MediaAttachment] Could not convert the voice note:', err);
                     }
@@ -112,7 +116,27 @@ export default function MediaAttachment({ mediaId, type, mimeType, fileName }: M
         );
     }
     if (type === 'audio') {
-        return <audio controls src={src} className="w-64 max-w-full" preload="metadata" />;
+        return (
+            <audio
+                controls
+                src={src}
+                className="w-64 max-w-full"
+                preload="metadata"
+                onError={async () => {
+                    // Native playback failed: try the local Opus → WAV conversion once
+                    if (converted.current || !rawBlob.current) return;
+                    converted.current = true;
+                    try {
+                        const wav = await oggOpusToWav(await rawBlob.current.arrayBuffer());
+                        setSrc(URL.createObjectURL(wav));
+                    } catch (err) {
+                        console.warn('[MediaAttachment] Voice note conversion failed:', err);
+                        setErrorText('No se pudo reproducir este audio');
+                        setState('error');
+                    }
+                }}
+            />
+        );
     }
     if (type === 'video') {
         return <video controls src={src} className="rounded-xl max-h-72 max-w-full" preload="metadata" />;

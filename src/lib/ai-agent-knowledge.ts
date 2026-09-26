@@ -14,9 +14,9 @@ import { priceLineToBlock } from '@/lib/ai-agent-guard';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-const money = (n: number) => `$${String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+export const money = (n: number) => `$${String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
 const SIZE_LABEL: Record<string, string> = { '1/2G': '1/2 galón', '3.8L': 'galón', '10L': '10L', '20L': '20L', COMBO: 'combo', DEFAULT: 'única' };
-const sizeLabel = (size: string) => SIZE_LABEL[size] ?? size;
+export const sizeLabel = (size: string) => SIZE_LABEL[size] ?? size;
 
 let cache: { at: number; products: Product[]; catalog: string } | null = null;
 
@@ -169,7 +169,7 @@ export async function getRelevantProductSheets(
  * presentation and price. Computed server-side so the model never "picks one" by itself
  * (e.g. asking for "detergente para ropa" lists every laundry detergent).
  */
-export async function getMatchingProductPrices(customerTexts: string[], max: number = 5): Promise<string> {
+export async function getMatchingProducts(customerTexts: string[], max: number = 5): Promise<Product[]> {
     const { products } = await load();
     // The head noun is the first significant word that actually exists in the catalog
     // ("detergente" in "detergente para ropa"). Products must match it; the other words only rank
@@ -178,7 +178,7 @@ export async function getMatchingProductPrices(customerTexts: string[], max: num
     const singles = products.filter(p => !Object.keys(p.precios ?? {}).every(k => k.toUpperCase() === 'COMBO'));
     const matchesToken = (nameWords: string[], q: string) => nameWords.some(w => stemMatch(w, q));
     const head = ordered.find(q => singles.some(p => matchesToken(tokens(p.nombre), q)));
-    if (!head) return '';
+    if (!head) return [];
     const rest = new Set(ordered.filter(q => q !== head));
 
     const scored = singles
@@ -198,9 +198,12 @@ export async function getMatchingProductPrices(customerTexts: string[], max: num
     const best = scored[0]?.score ?? 0;
     const top = scored.filter(s => s.score === best);
     if (best > 4 && top.length === 1) scored.splice(1);
+    return scored.map(s => s.p);
+}
 
-    return scored
-        .map(({ p }) => {
+export async function getMatchingProductPrices(customerTexts: string[], max: number = 5): Promise<string> {
+    return (await getMatchingProducts(customerTexts, max))
+        .map(p => {
             const sizes = Object.entries(p.precios ?? {})
                 .filter(([size, price]) => !isDisallowedSize(size) && Number(price) > 0)
                 .sort((a, b) => Number(a[1]) - Number(b[1]))
@@ -209,6 +212,16 @@ export async function getMatchingProductPrices(customerTexts: string[], max: num
             return `- ${p.nombre}: ${sizes}`;
         })
         .join('\n');
+}
+
+/** Sellable product by id (live catalog), or null. */
+export async function getProductById(id: string): Promise<Product | null> {
+    return (await load()).products.find(p => p.id === id) ?? null;
+}
+
+/** All sellable products (live catalog). */
+export async function getSellableProducts(): Promise<Product[]> {
+    return (await load()).products;
 }
 
 /** Price line of one catalog product by its exact name ("- Name: galón $X · 10L $Y"), or '' if unknown. */

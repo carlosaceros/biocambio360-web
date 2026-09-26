@@ -23,6 +23,7 @@ import { recordNewInboundConversation } from '@/lib/ai-agent-insights';
 import { sendTextMessage } from '@/lib/whatsapp-service';
 import { handleDeliveryReply } from '@/lib/delivery-alerts';
 import { persistMedia } from '@/lib/media-store';
+import { resolvePick } from '@/lib/product-card';
 import { isOptOutText, registerOptOut, OPTOUT_CONFIRMATION } from '@/lib/wa-optout';
 import { fetchSocialProfile } from '@/lib/meta-social-service';
 
@@ -385,7 +386,10 @@ async function handleWhatsAppInboundMessage(
 
     // Determine conversation ID and message type
     const conversationId = buildConversationId('whatsapp', phoneNumberId, contactKey);
-    const { type, content, mediaUrl, mimeType, fileName, location } = extractWhatsAppContent(msg);
+    const extracted = extractWhatsAppContent(msg);
+    const { type, mediaUrl, mimeType, fileName, location } = extracted;
+    // Picks from the product card / catalog pickers become the sentence the customer meant
+    const content = /^(psize|catcat):/.test(extracted.content) ? await resolvePick(extracted.content) : extracted.content;
 
     // Determine which account this is
     const accountKey = phoneNumberId === process.env.WHATSAPP_PHONE_ID_BIOCAMBIO
@@ -612,6 +616,11 @@ function extractWhatsAppContent(msg: any): {
             const interactiveReply = msg.interactive?.button_reply?.title
                 ?? msg.interactive?.list_reply?.title
                 ?? '📲 Respuesta interactiva';
+            // Picks from a product card / catalog picker carry their meaning in the row id
+            const rowId: string = String(msg.interactive?.list_reply?.id ?? '');
+            if (rowId.startsWith('psize:') || rowId.startsWith('catcat:')) {
+                return { type: 'interactive', content: rowId, };
+            }
             return { type: 'interactive', content: interactiveReply };
         default:
             return { type: 'text', content: `[${msgType}]` };

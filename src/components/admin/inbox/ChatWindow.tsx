@@ -367,6 +367,28 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                             <FileText size={18} />
                         </button>
                         <EmojiPicker onSelect={insertEmoji} disabled={isSending} />
+                        <button
+                            type="button"
+                            title="Enviar el catálogo visual por categorías"
+                            disabled={isSending}
+                            onClick={async () => {
+                                if (!conversation) return;
+                                setIsSending(true);
+                                setSendError(null);
+                                try {
+                                    const token = await auth.currentUser?.getIdToken();
+                                    const res = await fetch('/api/inbox/send-catalog', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ conversationId: conversation.id }) });
+                                    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'No se pudo enviar el catálogo');
+                                } catch (e) {
+                                    setSendError(e instanceof Error ? e.message : 'No se pudo enviar el catálogo');
+                                } finally {
+                                    setIsSending(false);
+                                }
+                            }}
+                            className="p-2 text-gray-400 hover:text-green-600 transition-colors disabled:opacity-40 text-base leading-none"
+                        >
+                            📚
+                        </button>
                         <textarea
                             ref={inputRef}
                             value={inputText}

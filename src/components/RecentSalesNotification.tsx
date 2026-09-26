@@ -27,7 +27,7 @@ export default function RecentSalesNotification() {
     const isPausedRef = useRef(false);
 
     // Disable completely on checkout or admin pages
-    const isHiddenRoute = pathname?.startsWith('/checkout') || pathname?.startsWith('/admin');
+    const isHiddenRoute = pathname?.startsWith('/checkout') || pathname?.startsWith('/admin') || pathname?.startsWith('/catalogo');
 
     useEffect(() => {
         if (isHiddenRoute) return;

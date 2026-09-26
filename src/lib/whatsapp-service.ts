@@ -338,6 +338,42 @@ export async function sendInteractiveList(
 }
 
 /**
+ * Sends a list picker whose rows have a title (max 24) and a description (max 72), e.g. one row per
+ * presentation with its price. Valid within the 24h window.
+ */
+export async function sendRichList(
+    phoneNumberId: string,
+    to: string,
+    bodyText: string,
+    buttonLabel: string,
+    rows: Array<{ id: string; title: string; description?: string }>,
+    sectionTitle: string = 'Opciones'
+): Promise<{ messageId: string }> {
+    return sendToMeta(phoneNumberId, {
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+            type: 'list',
+            body: { text: bodyText.slice(0, 1024) },
+            action: {
+                button: buttonLabel.slice(0, 20),
+                sections: [
+                    {
+                        title: sectionTitle.slice(0, 24),
+                        rows: rows.slice(0, 10).map(r => ({
+                            id: r.id.slice(0, 200),
+                            title: r.title.slice(0, 24),
+                            ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+                        })),
+                    },
+                ],
+            },
+        },
+    });
+}
+
+/**
  * Sends a message with a single call-to-action button that opens a URL (valid within the 24h window).
  * The button label is limited to 20 characters by WhatsApp.
  */
@@ -346,7 +382,9 @@ export async function sendCtaUrlButton(
     to: string,
     bodyText: string,
     displayText: string,
-    url: string
+    url: string,
+    headerImageUrl?: string,
+    footerText?: string
 ): Promise<{ messageId: string }> {
     return sendToMeta(phoneNumberId, {
         recipient_type: 'individual',
@@ -354,7 +392,9 @@ export async function sendCtaUrlButton(
         type: 'interactive',
         interactive: {
             type: 'cta_url',
+            ...(headerImageUrl ? { header: { type: 'image', image: { link: headerImageUrl } } } : {}),
             body: { text: bodyText.slice(0, 1024) },
+            ...(footerText ? { footer: { text: footerText.slice(0, 60) } } : {}),
             action: {
                 name: 'cta_url',
                 parameters: { display_text: displayText.slice(0, 20), url },

@@ -9,6 +9,17 @@ export function browserPlaysOggOpus(): boolean {
     return document.createElement('audio').canPlayType('audio/ogg; codecs=opus') !== '';
 }
 
+/**
+ * Safari and every iOS browser (WebKit) claim they can play Ogg/Opus through canPlayType but fail
+ * when playing, so the browser's own answer is not trusted there: the note is always converted.
+ */
+export function shouldConvertOgg(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent;
+    const webkit = (/AppleWebKit/.test(ua) && !/Chrome\/|Chromium\/|Android/.test(ua)) || /CriOS|FxiOS|EdgiOS/.test(ua);
+    return webkit || !browserPlaysOggOpus();
+}
+
 function encodeWav(channels: Float32Array[], sampleRate: number): Blob {
     const numChannels = channels.length;
     const length = channels[0]?.length ?? 0;

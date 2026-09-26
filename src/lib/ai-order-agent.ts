@@ -19,7 +19,9 @@ import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton, isReplyableId, downloadMedia } from '@/lib/whatsapp-service';
-import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getProductLineByName, correctPriceLines } from '@/lib/ai-agent-knowledge';
+import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getMatchingProducts, getSellableProducts, getProductLineByName, correctPriceLines } from '@/lib/ai-agent-knowledge';
+import { sendProductCard, sendCatalogCard, sendCategoryCard, productSizes } from '@/lib/product-card';
+import { wantsCatalog } from '@/lib/catalog-categories';
 import { loadTrainingSnapshot, rulesPromptBlock, examplesPromptBlock, pickExamples, verifyAdConfig } from '@/lib/ai-agent-training';
 import {
     getPromptCacheName,
@@ -67,7 +69,7 @@ const MAX_TURNS_PER_NIGHT = 30;
 const MAX_STRIKES_PER_NIGHT = 3;
 const HISTORY_MESSAGES = 14;
 /** Bump when the prompt/presentation changes so cached first replies are regenerated. */
-const AGENT_VERSION = 'v6';
+const AGENT_VERSION = 'v7';
 const NO_CLOSURE_TURN = 5;
 const HUMAN_ACTIVE_GRACE_MS = 20 * 60 * 1000; // the agent yields only while a human is actively replying
 const SITE_URL = 'https://biocambio360.com';
@@ -236,6 +238,7 @@ DUDA DE PRECIO O COBRO: si el cliente compara con un precio de una compra anteri
 PREGUNTAS FRECUENTES: responde directo y breve. Medios de pago: el sistema imprime la lista con ✅; tú solo pregunta cuál prefiere. No pidas datos antes de contestar.
 BOTÓN WEB: nunca escribas la dirección de la web en los mensajes; pon botonWeb=true cuando invites a comprar en la web y el sistema enviará un botón para abrirla.
 
+SELECTOR DE PRESENTACIÓN: un mensaje «Quiero el <producto> en presentación <tamaño>» viene de la tarjeta del producto: es un pedido de ese producto y presentación. Regístralo en preOrder y pregunta solo la cantidad. El sistema envía por su cuenta la tarjeta con foto y presentaciones: no escribas listas de precios.
 FECHAS DE ENTREGA: si preguntan cuándo llega o se entrega su pedido, usa ENTREGAS PROGRAMADAS del contexto. Responde: "Para el día {día de la semana + fecha, p. ej. viernes 25 de septiembre} tenemos programada entrega para tu zona: {zona}". SIEMPRE incluye el día de la semana junto con la fecha. Si vienen varias fechas, menciona hasta las 2 más próximas. Nunca menciones mensajeros, teléfonos ni datos internos, y no prometas hora ni garantía: el asesor confirma el horario. Si la zona no está identificada, pregunta su localidad o municipio; si está fuera de las zonas listadas, di que un asesor confirma.
 ASESOR: primero toma el pedido (producto, cantidad, dirección, pago). NO te apresures a decir que un asesor confirmará al día siguiente ni lo repitas en cada mensaje; menciónalo UNA sola vez, al final del pedido, para coordinar el envío. Habla antes del asesor solo si el cliente lo pide, hay un reclamo o algo que no sabes.
 PEDIDOS: si calculas un total, di que es de referencia y sin envío. Los precios son de referencia; el asesor confirma precio, disponibilidad, envío y pago. No confirmes como definitivo, no prometas fechas/horas de entrega ni descuentos. Con productos, cantidades y datos de entrega: resume y pregunta si es correcto; solo si el cliente confirma pon listo=true y en ese momento (solo al final) dile que un asesor se comunicará para coordinar el envío (puedes indicar cuándo con la APERTURA). Si no quiere esperar, invítalo a pedir ya en la web (24 h) con botonWeb=true.
@@ -631,6 +634,8 @@ export interface BrainResult {
     closingAsked?: boolean;
     imagen?: { vista: boolean; descripcion: string; productoSenalado: string };
     casoCompleto?: boolean;
+    /** send this product as a card (photo + presentations) after the messages */
+    productCardId?: string;
     error?: string;
 }
 
@@ -654,6 +659,10 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
     const matches = adProductLine ? '' : await getMatchingProductPrices([...adTexts, ...customerTexts.slice(-2)]);
     // With an ad the goal is closing, so the generic "list every variant" guarantee only applies without one
     const lastTextMatches = ad ? '' : await getMatchingProductPrices([lastText]);
+    // One specific product (named by the customer or promoted by the ad) is shown as a product card
+    const lastMatchProducts = ad ? [] : await getMatchingProducts([lastText]);
+    const adProduct = ad?.productName ? ((await getSellableProducts()).find(p => p.nombre === ad.productName) ?? null) : null;
+    const cardCandidate = (lastMatchProducts.length === 1 ? lastMatchProducts[0] : null) ?? adProduct;
     const noClosure = turns >= NO_CLOSURE_TURN && input.preOrder?.estado !== 'listo' && !input.preOrder?.horarioContacto;
     const examples = examplesPromptBlock(pickExamples(training.examples, lastText));
 
@@ -734,7 +743,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
 
         const raw = (output.mensajes ?? []).map(m => String(m ?? '').trim()).filter(Boolean);
         if (raw.length === 0) throw new Error('Empty reply from model');
-        const options = (Array.isArray(output.options) ? output.options : []).map(o => String(o).trim()).filter(Boolean).slice(0, 10);
+        let options = (Array.isArray(output.options) ? output.options : []).map(o => String(o).trim()).filter(Boolean).slice(0, 10);
 
         if (leaksSensitive([...raw, ...options].join('\n'))) {
             console.warn('[ai-agent] Blocked model output (possible leak)');
@@ -760,6 +769,8 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
         // (they could be incomplete or wrong)
         const priceLines = lastTextMatches || adProductLine;
         const willList = !!priceLines && !input.alreadyListed && !preOrder.items.length && (!!lastTextMatches || turns === 0);
+        // Product card: photo, description and every presentation with its price (the picker asks which one)
+        const cardProduct = willList && cardCandidate?.imgFile && productSizes(cardCandidate).length > 0 ? cardCandidate : null;
         if (willList) {
             const multiPrice = (m: string) => (m.match(/\$\s*\d/g) ?? []).length >= 2;
             messages = messages
@@ -767,13 +778,18 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
                 .map(m => m.replace(/\s*(?:y\s+)?tambi[eé]n[^.!?:]*:\s*$/i, '').trim())
                 .filter(Boolean);
         }
+        if (cardProduct) {
+            messages = messages.filter(m => !m.includes('?') && !/\$\s*\d/.test(m));
+            if (messages.length === 0) messages = ['¡Claro! Mira este producto 👇'];
+            options = [];
+        }
 
         const reformatted = reformatPriceMessages(messages);
         messages = reformatted.messages.filter((m, i, all) => all.indexOf(m) === i);
         let pricesShown = reformatted.hadBlocks || input.alreadyListed;
 
         // A question about a type of product must list EVERY matching variant
-        if (willList && !messages.some(m => m.includes('✅'))) {
+        if (willList && !cardProduct && !messages.some(m => m.includes('✅'))) {
             messages = injectPriceList(messages, PRICE_LIST_HEADER, priceLines);
             pricesShown = true;
         }
@@ -814,7 +830,8 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
             kind: 'reply',
             messages,
             options,
-            webButton: wantsLink && !input.buttonRecentlySent,
+            webButton: wantsLink && !input.buttonRecentlySent && !cardProduct,
+            productCardId: cardProduct?.id,
             preOrder,
             pqrs: output.pqrs,
             resumen: String(output.resumen ?? '').replace(/\s+/g, ' ').trim().slice(0, 300) || undefined,
@@ -1118,6 +1135,29 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
             return;
         }
 
+        // Catalog requests and category picks are answered with visual cards (no model call)
+        const asksCatalog = lastMsg.type === 'text' && wantsCatalog(lastText);
+        const pickedCategory = /^Quiero ver la categoría (.+)$/.exec(lastText)?.[1];
+        const catalogRecently = agentTexts.slice(-6).some(m => /Catálogo Biocambio360/.test(String(m.content)));
+        if ((asksCatalog && !catalogRecently) || pickedCategory) {
+            try {
+                const ctx = { phoneId: input.phoneId, to: input.contactPhone, conversationId: input.conversationId, agentUid: AI_AGENT_ID, agentName: AI_AGENT_NAME };
+                if (pickedCategory) await sendCategoryCard({ ...ctx, categoria: pickedCategory });
+                else await sendCatalogCard(ctx);
+                await convRef.update({
+                    status: 'bot',
+                    lastMessage: pickedCategory ? `Categoría: ${pickedCategory}` : '📚 Catálogo Biocambio360',
+                    lastMessageAt: FieldValue.serverTimestamp(),
+                    updatedAt: FieldValue.serverTimestamp(),
+                    ...countersUpdate,
+                    botClosedKey: FieldValue.delete(),
+                });
+                return;
+            } catch (err) {
+                console.warn('[ai-agent] Catalog card failed, continuing with the normal reply:', err instanceof Error ? err.message : err);
+            }
+        }
+
         // Do not repeat the link button / the price list if one of the last agent messages already had it
         const lastAgentMessages = recent.filter(m => m.agentUid === AI_AGENT_ID).slice(-3);
         const buttonRecentlySent = lastAgentMessages.some(m => !!m.cta || String(m.content).includes(WEB_BUTTON_MARKER));
@@ -1225,6 +1265,17 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
         }
 
         await sendMessages(convRef, input.phoneId, input.contactPhone, messages, options, webButton);
+        if (result.kind === 'reply' && result.productCardId) {
+            const product = (await getSellableProducts()).find(p => p.id === result.productCardId);
+            if (product) {
+                try {
+                    await sleep(SEND_DELAY_MS);
+                    await sendProductCard({ phoneId: input.phoneId, to: input.contactPhone, product, conversationId: input.conversationId, agentUid: AI_AGENT_ID, agentName: AI_AGENT_NAME });
+                } catch (err) {
+                    console.warn('[ai-agent] Product card failed, the text replies were already sent:', err instanceof Error ? err.message : err);
+                }
+            }
+        }
 
         const update: Record<string, unknown> = {
             status: 'bot',
