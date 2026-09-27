@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     ShoppingCart, 
@@ -169,6 +169,18 @@ export default function ProductPageContent({ product, relatedProducts }: Product
         setToastData({ name: product.nombre, size: selectedSize });
         setShowToast(true);
     };
+
+    // Mobile sticky "Agregar al carrito" bar: shown whenever the main CTA button is off-screen
+    // (either not yet scrolled to, or scrolled past), so the buy action is always reachable.
+    const ctaRef = useRef<HTMLDivElement>(null);
+    const [showStickyBar, setShowStickyBar] = useState(false);
+    useEffect(() => {
+        const el = ctaRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(([entry]) => setShowStickyBar(!entry.isIntersecting), { threshold: 0 });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
 
     const toggleSection = (section: string) => {
         setExpandedSection(expandedSection === section ? null : section);
@@ -339,8 +351,8 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             transition={{ duration: 0.35, delay: 0.05 }}
                             className="flex flex-col"
                         >
-                            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-lg sticky top-4">
-                                <div className="mb-2">
+                            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-lg sticky top-4 flex flex-col">
+                                <div className="order-1 lg:order-none mb-2">
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-50 text-[var(--brand-blue)] border border-blue-200/60">
                                         {product.id.includes('detergente') 
                                             ? '🧺 Lavadora Automática & Manual · Ropa Blanca y Color'
@@ -355,10 +367,10 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                             : (product.categoria ? `LÍNEA ${product.categoria.toUpperCase()}` : 'LÍNEA DE ASEO Y LIMPIEZA PROFESIONAL')}
                                     </span>
                                 </div>
-                                <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-4" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
+                                <h1 className="order-2 lg:order-none text-3xl md:text-4xl font-black text-gray-900 mb-4" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
                                     {product.nombre}
                                 </h1>
-                                <div className="space-y-4 mb-6">
+                                <div className="order-7 lg:order-none space-y-4 mb-6">
                                     <div className="text-gray-700 font-medium leading-relaxed border-l-4 border-[var(--brand-blue)] pl-4 whitespace-pre-line text-sm md:text-base">
                                         {product.descripcion}
                                     </div>
@@ -394,7 +406,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
 
                                 {/* Size Selector */}
                                 {availableSizes.length > 1 && (
-                                    <div className="mb-6">
+                                    <div className="order-3 lg:order-none mb-6">
                                         <label className="text-sm font-bold text-gray-700 mb-3 block">
                                             Selecciona Presentación:
                                         </label>
@@ -423,7 +435,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 )}
 
                                 {/* Price Display */}
-                                <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 mb-6">
+                                <div className="order-4 lg:order-none bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 mb-6">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="text-sm text-gray-600 font-medium">Precio por unidad:</span>
                                         <div className="text-right">
@@ -460,7 +472,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </div>
 
                                 {/* Quantity Selector */}
-                                <div className="mb-6">
+                                <div className="order-5 lg:order-none mb-6">
                                     <label className="text-sm font-bold text-gray-700 mb-3 block">
                                         Cantidad:
                                     </label>
@@ -489,7 +501,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </div>
 
                                 {/* CTA Buttons */}
-                                <div className="space-y-3">
+                                <div ref={ctaRef} className="order-6 lg:order-none space-y-3">
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
@@ -940,6 +952,36 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                     )}
                 </div>
             </div>
+
+            {/* Mobile sticky "Agregar al carrito" bar — always reachable, whether the main CTA is below the fold or already scrolled past */}
+            <AnimatePresence>
+                {showStickyBar && (
+                    <motion.div
+                        initial={{ y: 80, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 80, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="min-w-0">
+                                <div className="text-[11px] text-gray-500 font-medium truncate">{selectedSize} · Cant. {quantity}</div>
+                                <div className="text-lg font-black text-gray-900" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
+                                    {formatCurrency(effectiveTotalPrice)}
+                                </div>
+                            </div>
+                            <motion.button
+                                whileTap={{ scale: 0.97 }}
+                                onClick={handleAddToCart}
+                                className="ml-auto shrink-0 flex items-center justify-center gap-2 bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white font-black px-6 py-3 rounded-xl shadow-lg shadow-[var(--brand-blue-light)] transition-all"
+                            >
+                                <ShoppingCart size={18} />
+                                AGREGAR
+                            </motion.button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </>
     );
 }
