@@ -30,8 +30,11 @@ export function productSizes(p: Product): ProductSize[] {
 const clean = (t?: string) => String(t ?? '').replace(/\s+/g, ' ').trim();
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
-/** Image URL WhatsApp can fetch (JPEG, converted on the fly from the store's WebP). */
-export const productImageUrl = (p: Product) => `${SITE}/api/catalog-image/${encodeURIComponent(p.id)}`;
+/** Image URL WhatsApp can fetch: the JPEG twin generated at build time from the store's WebP. */
+export const productImageUrl = (p: Product) =>
+    /\.(jpe?g|png)$/i.test(p.imgFile)
+        ? `${SITE}/images/${encodeURIComponent(p.imgFile)}`
+        : `${SITE}/images-jpg/${encodeURIComponent(p.imgFile.replace(/\.[^.]+$/, ''))}.jpg`;
 export const productUrl = (p: Product) => `${SITE}/producto/${p.id}`;
 
 export function productCardText(p: Product): string {

@@ -58,3 +58,6 @@ scripts/*
 EXCELS POR INTEGRAR/
 
 
+
+# generated at build time (scripts/generate-jpg-images.mjs)
+/public/images-jpg
