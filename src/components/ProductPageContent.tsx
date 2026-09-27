@@ -25,6 +25,7 @@ import ProductCard from '@/components/ProductCard';
 import Toast from '@/components/Toast';
 import AddiWidget from '@/components/AddiWidget';
 import SmartVideo from '@/components/SmartVideo';
+import GoogleReviewsLight from '@/components/GoogleReviewsLight';
 import { getRichProductDetails, getSchwartzCopy, getProductImage, generateProductSlug } from '@/lib/product-utils';
 import { getManualContentForProduct, MANUAL_NOTICE_TEXT } from '@/lib/products-rich-data';
 import { trackViewContent } from '@/lib/meta-pixel';
@@ -327,21 +328,51 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 )}
                             </div>
 
-                            {/* Trust Badges */}
-                            <div className="grid grid-cols-3 gap-4 mt-6">
-                                <div className="text-center p-3 bg-blue-50 rounded-lg">
-                                    <Shield className="w-6 h-6 text-blue-600 mx-auto mb-1" />
-                                    <p className="text-[10px] font-bold text-gray-700">Calidad Garantizada</p>
+                            {/* Trust Badges — horizontal pills, compact on mobile */}
+                            <div className="grid grid-cols-3 gap-2 mt-4">
+                                <div className="flex items-center gap-1.5 p-2 bg-blue-50 rounded-lg">
+                                    <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+                                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-700 leading-tight">Calidad Garantizada</p>
                                 </div>
-                                <div className="text-center p-3 bg-green-50 rounded-lg">
-                                    <Truck className="w-6 h-6 text-green-600 mx-auto mb-1" />
-                                    <p className="text-[10px] font-bold text-gray-700">Envío Rastreado a Nivel Nacional</p>
+                                <div className="flex items-center gap-1.5 p-2 bg-green-50 rounded-lg">
+                                    <Truck className="w-4 h-4 text-green-600 shrink-0" />
+                                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-700 leading-tight">Envío Nacional Rastreado</p>
                                 </div>
-                                <div className="text-center p-3 bg-orange-50 rounded-lg">
-                                    <Package className="w-6 h-6 text-orange-600 mx-auto mb-1" />
-                                    <p className="text-[10px] font-bold text-gray-700">Empaque Seguro</p>
+                                <div className="flex items-center gap-1.5 p-2 bg-orange-50 rounded-lg">
+                                    <Package className="w-4 h-4 text-orange-600 shrink-0" />
+                                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-700 leading-tight">Empaque Seguro</p>
                                 </div>
                             </div>
+
+                            {/* Size Selector — right below the photo it controls, so picking a size and seeing it update never needs a scroll */}
+                            {availableSizes.length > 1 && (
+                                <div className="mt-4">
+                                    <label className="text-xs font-bold text-gray-700 mb-2 block">
+                                        Selecciona Presentación:
+                                    </label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {availableSizes.map(size => {
+                                            const isSelected = selectedSize === size;
+                                            return (
+                                                <button
+                                                    key={size}
+                                                    type="button"
+                                                    onClick={() => handleSizeSelect(size)}
+                                                    className={`py-2.5 px-1 rounded-xl border-2 transition-all duration-150 touch-manipulation cursor-pointer active:scale-[0.97] text-center ${isSelected
+                                                            ? 'border-[var(--brand-pink)] bg-[var(--brand-pink-50)] shadow-md'
+                                                            : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <div className="text-sm font-black text-gray-900 leading-none">{size}</div>
+                                                    <div className={`text-[10px] mt-1 font-bold ${isSelected ? 'text-[var(--brand-pink)]' : 'text-gray-500'}`}>
+                                                        {formatCurrency(product.precios[size] || 0)}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </motion.div>
 
                         {/* Right: Product Info + Purchase */}
@@ -403,36 +434,6 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Size Selector */}
-                                {availableSizes.length > 1 && (
-                                    <div className="order-3 lg:order-none mb-6">
-                                        <label className="text-sm font-bold text-gray-700 mb-3 block">
-                                            Selecciona Presentación:
-                                        </label>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {availableSizes.map(size => {
-                                                const isSelected = selectedSize === size;
-                                                return (
-                                                    <button
-                                                        key={size}
-                                                        type="button"
-                                                        onClick={() => handleSizeSelect(size)}
-                                                        className={`p-4 rounded-xl border-2 transition-all duration-150 touch-manipulation cursor-pointer active:scale-[0.97] text-left ${isSelected
-                                                                ? 'border-[var(--brand-pink)] bg-[var(--brand-pink-50)] shadow-md'
-                                                                : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50'
-                                                            }`}
-                                                    >
-                                                        <div className="text-2xl font-black text-gray-900 leading-none">{size}</div>
-                                                        <div className={`text-xs mt-1.5 font-bold ${isSelected ? 'text-[var(--brand-pink)]' : 'text-gray-500'}`}>
-                                                            {formatCurrency(product.precios[size] || 0)}
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
 
                                 {/* Price Display */}
                                 <div className="order-4 lg:order-none bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 mb-6">
@@ -524,6 +525,8 @@ export default function ProductPageContent({ product, relatedProducts }: Product
 
                     {/* Expandable Sections - Semantically Rich for SEO/AEO/GEO/RAGs */}
                     <div className="max-w-4xl mx-auto mb-16 space-y-4">
+                        <GoogleReviewsLight />
+
                         {/* Banner Educativo & Bioseguridad */}
                         <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white rounded-2xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
                             <div className="space-y-1">

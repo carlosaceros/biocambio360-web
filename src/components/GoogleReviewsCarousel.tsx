@@ -1,13 +1,13 @@
 import { Quote, Star } from 'lucide-react';
 
-interface Review {
+export interface Review {
     name: string;
     meta: string;
     text: string;
 }
 
 // Verbatim reviews from the real Biocambio360 Google Business Profile (provided by the business owner)
-const REVIEWS: Review[] = [
+export const REVIEWS: Review[] = [
     { name: 'Dama YH', meta: 'Local Guide · 23 opiniones', text: 'Excelentes productos, un aroma delicioso, rendidores, nada que comparar con productos del mercado, estos si te facilitan la vida, muy buenos super recomendados, me los traen hasta la puerta de mi casa y pago cómodamente, cuando los recibo.' },
     { name: 'Diana Marcela Vargas Hernandez', meta: 'Cliente en Google', text: 'Me gusta el punto de venta físico por que se puede comprar todos los productos de aseo para cada área del hogar. Además que la atención al cliente es muy cálida y técnica. Los productos son de excelente calidad y rinden mucho y el aroma es muy rico y perdura.' },
     { name: 'Graciela Vargas', meta: 'Cliente en Google', text: 'Los productos de Biocambio 360 son excelentes. Los llevo utilizando ya hace más de 4 años, vivía en Bogotá Suba, ahora me trasladé a Madrid Cundinamarca y hasta aquí llegan los productos…' },
