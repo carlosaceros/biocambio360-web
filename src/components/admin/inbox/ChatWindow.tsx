@@ -367,28 +367,34 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                             <FileText size={18} />
                         </button>
                         <EmojiPicker onSelect={insertEmoji} disabled={isSending} />
-                        <button
-                            type="button"
-                            title="Enviar el catálogo visual por categorías"
-                            disabled={isSending}
-                            onClick={async () => {
-                                if (!conversation) return;
-                                setIsSending(true);
-                                setSendError(null);
-                                try {
-                                    const token = await auth.currentUser?.getIdToken();
-                                    const res = await fetch('/api/inbox/send-catalog', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ conversationId: conversation.id }) });
-                                    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'No se pudo enviar el catálogo');
-                                } catch (e) {
-                                    setSendError(e instanceof Error ? e.message : 'No se pudo enviar el catálogo');
-                                } finally {
-                                    setIsSending(false);
-                                }
-                            }}
-                            className="p-2 text-gray-400 hover:text-green-600 transition-colors disabled:opacity-40 text-base leading-none"
-                        >
-                            📚
-                        </button>
+                        <div className="relative group">
+                            <button
+                                type="button"
+                                aria-label="Enviar el catálogo visual"
+                                disabled={isSending}
+                                onClick={async () => {
+                                    if (!conversation) return;
+                                    setIsSending(true);
+                                    setSendError(null);
+                                    try {
+                                        const token = await auth.currentUser?.getIdToken();
+                                        const res = await fetch('/api/inbox/send-catalog', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ conversationId: conversation.id }) });
+                                        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'No se pudo enviar el catálogo');
+                                    } catch (e) {
+                                        setSendError(e instanceof Error ? e.message : 'No se pudo enviar el catálogo');
+                                    } finally {
+                                        setIsSending(false);
+                                    }
+                                }}
+                                className="p-2 text-gray-400 hover:text-green-600 transition-colors disabled:opacity-40 text-base leading-none"
+                            >
+                                📚
+                            </button>
+                            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-xl bg-gray-900 text-white text-[11px] leading-snug px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-lg">
+                                📚 Envía el catálogo completo de productos: foto de portada, botón para abrirlo en la web y un menú para ir directo a una categoría. En WhatsApp sale como tarjeta; en Instagram/Messenger, como enlace de texto.
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                            </div>
+                        </div>
                         <textarea
                             ref={inputRef}
                             value={inputText}

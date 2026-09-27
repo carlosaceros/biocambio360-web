@@ -323,7 +323,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </div>
                                 <div className="text-center p-3 bg-green-50 rounded-lg">
                                     <Truck className="w-6 h-6 text-green-600 mx-auto mb-1" />
-                                    <p className="text-[10px] font-bold text-gray-700">Envío Rastreado</p>
+                                    <p className="text-[10px] font-bold text-gray-700">Envío Rastreado a Nivel Nacional</p>
                                 </div>
                                 <div className="text-center p-3 bg-orange-50 rounded-lg">
                                     <Package className="w-6 h-6 text-orange-600 mx-auto mb-1" />
@@ -378,7 +378,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                             <p className="text-sm leading-relaxed whitespace-pre-line">{schwartzCopy.producto}</p>
                                         </div>
                                         <div id="schwartz-geo" className="space-y-1">
-                                            <h4 className="font-bold uppercase tracking-wider text-xs text-gray-500">Distribución en Bogotá</h4>
+                                            <h4 className="font-bold uppercase tracking-wider text-xs text-gray-500">Envío a Nivel Nacional · Bogotá y Toda Colombia</h4>
                                             <p className="text-sm leading-relaxed whitespace-pre-line">{schwartzCopy.transaccion}</p>
                                         </div>
                                         

@@ -34,6 +34,7 @@ import SoachaLocationCard from '@/components/SoachaLocationCard';
 import FomoTopBanner from '@/components/FomoTopBanner';
 import AddiPromoBanner from '@/components/AddiPromoBanner';
 import KitsSection from '@/components/KitsSection';
+import GoogleReviewsCarousel from '@/components/GoogleReviewsCarousel';
 import Toast from '@/components/Toast';
 import HeaderMessage from '@/components/HeaderMessage';
 import ComboBuilder from '@/components/ComboBuilder';
@@ -553,9 +554,12 @@ function HomeContent() {
           {/* Banner Promocional Oficial de ADDI (0% Interés) */}
           <AddiPromoBanner />
 
+          {/* Google Reviews Carousel (hidden while searching, same as the section it introduces) */}
+          {!isSearching && <GoogleReviewsCarousel />}
+
           {/* Kits & Combos Section (Hidden when searching so user sees search results immediately) */}
           {!isSearching && (
-            <KitsSection 
+            <KitsSection
               onAddToCart={handleAddToCart} 
               onViewDetails={openQuickView}
               onVerTodosKits={() => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronDown, MessageCircle, Search, ShoppingBag } from 'lucide-react';
+import { ChevronDown, ImageOff, MessageCircle, Search, ShoppingBag } from 'lucide-react';
 import { slugify } from '@/lib/catalog-categories';
 
 export interface CatalogProduct {
@@ -11,10 +11,11 @@ export interface CatalogProduct {
     categoria: string;
     subcategoria: string | null;
     descripcion: string;
-    imgFile: string;
+    hasImage: boolean;
+    image: string | null;
     badge: string;
     featured: boolean;
-    sizes: Array<{ label: string; price: number }>;
+    sizes: Array<{ label: string; price: number; image: string | null }>;
 }
 
 const WHATSAPP = '573241005353';
@@ -53,7 +54,8 @@ export default function CatalogClient({ products }: { products: CatalogProduct[]
         const q = fold(query.trim());
         return products
             .filter(p => (category === 'all' || p.categoria === category) && (sub === 'all' || p.subcategoria === sub) && (!q || fold(`${p.nombre} ${p.categoria} ${p.subcategoria ?? ''}`).includes(q)))
-            .sort((a, b) => Number(b.featured) - Number(a.featured) || a.nombre.localeCompare(b.nombre));
+            // Products with a real photo first (in every grid: "Todos" and each category/subcategory)
+            .sort((a, b) => Number(b.hasImage) - Number(a.hasImage) || Number(b.featured) - Number(a.featured) || a.nombre.localeCompare(b.nombre));
     }, [products, category, sub, query]);
 
     const chip = (active: boolean) =>
@@ -102,8 +104,15 @@ export default function CatalogClient({ products }: { products: CatalogProduct[]
                                 <article key={p.id} className={`bg-white rounded-2xl border shadow-xs overflow-hidden ${isOpen ? 'border-blue-300 col-span-2 md:col-span-1' : 'border-gray-100'}`}>
                                     <button className="w-full text-left cursor-pointer" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
                                         <div className="relative aspect-square bg-white">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={`/images/${p.imgFile}`} alt={p.nombre} loading="lazy" className="w-full h-full object-contain p-2" />
+                                            {p.image ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={p.image} alt={p.nombre} loading="lazy" className="w-full h-full object-contain p-2" />
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-gray-300 bg-gray-50">
+                                                    <ImageOff size={28} />
+                                                    <span className="text-[10px] font-bold text-gray-400">Foto próximamente</span>
+                                                </div>
+                                            )}
                                             {p.badge && <span className="absolute top-2 left-2 text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded-full">{p.badge}</span>}
                                         </div>
                                         <div className="px-3 pb-3">
@@ -119,9 +128,17 @@ export default function CatalogClient({ products }: { products: CatalogProduct[]
                                             {p.descripcion && <p className="text-xs text-gray-600">{p.descripcion}</p>}
                                             <ul className="divide-y divide-gray-100">
                                                 {p.sizes.map(s => (
-                                                    <li key={s.label} className="flex items-center justify-between py-1.5 text-xs">
-                                                        <span className="font-semibold text-gray-800">{cap(s.label)}</span>
-                                                        <span className="flex items-center gap-2">
+                                                    <li key={s.label} className="flex items-center justify-between py-1.5 text-xs gap-2">
+                                                        <span className="flex items-center gap-2 min-w-0">
+                                                            {s.image ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img src={s.image} alt={`${p.nombre} - ${s.label}`} loading="lazy" className="w-9 h-9 rounded-lg object-contain bg-gray-50 border border-gray-100 shrink-0" />
+                                                            ) : (
+                                                                <span className="w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 shrink-0 flex items-center justify-center text-gray-300"><ImageOff size={14} /></span>
+                                                            )}
+                                                            <span className="font-semibold text-gray-800 truncate">{cap(s.label)}</span>
+                                                        </span>
+                                                        <span className="flex items-center gap-2 shrink-0">
                                                             <span className="font-black text-gray-900">{money(s.price)}</span>
                                                             <a href={orderLink(p, s.label)} className="px-2 py-1 rounded-lg bg-green-600 text-white font-bold">Pedir</a>
                                                         </span>

@@ -119,3 +119,26 @@ p {
   -webkit-tap-highlight-color: transparent;
 }
 
+
+/* Google reviews marquee (GoogleReviewsCarousel) */
+@keyframes marquee-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes marquee-right {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+.reviews-track {
+  width: max-content;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.reviews-track-left { animation-name: marquee-left; }
+.reviews-track-right { animation-name: marquee-right; }
+.reviews-row:hover .reviews-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reviews-track { animation: none; }
+}

@@ -19,8 +19,9 @@ import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton, isReplyableId, downloadMedia } from '@/lib/whatsapp-service';
-import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getMatchingProducts, getSellableProducts, getProductLineByName, correctPriceLines } from '@/lib/ai-agent-knowledge';
-import { sendProductCard, sendCatalogCard, sendCategoryCard, productSizes } from '@/lib/product-card';
+import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getMatchingProducts, getSellableProducts, getProductLineByName, correctPriceLines, sizeLabel } from '@/lib/ai-agent-knowledge';
+import { sendProductCard, sendCatalogCard, sendCategoryCard, productSizes, productImageUrl, productImageUrlForSize, wantsProductPhoto, matchRequestedSize } from '@/lib/product-card';
+import { sendImageMessage } from '@/lib/whatsapp-service';
 import { pickAdVariant, AD_VARIANT_INSTRUCTION, type AdVariant } from '@/lib/ad-copy-variants';
 import { wantsCatalog } from '@/lib/catalog-categories';
 import { loadTrainingSnapshot, rulesPromptBlock, examplesPromptBlock, pickExamples, verifyAdConfig } from '@/lib/ai-agent-training';
@@ -979,6 +980,13 @@ export async function runReactivationTurn(input: {
             const lastInbound = [...usable].reverse().find(m => m.direction === 'inbound');
             if (!lastInbound) return { sent: false, reason: 'no hay mensaje del cliente que retomar' };
 
+            // WhatsApp only allows free-form (non-template) messages within 24h of the customer's last
+            // message; past that, Meta accepts the API call but bounces it later as error 131047
+            const lastInboundAtMs = conv.lastInboundAt?.toMillis?.() ?? 0;
+            if (!lastInboundAtMs || Date.now() - lastInboundAtMs > 24 * 3600 * 1000) {
+                return { sent: false, reason: 'pasaron más de 24 h desde que el cliente escribió: WhatsApp ya no permite un mensaje libre, solo una plantilla aprobada' };
+            }
+
             const lastText = sanitizeUserText(String(lastInbound.content));
             const history = usable.slice(-HISTORY_MESSAGES).map(m => ({
                 role: (m.direction === 'inbound' ? 'user' : 'model') as 'user' | 'model',
@@ -1253,6 +1261,33 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
                 botQuoteAskedKey: key,
             });
             return;
+        }
+
+        // "Envíame la foto del galón": a picture of the exact presentation asked (or the product's
+        // main photo when no size is named), resolved deterministically — no model call needed.
+        if (lastMsg.type === 'text' && wantsProductPhoto(lastText)) {
+            const inOrder = currentPreOrder?.items?.map(i => i.producto) ?? [];
+            const candidates = inOrder.length > 0 ? (await getSellableProducts()).filter(p => inOrder.includes(p.nombre)) : await getMatchingProducts([lastText, ...recent.filter(m => m.direction === 'inbound').slice(-3).map(m => String(m.content))]);
+            const photoProduct = candidates.length === 1 ? candidates[0] : candidates.length > 0 ? candidates.find(p => matchRequestedSize(p, lastText)) ?? null : null;
+            if (photoProduct) {
+                const size = matchRequestedSize(photoProduct, lastText);
+                const url = size ? productImageUrlForSize(photoProduct, size) : productImageUrl(photoProduct);
+                const caption = `${photoProduct.nombre}${size ? ` — ${sizeLabel(size)}` : ''}`;
+                try {
+                    const { messageId } = await sendImageMessage(input.phoneId, input.contactPhone, url, caption);
+                    await convRef.collection('messages').add({
+                        direction: 'outbound', type: 'image', content: caption, mediaUrl: url,
+                        agentUid: AI_AGENT_ID, agentName: AI_AGENT_NAME, status: 'sent', timestamp: FieldValue.serverTimestamp(),
+                    });
+                    await convRef.update({
+                        status: 'bot', lastMessage: `📷 ${caption}`, lastMessageAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+                        ...countersUpdate, botClosedKey: FieldValue.delete(),
+                    });
+                    return;
+                } catch (err) {
+                    console.warn('[ai-agent] Photo send failed, continuing with the normal reply:', err instanceof Error ? err.message : err);
+                }
+            }
         }
 
         // Catalog requests and category picks are answered with visual cards (no model call)

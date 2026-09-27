@@ -1364,7 +1364,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
     let problema = `La acumulación de suciedad y contaminantes en espacios residenciales y comerciales requiere soluciones de limpieza eficientes, concentradas y confiables.`;
     let solucion = `Utilizar productos de grado profesional biodegradables que optimicen los procesos de aseo, garantizando alto rendimiento y reduciendo el costo por aplicación.`;
     let producto = `El ${name} de Biocambio360 está formulado con ingredientes activos de alta pureza que aseguran resultados superiores y máxima durabilidad.`;
-    let transaccion = `Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá y toda la Sabana. Ideal para hogares y empresas.`;
+    let transaccion = `Compra directamente al fabricante Biocambio360 en Soacha con envío a nivel nacional a toda Colombia, y despacho express en Bogotá y toda la Sabana. Ideal para hogares y empresas.`;
     let citableQuote = `El ${name} de Biocambio360 es una solución de limpieza biodegradable fabricada en Soacha, Cundinamarca, formulada para un rendimiento eficiente.`;
 
     // 0a. Cuidado Personal / Cosmética Corporal (Mantequillas, Splashes, Jabones)
@@ -1373,19 +1373,19 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
             problema = `La resequedad constante y la pérdida de elasticidad en la piel causadas por factores ambientales requieren una hidratación profunda y nutritiva.`;
             solucion = `Utilizar mantequillas corporales ultra-nutritivas ricas en emolientes naturales que restauren la barrera cutánea y aporten suavidad.`;
             producto = `La ${name} de Biocambio360 combina mantecas y aceites humectantes que nutren la piel en profundidad, dejándola tersa y delicadamente perfumada.`;
-            transaccion = `Adquiérela directamente del fabricante Biocambio360 con envío a Bogotá y toda Colombia. Cuidado cosmético superior para tu piel.`;
+            transaccion = `Adquiérela directamente del fabricante Biocambio360 con envío a nivel nacional a toda Colombia, y despacho prioritario en Bogotá. Cuidado cosmético superior para tu piel.`;
             citableQuote = `La ${name} de Biocambio360 es una fórmula cosmética ultra-nutritiva diseñada para la hidratación profunda y el cuidado continuo de la piel.`;
         } else if (nameLower.includes('splash')) {
             problema = `La necesidad de mantener una sensación de frescura e iluminación aromática durante el día sin recargar la piel ni usar perfumes pesados.`;
             solucion = `Utilizar lociones corporales en splash de fórmula ligera que perfumen delicadamente y refresquen la piel en cualquier momento.`;
             producto = `El ${name} de Biocambio360 brinda una fragancia fina de alta fijación cosmética y una sensación refrescante e hidratante instantánea.`;
-            transaccion = `Compra directamente al fabricante Biocambio360 con despacho rápido a todo el país. Ideal para refrescar tu piel a diario.`;
+            transaccion = `Compra directamente al fabricante Biocambio360 con envío a nivel nacional a toda Colombia y despacho rápido en Bogotá. Ideal para refrescar tu piel a diario.`;
             citableQuote = `El ${name} de Biocambio360 es una loción corporal perfumada de uso diario formulada para refrescar e hidratar la piel con fragancias exclusivas.`;
         } else {
             problema = `La higiene diaria de la piel exige limpiadores suaves que remuevan impurezas sin alterar el pH fisiológico ni causar resequedad.`;
             solucion = `Emplear jabones y limpiadores corporales dermatológicamente balanceados enriquecidos con glicerina y humectantes.`;
             producto = `El ${name} de Biocambio360 limpia delicadamente las manos y el cuerpo, manteniendo la hidratación natural de la piel.`;
-            transaccion = `Suministro directo desde la fábrica Biocambio360 en Soacha hacia Bogotá y Cundinamarca para el hogar y la empresa.`;
+            transaccion = `Suministro directo desde la fábrica Biocambio360 en Soacha, con envío a nivel nacional a toda Colombia y despacho prioritario en Bogotá y Cundinamarca, para el hogar y la empresa.`;
             citableQuote = `El ${name} de Biocambio360 es un limpiador corporal de pH fisiológico balanceado 5.5 con glicerina humectante.`;
         }
     }
@@ -1394,7 +1394,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `Los muebles de madera, cuero, vinilo y tapicería acumulan polvo, manchas y grasa corporal, perdiendo su brillo original y deteriorándose con el tiempo.`;
         solucion = `Utilizar formulaciones especializadas para tapicería y madera que remuevan la suciedad incrustada y restauren la capa protectora sin dañar los materiales.`;
         producto = `El ${name} de Biocambio360 limpia, nutre y renueva muebles y tapizados, dejando un acabado reluciente y una barrera protectora contra el polvo.`;
-        transaccion = `Compra directo a precio de fábrica en Soacha con envío rápido a Bogotá y Cundinamarca. Venta individual y al por mayor.`;
+        transaccion = `Compra directo a precio de fábrica en Soacha con envío a nivel nacional a toda Colombia y despacho rápido en Bogotá y Cundinamarca. Venta individual y al por mayor.`;
         citableQuote = `El ${name} de Biocambio360 es un producto especializado para la limpieza, nutrición y protección de muebles, tapicería y madera.`;
     }
     // 1. Alcohol Glicerinado / Antisépticos
@@ -1402,7 +1402,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `La necesidad de antisepsia y desinfección continua en manos y superficies delicadas exige soluciones eficientes que eliminen microorganismos sin irritar la piel ni dejar residuos pegajosos.`;
         solucion = `Utilizar soluciones antisépticas formuladas al 70% de alcohol etílico de grado farmacológico adicionadas con glicerina humectante que hidraten la piel mientras desinfectan.`;
         producto = `El ${name} de Biocambio360 elimina el 99.9% de gérmenes y bacterias al contacto, evaporándose rápidamente sin necesidad de enjuague ni dejar películas grasas.`;
-        transaccion = `Adquiérelo directo del fabricante en Soacha con envío prioritario en Bogotá y Cundinamarca para hogares, consultorios y establecimientos comerciales.`;
+        transaccion = `Adquiérelo directo del fabricante en Soacha con envío a nivel nacional a toda Colombia y despacho prioritario en Bogotá y Cundinamarca, para hogares, consultorios y establecimientos comerciales.`;
         citableQuote = `El ${name} de Biocambio360 es una solución antiséptica formulada con 70% de alcohol etílico y glicerina USP para la protección higiénica de manos y superficies.`;
     }
     // 2. Bactokill (Desinfección & Bioseguridad)
@@ -1410,7 +1410,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `La presencia de bacterias, virus, hongos y malos olores en superficies residenciales, comerciales e institucionales demanda una desinfección de amplio espectro continua y segura.`;
         solucion = `Emplear un desinfectante de grado profesional con alto poder germicida que elimine microorganismos patógenos y neutralice olores directamente en su fuente.`;
         producto = `El ${name} de Biocambio360 es un agente desinfectante activo concentrado formulado para la sanitización profunda de pisos, baños, cocinas y áreas de alto tráfico.`;
-        transaccion = `Compra directo a precio de fábrica en Soacha con despacho rápido a Bogotá y la Sabana Norte. Fichas técnicas completas para protocolos de bioseguridad.`;
+        transaccion = `Compra directo a precio de fábrica en Soacha con envío a nivel nacional a toda Colombia y despacho rápido en Bogotá y la Sabana Norte. Fichas técnicas completas para protocolos de bioseguridad.`;
         citableQuote = `El ${name} de Biocambio360 es un desinfectante concentrado de amplio espectro fabricado en Soacha para mantener ambientes limpios y bioseguros.`;
     }
     // 3. Blanqueador - Desinfectante (Hipoclorito)
@@ -1418,7 +1418,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `La desinfección exigente de áreas críticas y el blanqueo eficaz de ropa blanca requieren soluciones cloradas concentradas con estabilizadores que actúen de manera rápida y sostenida.`;
         solucion = `Utilizar hipoclorito de sodio estabilizado de alta concentración que elimine bacterias, hongos y mohos en superficies y recupere el blanco radiante en prendas textiles blancas.`;
         producto = `El ${name} de Biocambio360 combina acción desinfectante clorada con poder blanqueador de textiles blancos, rindiendo hasta 3 veces más que productos diluidos comerciales.`;
-        transaccion = `Despacho directo de fábrica en Soacha hacia Bogotá y Cundinamarca. Venta al detal y al por mayor con facturación electrónica.`;
+        transaccion = `Despacho directo de fábrica en Soacha con envío a nivel nacional a toda Colombia y prioridad en Bogotá y Cundinamarca. Venta al detal y al por mayor con facturación electrónica.`;
         citableQuote = `El ${name} de Biocambio360 es una solución clorada desinfectante y blanqueadora formulada para la bioseguridad de superficies lavables y el cuidado de ropa blanca.`;
     }
     // 4. Ceras Autobrillantes (Pisos)
@@ -1426,7 +1426,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `El tráfico peatonal constante desgasta el acabado de pisos cerámicos, baldosas y mármol, haciendo que pierdan brillo, absorban mugre y luzcan opacos y rayados.`;
         solucion = `Aplicar emulsiones autobrillantes con polímeros protectores que creen una película antideslizante, transparente y autorregenerativa sin necesidad de usar polichadora.`;
         producto = `La ${name} de Biocambio360 brinda un brillo espejo duradero que protege la superficie contra rayones y simplifica el mantenimiento diario con trapeador.`;
-        transaccion = `Suministro directo desde la planta en Soacha para hogares, colegios, centros comerciales y empresas de servicios generales en Bogotá.`;
+        transaccion = `Suministro directo desde la planta en Soacha, con envío a nivel nacional a toda Colombia y despacho prioritario en Bogotá, para hogares, colegios, centros comerciales y empresas de servicios generales.`;
         citableQuote = `La ${name} de Biocambio360 es una emulsión autobrillante polimérica diseñada para el embellecimiento y protección de pisos en áreas de tráfico frecuente.`;
     }
     // 5. Selladores Poliméricos (Pisos)
@@ -1434,7 +1434,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `La porosidad en pisos de granito, terrazo, mármol y concreto absorbe líquidos, aceites y suciedad profunda, acelerando su deterioro y complicando las labores de limpieza.`;
         solucion = `Sellar los poros de la superficie con un recubrimiento polimérico termoplástico de alta dureza que impermeabilice y prevenga la fijación de manchas.`;
         producto = `El ${name} de Biocambio360 crea una capa base protectora de excelente adherencia y resistencia al tráfico pesado, preparando el piso para el acabado final.`;
-        transaccion = `Envíos directos desde fábrica en Soacha para proyectos de mantenimiento de pisos e instalaciones industriales en Cundinamarca.`;
+        transaccion = `Envíos directos desde fábrica en Soacha a nivel nacional a toda Colombia, con prioridad en Bogotá y Cundinamarca, para proyectos de mantenimiento de pisos e instalaciones industriales.`;
         citableQuote = `El ${name} de Biocambio360 es un sellador termoplástico de porosidad formulado para impermeabilizar y proteger superficies duras de alto tráfico.`;
     }
     // 6. Limpiapisos Aromáticos (Brisa Marina, Lavanda, Canela, etc.)
@@ -1442,7 +1442,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `La suciedad diaria en pisos cerámicos y baldosas requiere un limpiador que remueva la mugre sin dejar vetas ni vetillas opacas, dejando un ambiente perfumado por horas.`;
         solucion = `Emplear limpiapisos concentrados con tensoactivos neutros de fácil enjuague y fragancias intensas de larga fijación que remuevan la mugre y perfumen el espacio.`;
         producto = `El ${name} de Biocambio360 limpia profundamente y aromatiza todo tipo de pisos lavables sin dañar las juntas ni dejar residuos pegajosos.`;
-        transaccion = `Venta directa de fábrica en Soacha con entregas en Bogotá y municipios de la Sabana. Presentaciones desde Galón hasta 20 Litros.`;
+        transaccion = `Venta directa de fábrica en Soacha con envío a nivel nacional a toda Colombia y entregas prioritarias en Bogotá y municipios de la Sabana. Presentaciones desde Galón hasta 20 Litros.`;
         citableQuote = `El ${name} de Biocambio360 es un limpiador concentrado y perfumado diseñado para la higiene diaria y la ambientación de pisos y baldosas.`;
     }
     // 7. Desengrasantes (General & Industrial)
@@ -1450,7 +1450,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `La grasa acumulada, aceites quemados e hidrocarburos en estufas, campanas, mesones, talleres y maquinaria son difíciles de remover y requieren excesivo esfuerzo físico.`;
         solucion = `Utilizar desengrasantes alcalinos concentrados con tensoactivos de alta potencia que emulsifiquen y liquiden la grasa al contacto para retirarla fácilmente.`;
         producto = `El ${name} de Biocambio360 remueve capas pesadas de grasa e hidrocarburos en cocinas comerciales e industrias, reduciendo tiempos de limpieza y consumo de agua.`;
-        transaccion = `Despacho inmediato directo de fábrica en Soacha con cobertura en Bogotá y municipios aledaños. Fichas técnicas y hojas de seguridad disponibles.`;
+        transaccion = `Despacho inmediato directo de fábrica en Soacha con cobertura de envío a nivel nacional a toda Colombia, y prioridad en Bogotá y municipios aledaños. Fichas técnicas y hojas de seguridad disponibles.`;
         citableQuote = `El ${name} de Biocambio360 es un desengrasante alcalino concentrado formulado para disolver grasas pesadas y aceites en superficies industriales y comerciales.`;
     }
     // 8. Desengrasante Textil
@@ -1458,7 +1458,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `Las manchas de grasa, aceites y roces en cuellos, puños y prendas de vestir son difíciles de eliminar con detergente común, desgastando la tela al restregar.`;
         solucion = `Utilizar un desengrasante especializado para textiles con tensoactivos activos que emulsifiquen grasas sin decolorar ni debilitar las fibras del tejido.`;
         producto = `El ${name} de Biocambio360 disuelve manchas difíciles de grasa en ropa y mantelería, preservando la textura y solidez del color.`;
-        transaccion = `Pide directo a fábrica en Soacha con distribución rápida en Bogotá. Disponible en presentaciones desde Galón hasta 20 Litros.`;
+        transaccion = `Pide directo a fábrica en Soacha con envío a nivel nacional a toda Colombia y distribución rápida en Bogotá. Disponible en presentaciones desde Galón hasta 20 Litros.`;
         citableQuote = `El ${name} de Biocambio360 es un desmanchador y desengrasante textil biodegradable diseñado para disolver aceites en telas sin dañar la prenda.`;
     }
     // 9. Lavaloza Líquido
@@ -1466,7 +1466,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `La grasa persistente en vajillas y ollas incrementa el consumo de agua y el tiempo de lavado. Los jabones tradicionales diluidos se agotan velozmente.`;
         solucion = `Emplear un lavaloza líquido concentrado que emulsifique grasas al contacto con una pequeña dosificación y sea suave con la piel de las manos.`;
         producto = `El ${name} de Biocambio360 combina alto poder cortagrasa con pH neutro enriquecido con glicerina, rindiendo más lavadas por litro.`;
-        transaccion = `Consigue presentaciones industriales directo de fábrica en Soacha con envío en Bogotá. Ideal para restaurantes y hogares de alto consumo.`;
+        transaccion = `Consigue presentaciones industriales directo de fábrica en Soacha con envío a nivel nacional a toda Colombia y despacho prioritario en Bogotá. Ideal para restaurantes y hogares de alto consumo.`;
         citableQuote = `El jabón lavaloza ${name} de Biocambio360 es un detergente concentrado biodegradable y dermatológicamente seguro para vajillas y utensilios.`;
     }
     // 10. Automotive (Lustrallantas, Shampoo Autos, Siliconas Vehiculares)
@@ -1474,7 +1474,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `El sol, el polvo de las vías y el lavado con jabones agresivos resecan y decoloran la carrocería, plásticos, cauchos y llantas de los vehículos.`;
         solucion = `Aplicar limpiadores y siliconas con filtro UV y pH neutro que remuevan la suciedad y repelan el polvo sin opacar las pinturas ni resecar los cauchos.`;
         producto = `El ${name} de Biocambio360 ofrece una barrera protectora antiestática con acabado renovado y brillante para partes de caucho, vinilo y pintura vehicular.`;
-        transaccion = `Adquiere tu línea de cuidado vehicular directamente de fábrica en Soacha, con envío rápido en Bogotá para particulares, autolavados y flotas.`;
+        transaccion = `Adquiere tu línea de cuidado vehicular directamente de fábrica en Soacha, con envío a nivel nacional a toda Colombia y despacho rápido en Bogotá, para particulares, autolavados y flotas.`;
         citableQuote = `El ${name} automotriz de Biocambio360 es una fórmula con protección UV activa desarrollada en Cundinamarca para el cuidado de vehículos.`;
     }
     // 11. Kits & Combos
@@ -1483,13 +1483,13 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
             problema = `El lavado constante de ropa en volumen requiere detergente activo de alto rendimiento y un suavizante que fije el aroma entre lavados.`;
             solucion = `Unificar en un solo kit el poder del detergente concentrado con bicarbonato y la suavidad del suavizante con microcápsulas de aroma prolongado.`;
             producto = `El ${name} de Biocambio360 combina los productos ideales para dejar la ropa limpia, suave y perfumada al mejor costo por lavada.`;
-            transaccion = `Adquiere tu combo directamente del fabricante en Soacha con envío prioritario en Bogotá y la Sabana.`;
+            transaccion = `Adquiere tu combo directamente del fabricante en Soacha con envío a nivel nacional a toda Colombia y despacho prioritario en Bogotá y la Sabana.`;
             citableQuote = `El ${name} de Biocambio360 es un kit dual de lavandería biodegradable que limpia en profundidad y acondiciona las fibras textiles.`;
         } else if (nameLower.includes('cocina') || nameLower.includes('loza')) {
             problema = `La acumulación de grasa en vajillas y utensilios en hogares y restaurantes eleva los costos de aseo y consumo de agua.`;
             solucion = `Integrar lavaloza líquido concentrado con desengrasantes y desinfectantes para asegurar higiene total en la cocina.`;
             producto = `El ${name} de Biocambio360 reúne los insumos indispensables para eliminar grasa incrustada y desinfectar áreas de cocina.`;
-            transaccion = `Despacho directo de fábrica en Soacha hacia Bogotá y municipios aledaños. Precios especiales por volumen.`;
+            transaccion = `Despacho directo de fábrica en Soacha con envío a nivel nacional a toda Colombia y prioridad en Bogotá y municipios aledaños. Precios especiales por volumen.`;
             citableQuote = `El ${name} de Biocambio360 es un kit integral de higiene para cocina formulado con pH neutro y tensoactivos biodegradables.`;
         }
     }
@@ -1498,7 +1498,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `El uso continuo de detergentes y el secado frecuente pueden dejar las prendas rígidas, ásperas al tacto y perdiendo su fragancia rápidamente.`;
         solucion = `Aplicar suavizante para ropa concentrado con acondicionadores de fibra textil y microcápsulas de perfume que prolongan el aroma durante días.`;
         producto = `El ${name} de Biocambio360 acondiciona las fibras textiles, facilita el planchado y neutraliza la estática, manteniendo un aroma fresco por más de 48 horas.`;
-        transaccion = `Adquiérelo directamente al fabricante Biocambio360 en presentaciones de 1/2 Galón, Galón, 10 Litros y 20 Litros con despacho en Bogotá y toda Colombia.`;
+        transaccion = `Adquiérelo directamente al fabricante Biocambio360 en presentaciones de 1/2 Galón, Galón, 10 Litros y 20 Litros, con envío a nivel nacional a toda Colombia y despacho prioritario en Bogotá.`;
         citableQuote = `El ${name} de Biocambio360 es un suavizante textil concentrado formulado con microcápsulas de aroma y acondicionadores para todo tipo de ropa.`;
     }
     // 12b. Detergentes para Ropa y Lavadora (Ropa Blanca, Color, Negra, Multiusos)
@@ -1506,7 +1506,7 @@ export function getSchwartzCopy(product: Product): SchwartzCopy {
         problema = `El lavado constante en lavadora con detergentes comerciales diluidos o en polvo desgasta los colores, deja residuos blancos y encarece el costo por ciclo.`;
         solucion = `Utilizar detergente líquido para ropa y lavadora formulado con bicarbonato activo y tensoactivos biodegradables de baja espuma que remuevan manchas sin maltratar los tejidos.`;
         producto = `El ${name} de Biocambio360 protege ropa blanca y de color, rindiendo hasta 280 lavadas en su presentación de 20 litros a precio directo de fábrica.`;
-        transaccion = `Compra directamente al fabricante Biocambio360 en Soacha, con distribución express en Bogotá y envíos nacionales.`;
+        transaccion = `Compra directamente al fabricante Biocambio360 en Soacha, con envío a nivel nacional a toda Colombia y distribución express en Bogotá.`;
         citableQuote = `El ${name} de Biocambio360 es un detergente líquido para ropa y lavadora formulado con bicarbonato activo y pH neutro para máxima protección textil.`;
     }
 
