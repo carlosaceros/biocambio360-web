@@ -554,9 +554,6 @@ function HomeContent() {
           {/* Banner Promocional Oficial de ADDI (0% Interés) */}
           <AddiPromoBanner />
 
-          {/* Google Reviews Carousel (hidden while searching, same as the section it introduces) */}
-          {!isSearching && <GoogleReviewsCarousel />}
-
           {/* Kits & Combos Section (Hidden when searching so user sees search results immediately) */}
           {!isSearching && (
             <KitsSection
@@ -788,6 +785,9 @@ function HomeContent() {
               </>
             )}
           </div>
+
+          {/* Google Reviews Carousel — right before the combo builder, on both search and normal browsing */}
+          <GoogleReviewsCarousel />
 
           {/* ─── COMBOTIZER SECTION ─────────────────────────────── */}
           <div id="combos" className="px-6 pb-20 content-auto">
