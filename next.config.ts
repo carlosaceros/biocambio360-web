@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  // sharp's native libvips is not traced automatically on Vercel: include it for the product-image route
+  outputFileTracingIncludes: {
+    '/api/catalog-image/[id]': ['./node_modules/@img/**/*', './node_modules/sharp/**/*'],
+  },
   images: {
     contentDispositionType: 'inline',
     formats: ['image/avif', 'image/webp'],
