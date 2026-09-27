@@ -635,6 +635,11 @@ async function handleWhatsAppStatusUpdate(status: any, phoneNumberId: string): P
 
     if (!recipientPhone || !metaMessageId) return;
 
+    if (deliveryStatus === 'failed') {
+        const errors = status.errors ?? [];
+        console.warn(`[webhook/meta] Delivery failed to ${recipientPhone} (msg ${metaMessageId}):`, JSON.stringify(errors).slice(0, 500));
+    }
+
     const conversationId = buildConversationId('whatsapp', phoneNumberId, recipientPhone);
 
     // Find and update the message status
@@ -647,7 +652,12 @@ async function handleWhatsAppStatusUpdate(status: any, phoneNumberId: string): P
 
     const snap = await msgQuery.get();
     if (!snap.empty) {
-        await snap.docs[0].ref.update({ status: deliveryStatus });
+        const update: Record<string, unknown> = { status: deliveryStatus };
+        if (deliveryStatus === 'failed' && status.errors?.[0]) {
+            const e = status.errors[0];
+            update.statusError = `${e.code ?? ''} ${e.title ?? e.message ?? ''}`.trim().slice(0, 300);
+        }
+        await snap.docs[0].ref.update(update);
     }
 }
 
