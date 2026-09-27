@@ -446,6 +446,7 @@ async function handleWhatsAppInboundMessage(
             contactName,
             lastInboundAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
+            nudgeCount: FieldValue.delete(),
             status: convSnap.data()?.status === 'bot' ? 'bot' : 'abierto',
             ...(adReferral ? { adReferral } : {}),
         });

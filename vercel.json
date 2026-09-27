@@ -29,6 +29,14 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/cron/agent-schedule",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/stall-recovery",
+      "schedule": "*/20 * * * *"
+    },
+    {
       "path": "/api/cron/bot-handoff",
       "schedule": "*/10 * * * *"
     },

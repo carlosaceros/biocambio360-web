@@ -21,6 +21,7 @@ import { getAdminDB } from '@/lib/firebase-admin';
 import { sendTextMessage, sendInteractiveButtons, sendInteractiveList, sendCtaUrlButton, isReplyableId, downloadMedia } from '@/lib/whatsapp-service';
 import { getCompactCatalog, getCatalogHash, getRelevantProductSheets, getMatchingProductPrices, getMatchingProducts, getSellableProducts, getProductLineByName, correctPriceLines } from '@/lib/ai-agent-knowledge';
 import { sendProductCard, sendCatalogCard, sendCategoryCard, productSizes } from '@/lib/product-card';
+import { pickAdVariant, AD_VARIANT_INSTRUCTION, type AdVariant } from '@/lib/ad-copy-variants';
 import { wantsCatalog } from '@/lib/catalog-categories';
 import { loadTrainingSnapshot, rulesPromptBlock, examplesPromptBlock, pickExamples, verifyAdConfig } from '@/lib/ai-agent-training';
 import {
@@ -278,7 +279,9 @@ export async function callGemini(params: {
     context: string;
     isFirstBotTurn: boolean;
     adMode?: boolean;
+    adVariant?: AdVariant;
     newMode?: boolean;
+    reactivation?: { style: 'checkin' | 'fomo' };
     images?: Array<{ mimeType: string; data: string }>;
 }): Promise<{ output: AgentOutput; usage: GeminiUsage }> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -314,19 +317,31 @@ export async function callGemini(params: {
     }
     while (contents.length > 0 && contents[0].role !== 'user') contents.shift();
 
-    // Dynamic context goes at the END (right before the customer's latest message)
+    // Dynamic context goes at the END, as the turn Gemini must respond to. Normally that is the
+    // customer's latest message (last entry, role 'user'); in reactivation the thread instead ends
+    // with OUR OWN last message (role 'model', still unanswered), so a fresh 'user' turn carrying the
+    // instructions is appended instead of corrupting that trailing model turn.
+    const promptBody =
+        `[CONTEXTO INTERNO — no lo menciones]\n${params.context}\n` +
+        (params.isFirstBotTurn && params.newMode !== false
+            ? params.adMode
+                ? `PRIMER_MENSAJE (cliente de anuncio): ${params.adVariant ? AD_VARIANT_INSTRUCTION[params.adVariant] : 'confirma el producto del anuncio y su precio.'} No escribas el precio de otras presentaciones (el sistema imprime después la lista completa: NO la escribas ni repitas precios) y pregunta cuántas unidades necesita y para qué ciudad es. NO menciones asesores ni horarios en este mensaje. No listes otros productos ni preguntes qué busca.\n`
+                : 'PRIMER_MENSAJE: saluda con el SALUDO, preséntate en una línea y pregunta en qué le ayudas o qué necesita; NO menciones asesores ni horarios; puedes ofrecer pedir en la web (botonWeb=true).\n'
+            : '') +
+        (params.reactivation
+            ? params.reactivation.style === 'fomo'
+                ? 'REACTIVACIÓN (cierre): ha pasado bastante tiempo sin respuesta del cliente y el chat directo se cerrará pronto. Escribe un mensaje NUEVO (no repitas tu mensaje anterior) que retome en 1-2 líneas justo lo que faltaba, sin saludar de nuevo ni presentarte, y con calidez sutil transmite que es tu última oportunidad de terminarlo hoy mismo antes de que se cierre esta conversación (sin inventar plazos falsos ni descuentos). Termina invitando a responder ahora.\n'
+                : 'REACTIVACIÓN: el cliente no respondió tu último mensaje (que ves arriba). Escribe un mensaje NUEVO (no lo repitas) que retome en 1-2 líneas justo el punto donde quedó, sin saludar de nuevo ni presentarte, y anímalo con calidez a continuar. No te disculpes ni menciones que "no respondió".\n'
+            : '');
+
     const last = contents[contents.length - 1];
     if (last && last.role === 'user') {
-        last.parts[0].text =
-            `[CONTEXTO INTERNO — no lo menciones]\n${params.context}\n` +
-            (params.isFirstBotTurn && params.newMode !== false
-                ? params.adMode
-                    ? 'PRIMER_MENSAJE (cliente de anuncio): saluda en una línea, confirma el producto del anuncio y el precio de la presentación que promociona (el sistema imprime después la lista completa de presentaciones: NO la escribas ni repitas otros precios) y pregunta cuántas unidades necesita y para qué ciudad es. NO menciones asesores ni horarios en este mensaje. No listes otros productos ni preguntes qué busca.\n'
-                    : 'PRIMER_MENSAJE: saluda con el SALUDO, preséntate en una línea y pregunta en qué le ayudas o qué necesita; NO menciones asesores ni horarios; puedes ofrecer pedir en la web (botonWeb=true).\n'
-                : '') +
-            `[MENSAJE DEL CLIENTE]\n${last.parts[0].text}`;
+        last.parts[0].text = `${promptBody}[MENSAJE DEL CLIENTE]\n${last.parts[0].text}`;
         // Images the customer just sent (analysed once; later turns use the stored description)
         for (const img of params.images ?? []) last.parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } } as never);
+    } else {
+        // Thread ends on our own message (reactivation): add a fresh user turn with the instructions
+        contents.push({ role: 'user', parts: [{ text: `${promptBody}[INSTRUCCIÓN DEL SISTEMA — no es un mensaje del cliente]\nEscribe ahora el mensaje de reactivación.` }] });
     }
 
     const cacheName = await getPromptCacheName(apiKey, systemPrompt);
@@ -619,6 +634,8 @@ export interface BrainInput {
     /** images sent by the customer that have not been analysed yet */
     images?: Array<{ mimeType: string; data: string }>;
     now?: Date;
+    adVariant?: AdVariant;
+    reactivation?: { style: 'checkin' | 'fomo' };
 }
 
 export interface BrainResult {
@@ -723,7 +740,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
                 botonWeb: cachedReply.botonWeb,
             };
         } else {
-            const result = await callGemini({ history, context, isFirstBotTurn: botMessagesBefore === 0, adMode: !!ad, newMode: mode === 'nuevo', images: input.images });
+            const result = await callGemini({ history, context, isFirstBotTurn: botMessagesBefore === 0, adMode: !!ad, adVariant: input.adVariant, newMode: mode === 'nuevo', images: input.images, reactivation: input.reactivation });
             output = result.output;
             void recordUsage(result.usage);
             console.log(`[ai-agent] Tokens: prompt=${result.usage.promptTokens} cached=${result.usage.cachedTokens} out=${result.usage.outputTokens}`);
@@ -920,6 +937,109 @@ function detectContinuation(
     const rawName = String(conv.assignedToName || humanOut?.agentName || '').trim();
     const advisorName = rawName && rawName !== AI_AGENT_NAME ? rawName : null;
     return { is: assigned || !!humanOut || daytimeInbound, advisorName };
+}
+
+/**
+ * Sends ONE context-aware reactivation message for a conversation the AI agent already handled and
+ * that went quiet. Reused by: (1) "Activar en este chat" (immediate or scheduled), and (2) the
+ * automatic stall-recovery cron. It bypasses the human-online gate (the caller already decided the
+ * moment) but still yields if a human just answered, respects the global pause, and only fires when
+ * the last message is ours and unanswered — never interrupts a live human conversation.
+ */
+export async function runReactivationTurn(input: {
+    conversationId: string;
+    phoneId: string;
+    contactPhone: string;
+    style: 'checkin' | 'fomo';
+}): Promise<{ sent: boolean; reason?: string }> {
+    try {
+        if (!isReplyableId(input.contactPhone)) return { sent: false, reason: 'sin contacto válido' };
+        if (!(await isAgentEnabled())) return { sent: false, reason: 'agente pausado' };
+
+        const db = getAdminDB();
+        const convRef = db.collection('conversations').doc(input.conversationId);
+        if (!(await acquireLock(convRef))) return { sent: false, reason: 'ocupado, intenta de nuevo' };
+
+        try {
+            const convSnap = await convRef.get();
+            if (!convSnap.exists) return { sent: false, reason: 'conversación no encontrada' };
+            const conv = convSnap.data() ?? {};
+
+            const msgSnap = await convRef.collection('messages').orderBy('timestamp', 'desc').limit(HISTORY_MESSAGES + 4).get();
+            const recent: Array<FirebaseFirestore.DocumentData & { _id: string }> = msgSnap.docs.map(d => Object.assign(d.data(), { _id: d.id })).reverse();
+
+            const humanActive = recent.some(m => {
+                if (m.direction !== 'outbound' || !m.agentUid || m.agentUid === AI_AGENT_ID) return false;
+                return Date.now() - (m.timestamp?.toMillis?.() ?? 0) < HUMAN_ACTIVE_GRACE_MS;
+            });
+            if (humanActive) return { sent: false, reason: 'un asesor respondió hace poco' };
+
+            const usable = recent.filter(m => m.content && ['text', 'interactive', 'audio', 'image', 'document', 'video'].includes(m.type));
+            if (usable[usable.length - 1]?.direction !== 'outbound') return { sent: false, reason: 'el cliente ya respondió' };
+            const lastInbound = [...usable].reverse().find(m => m.direction === 'inbound');
+            if (!lastInbound) return { sent: false, reason: 'no hay mensaje del cliente que retomar' };
+
+            const lastText = sanitizeUserText(String(lastInbound.content));
+            const history = usable.slice(-HISTORY_MESSAGES).map(m => ({
+                role: (m.direction === 'inbound' ? 'user' : 'model') as 'user' | 'model',
+                text: (m.direction === 'inbound' ? sanitizeUserText(String(m.content)) : String(m.content)).slice(0, 400),
+            }));
+
+            const key = shiftKey();
+            const turns = conv.botWindowKey === key ? Number(conv.botTurns ?? 0) : 0;
+
+            const ad = await resolveAd(conv.adReferral);
+            let adVariant = ad ? (conv.adVariant as AdVariant | undefined) : undefined;
+            if (ad && !adVariant) {
+                adVariant = pickAdVariant(input.conversationId);
+                await convRef.update({ adVariant }).catch(() => undefined);
+            }
+
+            const memory = await loadCustomerMemory(input.contactPhone);
+            const currentPreOrder = (conv.preOrder as PreOrder | undefined) ?? null;
+
+            const result = await generateAgentReply({
+                history,
+                lastText,
+                preOrder: currentPreOrder,
+                turns,
+                botMessagesBefore: turns,
+                ad,
+                adVariant,
+                useResponseCache: false,
+                buttonRecentlySent: recent.slice(-3).some(m => !!m.cta || String(m.content).includes(WEB_BUTTON_MARKER)),
+                alreadyListed: recent.slice(-10).some(m => String(m.content).includes(PRICE_LIST_HEADER) || (String(m.content).includes('✅') && String(m.content).includes('$'))),
+                mode: 'demanda',
+                memory,
+                closingAsked: false,
+                reactivation: { style: input.style },
+            });
+            if (result.kind !== 'reply' || result.messages.length === 0) return { sent: false, reason: 'el modelo no generó un mensaje' };
+
+            await sendMessages(convRef, input.phoneId, input.contactPhone, result.messages, result.options, result.webButton);
+            const preOrder = result.preOrder;
+            const hasLead = !!preOrder && (preOrder.items.length > 0 || !!preOrder.horarioContacto || !!preOrder.notas);
+            await convRef.update({
+                status: 'bot',
+                lastMessage: result.messages[result.messages.length - 1].split('\n')[0],
+                lastMessageAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+                botTurns: turns + 1,
+                botWindowKey: key,
+                nudgeCount: FieldValue.increment(1),
+                lastNudgeAt: new Date().toISOString(),
+                lastNudgeStyle: input.style,
+                ...(preOrder && preOrder !== currentPreOrder && hasLead ? { preOrder } : {}),
+                ...(result.resumen ? { agentSummary: result.resumen } : {}),
+            });
+            return { sent: true };
+        } finally {
+            await releaseLock(convRef);
+        }
+    } catch (err) {
+        console.error('[ai-agent] Reactivation failed:', err);
+        return { sent: false, reason: err instanceof Error ? err.message : 'error' };
+    }
 }
 
 async function runTurnOnce(input: AgentTurnInput): Promise<void> {
@@ -1164,6 +1284,12 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
         const alreadyListed = recent.filter(m => m.agentUid === AI_AGENT_ID).slice(-10).some(m => String(m.content).includes(PRICE_LIST_HEADER) || (String(m.content).includes('✅') && String(m.content).includes('$')));
 
         const ad = await resolveAd(conv.adReferral);
+        // Stable A/B opener angle per conversation (Schwartz awareness levels + Ogilvy/Isra Bravo copy)
+        let adVariant = ad ? (conv.adVariant as AdVariant | undefined) : undefined;
+        if (ad && !adVariant) {
+            adVariant = pickAdVariant(input.conversationId);
+            await convRef.update({ adVariant }).catch(() => undefined);
+        }
         const result = await generateAgentReply({
             history,
             lastText,
@@ -1171,6 +1297,7 @@ async function runTurnOnce(input: AgentTurnInput): Promise<void> {
             turns,
             botMessagesBefore,
             ad,
+            adVariant,
             useResponseCache: true,
             buttonRecentlySent,
             alreadyListed,

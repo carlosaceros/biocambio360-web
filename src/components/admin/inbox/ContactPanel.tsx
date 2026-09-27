@@ -59,6 +59,9 @@ export default function ContactPanel({
     const [autoAssignResult, setAutoAssignResult] = useState<{ advisorName?: string; detail?: string; assigned: boolean } | null>(null);
     const [confirmingPreOrder, setConfirmingPreOrder] = useState(false);
     const [togglingAgent, setTogglingAgent] = useState(false);
+    const [agentActionMsg, setAgentActionMsg] = useState('');
+    const [showSchedule, setShowSchedule] = useState(false);
+    const [scheduleValue, setScheduleValue] = useState('');
     const [cartDoc, setCartDoc] = useState<{
         status?: string;
         total?: number;
@@ -98,51 +101,40 @@ export default function ContactPanel({
         setLoading(true);
         try {
             const cleanPhone = phone.replace(/\D/g, '');
-
-            // Try searching in orders by phone
+            // Orders store the phone under cliente.celular, in whatever format the checkout captured it
+            const phoneVariants = [...new Set([cleanPhone, cleanPhone.slice(-10), `57${cleanPhone.slice(-10)}`, `+57${cleanPhone.slice(-10)}`])];
             const ordersRef = collection(db, 'orders');
-            const phoneVariants = [cleanPhone, `+${cleanPhone}`, `+57${cleanPhone.slice(-10)}`];
+
+            // Plain equality queries (no orderBy): avoids requiring a composite index, and a customer
+            // realistically has few enough orders that sorting client-side is simpler and just as fast
+            const snaps = await Promise.all(phoneVariants.map(v => getDocs(query(ordersRef, where('cliente.celular', '==', v)))));
+            const orders = new Map<string, any>();
+            snaps.forEach(snap => snap.docs.forEach(d => orders.set(d.id, { id: d.id, ...d.data() })));
+
+            const toMs = (v: unknown): number => {
+                const t = v as { toMillis?: () => number; seconds?: number } | string | undefined;
+                if (t && typeof t === 'object') return t.toMillis?.() ?? (t.seconds ? t.seconds * 1000 : 0);
+                return Date.parse(String(t ?? '')) || 0;
+            };
+            const list = [...orders.values()].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 
             let customerData: CustomerData | null = null;
-
-            for (const variant of phoneVariants) {
-                const q = query(
-                    ordersRef,
-                    where('customerPhone', '==', variant),
-                    orderBy('createdAt', 'desc'),
-                    limit(1)
-                );
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                    const order = snap.docs[0].data();
-                    // Get all orders to calculate totals
-                    const allOrdersQ = query(
-                        ordersRef,
-                        where('customerPhone', '==', variant),
-                        where('status', '!=', 'cancelado')
-                    );
-                    const allSnap = await getDocs(allOrdersQ);
-                    const totalOrders = allSnap.size;
-                    const totalSpent = allSnap.docs.reduce((acc, d) => acc + (d.data().total ?? 0), 0);
-
-                    customerData = {
-                        name: order.customerName ?? conversation?.contactName ?? 'Desconocido',
-                        email: order.customerEmail,
-                        phone: variant,
-                        city: order.shippingCity ?? order.customerCity,
-                        type: order.orderType === 'b2b' ? 'b2b' : 'b2c',
-                        totalOrders,
-                        totalSpent,
-                        lastOrderDate: order.createdAt?.seconds
-                            ? new Date(order.createdAt.seconds * 1000).toLocaleDateString('es-CO')
-                            : undefined,
-                        lastOrderId: snap.docs[0].id,
-                        lastOrderItems: Array.isArray(order.items)
-                            ? order.items.slice(0, 2).map((i: any) => i.product?.nombre ?? i.nombre ?? '').join(', ')
-                            : '',
-                    };
-                    break;
-                }
+            if (list.length > 0) {
+                const last = list[0];
+                const active = list.filter(o => o.status !== 'cancelado');
+                const items = Array.isArray(last.productos) ? last.productos : Object.values(last.productos ?? {});
+                customerData = {
+                    name: last.cliente?.nombre ?? conversation?.contactName ?? 'Desconocido',
+                    email: last.cliente?.email,
+                    phone: last.cliente?.celular ?? cleanPhone,
+                    city: last.cliente?.ciudad,
+                    type: last.canal === 'b2b' ? 'b2b' : 'b2c',
+                    totalOrders: active.length,
+                    totalSpent: active.reduce((acc, o) => acc + (Number(o.total) || 0), 0),
+                    lastOrderDate: toMs(last.createdAt) ? new Date(toMs(last.createdAt)).toLocaleDateString('es-CO') : undefined,
+                    lastOrderId: last.id,
+                    lastOrderItems: items.slice(0, 2).map((i: any) => i.product?.nombre ?? i.nombre ?? '').join(', '),
+                };
             }
 
             setCustomer(customerData);
@@ -297,37 +289,95 @@ export default function ContactPanel({
             )}
 
             {/* On-demand AI agent for this conversation */}
-            {conversation.channel === 'whatsapp' && conversation.contactPhone && (() => {
+            {conversation.channel === 'whatsapp' && (conversation.contactPhone || conversation.contactUserId) && (() => {
                 const forcedAt = Date.parse(String(conversation.agentForcedAt ?? ''));
                 const forcedOn = conversation.agentForced === true && Number.isFinite(forcedAt) && Date.now() - forcedAt < 6 * 60 * 60 * 1000;
+                const scheduledAt = conversation.agentScheduledAt ? new Date(conversation.agentScheduledAt) : null;
+                const isScheduled = !!scheduledAt && scheduledAt.getTime() > Date.now();
+
+                const callActivate = async (body: Record<string, unknown>) => {
+                    setTogglingAgent(true);
+                    setAgentActionMsg('');
+                    try {
+                        const token = await auth.currentUser?.getIdToken();
+                        const res = await fetch('/api/inbox/activate-agent', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ conversationId: conversation.id, ...body }) });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.error ?? 'No se pudo activar');
+                        if (body.scheduledAt) setAgentActionMsg(`✅ Programado para ${new Date(body.scheduledAt as string).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}`);
+                        else setAgentActionMsg(data.messaged ? '✅ Activado y le escribió al cliente' : `✅ Activado (sin mensaje: ${data.reason ?? 'nada que retomar'})`);
+                        setShowSchedule(false);
+                    } catch (e) {
+                        setAgentActionMsg(e instanceof Error ? `⚠️ ${e.message}` : '⚠️ No se pudo activar');
+                    } finally {
+                        setTogglingAgent(false);
+                    }
+                };
+                const cancelSchedule = async () => {
+                    setTogglingAgent(true);
+                    try {
+                        const token = await auth.currentUser?.getIdToken();
+                        await fetch('/api/inbox/activate-agent', { method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ conversationId: conversation.id }) });
+                        setAgentActionMsg('Programación cancelada.');
+                    } finally {
+                        setTogglingAgent(false);
+                    }
+                };
+
                 return (
                     <div className="px-4 py-3 border-b border-gray-100 bg-violet-50/30 space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-[10px] font-extrabold uppercase text-violet-700 tracking-wider flex items-center gap-1">
                                 <Sparkles size={11} /> Agente IA
                             </p>
-                            <button
-                                disabled={togglingAgent}
-                                onClick={async () => {
-                                    setTogglingAgent(true);
-                                    try {
-                                        await setConversationAgentForced(conversation.id, !forcedOn);
-                                    } finally {
-                                        setTogglingAgent(false);
-                                    }
-                                }}
-                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer disabled:opacity-50 ${
-                                    forcedOn ? 'bg-violet-600 text-white border-violet-600' : 'text-violet-700 border-violet-200 bg-white hover:bg-violet-50'
-                                }`}
-                            >
-                                {forcedOn ? 'Desactivar en este chat' : 'Activar en este chat'}
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                                {!forcedOn && !isScheduled && (
+                                    <button disabled={togglingAgent} onClick={() => setShowSchedule(v => !v)} className="px-2 py-1 text-[11px] font-bold rounded-lg border border-violet-200 text-violet-700 bg-white hover:bg-violet-50 cursor-pointer disabled:opacity-50">
+                                        Programar
+                                    </button>
+                                )}
+                                <button
+                                    disabled={togglingAgent}
+                                    onClick={() => (forcedOn ? setConversationAgentForced(conversation.id, false).then(() => setAgentActionMsg('Desactivado.')) : callActivate({}))}
+                                    className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer disabled:opacity-50 ${
+                                        forcedOn ? 'bg-violet-600 text-white border-violet-600' : 'text-violet-700 border-violet-200 bg-white hover:bg-violet-50'
+                                    }`}
+                                >
+                                    {togglingAgent ? 'Un momento…' : forcedOn ? 'Desactivar en este chat' : 'Activar ahora'}
+                                </button>
+                            </div>
                         </div>
+
+                        {showSchedule && !forcedOn && !isScheduled && (
+                            <div className="flex items-center gap-1.5 pt-0.5">
+                                <input
+                                    type="datetime-local"
+                                    value={scheduleValue}
+                                    onChange={e => setScheduleValue(e.target.value)}
+                                    className="text-[11px] border border-violet-200 rounded-lg px-2 py-1 flex-1"
+                                />
+                                <button
+                                    disabled={!scheduleValue || togglingAgent}
+                                    onClick={() => callActivate({ scheduledAt: new Date(`${scheduleValue}-05:00`).toISOString() })}
+                                    className="px-2 py-1 text-[11px] font-bold rounded-lg bg-violet-600 text-white cursor-pointer disabled:opacity-50"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        )}
+
+                        {isScheduled && (
+                            <p className="text-[11px] text-violet-800 flex items-center gap-1.5">
+                                🕓 Programado para {scheduledAt!.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}
+                                <button onClick={cancelSchedule} disabled={togglingAgent} className="text-red-600 underline cursor-pointer disabled:opacity-50">cancelar</button>
+                            </p>
+                        )}
+
                         <p className="text-[11px] text-gray-500">
                             {forcedOn
                                 ? 'El agente responde este chat aunque haya asesores en línea (se apaga solo a las 6 h o si un asesor responde).'
-                                : 'Responde solo fuera del horario del equipo. Actívalo aquí si quieres que atienda este chat ahora.'}
+                                : 'Responde solo fuera del horario del equipo. "Activar ahora" hace que le escriba de inmediato retomando la conversación; "Programar" elige una fecha y hora exactas.'}
                         </p>
+                        {agentActionMsg && <p className="text-[11px] font-bold text-violet-900">{agentActionMsg}</p>}
                         {conversation.agentSummary && (
                             <p className="text-[11px] text-gray-700"><strong>Nota del agente:</strong> {conversation.agentSummary}</p>
                         )}

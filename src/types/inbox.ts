@@ -97,6 +97,12 @@ export interface ConversationDoc {
     /** A human switched the AI agent on for this conversation (expires after 6 h) */
     agentForced?: boolean;
     agentForcedAt?: string;
+    agentScheduledAt?: string;
+    agentScheduledBy?: string;
+    adVariant?: string;
+    nudgeCount?: number;
+    lastNudgeAt?: string;
+    lastNudgeStyle?: 'checkin' | 'fomo';
     /** One-line note for the advisor written by the AI agent */
     agentSummary?: string;
     /** 'nuevo' | 'continuacion' | 'demanda' — how the agent is treating the conversation */

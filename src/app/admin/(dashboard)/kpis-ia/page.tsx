@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import StallRecoveryPanel from '@/components/admin/StallRecoveryPanel';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BarChart3, Bot, Megaphone, MessageSquare, RefreshCw, ShoppingBag, Users } from 'lucide-react';
 import { auth } from '@/lib/firebase';
@@ -35,6 +36,8 @@ interface Kpis {
     byMode: Counter;
     channelFunnel: Counter;
     ads: Array<{ id: string; headline: string; conversations: number; preOrders: number; sales: number; revenue: number }>;
+    adVariants: Array<{ variant: string; conversations: number; preOrders: number; sales: number; noReply: number }>;
+    nudges: { checkinSent: number; fomoSent: number; nudgedConversations: number; convertedAfterNudge: number };
     advisors: Array<{ name: string; assigned: number; sales: number; revenue: number }>;
     sla: {
         leads: number;
@@ -207,6 +210,8 @@ export default function KpisIaPage() {
                 </div>
             </div>
 
+            <StallRecoveryPanel />
+
             {error && <div className="p-3 rounded-xl bg-red-50 text-red-700 text-sm font-medium">{error}</div>}
             {!data && loading && <p className="text-sm text-gray-500">Cargando…</p>}
 
@@ -275,6 +280,48 @@ export default function KpisIaPage() {
                         </div>
                         <div className="flex justify-between text-[10px] text-gray-400 mt-1">
                             <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span>
+                        </div>
+                    </Section>
+
+                    {data.adVariants.length > 0 && (
+                        <Section title="Ángulos de copy del anuncio (Schwartz / Ogilvy / Isra Bravo)">
+                            <p className="text-[11px] text-gray-500 mb-3">
+                                Cada conversación de anuncio recibe un ángulo de apertura fijo y comparable: <strong>curiosidad</strong> (gancho, Isra Bravo), <strong>beneficio</strong> (titular de resultado, Ogilvy), <strong>directo</strong> (producto y precio de una) y <strong>urgencia</strong> (alta demanda, cierre). El agente conserva el mismo ángulo durante toda la conversación.
+                            </p>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="text-left text-gray-500 border-b border-gray-100">
+                                            <th className="py-1.5 pr-2 font-bold">Ángulo</th>
+                                            <th className="py-1.5 px-2 font-bold text-right">Conversaciones</th>
+                                            <th className="py-1.5 px-2 font-bold text-right">Pre-pedidos</th>
+                                            <th className="py-1.5 px-2 font-bold text-right">Ventas</th>
+                                            <th className="py-1.5 pl-2 font-bold text-right">Conversión</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.adVariants.map(v => (
+                                            <tr key={v.variant} className="border-b border-gray-50">
+                                                <td className="py-1.5 pr-2 text-gray-800 font-bold capitalize">{v.variant}</td>
+                                                <td className="py-1.5 px-2 text-right">{int(v.conversations)}</td>
+                                                <td className="py-1.5 px-2 text-right">{int(v.preOrders)}</td>
+                                                <td className="py-1.5 px-2 text-right">{int(v.sales)}</td>
+                                                <td className="py-1.5 pl-2 text-right font-bold">{pct(v.preOrders + v.sales, v.conversations)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-2">Solo cuenta desde que se activó esta versión: los datos crecen con cada conversación nueva de anuncio.</p>
+                        </Section>
+                    )}
+
+                    <Section title="Recuperación de conversaciones frías">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            <div><p className="text-gray-500">Chats con seguimiento</p><p className="text-lg font-black">{int(data.nudges.nudgedConversations)}</p></div>
+                            <div><p className="text-gray-500">Mensaje 1 (check-in)</p><p className="text-lg font-black">{int(data.nudges.checkinSent)}</p></div>
+                            <div><p className="text-gray-500">Mensaje 2 (cierre)</p><p className="text-lg font-black">{int(data.nudges.fomoSent)}</p></div>
+                            <div><p className="text-gray-500">Convirtieron tras el seguimiento</p><p className="text-lg font-black text-emerald-700">{int(data.nudges.convertedAfterNudge)} <span className="text-sm">({pct(data.nudges.convertedAfterNudge, data.nudges.nudgedConversations)})</span></p></div>
                         </div>
                     </Section>
 

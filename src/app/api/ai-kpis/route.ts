@@ -96,6 +96,8 @@ export async function GET(req: NextRequest) {
     // ── Conversations: funnel, sales, ads, advisors ─────────────────────────
     const funnel = { conversations: 0, withPreOrder: 0, preOrderReady: 0, preOrderConfirmed: 0, closedSales: 0, revenue: 0 };
     const ads = new Map<string, { id: string; headline: string; conversations: number; preOrders: number; sales: number; revenue: number }>();
+    const adVariants = new Map<string, { variant: string; conversations: number; preOrders: number; sales: number; noReply: number }>();
+    const nudges = { checkinSent: 0, fomoSent: 0, nudgedConversations: 0, convertedAfterNudge: 0 };
     const advisors = new Map<string, { name: string; assigned: number; sales: number; revenue: number }>();
     const status: Counter = {};
     const channelFunnel: Counter = {};
@@ -129,6 +131,24 @@ export async function GET(req: NextRequest) {
                 row.revenue += value;
             }
             ads.set(adId, row);
+
+            if (c.adVariant) {
+                const converted = hasPre || sold;
+                const vrow = adVariants.get(String(c.adVariant)) ?? { variant: String(c.adVariant), conversations: 0, preOrders: 0, sales: 0, noReply: 0 };
+                vrow.conversations++;
+                if (hasPre) vrow.preOrders++;
+                if (sold) vrow.sales++;
+                if (!converted) vrow.noReply++;
+                adVariants.set(String(c.adVariant), vrow);
+            }
+        }
+
+        const nudgeCount = num(c.nudgeCount);
+        if (nudgeCount > 0) {
+            nudges.nudgedConversations++;
+            if (nudgeCount >= 1) nudges.checkinSent++;
+            if (nudgeCount >= 2) nudges.fomoSent++;
+            if (hasPre || sold) nudges.convertedAfterNudge++;
         }
 
         if (c.assignedToName) {
@@ -339,6 +359,8 @@ export async function GET(req: NextRequest) {
         ads: [...ads.values()].sort((a, b) => b.conversations - a.conversations).slice(0, 25),
         advisors: [...advisors.values()].sort((a, b) => b.revenue - a.revenue || b.assigned - a.assigned),
         sla,
+        adVariants: [...adVariants.values()].sort((a, b) => b.conversations - a.conversations),
+        nudges,
         carts,
         usage: { ...usage, estimatedCostUsd, savedByCacheUsd: Math.max(0, withoutCacheUsd - estimatedCostUsd) },
         truncated: convSnap.size >= 4000,
