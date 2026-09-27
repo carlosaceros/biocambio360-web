@@ -234,17 +234,17 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                 </header>
 
                 {/* Main Content */}
-                <div className="max-w-7xl mx-auto px-4 py-8">
+                <div className="max-w-7xl mx-auto px-4 py-3 md:py-8">
                     <motion.button
                         whileHover={{ x: -5 }}
                         onClick={() => router.back()}
-                        className="flex items-center gap-2 text-gray-600 hover:text-[var(--brand-blue)] mb-6 transition-colors"
+                        className="flex items-center gap-2 text-gray-600 hover:text-[var(--brand-blue)] mb-3 md:mb-6 transition-colors"
                     >
                         <ArrowLeft size={20} />
                         <span className="font-medium">Volver</span>
                     </motion.button>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-16">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-12 mb-16">
                         {/* Left: Product Image & Video Gallery */}
                         <motion.div
                             initial={{ opacity: 0, y: 15 }}
@@ -329,18 +329,18 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             </div>
 
                             {/* Trust Badges — horizontal pills, compact on mobile */}
-                            <div className="grid grid-cols-3 gap-2 mt-4">
-                                <div className="flex items-center gap-1.5 p-2 bg-blue-50 rounded-lg">
-                                    <Shield className="w-4 h-4 text-blue-600 shrink-0" />
-                                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-700 leading-tight">Calidad Garantizada</p>
+                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-3">
+                                <div className="flex items-center gap-1 p-1.5 sm:p-2 bg-blue-50 rounded-lg min-w-0">
+                                    <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 shrink-0" />
+                                    <p className="min-w-0 text-[8px] sm:text-[10px] font-bold text-gray-700 leading-tight">Calidad Garantizada</p>
                                 </div>
-                                <div className="flex items-center gap-1.5 p-2 bg-green-50 rounded-lg">
-                                    <Truck className="w-4 h-4 text-green-600 shrink-0" />
-                                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-700 leading-tight">Envío Nacional Rastreado</p>
+                                <div className="flex items-center gap-1 p-1.5 sm:p-2 bg-green-50 rounded-lg min-w-0">
+                                    <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 shrink-0" />
+                                    <p className="min-w-0 text-[8px] sm:text-[10px] font-bold text-gray-700 leading-tight">Envío Nacional Rastreado</p>
                                 </div>
-                                <div className="flex items-center gap-1.5 p-2 bg-orange-50 rounded-lg">
-                                    <Package className="w-4 h-4 text-orange-600 shrink-0" />
-                                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-700 leading-tight">Empaque Seguro</p>
+                                <div className="flex items-center gap-1 p-1.5 sm:p-2 bg-orange-50 rounded-lg min-w-0">
+                                    <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-600 shrink-0" />
+                                    <p className="min-w-0 text-[8px] sm:text-[10px] font-bold text-gray-700 leading-tight">Empaque Seguro</p>
                                 </div>
                             </div>
 
@@ -382,7 +382,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                             transition={{ duration: 0.35, delay: 0.05 }}
                             className="flex flex-col"
                         >
-                            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-lg sticky top-4 flex flex-col">
+                            <div className="bg-white rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg sticky top-4 flex flex-col">
                                 <div className="order-1 lg:order-none mb-2">
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-50 text-[var(--brand-blue)] border border-blue-200/60">
                                         {product.id.includes('detergente') 
@@ -398,7 +398,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                             : (product.categoria ? `LÍNEA ${product.categoria.toUpperCase()}` : 'LÍNEA DE ASEO Y LIMPIEZA PROFESIONAL')}
                                     </span>
                                 </div>
-                                <h1 className="order-2 lg:order-none text-3xl md:text-4xl font-black text-gray-900 mb-4" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
+                                <h1 className="order-2 lg:order-none text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 mb-2 md:mb-4" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
                                     {product.nombre}
                                 </h1>
                                 <div className="order-7 lg:order-none space-y-4 mb-6">
@@ -436,7 +436,7 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </div>
 
                                 {/* Price Display */}
-                                <div className="order-4 lg:order-none bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 mb-6">
+                                <div className="order-4 lg:order-none bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4 sm:p-6 mb-4 md:mb-6">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="text-sm text-gray-600 font-medium">Precio por unidad:</span>
                                         <div className="text-right">
@@ -448,9 +448,28 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                             <div className="text-3xl font-black text-gray-900" style={{ fontFamily: '"Archivo Black", sans-serif' }}>
                                                 {formatCurrency(product.precios[selectedSize])}
                                             </div>
-                                            <div className="text-xs text-gray-500 mt-1">
-                                                ${savingsData.nuestroPrecioML}/ml
-                                            </div>
+                                            <AnimatePresence mode="wait">
+                                                {selectedSize === '10L' || selectedSize === '20L' ? (
+                                                    <motion.div
+                                                        key={`ml-bulk-${selectedSize}`}
+                                                        initial={{ scale: 0.6, opacity: 0 }}
+                                                        animate={{ scale: 1, opacity: 1 }}
+                                                        transition={{ type: 'spring', stiffness: 400, damping: 14 }}
+                                                        className="inline-flex items-center gap-1 mt-1.5 bg-green-100 text-green-700 text-xs font-black px-2 py-1 rounded-lg"
+                                                    >
+                                                        🔥 ${savingsData.nuestroPrecioML}/ml · ¡El mejor precio!
+                                                    </motion.div>
+                                                ) : (
+                                                    <motion.div
+                                                        key={`ml-${selectedSize}`}
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        className="text-xs text-gray-500 mt-1"
+                                                    >
+                                                        ${savingsData.nuestroPrecioML}/ml
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
                                     </div>
                                     {savingsData.mostrarFOMO && (
@@ -473,8 +492,8 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </div>
 
                                 {/* Quantity Selector */}
-                                <div className="order-5 lg:order-none mb-6">
-                                    <label className="text-sm font-bold text-gray-700 mb-3 block">
+                                <div className="order-5 lg:order-none mb-4 md:mb-6">
+                                    <label className="text-sm font-bold text-gray-700 mb-2 md:mb-3 block">
                                         Cantidad:
                                     </label>
                                     <div className="flex items-center gap-3">

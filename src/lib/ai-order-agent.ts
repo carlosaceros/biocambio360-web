@@ -1050,6 +1050,41 @@ export async function runReactivationTurn(input: {
     }
 }
 
+/**
+ * Entry point for "Activar en este chat" (immediate or scheduled) and the schedule cron: picks the
+ * right turn depending on who spoke last. If the customer's last message is still unanswered (e.g.
+ * they wrote after hours and no one replied), that's not a stale conversation to "reactivate" — it's
+ * a normal pending reply, so this just answers it (and can close the sale) via the regular turn.
+ * Only when the last message is ours and the customer went quiet does it fall back to the
+ * reactivation/nudge flow.
+ */
+export async function runActivateAgentTurn(input: {
+    conversationId: string;
+    phoneId: string;
+    contactPhone: string;
+    style: 'checkin' | 'fomo';
+}): Promise<{ sent: boolean; reason?: string }> {
+    const convRef = getAdminDB().collection('conversations').doc(input.conversationId);
+    const convSnap = await convRef.get();
+    const conv = convSnap.data();
+    if (!conv) return { sent: false, reason: 'conversación no encontrada' };
+
+    const msgSnap = await convRef.collection('messages').orderBy('timestamp', 'desc').limit(10).get();
+    const lastUsable = msgSnap.docs
+        .map(d => d.data())
+        .find(m => m.content && ['text', 'interactive', 'audio', 'image', 'document', 'video'].includes(m.type));
+
+    if (lastUsable?.direction === 'inbound') {
+        const beforeMs = conv.lastMessageAt?.toMillis?.() ?? 0;
+        await runOrderAgentTurn({ conversationId: input.conversationId, phoneId: input.phoneId, contactPhone: input.contactPhone });
+        const afterMs = (await convRef.get()).data()?.lastMessageAt?.toMillis?.() ?? 0;
+        if (afterMs > beforeMs) return { sent: true };
+        return { sent: false, reason: 'el agente no generó una respuesta (revisa el pausado global, el límite nocturno o la ventana de 24h)' };
+    }
+
+    return runReactivationTurn(input);
+}
+
 async function runTurnOnce(input: AgentTurnInput): Promise<void> {
     try {
         const db = getAdminDB();

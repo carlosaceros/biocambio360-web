@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDB } from '@/lib/firebase-admin';
 import { requireStaff } from '@/lib/ai-training-auth';
-import { runReactivationTurn } from '@/lib/ai-order-agent';
+import { runActivateAgentTurn } from '@/lib/ai-order-agent';
 
 export async function POST(req: NextRequest) {
     const user = await requireStaff(req);
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         agentForcedAt: new Date().toISOString(),
         agentScheduledAt: FieldValue.delete(),
     });
-    const result = await runReactivationTurn({ conversationId: convRef.id, phoneId: conv.phoneId, contactPhone: to, style: 'checkin' });
+    const result = await runActivateAgentTurn({ conversationId: convRef.id, phoneId: conv.phoneId, contactPhone: to, style: 'checkin' });
     if (!result.sent) {
         return NextResponse.json({ ok: true, activated: true, messaged: false, reason: result.reason });
     }

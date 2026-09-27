@@ -29,6 +29,7 @@ interface QuoteResult {
     gratis: boolean;
     esLocal: boolean;
     mensaje: string;
+    subsidioEfectivo: number;
 }
 
 export default function ShippingQuoteButton({ disabled, onInsert }: ShippingQuoteButtonProps) {
@@ -80,6 +81,7 @@ export default function ShippingQuoteButton({ disabled, onInsert }: ShippingQuot
                 gratis: !!data.gratis,
                 esLocal: !!data.esLocal,
                 mensaje: data.mensaje ?? '',
+                subsidioEfectivo: data.subsidioEfectivo ?? 0,
             });
         } catch (e) {
             setError(e instanceof Error ? e.message : 'No se pudo cotizar el envío');
@@ -91,9 +93,12 @@ export default function ShippingQuoteButton({ disabled, onInsert }: ShippingQuot
     const insertar = () => {
         if (!result) return;
         const destino = ciudad === 'Bogotá D.C.' ? 'Bogotá' : `${ciudad}, ${departamento}`;
+        const subsidioLine = !result.gratis && result.subsidioEfectivo > 0
+            ? `\n✨ Biocambio360 te ayuda con *$${result.subsidioEfectivo.toLocaleString('es-CO')} COP* de subsidio en este envío.`
+            : '';
         const text = result.gratis
             ? `🚚 ¡Buenas noticias! El envío a ${destino} es *GRATIS*, llega en ${result.dias} días hábiles.`
-            : `🚚 El envío a ${destino} tiene un costo de *$${result.precio.toLocaleString('es-CO')} COP* (${result.transportadora}${result.esLocal ? '' : ` · pago ${contrapago ? 'contra entrega' : 'anticipado'}`}), llega en ${result.dias} días hábiles.`;
+            : `🚚 El envío a ${destino} tiene un costo de *$${result.precio.toLocaleString('es-CO')} COP* (${result.transportadora}${result.esLocal ? '' : ` · pago ${contrapago ? 'contra entrega' : 'anticipado'}`}), llega en ${result.dias} días hábiles.${subsidioLine}`;
         onInsert(text);
         setOpen(false);
         setResult(null);
@@ -168,6 +173,9 @@ export default function ShippingQuoteButton({ disabled, onInsert }: ShippingQuot
                                 {result.gratis ? 'Envío GRATIS' : `$${result.precio.toLocaleString('es-CO')} COP`}
                             </p>
                             <p className="text-[10px] text-blue-700">{result.transportadora} · {result.dias} días hábiles</p>
+                            {!result.gratis && result.subsidioEfectivo > 0 && (
+                                <p className="text-[10px] font-bold text-emerald-700">✨ Biocambio360 subsidia ${result.subsidioEfectivo.toLocaleString('es-CO')}</p>
+                            )}
                             <button
                                 type="button"
                                 onClick={insertar}

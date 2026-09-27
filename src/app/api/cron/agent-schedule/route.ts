@@ -6,7 +6,7 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB } from '@/lib/firebase-admin';
-import { runReactivationTurn } from '@/lib/ai-order-agent';
+import { runActivateAgentTurn } from '@/lib/ai-order-agent';
 
 export async function GET(req: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
             });
             stats.activated++;
             if (to && conv.channel === 'whatsapp') {
-                const result = await runReactivationTurn({ conversationId: doc.id, phoneId: conv.phoneId, contactPhone: to, style: 'checkin' });
+                const result = await runActivateAgentTurn({ conversationId: doc.id, phoneId: conv.phoneId, contactPhone: to, style: 'checkin' });
                 if (result.sent) stats.messaged++;
             }
         } catch (err) {
