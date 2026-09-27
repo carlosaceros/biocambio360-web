@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prebuild": "node scripts/generate-jpg-images.mjs"
+    "prebuild": "node build-tools/generate-jpg-images.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
