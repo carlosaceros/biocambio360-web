@@ -41,7 +41,7 @@ import ComboBuilder from '@/components/ComboBuilder';
 import SidebarMenu from '@/components/SidebarMenu';
 import ProductQuickView from '@/components/ProductQuickView';
 import SmartVideo from '@/components/SmartVideo';
-import { Product, ProductSize } from '@/lib/products';
+import { Product, ProductSize, isDisallowedSize } from '@/lib/products';
 import { PRODUCTOS } from '@/lib/products-data';
 import { useCart } from '@/lib/cart-context';
 import { getProductAffinities } from '@/lib/product-utils';
@@ -64,6 +64,16 @@ const isComboOrKit = (p: Product) => {
     nombre.startsWith('combo ') ||
     nombre.includes('pack ')
   );
+};
+
+const normalizeSearchText = (val?: string | null) =>
+  (val || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+const productMinPrice = (p: Product): number | null => {
+  const prices = Object.entries(p.precios || {})
+    .filter(([size, price]) => !isDisallowedSize(size) && Number(price) > 0)
+    .map(([, price]) => Number(price));
+  return prices.length > 0 ? Math.min(...prices) : null;
 };
 
 function HomeContent() {
@@ -96,6 +106,24 @@ function HomeContent() {
   const deferredQuery = useDeferredValue(inputValue);
   const hasScrolledForQueryRef = useRef(false);
 
+  // Header search autocomplete: suggestions click straight through to the product page
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const deferredSuggestQuery = useDeferredValue(inputValue);
+  // Set synchronously (before router.push) so the debounced replaceState below can bail out
+  // immediately — usePathname() only updates once the navigation actually commits, which is too late.
+  const navigatingAwayRef = useRef(false);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
   // Sync local input value when URL changes from external navigation
   useEffect(() => {
     setInputValue(searchQuery);
@@ -105,7 +133,9 @@ function HomeContent() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       try {
-        if (typeof window !== 'undefined') {
+        // Skip if the user has since navigated away (e.g. clicked an autocomplete suggestion):
+        // otherwise this stale write stomps the new URL and aborts the in-flight navigation.
+        if (typeof window !== 'undefined' && !navigatingAwayRef.current && window.location.pathname === pathname) {
           const url = new URL(window.location.href);
           if (inputValue.trim()) {
             url.searchParams.set('q', inputValue.trim());
@@ -120,7 +150,7 @@ function HomeContent() {
       }
     }, 400);
     return () => window.clearTimeout(timeoutId);
-  }, [inputValue]);
+  }, [inputValue, pathname]);
 
   // Auto-scroll to catalog when user begins typing or searching
   useEffect(() => {
@@ -188,6 +218,25 @@ function HomeContent() {
     const base = dbProducts.length > 0 ? dbProducts : PRODUCTOS;
     return base.filter(p => p.status !== 'draft' && p.status !== 'archived' && !(p as any).isDeleted);
   }, [dbProducts]);
+
+  // Header search autocomplete suggestions: independent of category/segment filters, always global
+  const searchSuggestions = useMemo(() => {
+    const q = deferredSuggestQuery.trim();
+    if (q.length < 2) return [];
+    const tokens = normalizeSearchText(q).split(/\s+/).filter(Boolean);
+    return activeProducts
+      .filter(p => {
+        const searchable = normalizeSearchText(`${p.nombre} ${p.categoria} ${p.subcategoria || ''}`);
+        return tokens.every(token => searchable.includes(token));
+      })
+      .sort((a, b) => {
+        const aImg = a.imgFile && a.imgFile !== 'placeholder.png';
+        const bImg = b.imgFile && b.imgFile !== 'placeholder.png';
+        if (aImg !== bImg) return aImg ? -1 : 1;
+        return a.nombre.localeCompare(b.nombre);
+      })
+      .slice(0, 6);
+  }, [activeProducts, deferredSuggestQuery]);
 
   // SEARCH-02: Accent-insensitive normalized token matching with deferred value
   const filteredProducts = useMemo(() => {
@@ -339,16 +388,31 @@ function HomeContent() {
 
           {/* Search Input — Visible on BOTH Mobile and Desktop */}
           <div className="w-full md:max-w-xs mx-0 md:mx-4">
-            <div className="relative">
+            <div className="relative" ref={searchBoxRef}>
               <input
                 type="search"
                 placeholder="Buscar productos (ej. desengrasante)..."
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  setShowSuggestions(e.target.value.trim().length >= 2);
+                }}
+                onFocus={() => {
+                  if (inputValue.trim().length >= 2) setShowSuggestions(true);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (showSuggestions && searchSuggestions.length > 0) {
+                      navigatingAwayRef.current = true;
+                      setShowSuggestions(false);
+                      setInputValue('');
+                      router.push(`/producto/${searchSuggestions[0].id}`);
+                    } else {
+                      document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  } else if (e.key === 'Escape') {
+                    setShowSuggestions(false);
                   }
                 }}
                 inputMode="search"
@@ -358,9 +422,10 @@ function HomeContent() {
               />
               <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
               {inputValue && (
-                <button 
+                <button
                   onClick={() => {
                     setInputValue('');
+                    setShowSuggestions(false);
                     const url = new URL(window.location.href);
                     url.searchParams.delete('q');
                     window.history.replaceState(window.history.state, '', url.toString());
@@ -370,6 +435,41 @@ function HomeContent() {
                 >
                   <X size={14} />
                 </button>
+              )}
+
+              {/* Autocomplete: click goes straight to the product page (no quick-view popup) */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden z-50 max-h-[70vh] overflow-y-auto">
+                  {searchSuggestions.map((p) => {
+                    const price = productMinPrice(p);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          navigatingAwayRef.current = true;
+                          setShowSuggestions(false);
+                          setInputValue('');
+                          router.push(`/producto/${p.id}`);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-50 last:border-0 cursor-pointer"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/images/${p.imgFile && p.imgFile !== 'placeholder.png' ? p.imgFile : 'logo-biocambio360.png'}`}
+                          alt={p.nombre}
+                          className="w-10 h-10 rounded-lg object-contain bg-gray-50 border border-gray-100 shrink-0"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] font-bold text-gray-900 truncate">{p.nombre}</span>
+                          {price !== null && (
+                            <span className="block text-[11px] font-black text-[var(--brand-blue)]">Desde ${price.toLocaleString('es-CO')}</span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>

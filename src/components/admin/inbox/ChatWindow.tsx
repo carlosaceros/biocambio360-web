@@ -18,6 +18,7 @@ import {
     ChevronLeft,
 } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
+import ShippingQuoteButton from './ShippingQuoteButton';
 import dynamic from 'next/dynamic';
 
 // Loaded only in the browser: it bundles a WebAssembly audio decoder that must not be compiled for the server
@@ -101,6 +102,11 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    const insertQuoteText = useCallback((text: string) => {
+        setInputText(prev => (prev.trim() ? `${prev}\n${text}` : text));
+        requestAnimationFrame(() => inputRef.current?.focus());
+    }, []);
 
     const insertEmoji = useCallback((emoji: string) => {
         const el = inputRef.current;
@@ -395,6 +401,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
                             </div>
                         </div>
+                        <ShippingQuoteButton disabled={isSending} onInsert={insertQuoteText} />
                         <textarea
                             ref={inputRef}
                             value={inputText}
