@@ -334,6 +334,22 @@ function OrderCard({ order, onClick, isOverlay }: OrderCardProps) {
                         </button>
                     ) : null}
                     {getOriginBadge(order.origen)}
+                    {order.canal === 'sistema_externo' && (
+                        <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                order.externo?.productosNoIdentificados?.length
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200'
+                            }`}
+                            title={
+                                order.externo?.productosNoIdentificados?.length
+                                    ? `Pedido de ${order.externo?.sistema || 'sistema externo'} · tiene productos sin identificar, revisa antes de confirmar`
+                                    : `Pedido recibido de ${order.externo?.sistema || 'sistema externo'}, validar chat y cotización antes de confirmar`
+                            }
+                        >
+                            🔗 {order.externo?.productosNoIdentificados?.length ? 'Externo · revisar productos' : 'Externo · sin validar'}
+                        </span>
+                    )}
                     {order.guiaTransportadora ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200" title={`Guía: ${order.guiaTransportadora} (${order.transportadora || '99 Envíos'})`}>
                             <Truck size={11} className="text-emerald-600" />

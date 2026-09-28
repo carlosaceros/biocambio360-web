@@ -173,6 +173,13 @@ export interface Order {
     asesorEmail?: string;
     motivoBorrador?: string;
     novedadEntrega?: OrderDeliveryException;
+    /** Present when this order was ingested from an external system's order/inventory integration (canal: 'sistema_externo'). */
+    externo?: {
+        sistema: string;
+        idExterno: string;
+        productosNoIdentificados?: string[];
+        recibidoAt: string; // ISO string
+    };
     // ── Logística de Flota Propia, Mensajería y Alertas ──
     tipoEnvio?: 'flota_propia' | '99envios' | 'recogida_mostrador';
     fechaProgramadaEntrega?: string; // YYYY-MM-DD
