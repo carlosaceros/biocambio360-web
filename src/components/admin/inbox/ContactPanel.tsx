@@ -16,12 +16,17 @@ import {
     AlertCircle,
     CheckCircle2,
     Sparkles,
+    UserCircle2,
+    ShoppingCart,
+    UserPlus,
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, onSnapshot } from 'firebase/firestore';
 import type { ConversationDoc } from '@/types/inbox';
+import type { Customer } from '@/types/customer';
 import Link from 'next/link';
 import { confirmPreOrder, setConversationAgentForced } from '@/lib/inbox-service';
+import { formatCurrency } from '@/lib/checkout-utils';
 
 interface CustomerData {
     name: string;
@@ -42,6 +47,13 @@ interface ContactPanelProps {
     advisors: Array<{ uid: string; nombre: string; openConversations?: number }>;
     onAssign: (advisorUid: string) => Promise<void>;
     onAutoAssign: () => Promise<{ assigned: boolean; advisorName?: string; reason?: string; detail?: string } | null>;
+    /** Real CRM record (customers collection) for this conversation's contact, looked up once by the parent page */
+    crmCustomer?: Customer | null;
+    crmCustomerLoading?: boolean;
+    /** Opens the full ficha drawer, or the quick-create form if there's no record yet */
+    onOpenCustomerCard?: () => void;
+    /** Opens "Pedido rápido" preloaded with this contact's data */
+    onOpenQuickOrder?: () => void;
 }
 
 export default function ContactPanel({
@@ -50,6 +62,10 @@ export default function ContactPanel({
     advisors,
     onAssign,
     onAutoAssign,
+    crmCustomer,
+    crmCustomerLoading,
+    onOpenCustomerCard,
+    onOpenQuickOrder,
 }: ContactPanelProps) {
     const [customer, setCustomer] = useState<CustomerData | null>(null);
     const [loading, setLoading] = useState(false);
@@ -589,6 +605,46 @@ export default function ContactPanel({
                 </div>
             )}
 
+            {/* Ficha del cliente + Pedido rápido, sin salir del chat */}
+            {(onOpenCustomerCard || onOpenQuickOrder) && (
+                <div className="p-4 border-b border-gray-100 space-y-2">
+                    <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Cliente</p>
+                    <div className="grid grid-cols-2 gap-2">
+                        {onOpenCustomerCard && (
+                            <button
+                                type="button"
+                                onClick={onOpenCustomerCard}
+                                disabled={crmCustomerLoading}
+                                className={`py-2.5 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${
+                                    crmCustomer
+                                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                        : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                                }`}
+                            >
+                                {crmCustomer ? <UserCircle2 size={14} /> : <UserPlus size={14} />}
+                                <span>{crmCustomerLoading ? 'Buscando...' : crmCustomer ? 'Ver ficha' : 'Crear ficha'}</span>
+                            </button>
+                        )}
+                        {onOpenQuickOrder && (
+                            <button
+                                type="button"
+                                onClick={onOpenQuickOrder}
+                                className="py-2.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                                <ShoppingCart size={14} />
+                                <span>Crear pedido</span>
+                            </button>
+                        )}
+                    </div>
+                    {crmCustomer && (
+                        <div className="bg-indigo-50/60 rounded-xl px-3 py-2 text-[11px] text-indigo-900 flex items-center justify-between">
+                            <span>{crmCustomer.ordersCount ?? 0} {crmCustomer.ordersCount === 1 ? 'pedido' : 'pedidos'} previos</span>
+                            <span className="font-bold">{formatCurrency(crmCustomer.totalSpent || 0)}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Customer data from CRM */}
             <div className="p-4 space-y-3">
                 <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">Perfil CRM</p>
@@ -653,14 +709,25 @@ export default function ContactPanel({
 
                         {/* Links */}
                         <div className="flex flex-col gap-1.5 mt-2">
-                            <Link
-                                href={`/admin/clientes?phone=${conversation.contactPhone}`}
-                                className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold"
-                            >
-                                <User size={11} />
-                                Ver perfil completo
-                                <ExternalLink size={10} />
-                            </Link>
+                            {onOpenCustomerCard ? (
+                                <button
+                                    type="button"
+                                    onClick={onOpenCustomerCard}
+                                    className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+                                >
+                                    <User size={11} />
+                                    Ver ficha completa (sin salir del chat)
+                                </button>
+                            ) : (
+                                <Link
+                                    href={`/admin/clientes?phone=${conversation.contactPhone}`}
+                                    className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold"
+                                >
+                                    <User size={11} />
+                                    Ver perfil completo
+                                    <ExternalLink size={10} />
+                                </Link>
+                            )}
                             <Link
                                 href={`/admin/reabastecimiento?phone=${conversation.contactPhone}`}
                                 className="flex items-center gap-1.5 text-amber-600 hover:text-amber-800 font-semibold"

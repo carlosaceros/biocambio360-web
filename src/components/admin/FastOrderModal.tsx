@@ -41,6 +41,7 @@ interface FastOrderModalProps {
     onClose: () => void;
     onOrderCreated?: (orderId: string) => void;
     initialAdvisorName?: string;
+    initialChannel?: 'call_center' | 'whatsapp' | 'pos';
     draftOrder?: (Order & { id: string }) | null;
     preloadedCustomer?: {
         nombre?: string;
@@ -58,6 +59,7 @@ export default function FastOrderModal({
     onClose,
     onOrderCreated,
     initialAdvisorName,
+    initialChannel,
     draftOrder,
     preloadedCustomer
 }: FastOrderModalProps) {
@@ -70,7 +72,7 @@ export default function FastOrderModal({
 
     const [selectedAdvisor, setSelectedAdvisor] = useState<string>(activeAdvisor);
     const [advisorsList, setAdvisorsList] = useState<string[]>(ADVISORS);
-    const [salesChannel, setSalesChannel] = useState<'call_center' | 'whatsapp' | 'pos'>('call_center');
+    const [salesChannel, setSalesChannel] = useState<'call_center' | 'whatsapp' | 'pos'>(initialChannel || 'call_center');
 
     // Customer fields
     const [celular, setCelular] = useState<string>('');

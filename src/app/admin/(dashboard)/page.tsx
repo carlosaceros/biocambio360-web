@@ -28,7 +28,8 @@ import {
     Mail,
     Zap,
     MessageSquare,
-    ShieldAlert
+    ShieldAlert,
+    Megaphone
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -1104,6 +1105,17 @@ export default function AdminDashboard() {
                                         <span className="text-[10px] font-black bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">WhatsApp</span>
                                     </div>
                                     <p className="text-xs text-gray-600">Mensajes en tiempo real. WhatsApp, Messenger e Instagram unificados.</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/campanas')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-emerald-300 transition-colors"
+                                >
+                                    <Megaphone className="text-emerald-600 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Campañas WhatsApp</p>
+                                    <p className="text-xs text-gray-600">Difusiones masivas con plantillas, segmentadas y con historial.</p>
                                 </motion.button>
 
                                 <motion.button

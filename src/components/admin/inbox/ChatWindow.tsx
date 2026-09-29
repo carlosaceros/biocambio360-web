@@ -16,6 +16,9 @@ import {
     ChevronDown,
     MessageSquare,
     ChevronLeft,
+    UserCircle2,
+    ShoppingCart,
+    UserPlus,
 } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import ShippingQuoteButton from './ShippingQuoteButton';
@@ -34,6 +37,12 @@ interface ChatWindowProps {
     currentUserName?: string;
     /** mobile: go back to the conversation list */
     onBack?: () => void;
+    /** Opens the customer's full record (or the quick-create form if none exists yet) without leaving the chat */
+    onOpenCustomerCard?: () => void;
+    /** true = customer record found, false = none yet, undefined = still checking */
+    hasCustomerRecord?: boolean;
+    /** Opens the "Pedido rápido" modal preloaded with this contact's data */
+    onOpenQuickOrder?: () => void;
 }
 
 const STATUS_ICONS: Record<MessageStatus, React.ReactNode> = {
@@ -70,7 +79,7 @@ function isWithin24hWindow(lastInboundAt: any): boolean {
     }
 }
 
-export default function ChatWindow({ conversation, onOpenTemplates, currentUserName, onBack }: ChatWindowProps) {
+export default function ChatWindow({ conversation, onOpenTemplates, currentUserName, onBack, onOpenCustomerCard, hasCustomerRecord, onOpenQuickOrder }: ChatWindowProps) {
     const [messages, setMessages] = useState<MessageDoc[]>([]);
     const [msgStatus, setMsgStatus] = useState<MessagesStatus>({ loading: true });
     const [reloadKey, setReloadKey] = useState(0);
@@ -213,6 +222,40 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                         )}
                     </p>
                 </div>
+                {(onOpenCustomerCard || onOpenQuickOrder) && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {onOpenCustomerCard && (
+                            <button
+                                type="button"
+                                onClick={onOpenCustomerCard}
+                                title={hasCustomerRecord ? 'Ver ficha completa del cliente: datos e historial de compras' : 'Este cliente aún no tiene ficha — créala en segundos'}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                                    hasCustomerRecord
+                                        ? 'text-indigo-700 border-indigo-200 bg-indigo-50 hover:bg-indigo-100'
+                                        : hasCustomerRecord === false
+                                        ? 'text-amber-700 border-amber-200 bg-amber-50 hover:bg-amber-100'
+                                        : 'text-gray-400 border-gray-200 bg-gray-50'
+                                }`}
+                            >
+                                {hasCustomerRecord === false ? <UserPlus size={14} /> : <UserCircle2 size={14} />}
+                                <span className="hidden sm:inline">
+                                    {hasCustomerRecord === false ? 'Crear ficha' : 'Ficha del cliente'}
+                                </span>
+                            </button>
+                        )}
+                        {onOpenQuickOrder && (
+                            <button
+                                type="button"
+                                onClick={onOpenQuickOrder}
+                                title="Crear pedido rápido para este cliente sin salir del chat (Ctrl+N)"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+                            >
+                                <ShoppingCart size={14} />
+                                <span className="hidden sm:inline">Crear pedido</span>
+                            </button>
+                        )}
+                    </div>
+                )}
                 {!withinWindow && (
                     <div className="basis-full sm:basis-auto text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-lg font-semibold">
                         {conversation?.channel === 'whatsapp' ? '⏱ Ventana 24h expirada — usa plantilla' : '⏱ Ventana 24h expirada — solo el cliente puede reabrir el chat'}

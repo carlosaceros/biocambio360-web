@@ -18,6 +18,11 @@ import ChatWindow from '@/components/admin/inbox/ChatWindow';
 import ContactPanel from '@/components/admin/inbox/ContactPanel';
 import TemplatePickerModal from '@/components/admin/inbox/TemplatePickerModal';
 import WhatsAppAlertsBanner from '@/components/admin/inbox/WhatsAppAlertsBanner';
+import CreateCustomerQuickModal from '@/components/admin/inbox/CreateCustomerQuickModal';
+import PosCustomerDetailsSidebar from '@/components/admin/PosCustomerDetailsSidebar';
+import FastOrderModal from '@/components/admin/FastOrderModal';
+import { getCustomerById } from '@/lib/customers-service';
+import type { Customer } from '@/types/customer';
 import {
     getAlertsEnabled,
     setAlertsEnabled,
@@ -171,6 +176,66 @@ export default function InboxPage() {
 
     // Advisor data for assignment (coordinators/superadmin)
     const [advisors, setAdvisors] = useState<AdvisorWorkload[]>([]);
+
+    // ── Ficha de cliente + Pedido rápido, sin salir del chat ────────────────────
+    const [crmCustomer, setCrmCustomer] = useState<Customer | null>(null);
+    const [crmCustomerLoading, setCrmCustomerLoading] = useState(false);
+    const [isCustomerDrawerOpen, setIsCustomerDrawerOpen] = useState(false);
+    const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
+    const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
+
+    // Look up the real CRM record for whoever's conversation is open (by phone, same ID scheme as `customers`)
+    useEffect(() => {
+        const phone = selectedConv?.contactPhone;
+        if (!phone) {
+            setCrmCustomer(null);
+            setCrmCustomerLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setCrmCustomerLoading(true);
+        getCustomerById(phone)
+            .then(c => { if (!cancelled) setCrmCustomer(c); })
+            .catch(() => { if (!cancelled) setCrmCustomer(null); })
+            .finally(() => { if (!cancelled) setCrmCustomerLoading(false); });
+        return () => { cancelled = true; };
+    }, [selectedConv?.contactPhone]);
+
+    // Clicking "Ficha del cliente": open the full record, or the quick-create form if there isn't one yet
+    const handleOpenCustomerCard = useCallback(() => {
+        if (crmCustomer) setIsCustomerDrawerOpen(true);
+        else setIsCreateCustomerOpen(true);
+    }, [crmCustomer]);
+
+    // Ctrl+N / Cmd+N: same shortcut used in the Asesores cockpit, preloaded with the open conversation's contact
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n' && selectedConv) {
+                e.preventDefault();
+                setIsFastOrderOpen(true);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedConv]);
+
+    const quickOrderPreload = useMemo(() => {
+        if (!selectedConv) return undefined;
+        if (crmCustomer) {
+            return {
+                nombre: crmCustomer.nombre,
+                celular: crmCustomer.celular,
+                cedula: crmCustomer.cedula,
+                direccion: crmCustomer.direccion,
+                ciudad: crmCustomer.ciudad,
+                departamento: crmCustomer.departamento,
+            };
+        }
+        return {
+            nombre: selectedConv.contactName,
+            celular: selectedConv.contactPhone,
+        };
+    }, [selectedConv, crmCustomer]);
 
     // Permissions
     const isSuperAdmin = role === 'superadmin';
@@ -607,6 +672,9 @@ export default function InboxPage() {
                         onOpenTemplates={() => setIsTemplateModalOpen(true)}
                         currentUserName={userProfile?.nombre ?? user?.email ?? undefined}
                         onBack={() => setShowMobileList(true)}
+                        onOpenCustomerCard={selectedConv?.contactPhone ? handleOpenCustomerCard : undefined}
+                        hasCustomerRecord={crmCustomerLoading ? undefined : !!crmCustomer}
+                        onOpenQuickOrder={selectedConv ? () => setIsFastOrderOpen(true) : undefined}
                     />
                 </div>
 
@@ -619,10 +687,53 @@ export default function InboxPage() {
                             advisors={advisors}
                             onAssign={handleAssign}
                             onAutoAssign={handleAutoAssign}
+                            crmCustomer={crmCustomer}
+                            crmCustomerLoading={crmCustomerLoading}
+                            onOpenCustomerCard={handleOpenCustomerCard}
+                            onOpenQuickOrder={() => setIsFastOrderOpen(true)}
                         />
                     </div>
                 )}
             </div>
+
+            {/* Ficha completa del cliente (drawer) — misma pieza usada en el Punto de Venta */}
+            <PosCustomerDetailsSidebar
+                isOpen={isCustomerDrawerOpen}
+                onClose={() => setIsCustomerDrawerOpen(false)}
+                customer={crmCustomer}
+            />
+
+            {/* Ficha aún no existe: creación en segundos sin salir del chat */}
+            {selectedConv?.contactPhone && (
+                <CreateCustomerQuickModal
+                    isOpen={isCreateCustomerOpen}
+                    onClose={() => setIsCreateCustomerOpen(false)}
+                    phone={selectedConv.contactPhone}
+                    suggestedName={selectedConv.contactName}
+                    onCreated={(created) => {
+                        setCrmCustomer(created);
+                        setIsCreateCustomerOpen(false);
+                        setIsCustomerDrawerOpen(true);
+                        showToast(`✓ Ficha creada para ${created.nombre}`);
+                    }}
+                />
+            )}
+
+            {/* Pedido rápido, preload con los datos del contacto de esta conversación.
+                No cerramos el modal al crear: FastOrderModal muestra su propia pantalla de éxito
+                con el botón para enviar el resumen por WhatsApp; el asesor la cierra cuando termine. */}
+            <FastOrderModal
+                isOpen={isFastOrderOpen}
+                onClose={() => setIsFastOrderOpen(false)}
+                initialChannel="whatsapp"
+                preloadedCustomer={quickOrderPreload}
+                onOrderCreated={(orderId) => {
+                    showToast(`✓ Pedido ${orderId.slice(-6)} creado`);
+                    if (selectedConv?.contactPhone) {
+                        getCustomerById(selectedConv.contactPhone).then(setCrmCustomer).catch(() => undefined);
+                    }
+                }}
+            />
 
             {/* Template picker modal */}
             <TemplatePickerModal

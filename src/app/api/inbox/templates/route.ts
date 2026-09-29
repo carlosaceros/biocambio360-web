@@ -7,6 +7,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase-admin';
+import { REMINDER_WABA_ID } from '@/lib/whatsapp-sender';
 
 export async function GET(req: NextRequest) {
     const authorization = req.headers.get('Authorization') ?? '';
@@ -20,7 +21,12 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const wabaId = searchParams.get('wabaId') ?? process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    // accountKey lets the client ask "give me Total Limpieza's templates" without needing to know
+    // (or be handed) that line's WABA id, which is not a NEXT_PUBLIC_ var.
+    const accountKey = searchParams.get('accountKey');
+    const wabaId = accountKey === 'totalLimpieza'
+        ? REMINDER_WABA_ID
+        : searchParams.get('wabaId') ?? process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 
     if (!wabaId) {
         return NextResponse.json({ error: 'wabaId is required' }, { status: 400 });
