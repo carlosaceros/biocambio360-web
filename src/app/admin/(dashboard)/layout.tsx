@@ -32,6 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     '/admin/asesores': 'asesores',
                     '/admin/produccion': 'produccion',
                     '/admin/finanzas': 'finanzas',
+                    '/admin/rendimiento-pauta': 'finanzas',
                     '/admin/clientes': 'clientes',
                     '/admin/reabastecimiento': 'reabastecimiento',
                     '/admin/cupones': 'cupones',

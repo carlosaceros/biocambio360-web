@@ -30,7 +30,8 @@ import {
     MessageSquare,
     ShieldAlert,
     Megaphone,
-    GraduationCap
+    GraduationCap,
+    LineChart
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -198,6 +199,7 @@ export default function AdminDashboard() {
     const isSuperAdmin = role === 'superadmin';
     const isGestor = !isSuperAdmin;
     const canSeeCapacitacion = isSuperAdmin || email === 'fernando@biocambio360.com' || email === 'diego@biocambio360.com';
+    const canSeeAdsPerformance = isSuperAdmin || role === 'director';
 
     // Verificador de capacidades específicas asignadas al usuario
     const hasCap = (capKey: keyof UserModuleCapabilities) => {
@@ -1289,6 +1291,19 @@ export default function AdminDashboard() {
                                     <p className="font-black text-gray-900 mb-1">Histórico & Análisis Financiero</p>
                                     <p className="text-xs text-gray-600">Histórico de meses, AOV, fletes y CSV</p>
                                 </motion.button>
+
+                                {canSeeAdsPerformance && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/rendimiento-pauta')}
+                                        className="bg-white rounded-xl p-6 shadow-md border-2 border-blue-200 text-left hover:border-blue-400 transition-colors"
+                                    >
+                                        <LineChart className="text-blue-600 mb-3" size={24} />
+                                        <p className="font-black text-gray-900 mb-1">Rendimiento de Pauta</p>
+                                        <p className="text-xs text-gray-600">ROAS y ROI reales: gasto en Meta Ads vs. venta cerrada.</p>
+                                    </motion.button>
+                                )}
 
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
