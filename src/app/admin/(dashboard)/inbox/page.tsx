@@ -22,6 +22,7 @@ import CreateCustomerQuickModal from '@/components/admin/inbox/CreateCustomerQui
 import PosCustomerDetailsSidebar from '@/components/admin/PosCustomerDetailsSidebar';
 import FastOrderModal from '@/components/admin/FastOrderModal';
 import { getCustomerById } from '@/lib/customers-service';
+import { normalizeDepartmentAndCity } from '@/lib/checkout-utils';
 import type { Customer } from '@/types/customer';
 import {
     getAlertsEnabled,
@@ -221,19 +222,17 @@ export default function InboxPage() {
 
     const quickOrderPreload = useMemo(() => {
         if (!selectedConv) return undefined;
-        if (crmCustomer) {
-            return {
-                nombre: crmCustomer.nombre,
-                celular: crmCustomer.celular,
-                cedula: crmCustomer.cedula,
-                direccion: crmCustomer.direccion,
-                ciudad: crmCustomer.ciudad,
-                departamento: crmCustomer.departamento,
-            };
-        }
+        const preOrder = selectedConv.preOrder;
+        // La dirección que el cliente acaba de dar en ESTE chat (vía el pre-pedido del Agente IA)
+        // manda sobre la que tengamos guardada de antes: es la más reciente y la que pidió para este pedido.
+        const geo = preOrder?.ciudad ? normalizeDepartmentAndCity(undefined, preOrder.ciudad) : null;
         return {
-            nombre: selectedConv.contactName,
-            celular: selectedConv.contactPhone,
+            nombre: crmCustomer?.nombre || preOrder?.nombreCliente || selectedConv.contactName,
+            celular: crmCustomer?.celular || selectedConv.contactPhone,
+            cedula: crmCustomer?.cedula,
+            direccion: preOrder?.direccion || crmCustomer?.direccion,
+            ciudad: geo?.ciudad || crmCustomer?.ciudad,
+            departamento: geo?.departamento || crmCustomer?.departamento,
         };
     }, [selectedConv, crmCustomer]);
 
@@ -710,6 +709,7 @@ export default function InboxPage() {
                     onClose={() => setIsCreateCustomerOpen(false)}
                     phone={selectedConv.contactPhone}
                     suggestedName={selectedConv.contactName}
+                    preOrder={selectedConv.preOrder}
                     onCreated={(created) => {
                         setCrmCustomer(created);
                         setIsCreateCustomerOpen(false);

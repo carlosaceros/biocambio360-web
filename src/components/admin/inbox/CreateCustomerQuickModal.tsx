@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, UserPlus, Loader2 } from 'lucide-react';
 import { quickCreateCustomer } from '@/lib/customers-service';
 import { Customer } from '@/types/customer';
+import type { PreOrder } from '@/types/inbox';
 import { DEPARTAMENTOS, CIUDADES_POR_DEPARTAMENTO, normalizeDepartmentAndCity } from '@/lib/checkout-utils';
 
 interface CreateCustomerQuickModalProps {
@@ -14,6 +15,8 @@ interface CreateCustomerQuickModalProps {
     phone: string;
     /** Name suggested from the conversation's contact, editable before saving */
     suggestedName?: string;
+    /** Pre-pedido del Agente IA para esta conversación: si ya tiene dirección/ciudad, se usan de una vez */
+    preOrder?: Pick<PreOrder, 'direccion' | 'ciudad' | 'nombreCliente'> | null;
     onCreated: (customer: Customer) => void;
 }
 
@@ -22,6 +25,7 @@ export default function CreateCustomerQuickModal({
     onClose,
     phone,
     suggestedName,
+    preOrder,
     onCreated,
 }: CreateCustomerQuickModalProps) {
     const [nombre, setNombre] = useState('');
@@ -34,15 +38,17 @@ export default function CreateCustomerQuickModal({
 
     useEffect(() => {
         if (isOpen) {
-            setNombre(suggestedName?.trim() || '');
+            setNombre(suggestedName?.trim() || preOrder?.nombreCliente?.trim() || '');
             setCedula('');
-            setDireccion('');
-            const norm = normalizeDepartmentAndCity('Cundinamarca', 'Soacha');
+            setDireccion(preOrder?.direccion?.trim() || '');
+            const norm = preOrder?.ciudad
+                ? normalizeDepartmentAndCity(undefined, preOrder.ciudad)
+                : normalizeDepartmentAndCity('Cundinamarca', 'Soacha');
             setDepartamento(norm.departamento);
             setCiudad(norm.ciudad);
             setError(null);
         }
-    }, [isOpen, suggestedName]);
+    }, [isOpen, suggestedName, preOrder]);
 
     const availableCities = useMemo(() => {
         const dept = DEPARTAMENTOS.includes(departamento) ? departamento : 'Cundinamarca';
@@ -136,7 +142,14 @@ export default function CreateCustomerQuickModal({
                             </div>
 
                             <div>
-                                <label className="block text-[11px] font-bold text-slate-600 mb-1">Dirección (opcional)</label>
+                                <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1.5">
+                                    Dirección (opcional)
+                                    {preOrder?.direccion && (
+                                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                                            tomada del chat — verifícala
+                                        </span>
+                                    )}
+                                </label>
                                 <input
                                     type="text"
                                     value={direccion}
