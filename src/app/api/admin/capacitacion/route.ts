@@ -16,6 +16,9 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const ALLOWED_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
+// Cuenta raíz del sistema (ver isRootAccount en src/lib/auth-context.tsx): es superadmin aunque no
+// tenga documento propio en `admin_users` — sin este caso especial, esta cuenta queda fuera.
+const ROOT_ACCOUNT_EMAIL = 'thinktic.thinktic@gmail.com';
 
 export async function GET(req: NextRequest) {
     const authorization = req.headers.get('Authorization') ?? '';
@@ -30,10 +33,10 @@ export async function GET(req: NextRequest) {
     }
 
     const email = (decoded.email || '').toLowerCase();
-    let isSuperAdmin = false;
+    let isSuperAdmin = email === ROOT_ACCOUNT_EMAIL;
     try {
         const snap = await getAdminDB().collection('admin_users').doc(email).get();
-        isSuperAdmin = snap.exists && snap.data()?.rol === 'superadmin';
+        isSuperAdmin = isSuperAdmin || (snap.exists && snap.data()?.rol === 'superadmin');
     } catch {
         // si falla la consulta, seguimos: el chequeo por email explícito abajo igual aplica
     }
