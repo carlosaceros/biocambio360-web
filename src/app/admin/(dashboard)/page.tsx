@@ -29,7 +29,8 @@ import {
     Zap,
     MessageSquare,
     ShieldAlert,
-    Megaphone
+    Megaphone,
+    GraduationCap
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -196,6 +197,7 @@ export default function AdminDashboard() {
     const email = user?.email?.toLowerCase().trim();
     const isSuperAdmin = role === 'superadmin';
     const isGestor = !isSuperAdmin;
+    const canSeeCapacitacion = isSuperAdmin || email === 'fernando@biocambio360.com' || email === 'diego@biocambio360.com';
 
     // Verificador de capacidades específicas asignadas al usuario
     const hasCap = (capKey: keyof UserModuleCapabilities) => {
@@ -1117,6 +1119,22 @@ export default function AdminDashboard() {
                                     <p className="font-black text-gray-900 mb-1">Campañas WhatsApp</p>
                                     <p className="text-xs text-gray-600">Difusiones masivas con plantillas, segmentadas y con historial.</p>
                                 </motion.button>
+
+                                {canSeeCapacitacion && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/capacitacion')}
+                                        className="bg-white rounded-xl p-6 shadow-md border-2 border-indigo-300 text-left hover:border-indigo-500 transition-colors ring-1 ring-indigo-100"
+                                    >
+                                        <GraduationCap className="text-indigo-600 mb-3" size={24} />
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <p className="font-black text-gray-900">Capacitación</p>
+                                            <span className="text-[10px] font-black bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full">Privado</span>
+                                        </div>
+                                        <p className="text-xs text-gray-600">Mapa mental operativo de la plataforma, paso a paso.</p>
+                                    </motion.button>
+                                )}
 
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}

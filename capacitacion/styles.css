@@ -1,0 +1,576 @@
+:root {
+    --brand-blue: #2D6EB5;
+    --brand-pink: #E91E8C;
+    --brand-dark: #0F172A;
+    --brand-gray: #64748B;
+    --brand-surface: #F8FAFC;
+    --brand-success: #059669;
+    --border: #E2E8F0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--brand-surface);
+    color: var(--brand-dark);
+    line-height: 1.5;
+    position: relative;
+}
+
+/* Marca de agua del logo, fija en el fondo de toda la página */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url('logo-biocambio360.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: min(640px, 65vw);
+    opacity: 0.05;
+    filter: grayscale(1);
+    z-index: -1;
+    pointer-events: none;
+}
+
+body.modal-abierto {
+    overflow: hidden;
+}
+
+/* ── Encabezado ── */
+.topbar {
+    background: linear-gradient(135deg, var(--brand-dark) 0%, #1E293B 100%);
+    color: white;
+    padding: 28px 20px 22px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.topbar h1 {
+    margin: 0 0 4px;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+}
+
+.topbar .subtitle {
+    margin: 0 0 18px;
+    color: #CBD5E1;
+    font-size: 0.95rem;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+#search {
+    flex: 1 1 280px;
+    min-width: 0;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: none;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+}
+
+#search::placeholder {
+    color: #94A3B8;
+}
+
+#search:focus {
+    outline: 2px solid var(--brand-pink);
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── Root / raíz del mapa ── */
+.mapa-raiz {
+    text-align: center;
+    padding: 30px 20px 10px;
+}
+
+.mapa-raiz .raiz-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 2px solid var(--brand-blue);
+    border-radius: 20px;
+    padding: 14px 28px;
+    box-shadow: 0 6px 20px rgba(45, 110, 181, 0.15);
+}
+
+.mapa-raiz .raiz-logo {
+    height: 40px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+}
+
+.mapa-raiz .raiz-sub {
+    margin: 10px auto 0;
+    max-width: 520px;
+    color: var(--brand-gray);
+    font-size: 0.9rem;
+}
+
+.tronco {
+    width: 2px;
+    height: 24px;
+    background: var(--border);
+    margin: 0 auto;
+}
+
+/* ── Línea de tiempo (viaje del cliente) ── */
+main {
+    padding: 0 0 40px;
+}
+
+.timeline {
+    position: relative;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+}
+
+/* Líneas de fondo tipo "hoja de cuaderno" en un pseudo-elemento aparte: si la máscara de
+   desvanecido fuera del propio .timeline, recortaba también las tarjetas rotadas encima. */
+.timeline::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(15, 23, 42, 0.05) 0px,
+        rgba(15, 23, 42, 0.05) 1px,
+        transparent 1px,
+        transparent 32px
+    );
+}
+
+@media (min-width: 768px) {
+    .timeline::before {
+        -webkit-mask-image: linear-gradient(to right, transparent 0, black 48px, black calc(100% - 48px), transparent 100%);
+        mask-image: linear-gradient(to right, transparent 0, black 48px, black calc(100% - 48px), transparent 100%);
+    }
+}
+
+.timeline-path {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: visible;
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .timeline-path {
+        display: block;
+    }
+}
+
+.timeline-path-line {
+    fill: none;
+    stroke: #CBD5E1;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-dasharray: 8 6;
+    animation: dash-flow 3s linear infinite;
+}
+
+@keyframes dash-flow {
+    to {
+        stroke-dashoffset: -28;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timeline-path-line {
+        animation: none;
+    }
+}
+
+.timeline-track {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+}
+
+/* ── Tarjeta "pineada" (cada paso del viaje) ── */
+.card-pin {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+}
+
+.card-pin.oculto {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .card-pin {
+        transition: transform 0.3s ease-out;
+    }
+    .card-pin:nth-child(odd) {
+        align-self: flex-start;
+        margin-left: 2%;
+        transform: rotate(-5deg);
+    }
+    .card-pin:nth-child(even) {
+        align-self: flex-end;
+        margin-right: 2%;
+        transform: rotate(5deg);
+    }
+    .card-pin:nth-child(odd):hover,
+    .card-pin:nth-child(odd):focus-within {
+        transform: rotate(-5deg) scale(1.05);
+        z-index: 6;
+    }
+    .card-pin:nth-child(even):hover,
+    .card-pin:nth-child(even):focus-within {
+        transform: rotate(5deg) scale(1.05);
+        z-index: 6;
+    }
+}
+
+.card-pin-btn {
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 8px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+    display: block;
+}
+
+.card-pin-btn:focus-visible {
+    outline: 2px solid var(--pin-color, var(--brand-blue));
+    outline-offset: 2px;
+}
+
+.card-pin-inner {
+    display: block;
+    border-radius: 15px;
+    padding: 14px 16px 12px;
+    background: color-mix(in srgb, var(--pin-color, var(--brand-blue)) 10%, white);
+    border: 1px solid color-mix(in srgb, var(--pin-color, var(--brand-blue)) 30%, white);
+}
+
+.card-pin-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.card-pin-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: white;
+    font-size: 1.25rem;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
+.card-pin-num {
+    font-family: 'Caveat', cursive;
+    font-size: 2.1rem;
+    font-weight: 700;
+    color: var(--pin-color, var(--brand-blue));
+    line-height: 1;
+}
+
+.card-pin-title {
+    display: block;
+    font-weight: 900;
+    font-size: 1.02rem;
+    color: var(--brand-dark);
+    margin-bottom: 4px;
+}
+
+.card-pin-resumen {
+    display: block;
+    font-size: 0.84rem;
+    color: #475569;
+    line-height: 1.45;
+}
+
+.card-pin-meta {
+    display: block;
+    margin-top: 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--pin-color, var(--brand-blue));
+}
+
+.card-pin.match-interno .card-pin-meta {
+    color: var(--brand-pink);
+}
+
+/* ── Tooltip de vista rápida ── */
+.card-tooltip {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: min(240px, 80vw);
+    transform: translate(-50%, 8px);
+    background: var(--brand-dark);
+    color: white;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 10;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+}
+
+.card-tooltip strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #94A3B8;
+}
+
+.card-tooltip ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.card-tooltip-mas {
+    color: #94A3B8;
+    font-style: italic;
+}
+
+/* Solo en desktop: en mobile el resumen ya es visible en la propia tarjeta (columna simple,
+   sin recorte), así que el tooltip sobra y solo estorbaría superpuesto sobre la tarjeta siguiente. */
+@media (hover: hover) and (min-width: 768px) {
+    .card-pin:hover .card-tooltip,
+    .card-pin:focus-within .card-tooltip {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(-50%, 4px);
+    }
+}
+
+/* ── Mobile: columna simple, sin rotación ni ruta ── */
+@media (max-width: 767px) {
+    .card-pin {
+        max-width: none;
+    }
+    .timeline-track {
+        gap: 20px;
+    }
+}
+
+/* ── Modal de detalle ── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+}
+
+.modal-overlay[hidden] {
+    display: none;
+}
+
+.modal {
+    position: relative;
+    width: 100%;
+    max-width: 680px;
+    max-height: 85vh;
+    background: white;
+    border-radius: 20px;
+    border-top: 6px solid var(--modal-color, var(--brand-blue));
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: #F1F5F9;
+    color: var(--brand-dark);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    background: #E2E8F0;
+}
+
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 24px 50px 18px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.modal-header h2 {
+    margin: 0 0 4px;
+    font-size: 1.15rem;
+}
+
+.modal-resumen {
+    margin: 0;
+    color: var(--brand-gray);
+    font-size: 0.86rem;
+}
+
+.modal-body {
+    padding: 10px 24px 24px;
+    overflow-y: auto;
+}
+
+/* ── Contenido del detalle (dentro del modal) ── */
+.hijos-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.hijo {
+    padding: 12px 0;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+.hijo:last-child {
+    border-bottom: none;
+}
+
+.hijo-titulo {
+    font-weight: 700;
+    font-size: 0.94rem;
+    color: var(--brand-dark);
+    margin-bottom: 3px;
+}
+
+.hijo-desc {
+    font-size: 0.87rem;
+    color: #475569;
+    line-height: 1.55;
+}
+
+.hijo-enlaces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.hijo-enlaces a {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--brand-blue);
+    background: #EFF6FF;
+    border: 1px solid #DBEAFE;
+    border-radius: 999px;
+    padding: 4px 10px;
+    text-decoration: none;
+}
+
+.hijo-enlaces a:hover {
+    background: #DBEAFE;
+}
+
+.subitems-lista {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0 0 0 14px;
+    border-left: 2px solid var(--border);
+}
+
+.subitem {
+    padding: 7px 0;
+}
+
+.subitem-titulo {
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #334155;
+}
+
+.subitem-desc {
+    font-size: 0.8rem;
+    color: #64748B;
+    line-height: 1.5;
+    margin-top: 2px;
+}
+
+mark {
+    background: #FEF08A;
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+#sin-resultados {
+    text-align: center;
+    color: var(--brand-gray);
+    padding: 40px 20px;
+    font-size: 0.95rem;
+}
+
+footer {
+    text-align: center;
+    padding: 24px 20px 40px;
+    color: var(--brand-gray);
+    font-size: 0.78rem;
+}
+
+.footer-credito {
+    display: inline-block;
+    margin-top: 8px;
+    font-weight: 700;
+    color: var(--brand-dark);
+    letter-spacing: 0.02em;
+}

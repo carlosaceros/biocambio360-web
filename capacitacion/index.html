@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa Mental Operativo — Biocambio360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <header class="topbar">
+        <h1>🧠 Mapa Mental Operativo — Biocambio360</h1>
+        <p class="subtitle">
+            Material de capacitación para coordinación comercial y de logística: el viaje completo
+            del cliente, paso a paso, desde que llega como lead hasta que se fideliza. Pasa el mouse
+            sobre cada tarjeta para una vista rápida, o haz clic para ver el detalle completo.
+        </p>
+        <div class="controls">
+            <input type="text" id="search" placeholder="🔍 Buscar un tema (ej. 'ruleta', 'SARLAFT', 'agente IA')...">
+        </div>
+    </header>
+
+    <div class="mapa-raiz">
+        <div class="raiz-badge"><img src="logo-biocambio360.png" alt="Biocambio360" class="raiz-logo"></div>
+        <p class="raiz-sub">Ciclo completo del cliente: del primer contacto a la fidelización</p>
+        <div class="tronco"></div>
+    </div>
+
+    <main id="mapa-root"></main>
+
+    <p id="sin-resultados" hidden>No encontramos nada con ese término. Prueba con otra palabra.</p>
+
+    <div class="modal-overlay" id="modalOverlay" hidden>
+        <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">✕</button>
+            <header class="modal-header">
+                <span class="modal-icon" id="modalIcon"></span>
+                <div>
+                    <h2 id="modalTitle"></h2>
+                    <p class="modal-resumen" id="modalResumen"></p>
+                </div>
+            </header>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <footer>
+        Documento interno de capacitación · Biocambio360 · Ciclo completo del cliente, de punta a punta.<br>
+        No distribuir fuera del equipo interno.<br>
+        <span class="footer-credito">Elaborado por THINK TIC S.A.S.</span>
+    </footer>
+
+    <script src="mapa.js"></script>
+</body>
+</html>

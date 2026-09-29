@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  // La carpeta capacitacion/ vive fuera de src/ y public/ a propósito (no debe compilarse ni
+  // servirse como ruta pública); solo /api/admin/capacitacion la lee en runtime tras verificar el
+  // login, así que hay que forzar a Vercel a incluirla en el bundle de esa función serverless.
+  outputFileTracingIncludes: {
+    '/api/admin/capacitacion': ['./capacitacion/**'],
+  },
   images: {
     contentDispositionType: 'inline',
     formats: ['image/avif', 'image/webp'],
