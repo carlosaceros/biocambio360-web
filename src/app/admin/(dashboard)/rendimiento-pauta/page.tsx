@@ -22,6 +22,7 @@ interface CampaignPerformance {
     ventas: number;
     roas: number | null;
     roiPct: number | null;
+    metaPurchaseValue: number | null;
 }
 
 interface AdsPerformanceReport {
@@ -187,10 +188,13 @@ export default function RendimientoPautaPage() {
                                     <tr>
                                         <th className="text-left py-2.5 px-4">Campaña</th>
                                         <th className="text-right py-2.5 px-4">Gasto</th>
-                                        <th className="text-right py-2.5 px-4">Ingreso real</th>
+                                        <th className="text-right py-2.5 px-4">Ingreso verificado</th>
                                         <th className="text-right py-2.5 px-4">Ventas</th>
                                         <th className="text-right py-2.5 px-4">ROAS</th>
                                         <th className="text-right py-2.5 px-4">ROI</th>
+                                        <th className="text-right py-2.5 px-4" title="Referencia autoreportada por el píxel de Meta (evento Purchase, matcheado vía fbclid) — incluye toda la tienda, no solo WhatsApp, pero puede sobre o subestimar">
+                                            Compras según Meta*
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
@@ -204,10 +208,13 @@ export default function RendimientoPautaPage() {
                                             <td className={`py-2.5 px-4 text-right font-bold ${(c.roiPct ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
                                                 {c.roiPct !== null ? `${c.roiPct}%` : '—'}
                                             </td>
+                                            <td className="py-2.5 px-4 text-right text-indigo-600">
+                                                {c.metaPurchaseValue !== null ? formatCurrency(c.metaPurchaseValue) : '—'}
+                                            </td>
                                         </tr>
                                     ))}
                                     {report.campanas.length === 0 && (
-                                        <tr><td colSpan={6} className="text-center py-8 text-gray-400">Sin gasto ni ventas atribuidas en este rango</td></tr>
+                                        <tr><td colSpan={7} className="text-center py-8 text-gray-400">Sin gasto ni ventas atribuidas en este rango</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -221,7 +228,11 @@ export default function RendimientoPautaPage() {
                         )}
                         <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
                             <Target size={12} />
-                            El ingreso es la venta real registrada en la plataforma (marcada por el asesor o cerrada vía Kommo), no el valor de compra que reporta el píxel de Meta.
+                            &quot;Ingreso verificado&quot; es la venta real registrada en la plataforma (marcada por el asesor o cerrada vía Kommo) — solo cubre WhatsApp, no pedidos pagados directo en el checkout de la tienda.
+                        </p>
+                        <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
+                            <AlertCircle size={12} />
+                            * &quot;Compras según Meta&quot; es autoreportado por su propio píxel (matcheado por Meta vía fbclid al momento de la compra en la tienda) — da visibilidad por campaña de toda la tienda, no solo WhatsApp, pero puede sobre o subestimar frente a la venta real. Úsalo como referencia direccional, no como cifra de caja.
                         </p>
                     </>
                 )}

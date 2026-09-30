@@ -1,15 +1,21 @@
 /**
- * Mide pauta paga vs. ingresos reales: cruza el gasto en anuncios de Meta Marketing API con la venta
- * real registrada en la plataforma (no con el "valor de compra" que reporta el píxel de Meta, que
- * suele sobreestimar) — así el ROAS/ROI que se muestra es el que de verdad entró a caja.
+ * Mide pauta paga vs. ingresos reales, con tres capas de confianza distinta (todas se muestran, nunca
+ * se mezclan en un solo número):
  *
- * Atribución: cuando un lead escribe por un anuncio de clic-a-WhatsApp, WhatsApp entrega
- * `referral.source_id` (el ID del anuncio) — eso ya se guarda como `adReferral.sourceId` en cada
- * conversación (ver /api/webhook/meta) y también en el registro `ad_referrals`. La venta real de esa
- * conversación (si el asesor la marcó cerrada, o llegó por Kommo) vive en `lastSaleValue`/`lastSaleAt`
- * de esa misma conversación. Este servicio: 1) suma esa venta real por anuncio, 2) resuelve a qué
- * campaña pertenece cada anuncio (con caché en Firestore para no golpear la API de Meta cada vez),
- * 3) la cruza contra el gasto real de esa campaña en el mismo rango de fechas.
+ * 1. `negocioTotal` — ingreso REAL de todo el negocio (tienda + POS + asesores) en el rango, sin
+ *    importar el canal de origen. La cifra más confiable para "¿somos rentables?", pero no dice qué
+ *    campaña específica lo generó.
+ * 2. Atribución directa por campaña (`campanas[].revenue`) — venta REAL y verificada (marcada cerrada
+ *    por el asesor, o cerrada vía Kommo) en conversaciones que llegaron por un anuncio de clic-a-
+ *    WhatsApp. WhatsApp entrega `referral.source_id` (el ID del anuncio) al escribir, guardado como
+ *    `adReferral.sourceId` en la conversación (ver /api/webhook/meta) y en `ad_referrals`; la venta
+ *    real vive en `lastSaleValue`/`lastSaleAt` de esa conversación. Exacta pero parcial: solo cubre
+ *    WhatsApp, no pedidos pagados directo en el checkout de la tienda.
+ * 3. `campanas[].metaPurchaseValue` — referencia de Meta: lo que SU propio píxel/CAPI le atribuye a
+ *    cada campaña (evento "Purchase" que ya dispara la página de confirmación de pedido, matcheado
+ *    por Meta vía fbclid/fbc — no es algo que nosotros decodifiquemos). Da granularidad por campaña
+ *    para TODA la tienda, no solo WhatsApp, pero es autoreportado por Meta: puede sobreestimar
+ *    (ventanas de atribución largas, clics duplicados) o subestimar (bloqueadores de cookies).
  */
 
 import { getAdminDB } from './firebase-admin';
@@ -35,13 +41,30 @@ export interface CampaignSpend {
     spend: number;
     impressions: number;
     clicks: number;
+    /**
+     * Valor de compras que Meta atribuye a esta campaña por su propio píxel/CAPI (evento "Purchase"
+     * que ya dispara la página de confirmación de pedido, matcheado por Meta vía fbclid/fbc — no algo
+     * que nosotros decodifiquemos). Es una REFERENCIA, no una cifra verificada: puede sobreestimar
+     * (ventanas de atribución, clics duplicados) o subestimar (bloqueadores de cookies, consentimiento
+     * rechazado). Null si Meta no reportó compras para esa campaña en el rango.
+     */
+    metaPurchaseValue: number | null;
 }
 
-/** Gasto real por campaña de Meta en el rango de fechas (formato YYYY-MM-DD). */
+interface MetaActionValue { action_type: string; value: string }
+
+function extractPurchaseValue(actionValues: MetaActionValue[] | undefined): number | null {
+    if (!actionValues?.length) return null;
+    const match = actionValues.find(a => a.action_type === 'purchase') ?? actionValues.find(a => a.action_type === 'omni_purchase');
+    return match ? Number(match.value) || 0 : null;
+}
+
+/** Gasto real por campaña de Meta en el rango de fechas (formato YYYY-MM-DD), con la referencia de
+ *  compras que el propio píxel de Meta le atribuye a cada una. */
 export async function getCampaignSpend(since: string, until: string): Promise<CampaignSpend[]> {
     const url = new URL(`${GRAPH_API_BASE}/act_${getAdAccountId()}/insights`);
     url.searchParams.set('level', 'campaign');
-    url.searchParams.set('fields', 'campaign_id,campaign_name,spend,impressions,clicks');
+    url.searchParams.set('fields', 'campaign_id,campaign_name,spend,impressions,clicks,action_values');
     url.searchParams.set('time_range', JSON.stringify({ since, until }));
     url.searchParams.set('limit', '500');
     url.searchParams.set('access_token', getToken());
@@ -50,9 +73,10 @@ export async function getCampaignSpend(since: string, until: string): Promise<Ca
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error?.message ?? 'Error consultando gasto en Meta Ads');
 
-    return (data.data ?? []).map((row: Record<string, string>) => ({
+    return (data.data ?? []).map((row: Record<string, string> & { action_values?: MetaActionValue[] }) => ({
         campaignId: row.campaign_id,
         campaignName: row.campaign_name,
+        metaPurchaseValue: extractPurchaseValue(row.action_values),
         spend: Number(row.spend) || 0,
         impressions: Number(row.impressions) || 0,
         clicks: Number(row.clicks) || 0,
@@ -94,6 +118,8 @@ export interface CampaignPerformance {
     ventas: number;
     roas: number | null;
     roiPct: number | null;
+    /** Referencia de Meta (su propio píxel/CAPI), no verificado — ver CampaignSpend.metaPurchaseValue. */
+    metaPurchaseValue: number | null;
 }
 
 export interface AdsPerformanceReport {
@@ -230,6 +256,7 @@ export async function getAdsPerformanceReport(since: string, until: string): Pro
             ventas: revRow?.ventas ?? 0,
             roas: spend > 0 ? Number((revenue / spend).toFixed(2)) : null,
             roiPct: spend > 0 ? Number((((revenue - spend) / spend) * 100).toFixed(1)) : null,
+            metaPurchaseValue: spendRow?.metaPurchaseValue ?? null,
         };
     }).sort((a, b) => b.spend - a.spend);
 
