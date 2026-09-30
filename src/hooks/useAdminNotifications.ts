@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { collection, query, orderBy, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, where, limit, onSnapshot } from 'firebase/firestore';
 import { isSupported, getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { db } from '@/lib/firebase';
 import app from '@/lib/firebase';
@@ -134,6 +134,46 @@ function buildOrderNotification(docId: string, data: Order): AdminNotification {
     }
 }
 
+/**
+ * Firestore represa los cambios cuando la pestaña está en segundo plano/dormida y los entrega TODOS
+ * de golpe al reconectar. Sin este límite, una ráfaga de N cambios simultáneos dispara N notificaciones
+ * nativas del navegador en un loop síncrono — eso es lo que congela la pestaña y "revienta" un montón
+ * de notificaciones de una vez. Si la ráfaga es grande, se agrupan en una sola notificación resumen.
+ */
+const BURST_THRESHOLD = 3;
+
+function fireBrowserNotifications(
+    items: Array<{ title: string; body: string; tag: string }>,
+    onClickUrl: string,
+    burstTitle: string,
+    burstBody: (n: number) => string,
+) {
+    try {
+        const notifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
+        if (!notifAPI || notifAPI.permission !== 'granted' || items.length === 0) return;
+
+        const toFire = items.length > BURST_THRESHOLD
+            ? [{ title: burstTitle, body: burstBody(items.length), tag: `burst_${Date.now()}` }]
+            : items;
+
+        for (const item of toFire) {
+            const browserNotif = new notifAPI(item.title, {
+                body: item.body,
+                icon: '/icon.png',
+                badge: '/icon.png',
+                tag: item.tag,
+            });
+            browserNotif.onclick = () => {
+                window.focus();
+                window.location.href = onClickUrl;
+                browserNotif.close();
+            };
+        }
+    } catch (e) {
+        console.warn('[Notifications] No se pudo mostrar notificación del navegador', e);
+    }
+}
+
 async function registerFCMToken() {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
     if (!VAPID_KEY) {
@@ -222,9 +262,11 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
         initNotifications();
     }, []);
 
-    // Subscribe to orders and detect new ones or status updates (for in-app notifications)
+    // Subscribe to orders and detect new ones or status updates (for in-app notifications).
+    // Limitado a los más recientes: sin límite, esto escuchaba TODA la colección de pedidos en
+    // tiempo real, lo que además de costoso hacía la ráfaga represada mucho más grande al reconectar.
     useEffect(() => {
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(500));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             // On the very first load, record existing orders and load recent 15 into dropdown
@@ -248,8 +290,13 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
                 return;
             }
 
-            // For every change, detect added or modified documents
+            // Junta TODOS los cambios de este snapshot antes de tocar el estado o el navegador —
+            // así una ráfaga represada de N cambios genera una sola actualización de estado y, como
+            // mucho, una notificación resumen, en vez de N notificaciones nativas de golpe.
+            const newNotifications: AdminNotification[] = [];
+
             snapshot.docChanges().forEach((change) => {
+                if (change.type === 'removed') return; // salió del top 500, no es un evento real
                 const data = change.doc.data() as Order;
                 const docId = change.doc.id;
                 const currentStatusKey = `${data.status}_${data.wompiTransaction?.status || ''}`;
@@ -267,35 +314,24 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
                 }
 
                 if (shouldNotify) {
-                    const notification = buildOrderNotification(docId, data);
-
-                    // Add to in-app list, merge without duplicate orderIds, and sort chronologically
-                    setNotifications((prev) => {
-                        const merged = [notification, ...prev.filter(n => n.orderId !== docId)];
-                        return merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 20);
-                    });
-
-                    // Show browser notification if permission granted (fallback for non-FCM)
-                    try {
-                        const notifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
-                        if (notifAPI && notifAPI.permission === 'granted') {
-                            const browserNotif = new notifAPI(notification.title, {
-                                body: notification.body,
-                                icon: '/icon.png',
-                                badge: '/icon.png',
-                                tag: docId,
-                            });
-                            browserNotif.onclick = () => {
-                                window.focus();
-                                window.location.href = '/admin/pedidos';
-                                browserNotif.close();
-                            };
-                        }
-                    } catch (e) {
-                        console.warn('[Notifications] No se pudo mostrar notificación del navegador', e);
-                    }
+                    newNotifications.push(buildOrderNotification(docId, data));
                 }
             });
+
+            if (newNotifications.length === 0) return;
+
+            setNotifications((prev) => {
+                const newIds = new Set(newNotifications.map(n => n.orderId));
+                const merged = [...newNotifications, ...prev.filter(n => !newIds.has(n.orderId))];
+                return merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 20);
+            });
+
+            fireBrowserNotifications(
+                newNotifications.map(n => ({ title: n.title, body: n.body, tag: n.orderId })),
+                '/admin/pedidos',
+                '📬 Varios pedidos se actualizaron',
+                (n) => `${n} pedidos cambiaron mientras no estabas conectado — revisa el panel de pedidos.`,
+            );
         });
 
         return unsubscribe;
@@ -318,6 +354,8 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
                 return;
             }
 
+            const newNotifications: AdminNotification[] = [];
+
             snapshot.docChanges().forEach((change) => {
                 if (change.type !== 'added' || knownPreOrderConvIds.current.has(change.doc.id)) return;
                 knownPreOrderConvIds.current.add(change.doc.id);
@@ -328,7 +366,7 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
                     .map((it) => `${it.cantidad}x ${it.producto}`)
                     .join(', ');
 
-                const notification: AdminNotification = {
+                newNotifications.push({
                     id: `${change.doc.id}_preorder_${Date.now()}`,
                     title: '🤖 Pre-pedido confirmado por el Agente IA',
                     body: `${data.contactName || 'Cliente'} · ${itemsSummary || 'Ver detalle'} — conviértelo antes de que se enfríe`,
@@ -336,17 +374,17 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
                     read: false,
                     type: 'ai_preorder',
                     orderId: change.doc.id,
-                };
-
-                setNotifications((prev) => [notification, ...prev].slice(0, 30));
-
-                try {
-                    const notifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
-                    if (notifAPI && notifAPI.permission === 'granted') {
-                        new notifAPI(notification.title, { body: notification.body, icon: '/icon.png', tag: change.doc.id });
-                    }
-                } catch (_) {}
+                });
             });
+
+            if (newNotifications.length === 0) return;
+            setNotifications((prev) => [...newNotifications, ...prev].slice(0, 30));
+            fireBrowserNotifications(
+                newNotifications.map(n => ({ title: n.title, body: n.body, tag: n.orderId })),
+                '/admin/asesores?tab=prepedidos',
+                '🤖 Varios pre-pedidos del Agente IA',
+                (n) => `${n} pre-pedidos confirmados mientras no estabas — revísalos antes de que se enfríen.`,
+            );
         });
 
         return unsubscribe;
@@ -367,13 +405,15 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
                 return;
             }
 
+            const newNotifications: AdminNotification[] = [];
+
             snapshot.docChanges().forEach((change) => {
                 if (change.type !== 'added' || knownAssignedCustomerIds.current.has(change.doc.id)) return;
                 knownAssignedCustomerIds.current.add(change.doc.id);
 
                 const data = change.doc.data() as { nombre?: string; ciudad?: string; celular?: string; updatedAt?: unknown; createdAt?: unknown };
 
-                const notification: AdminNotification = {
+                newNotifications.push({
                     id: `${change.doc.id}_assigned_${Date.now()}`,
                     title: '📋 Nuevo cliente asignado a tu cartera',
                     body: `${data.nombre || 'Cliente'} · ${data.ciudad || 'Colombia'} · ${data.celular || ''}`,
@@ -381,17 +421,17 @@ export function useAdminNotifications(opts?: { role?: string; advisorName?: stri
                     read: false,
                     type: 'client_assigned',
                     orderId: change.doc.id,
-                };
-
-                setNotifications((prev) => [notification, ...prev].slice(0, 30));
-
-                try {
-                    const notifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
-                    if (notifAPI && notifAPI.permission === 'granted') {
-                        new notifAPI(notification.title, { body: notification.body, icon: '/icon.png', tag: change.doc.id });
-                    }
-                } catch (_) {}
+                });
             });
+
+            if (newNotifications.length === 0) return;
+            setNotifications((prev) => [...newNotifications, ...prev].slice(0, 30));
+            fireBrowserNotifications(
+                newNotifications.map(n => ({ title: n.title, body: n.body, tag: n.orderId })),
+                '/admin/asesores?tab=tareas',
+                '📋 Varios clientes nuevos asignados',
+                (n) => `${n} clientes se asignaron a tu cartera mientras no estabas.`,
+            );
         });
 
         return unsubscribe;
