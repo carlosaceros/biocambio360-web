@@ -55,11 +55,13 @@ interface UnmatchedItem {
 }
 
 const PAGE_SIZE = 50;
+const ALLOWED_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
 
 export default function KommoPreviewPage() {
     const router = useRouter();
-    const { user, role, loading: authLoading } = useAuth();
-    const isAllowed = role === 'superadmin';
+    const { user, userProfile, role, loading: authLoading } = useAuth();
+    const email = (user?.email || userProfile?.email || '').toLowerCase();
+    const isAllowed = role === 'superadmin' || ALLOWED_EMAILS.has(email);
 
     const [tab, setTab] = useState<'matched' | 'unmatched'>('matched');
     const [items, setItems] = useState<Array<MatchedItem | UnmatchedItem>>([]);
@@ -148,7 +150,7 @@ export default function KommoPreviewPage() {
                     <AlertCircle className="mx-auto text-amber-500" size={32} />
                     <p className="font-black text-gray-900">Acceso restringido</p>
                     <p className="text-sm text-gray-500">
-                        La revisión de migración de Kommo es solo para superadministradores.
+                        La revisión de migración de Kommo es solo para superadministradores, Fernando y Diego.
                     </p>
                     <button onClick={() => router.push('/admin')} className="mt-2 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold cursor-pointer">
                         Volver al panel

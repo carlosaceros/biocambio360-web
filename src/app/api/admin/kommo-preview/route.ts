@@ -2,8 +2,8 @@
  * GET /api/admin/kommo-preview?tab=matched|unmatched&pageSize=50&cursor=<kommoContactIdNum>
  * Lee paginado (cursor por kommoContactIdNum) las colecciones de staging que vuelca
  * `scripts/kommo-migrate-tags.ts --dump-preview`: kommo_migration_preview_matched /
- * _unmatched. Es de solo lectura — nunca toca `customers`. Solo superadmin: expone
- * teléfonos y datos de clientes reales.
+ * _unmatched. Es de solo lectura — nunca toca `customers`. Acceso: superadmin, o Fernando/Diego
+ * explícitamente (mismo criterio que /api/admin/capacitacion) — expone teléfonos y datos reales.
  */
 
 export const runtime = 'nodejs';
@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDB } from '@/lib/firebase-admin';
 
 const ROOT_ACCOUNT_EMAIL = 'thinktic.thinktic@gmail.com';
+const ALLOWED_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
 
 export async function GET(req: NextRequest) {
     const authorization = req.headers.get('Authorization') ?? '';
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
     } catch {
         // si falla, se mantiene lo ya resuelto arriba
     }
-    if (!isSuperAdmin) {
+    if (!isSuperAdmin && !ALLOWED_EMAILS.has(email)) {
         return NextResponse.json({ error: 'No tienes permiso para ver esta revisión' }, { status: 403 });
     }
 
