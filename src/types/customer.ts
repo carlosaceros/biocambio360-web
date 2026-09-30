@@ -24,10 +24,16 @@ export interface Customer {
     sarlaftStatus?: string;
     notas?: string;
 
-    // Migrado desde Kommo (etiquetas libres, no forzadas al enum cerrado CustomerTag)
+    // Migrado desde Kommo (datos de referencia, nunca sobrescriben nombre/direccion/etc. propios)
     externalTags?: string[];
     kommoContactId?: string;
     kommoMigratedAt?: Timestamp | any;
+    kommoNombre?: string;
+    kommoApellido?: string;
+    kommoEtapa?: string;
+    kommoLocalidad?: string;
+    kommoDireccion?: string;
+    kommoObservacion?: string;
 
     // Metadata
     createdAt: Timestamp | any;
