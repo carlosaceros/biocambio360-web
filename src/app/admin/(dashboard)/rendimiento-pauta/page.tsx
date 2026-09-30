@@ -30,6 +30,7 @@ interface AdsPerformanceReport {
     campanas: CampaignPerformance[];
     totales: { spend: number; revenue: number; ventas: number; roas: number | null; roiPct: number | null };
     sinAtribuir: { revenue: number; ventas: number };
+    negocioTotal: { revenue: number; roas: number | null; roiPct: number | null };
 }
 
 const toISODate = (d: Date) => d.toISOString().slice(0, 10);
@@ -124,24 +125,59 @@ export default function RendimientoPautaPage() {
                     <div className="py-16 flex justify-center"><Loader2 className="animate-spin text-gray-400" size={28} /></div>
                 ) : report && (
                     <>
-                        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                                <p className="text-[10px] font-extrabold uppercase text-gray-400">Gasto en pauta</p>
-                                <p className="text-lg font-black text-gray-900 mt-1">{formatCurrency(report.totales.spend)}</p>
+                        <section className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white shadow-md">
+                            <p className="text-[10px] font-extrabold uppercase text-indigo-200 tracking-wider mb-1">
+                                ¿Somos rentables? · Ingreso total del negocio vs. gasto en pauta
+                            </p>
+                            <p className="text-[11px] text-indigo-200 mb-4 max-w-xl">
+                                Todo el ingreso real (tienda online, mostrador y asesores), venga o no de un anuncio —
+                                es la cifra más confiable, aunque no diga qué campaña específica lo generó.
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div>
+                                    <p className="text-[10px] font-bold text-indigo-200 uppercase">Gasto en pauta</p>
+                                    <p className="text-xl font-black mt-0.5">{formatCurrency(report.totales.spend)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-indigo-200 uppercase">Ingreso total del negocio</p>
+                                    <p className="text-xl font-black mt-0.5">{formatCurrency(report.negocioTotal.revenue)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-indigo-200 uppercase">ROAS del negocio</p>
+                                    <p className="text-xl font-black mt-0.5">{report.negocioTotal.roas !== null ? `${report.negocioTotal.roas}x` : '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-indigo-200 uppercase">ROI del negocio</p>
+                                    <p className={`text-xl font-black mt-0.5 ${(report.negocioTotal.roiPct ?? 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                        {report.negocioTotal.roiPct !== null ? `${report.negocioTotal.roiPct}%` : '—'}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                                <p className="text-[10px] font-extrabold uppercase text-gray-400">Ingreso real atribuido</p>
-                                <p className="text-lg font-black text-emerald-700 mt-1">{formatCurrency(report.totales.revenue)}</p>
-                            </div>
-                            <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                                <p className="text-[10px] font-extrabold uppercase text-gray-400">ROAS</p>
-                                <p className="text-lg font-black text-gray-900 mt-1">{report.totales.roas !== null ? `${report.totales.roas}x` : '—'}</p>
-                            </div>
-                            <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                                <p className="text-[10px] font-extrabold uppercase text-gray-400">ROI</p>
-                                <p className={`text-lg font-black mt-1 ${(report.totales.roiPct ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                                    {report.totales.roiPct !== null ? `${report.totales.roiPct}%` : '—'}
-                                </p>
+                        </section>
+
+                        <section>
+                            <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider mb-2">
+                                Atribución directa por campaña (parcial — solo ventas cerradas por WhatsApp)
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                                    <p className="text-[10px] font-extrabold uppercase text-gray-400">Gasto en pauta</p>
+                                    <p className="text-lg font-black text-gray-900 mt-1">{formatCurrency(report.totales.spend)}</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                                    <p className="text-[10px] font-extrabold uppercase text-gray-400">Ingreso atribuido (WhatsApp)</p>
+                                    <p className="text-lg font-black text-emerald-700 mt-1">{formatCurrency(report.totales.revenue)}</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                                    <p className="text-[10px] font-extrabold uppercase text-gray-400">ROAS atribuido</p>
+                                    <p className="text-lg font-black text-gray-900 mt-1">{report.totales.roas !== null ? `${report.totales.roas}x` : '—'}</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                                    <p className="text-[10px] font-extrabold uppercase text-gray-400">ROI atribuido</p>
+                                    <p className={`text-lg font-black mt-1 ${(report.totales.roiPct ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                                        {report.totales.roiPct !== null ? `${report.totales.roiPct}%` : '—'}
+                                    </p>
+                                </div>
                             </div>
                         </section>
 

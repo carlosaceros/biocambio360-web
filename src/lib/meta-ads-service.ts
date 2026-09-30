@@ -112,6 +112,52 @@ export interface AdsPerformanceReport {
         revenue: number;
         ventas: number;
     };
+    /**
+     * Ingreso de TODO el negocio (tienda online + POS + asesores) en el mismo rango, sin importar el
+     * canal de origen. La atribución por campaña de arriba solo cuenta ventas cerradas en conversaciones
+     * de WhatsApp — un pedido de la tienda pagado directo en checkout no pasa por ahí, así que el ROAS
+     * "totales" de arriba casi siempre SUBESTIMA el ingreso real. Este número da el panorama honesto de
+     * si el negocio en general es rentable frente a lo que se gasta en pauta, aunque no diga qué
+     * campaña específica lo generó.
+     */
+    negocioTotal: {
+        revenue: number;
+        roas: number | null;
+        roiPct: number | null;
+    };
+}
+
+/**
+ * Ingreso de TODO el negocio en el rango (tienda online + POS + asesores), sin importar si el pedido
+ * pasó o no por una conversación de WhatsApp. Excluye pedidos cancelados.
+ *
+ * Nota: `orders.createdAt` no se guarda como Timestamp nativo de Firestore sino como mapa plano
+ * {seconds, nanoseconds} (bug preexistente en `removeUndefined()` de orders-service.ts, ya detectado
+ * antes en este proyecto pero no corregido) — por eso el rango se consulta contra `createdAt.seconds`
+ * (un número dentro del mapa) en vez de comparar directo contra un Timestamp/Date, que nunca haría
+ * match. `pos_sales.createdAt` sí es un string ISO consistente, así que ese rango se compara como texto.
+ */
+async function getTotalBusinessRevenue(since: string, until: string): Promise<number> {
+    const db = getAdminDB();
+
+    const sinceSeconds = Math.floor(new Date(`${since}T00:00:00-05:00`).getTime() / 1000);
+    const untilSeconds = Math.floor(new Date(`${until}T23:59:59-05:00`).getTime() / 1000);
+
+    const [ordersSnap, posSnap] = await Promise.all([
+        db.collection('orders').where('createdAt.seconds', '>=', sinceSeconds).where('createdAt.seconds', '<=', untilSeconds).get(),
+        db.collection('pos_sales').where('createdAt', '>=', `${since}T00:00:00`).where('createdAt', '<=', `${until}T23:59:59`).get(),
+    ]);
+
+    let total = 0;
+    for (const doc of ordersSnap.docs) {
+        const data = doc.data();
+        if (data.status === 'cancelado') continue;
+        total += Number(data.total) || 0;
+    }
+    for (const doc of posSnap.docs) {
+        total += Number(doc.data().total) || 0;
+    }
+    return total;
 }
 
 /**
@@ -121,10 +167,12 @@ export interface AdsPerformanceReport {
 export async function getAdsPerformanceReport(since: string, until: string): Promise<AdsPerformanceReport> {
     const db = getAdminDB();
 
-    const [spendByCampaign, sinceTs, untilTs] = await Promise.all([
+    const sinceTs = new Date(`${since}T00:00:00-05:00`);
+    const untilTs = new Date(`${until}T23:59:59-05:00`);
+
+    const [spendByCampaign, negocioTotalRevenue] = await Promise.all([
         getCampaignSpend(since, until),
-        Promise.resolve(new Date(`${since}T00:00:00-05:00`)),
-        Promise.resolve(new Date(`${until}T23:59:59-05:00`)),
+        getTotalBusinessRevenue(since, until),
     ]);
 
     // Ventas reales cerradas en el rango, en conversaciones que llegaron por un anuncio
@@ -201,5 +249,10 @@ export async function getAdsPerformanceReport(since: string, until: string): Pro
             roiPct: totalSpend > 0 ? Number((((totalRevenue - totalSpend) / totalSpend) * 100).toFixed(1)) : null,
         },
         sinAtribuir: { revenue: sinAtribuirRevenue, ventas: sinAtribuirVentas },
+        negocioTotal: {
+            revenue: negocioTotalRevenue,
+            roas: totalSpend > 0 ? Number((negocioTotalRevenue / totalSpend).toFixed(2)) : null,
+            roiPct: totalSpend > 0 ? Number((((negocioTotalRevenue - totalSpend) / totalSpend) * 100).toFixed(1)) : null,
+        },
     };
 }
