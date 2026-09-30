@@ -42,14 +42,24 @@ import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import NotificationBell from '@/components/NotificationBell';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
 import { UserModuleCapabilities, SystemRole, ROLE_DEFINITIONS } from '@/types/user';
+import { getConfirmedAiPreOrders } from '@/lib/inbox-service';
 
 export default function AdminDashboard() {
     const { user, userProfile, role, signOut } = useAuth();
     const router = useRouter();
-    const { notifications, unreadCount, permissionGranted, markAllAsRead, markAsRead, requestPermission } = useAdminNotifications();
+    const advisorName = userProfile?.asesorAsignado || userProfile?.nombre || user?.displayName || undefined;
+    const { notifications, unreadCount, permissionGranted, markAllAsRead, markAsRead, requestPermission } = useAdminNotifications({ role, advisorName });
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [isSendingReport, setIsSendingReport] = useState(false);
     const [reportToast, setReportToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [pendingPreOrdersCount, setPendingPreOrdersCount] = useState(0);
+
+    useEffect(() => {
+        if (role !== 'asesor') return;
+        getConfirmedAiPreOrders()
+            .then((preOrders) => setPendingPreOrdersCount(preOrders.length))
+            .catch(() => setPendingPreOrdersCount(0));
+    }, [role]);
 
     const handleSendDailyReport = async () => {
         if (!confirm('¿Deseas generar y enviar el reporte consolidado diario a los correos de administración ahora mismo?')) {
@@ -348,26 +358,53 @@ export default function AdminDashboard() {
                     <>
                         {/* Contextual Welcome Banner */}
                         {role === 'asesor' ? (
-                            <div className="bg-gradient-to-r from-indigo-800 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <Award size={12} /> ESTACIÓN COMERCIAL
-                                        </span>
+                            <>
+                                <div className="bg-gradient-to-r from-indigo-800 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                <Award size={12} /> ESTACIÓN COMERCIAL
+                                            </span>
+                                        </div>
+                                        <h2 className="text-2xl font-black mb-1">Cockpit de Ventas & Cierre</h2>
+                                        <p className="text-sm text-indigo-100">
+                                            Registro ágil de pedidos por llamada o WhatsApp, CRM de clientes y seguimiento de comisiones en tiempo real.
+                                        </p>
                                     </div>
-                                    <h2 className="text-2xl font-black mb-1">Cockpit de Ventas & Cierre</h2>
-                                    <p className="text-sm text-indigo-100">
-                                        Registro ágil de pedidos por llamada o WhatsApp, CRM de clientes y seguimiento de comisiones en tiempo real.
-                                    </p>
+                                    <button
+                                        onClick={() => router.push('/admin/asesores')}
+                                        className="relative px-5 py-2.5 bg-amber-400 text-slate-950 rounded-xl text-sm font-black hover:bg-amber-300 transition-all shadow flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Zap size={16} />
+                                        Ir al Cockpit de Ventas
+                                        {pendingPreOrdersCount > 0 && (
+                                            <span className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center border-2 border-white">
+                                                {pendingPreOrdersCount > 9 ? '9+' : pendingPreOrdersCount}
+                                            </span>
+                                        )}
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => router.push('/admin/asesores')}
-                                    className="px-5 py-2.5 bg-amber-400 text-slate-950 rounded-xl text-sm font-black hover:bg-amber-300 transition-all shadow flex items-center gap-2 cursor-pointer"
-                                >
-                                    <Zap size={16} />
-                                    Ir al Cockpit de Ventas
-                                </button>
-                            </div>
+
+                                {pendingPreOrdersCount > 0 && (
+                                    <button
+                                        onClick={() => router.push('/admin/asesores?tab=prepedidos')}
+                                        className="w-full text-left bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl px-5 py-3.5 flex items-center justify-between gap-3 shadow-md transition-colors cursor-pointer"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Zap size={20} className="shrink-0 text-amber-300" />
+                                            <div>
+                                                <p className="font-black text-sm">
+                                                    {pendingPreOrdersCount} pre-pedido{pendingPreOrdersCount === 1 ? '' : 's'} del Agente IA confirmado{pendingPreOrdersCount === 1 ? '' : 's'}, sin convertir a pedido real
+                                                </p>
+                                                <p className="text-[11px] text-emerald-100">No dejes que se enfríen — el cliente ya dijo que sí</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs font-black bg-white text-emerald-700 px-3 py-1.5 rounded-xl shrink-0">
+                                            Ver ahora
+                                        </span>
+                                    </button>
+                                )}
+                            </>
                         ) : role === 'cajero' ? (
                             <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                                 <div>

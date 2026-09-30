@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { isSupported, getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { db } from '@/lib/firebase';
 import app from '@/lib/firebase';
 import { Order } from '@/types/order';
+import { ConversationDoc } from '@/types/inbox';
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
@@ -37,7 +38,7 @@ export interface AdminNotification {
     body: string;
     timestamp: Date;
     read: boolean;
-    type: 'new_order' | 'payment_confirmed' | 'payment_pending' | 'payment_declined';
+    type: 'new_order' | 'payment_confirmed' | 'payment_pending' | 'payment_declined' | 'ai_preorder' | 'client_assigned';
     orderId: string;
 }
 
@@ -167,12 +168,14 @@ async function registerFCMToken() {
     }
 }
 
-export function useAdminNotifications() {
+export function useAdminNotifications(opts?: { role?: string; advisorName?: string }) {
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
     const [permissionGranted, setPermissionGranted] = useState(false);
     const knownOrderIds = useRef<Set<string>>(new Set());
     const knownOrderStatuses = useRef<Map<string, string>>(new Map());
     const isFirstLoad = useRef(true);
+    const isAsesor = opts?.role === 'asesor' && !!opts?.advisorName;
+    const advisorName = opts?.advisorName;
 
     // Request browser notification permission + register FCM token
     useEffect(() => {
@@ -297,6 +300,102 @@ export function useAdminNotifications() {
 
         return unsubscribe;
     }, [permissionGranted]);
+
+    // Alertas exclusivas del rol asesor: pre-pedidos confirmados por el Agente IA
+    // y clientes recién asignados a su cartera (ninguno de los dos tenía alerta antes).
+    const isFirstPreOrderLoad = useRef(true);
+    const knownPreOrderConvIds = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!isAsesor) return;
+
+        const q = query(collection(db, 'conversations'), where('preOrder.estado', '==', 'confirmado'));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            if (isFirstPreOrderLoad.current) {
+                snapshot.docs.forEach((doc) => knownPreOrderConvIds.current.add(doc.id));
+                isFirstPreOrderLoad.current = false;
+                return;
+            }
+
+            snapshot.docChanges().forEach((change) => {
+                if (change.type !== 'added' || knownPreOrderConvIds.current.has(change.doc.id)) return;
+                knownPreOrderConvIds.current.add(change.doc.id);
+
+                const data = change.doc.data() as ConversationDoc;
+                const pre = data.preOrder;
+                const itemsSummary = (pre?.items || [])
+                    .map((it) => `${it.cantidad}x ${it.producto}`)
+                    .join(', ');
+
+                const notification: AdminNotification = {
+                    id: `${change.doc.id}_preorder_${Date.now()}`,
+                    title: '🤖 Pre-pedido confirmado por el Agente IA',
+                    body: `${data.contactName || 'Cliente'} · ${itemsSummary || 'Ver detalle'} — conviértelo antes de que se enfríe`,
+                    timestamp: safeToDate(data.updatedAt),
+                    read: false,
+                    type: 'ai_preorder',
+                    orderId: change.doc.id,
+                };
+
+                setNotifications((prev) => [notification, ...prev].slice(0, 30));
+
+                try {
+                    const notifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
+                    if (notifAPI && notifAPI.permission === 'granted') {
+                        new notifAPI(notification.title, { body: notification.body, icon: '/icon.png', tag: change.doc.id });
+                    }
+                } catch (_) {}
+            });
+        });
+
+        return unsubscribe;
+    }, [isAsesor]);
+
+    const isFirstAssignmentLoad = useRef(true);
+    const knownAssignedCustomerIds = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!isAsesor || !advisorName) return;
+
+        const q = query(collection(db, 'customers'), where('asesorAsignado', '==', advisorName));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            if (isFirstAssignmentLoad.current) {
+                snapshot.docs.forEach((doc) => knownAssignedCustomerIds.current.add(doc.id));
+                isFirstAssignmentLoad.current = false;
+                return;
+            }
+
+            snapshot.docChanges().forEach((change) => {
+                if (change.type !== 'added' || knownAssignedCustomerIds.current.has(change.doc.id)) return;
+                knownAssignedCustomerIds.current.add(change.doc.id);
+
+                const data = change.doc.data() as { nombre?: string; ciudad?: string; celular?: string; updatedAt?: unknown; createdAt?: unknown };
+
+                const notification: AdminNotification = {
+                    id: `${change.doc.id}_assigned_${Date.now()}`,
+                    title: '📋 Nuevo cliente asignado a tu cartera',
+                    body: `${data.nombre || 'Cliente'} · ${data.ciudad || 'Colombia'} · ${data.celular || ''}`,
+                    timestamp: safeToDate(data.updatedAt || data.createdAt),
+                    read: false,
+                    type: 'client_assigned',
+                    orderId: change.doc.id,
+                };
+
+                setNotifications((prev) => [notification, ...prev].slice(0, 30));
+
+                try {
+                    const notifAPI = typeof window !== 'undefined' ? (window as any).Notification : null;
+                    if (notifAPI && notifAPI.permission === 'granted') {
+                        new notifAPI(notification.title, { body: notification.body, icon: '/icon.png', tag: change.doc.id });
+                    }
+                } catch (_) {}
+            });
+        });
+
+        return unsubscribe;
+    }, [isAsesor, advisorName]);
 
     const unreadCount = notifications.filter((n) => !n.read).length;
 

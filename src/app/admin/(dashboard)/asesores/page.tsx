@@ -131,7 +131,7 @@ export default function AsesoresCockpitPage() {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get('tab');
-            if (tabParam && ['tareas', 'pedidos', 'borradores', 'novedades', 'alertas', 'tiempos'].includes(tabParam)) {
+            if (tabParam && ['tareas', 'pedidos', 'borradores', 'novedades', 'alertas', 'tiempos', 'prepedidos'].includes(tabParam)) {
                 setActiveTab(tabParam as any);
             }
         }

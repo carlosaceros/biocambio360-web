@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Bell, BellRing, ShoppingCart, CreditCard, Clock, AlertTriangle, CheckCircle2, Check, X } from 'lucide-react';
+import { Bell, BellRing, ShoppingCart, CreditCard, Clock, AlertTriangle, CheckCircle2, Check, X, Sparkles, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AdminNotification } from '@/hooks/useAdminNotifications';
 import { useRouter } from 'next/navigation';
@@ -52,6 +52,20 @@ const getNotificationStyle = (type: AdminNotification['type']) => {
                 dot: 'bg-amber-500',
                 rowBg: 'hover:bg-amber-50/40'
             };
+        case 'ai_preorder':
+            return {
+                icon: <Sparkles size={15} />,
+                bg: 'bg-emerald-100 text-emerald-700',
+                dot: 'bg-emerald-500',
+                rowBg: 'hover:bg-emerald-50/40'
+            };
+        case 'client_assigned':
+            return {
+                icon: <Users size={15} />,
+                bg: 'bg-indigo-100 text-indigo-700',
+                dot: 'bg-indigo-500',
+                rowBg: 'hover:bg-indigo-50/40'
+            };
         case 'new_order':
         default:
             return {
@@ -89,7 +103,13 @@ export default function NotificationBell({
     const handleNotificationClick = (notif: AdminNotification) => {
         onMarkRead(notif.id);
         setIsOpen(false);
-        router.push('/admin/pedidos');
+        if (notif.type === 'ai_preorder') {
+            router.push('/admin/asesores?tab=prepedidos');
+        } else if (notif.type === 'client_assigned') {
+            router.push('/admin/asesores?tab=tareas');
+        } else {
+            router.push('/admin/pedidos');
+        }
     };
 
     return (
