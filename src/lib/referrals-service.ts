@@ -63,6 +63,20 @@ function removeUndefined<T>(obj: T): T {
 /**
  * Crea un Timestamp seguro compatible tanto con el SDK oficial como con entornos de test / Node
  */
+/**
+ * REGLA 2026 #3: el saldo debe quedar visible/disponible "al día siguiente", no a las 24 horas
+ * exactas — una entrega confirmada muy en la tarde con la regla de 24h rodantes libera el saldo casi
+ * a la misma hora al día siguiente (roza las 48h reales); con el corte a medianoche de Bogotá queda
+ * disponible desde temprano el día calendario siguiente a la entrega, sin importar a qué hora se
+ * confirmó, y sigue sin ser inmediato (nunca el mismo día).
+ */
+function nextCalendarDayBogota(fromMillis: number): number {
+    const BOGOTA_OFFSET_MS = 5 * 60 * 60 * 1000; // UTC-5, sin horario de verano
+    const bogotaNow = new Date(fromMillis - BOGOTA_OFFSET_MS);
+    const nextDayUTCMidnight = Date.UTC(bogotaNow.getUTCFullYear(), bogotaNow.getUTCMonth(), bogotaNow.getUTCDate() + 1, 0, 0, 0);
+    return nextDayUTCMidnight + BOGOTA_OFFSET_MS;
+}
+
 function createTimestampFromMillis(ms: number): Timestamp {
     if (typeof Timestamp.fromMillis === 'function') {
         return Timestamp.fromMillis(ms);
@@ -628,6 +642,46 @@ export async function validateReferralCodeForOrder(
 /**
  * Registrar una transacción de referido vinculada a una nueva orden (en estado PENDIENTE)
  */
+/**
+ * REGLA 2026 #2 — Antifraude de dirección compartida: una misma dirección no puede cobrar
+ * recompensa de referido más de una vez cada 30 días, sin importar el código o el celular usado
+ * (varias personas de la misma casa comparten un código y hacen varias compras "nuevas" seguidas).
+ * A diferencia de `isDuplicateAddressAlert` (solo marca para auditoría después de 2+ repeticiones,
+ * sin límite de tiempo), esto BLOQUEA de raíz la recompensa desde la primera repetición dentro de
+ * los 30 días — el amigo referido puede seguir comprando, pero el embajador no cobra dos veces por
+ * la misma dirección en tan poco tiempo.
+ */
+export async function checkAddressReferralCooldown(direccion: string, days = 30): Promise<{ onCooldown: boolean; daysAgo?: number }> {
+    if (!direccion || direccion.trim().length < 6) return { onCooldown: false };
+    try {
+        const cleanAddr = direccion.trim().toLowerCase().replace(/[#.,-]/g, ' ');
+        const cutoff = Timestamp.fromMillis(Date.now() - days * 24 * 60 * 60 * 1000);
+        const q = query(transactionsCollection, where('createdAt', '>=', cutoff));
+        const snap = await getDocs(q);
+
+        let mostRecentMatchMillis = 0;
+        for (const d of snap.docs) {
+            const tx = d.data() as ReferralTransaction;
+            if (tx.status === 'rejected') continue; // no penaliza por transacciones ya rechazadas
+            const prevAddr = tx.referredCustomer?.direccion?.trim().toLowerCase().replace(/[#.,-]/g, ' ');
+            if (!prevAddr) continue;
+            if (prevAddr.includes(cleanAddr) || cleanAddr.includes(prevAddr)) {
+                const createdMillis = tx.createdAt?.toMillis ? tx.createdAt.toMillis() : 0;
+                if (createdMillis > mostRecentMatchMillis) mostRecentMatchMillis = createdMillis;
+            }
+        }
+
+        if (mostRecentMatchMillis > 0) {
+            const daysAgo = Math.floor((Date.now() - mostRecentMatchMillis) / (24 * 60 * 60 * 1000));
+            return { onCooldown: true, daysAgo };
+        }
+        return { onCooldown: false };
+    } catch (err) {
+        console.warn('[Referrals] Error verificando cooldown de dirección:', err);
+        return { onCooldown: false };
+    }
+}
+
 export async function recordReferralTransaction(params: {
     orderId: string;
     profileId: string;
@@ -644,7 +698,7 @@ export async function recordReferralTransaction(params: {
 
     const now = Timestamp.now();
 
-    // Detección Antifraude: Concentración de Dirección de Entrega
+    // Detección Antifraude: Concentración de Dirección de Entrega (aviso informativo, no bloquea)
     let isDuplicateAddressAlert = false;
     if (params.customer.direccion && params.customer.direccion.trim().length > 6) {
         try {
@@ -674,6 +728,11 @@ export async function recordReferralTransaction(params: {
         }
     }
 
+    // REGLA 2026 #2: bloqueo real (no solo aviso) si esta dirección ya cobró recompensa en los
+    // últimos 30 días, sin importar quién compró ni con qué código — evita que varias personas de
+    // una misma casa exploten un código con compras "nuevas" seguidas.
+    const cooldown = await checkAddressReferralCooldown(params.customer.direccion || '', 30);
+
     const newTx: ReferralTransaction = {
         id: txId,
         referralProfileId: params.profileId,
@@ -684,14 +743,23 @@ export async function recordReferralTransaction(params: {
         orderTotal: params.orderTotal,
         rewardAmount: config.rewardAmount,
         friendDiscountAmount: params.discountAmount,
-        status: 'pending',
-        releaseStatus: 'pending_delivery',
+        status: cooldown.onCooldown ? 'rejected' : 'pending',
+        releaseStatus: cooldown.onCooldown ? 'cancelled' : 'pending_delivery',
+        ...(cooldown.onCooldown ? { rejectionReason: `Esta dirección ya recibió una recompensa de referido hace ${cooldown.daysAgo} día(s) (tope: 1 cada 30 días).` } : {}),
         isDuplicateAddressAlert,
         createdAt: now,
         updatedAt: now
     };
 
     await setDoc(txRef, removeUndefined(newTx));
+
+    // Si está en cooldown de dirección, se deja el registro (para auditoría/historial) pero NO se le
+    // suma nada al saldo del embajador — el amigo referido conserva su descuento, pero esta recompensa
+    // puntual no se paga.
+    if (cooldown.onCooldown) {
+        console.warn(`[Referrals] Recompensa bloqueada por cooldown de dirección (${cooldown.daysAgo}d) — orden ${params.orderId}`);
+        return;
+    }
 
     // Incrementar balance pendiente en el perfil del embajador
     const profileUpdates: Record<string, any> = {
@@ -753,9 +821,9 @@ export async function updateReferralTransactionOnOrderStatusChange(
     if (tx.status === 'rejected' && newStatus === 'cancelado') return;
 
     if (newStatus === 'entregado') {
-        // Se aprueba la recompensa y se coloca en ventana de custodia de 24 horas ('holding_24h')
-        // La recompensa se liberará a balanceAvailable transcurridas 24 horas.
-        const availableAt = createTimestampFromMillis(Date.now() + 24 * 60 * 60 * 1000);
+        // Se aprueba la recompensa y se coloca en ventana de custodia ('holding_24h') hasta el
+        // siguiente día calendario (Bogotá) — no 24h rodantes desde la hora exacta de la entrega.
+        const availableAt = createTimestampFromMillis(nextCalendarDayBogota(Date.now()));
 
         await runTransaction(db, async (t) => {
             const profDoc = await t.get(profileRef);
@@ -1090,5 +1158,95 @@ export async function toggleBlacklistReferralProfile(
     }
 
     await updateDoc(profileRef, updates);
+}
+
+/**
+ * REGLA 2026 #4 — si el embajador tiene un pedido PROPIO con novedad de "sin_dinero" (retraso/no pago
+ * en la entrega) sin resolver, se suspende su código hasta que se ponga al día. Es reversible: cuando
+ * ese pedido se marca resuelto (entregado o repuesto pagado), se puede reactivar a mano desde el panel.
+ */
+export async function suspendReferralCodeForUnpaidDelivery(phone: string, orderId: string): Promise<void> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const profileRef = doc(profilesCollection, cleanPhone);
+    const snap = await getDoc(profileRef);
+    if (!snap.exists()) return; // no es embajador, nada que suspender
+
+    await updateDoc(profileRef, {
+        isActive: false,
+        suspendedReason: `Suspendido: pedido ${orderId} con novedad de pago (sin_dinero) sin resolver. Reactivar manualmente cuando se ponga al día.`,
+        updatedAt: Timestamp.now()
+    });
+
+    await recordReferralBalanceAuditLog({
+        timestamp: new Date().toISOString(),
+        userEmail: 'sistema@biocambio360.com',
+        userName: 'Suspensión automática por novedad de pago',
+        userRole: 'sistema',
+        profileId: cleanPhone,
+        profileName: cleanPhone,
+        profilePhone: cleanPhone,
+        referralCode: '',
+        previousBalance: 0,
+        newBalance: 0,
+        difference: 0,
+        reason: `Código suspendido por novedad "sin_dinero" en pedido ${orderId} del propio embajador.`,
+        source: 'manual_adjustment',
+        createdAt: new Date().toISOString()
+    });
+}
+
+/**
+ * REGLA 2026 #5 (propuesta, uso caso a caso — "son pocos los casos, para ver si es viable"): en vez de
+ * cobrarle de nuevo el flete de reintento a un cliente recurrente que no recibió su pedido, se descuenta
+ * ese valor de su saldo de referidos disponible y se reenvía el pedido sin cobrar de más. Lo activa el
+ * gestor manualmente por caso (checkbox en el modal de novedad), nunca automático.
+ */
+export async function deductReshippingFeeFromBalance(
+    phone: string,
+    amount: number,
+    orderId: string
+): Promise<{ success: boolean; message: string }> {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone || amount <= 0) return { success: false, message: 'Monto o celular inválido.' };
+
+    const profileRef = doc(profilesCollection, cleanPhone);
+    try {
+        await syncReferralReleases(cleanPhone);
+        const snap = await getDoc(profileRef);
+        if (!snap.exists()) return { success: false, message: 'Este cliente no tiene saldo de referidos — cóbrale el flete normal.' };
+
+        const prof = snap.data() as ReferralProfile;
+        if ((prof.balanceAvailable || 0) < amount) {
+            return { success: false, message: `Saldo disponible insuficiente ($${(prof.balanceAvailable || 0).toLocaleString('es-CO')}) para cubrir $${amount.toLocaleString('es-CO')}.` };
+        }
+
+        const previousBalance = prof.balanceAvailable;
+        await updateDoc(profileRef, {
+            balanceAvailable: increment(-amount),
+            updatedAt: Timestamp.now()
+        });
+
+        await recordReferralBalanceAuditLog({
+            timestamp: new Date().toISOString(),
+            userEmail: 'sistema@biocambio360.com',
+            userName: 'Descuento de reenvío por novedad de entrega',
+            userRole: 'sistema',
+            profileId: cleanPhone,
+            profileName: prof.nombre || cleanPhone,
+            profilePhone: cleanPhone,
+            referralCode: prof.code || '',
+            previousBalance,
+            newBalance: previousBalance - amount,
+            difference: -amount,
+            reason: `Flete de reintento del pedido ${orderId} descontado del saldo en vez de cobrarlo de nuevo.`,
+            source: 'manual_adjustment',
+            createdAt: new Date().toISOString()
+        });
+
+        return { success: true, message: `Se descontaron $${amount.toLocaleString('es-CO')} del saldo del cliente para cubrir el reenvío.` };
+    } catch (err) {
+        console.warn('[Referrals] Error descontando flete de reintento del saldo:', err);
+        return { success: false, message: 'Error al descontar del saldo.' };
+    }
 }
 

@@ -34,21 +34,24 @@ import {
     ReferralTier,
     ReferralBalanceAuditLog
 } from '@/types/referral';
-import { 
-    getAllReferralProfiles, 
-    getAllReferralTransactions, 
-    getReferralConfig, 
-    saveReferralConfig, 
+import {
+    getAllReferralProfiles,
+    getAllReferralTransactions,
+    getReferralConfig,
+    saveReferralConfig,
     updateReferralProfileAdmin,
     toggleBlacklistReferralProfile,
     getReferralBalanceAuditLogs
 } from '@/lib/referrals-service';
+import { toggleCustomerReferrerStatus } from '@/lib/crm-service';
+import { getCustomersWithPagination } from '@/lib/customers-service';
+import { Customer } from '@/types/customer';
 import { formatCurrency } from '@/lib/checkout-utils';
 
 export default function AdminReferidosPage() {
     const router = useRouter();
     const { user, userProfile, role } = useAuth();
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'embajadores' | 'transacciones' | 'configuracion' | 'auditoria'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'embajadores' | 'transacciones' | 'configuracion' | 'auditoria' | 'activacion-masiva'>('dashboard');
     const [profiles, setProfiles] = useState<ReferralProfile[]>([]);
     const [transactions, setTransactions] = useState<ReferralTransaction[]>([]);
     const [balanceAuditLogs, setBalanceAuditLogs] = useState<ReferralBalanceAuditLog[]>([]);
@@ -73,6 +76,57 @@ export default function AdminReferidosPage() {
     // Guardado de configuración
     const [savingConfig, setSavingConfig] = useState(false);
     const [configMessage, setConfigMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+    // REGLA 2026 #1: activación masiva de clientes antiguos/frecuentes, sin exigirles una compra
+    // nueva para calificar (toggleCustomerReferrerStatus ya soporta esto vía referralActivatedManually)
+    const [frequentCustomers, setFrequentCustomers] = useState<Customer[]>([]);
+    const [loadingFrequent, setLoadingFrequent] = useState(false);
+    const [minOrdersFilter, setMinOrdersFilter] = useState(2);
+    const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
+    const [bulkActivating, setBulkActivating] = useState(false);
+    const [bulkResult, setBulkResult] = useState<{ activated: number; skipped: number } | null>(null);
+
+    const loadFrequentCustomers = async () => {
+        setLoadingFrequent(true);
+        setBulkResult(null);
+        try {
+            const res = await getCustomersWithPagination({ activeOnly: true, limit: 200 });
+            const eligible = res.customers.filter(c => (c.ordersCount || 0) >= minOrdersFilter && !c.isReferrer);
+            setFrequentCustomers(eligible);
+            setSelectedCustomerIds(new Set());
+        } finally {
+            setLoadingFrequent(false);
+        }
+    };
+
+    const handleBulkActivate = async () => {
+        if (selectedCustomerIds.size === 0) return;
+        setBulkActivating(true);
+        let activated = 0;
+        let skipped = 0;
+        for (const id of selectedCustomerIds) {
+            const c = frequentCustomers.find(fc => fc.id === id);
+            if (!c) { skipped++; continue; }
+            try {
+                await toggleCustomerReferrerStatus({
+                    customerId: c.id,
+                    isReferrer: true,
+                    customerName: c.nombre,
+                    customerPhone: c.celular,
+                    activatedByEmail: user?.email || 'admin@biocambio360.com',
+                    activatedByName: userProfile?.nombre || user?.displayName || 'Administrador',
+                });
+                activated++;
+            } catch {
+                skipped++;
+            }
+        }
+        setBulkActivating(false);
+        setBulkResult({ activated, skipped });
+        setFrequentCustomers(prev => prev.filter(c => !selectedCustomerIds.has(c.id)));
+        setSelectedCustomerIds(new Set());
+        loadData();
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -348,6 +402,17 @@ export default function AdminReferidosPage() {
                     >
                         <History size={16} />
                         Bitácora de Saldos ({balanceAuditLogs.length})
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('activacion-masiva'); if (frequentCustomers.length === 0) loadFrequentCustomers(); }}
+                        className={`py-3 text-xs sm:text-sm font-black border-b-2 flex items-center gap-2 transition-colors cursor-pointer shrink-0 ${
+                            activeTab === 'activacion-masiva'
+                                ? 'border-purple-600 text-purple-700'
+                                : 'border-transparent text-gray-500 hover:text-gray-900'
+                        }`}
+                    >
+                        <Users size={16} />
+                        Activación Masiva
                     </button>
                 </div>
             </header>
@@ -991,6 +1056,102 @@ export default function AdminReferidosPage() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* NUEVO — REGLA 2026 #1: activación masiva de clientes antiguos/frecuentes sin exigir compra nueva */}
+                {activeTab === 'activacion-masiva' && (
+                    <div className="space-y-5">
+                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
+                            <h2 className="font-black text-gray-900 mb-1">Activación masiva de clientes frecuentes</h2>
+                            <p className="text-xs text-gray-500 mb-4">
+                                Selecciona una base de clientes que ya compran seguido y actívales el beneficio de embajador sin
+                                exigirles una compra nueva para calificar (se marcan como activados manualmente, igual que el
+                                botón individual &quot;Activar a libre demanda&quot; del CRM/POS).
+                            </p>
+                            <div className="flex flex-wrap items-end gap-3">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 mb-1">Mínimo de pedidos históricos</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={minOrdersFilter}
+                                        onChange={e => setMinOrdersFilter(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-28 px-3 py-2 text-sm border border-gray-200 rounded-xl"
+                                    />
+                                </div>
+                                <button
+                                    onClick={loadFrequentCustomers}
+                                    disabled={loadingFrequent}
+                                    className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-black disabled:opacity-50"
+                                >
+                                    {loadingFrequent ? 'Buscando...' : 'Buscar clientes elegibles'}
+                                </button>
+                                {frequentCustomers.length > 0 && (
+                                    <button
+                                        onClick={() => setSelectedCustomerIds(new Set(frequentCustomers.map(c => c.id)))}
+                                        className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl text-xs font-black"
+                                    >
+                                        Seleccionar todos ({frequentCustomers.length})
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleBulkActivate}
+                                    disabled={selectedCustomerIds.size === 0 || bulkActivating}
+                                    className="ml-auto px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white rounded-xl text-xs font-black"
+                                >
+                                    {bulkActivating ? 'Activando...' : `Activar seleccionados (${selectedCustomerIds.size})`}
+                                </button>
+                            </div>
+                            {bulkResult && (
+                                <p className="mt-3 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                                    ✓ {bulkResult.activated} cliente(s) activado(s) como embajador{bulkResult.skipped > 0 ? `, ${bulkResult.skipped} con error` : ''}.
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+                            {loadingFrequent ? (
+                                <div className="p-10 text-center text-gray-400 text-sm">Cargando clientes...</div>
+                            ) : frequentCustomers.length === 0 ? (
+                                <div className="p-10 text-center text-gray-400 text-sm">
+                                    Sin resultados. Haz clic en &quot;Buscar clientes elegibles&quot; para ver candidatos (clientes activos, con {minOrdersFilter}+ pedidos, que aún no son embajadores).
+                                </div>
+                            ) : (
+                                <table className="w-full text-xs">
+                                    <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px]">
+                                        <tr>
+                                            <th className="p-3 text-left w-10"></th>
+                                            <th className="p-3 text-left">Cliente</th>
+                                            <th className="p-3 text-left">Celular</th>
+                                            <th className="p-3 text-right">Pedidos</th>
+                                            <th className="p-3 text-right">Gastado total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {frequentCustomers.map(c => (
+                                            <tr key={c.id} className="hover:bg-gray-50">
+                                                <td className="p-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedCustomerIds.has(c.id)}
+                                                        onChange={() => setSelectedCustomerIds(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
+                                                            return next;
+                                                        })}
+                                                    />
+                                                </td>
+                                                <td className="p-3 font-bold text-gray-800">{c.nombre}</td>
+                                                <td className="p-3 font-mono text-gray-500">{c.celular}</td>
+                                                <td className="p-3 text-right text-gray-700">{c.ordersCount}</td>
+                                                <td className="p-3 text-right font-bold text-gray-900">{formatCurrency(c.totalSpent || 0)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </div>
                 )}

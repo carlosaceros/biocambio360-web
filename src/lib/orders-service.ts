@@ -17,6 +17,7 @@ import { db } from './firebase';
 import { upsertCustomerFromOrder } from './customers-service';
 import { decrementStockForOrderItems, incrementStockForOrderItems } from './products-service';
 import { recordAuditLog } from './audit-service';
+import { suspendReferralCodeForUnpaidDelivery, deductReshippingFeeFromBalance } from './referrals-service';
 
 import { Order, OrderStatus, TimelineEvent, OrderInternalNote, OrderCustomer, OrderDeliveryException } from '@/types/order';
 import { normalizeDepartmentAndCity } from './checkout-utils';
@@ -806,6 +807,9 @@ export interface ProcessDeliveryExceptionParams {
     notasSeguimiento?: string;
     radicadoSiniestro?: string;
     montoReclamado?: number;
+    /** Regla 2026 #5 (caso a caso): descuenta tarifaEspecialReintento del saldo de referidos del
+     *  cliente en vez de sumarlo a su flete/total — el gestor lo activa a mano por caso. */
+    descontarDeSaldoReferido?: boolean;
     userContext?: { email?: string; nombre?: string; role?: string };
 }
 
@@ -845,6 +849,14 @@ export async function markOrderAsFailedDelivery(
     });
 
     await updateOrderStatus(orderId, 'no_entregado', note, userContext);
+
+    // REGLA 2026 #4: si el pedido con novedad de pago es del propio embajador, se suspende su código
+    // hasta que se ponga al día — nunca bloquea a otros clientes, solo su propio código de referido.
+    if (motivo === 'sin_dinero' && order.cliente?.celular) {
+        suspendReferralCodeForUnpaidDelivery(order.cliente.celular, orderId).catch(err =>
+            console.warn('[Referrals] No se pudo suspender el código por novedad de pago:', err)
+        );
+    }
 }
 
 /**
@@ -869,6 +881,7 @@ export async function processDeliveryException(params: ProcessDeliveryExceptionP
         notasSeguimiento,
         radicadoSiniestro,
         montoReclamado,
+        descontarDeSaldoReferido = false,
         userContext
     } = params;
 
@@ -880,8 +893,18 @@ export async function processDeliveryException(params: ProcessDeliveryExceptionP
     const nowIso = new Date().toISOString();
 
     if (resolucion === 'reintento_programado') {
-        const nuevoFlete = (order.envio || 0) + Math.max(0, tarifaEspecialReintento);
-        const nuevoTotal = (order.total || 0) + Math.max(0, tarifaEspecialReintento);
+        const tarifa = Math.max(0, tarifaEspecialReintento);
+        let coveredByBalance = false;
+        if (descontarDeSaldoReferido && tarifa > 0 && order.cliente?.celular) {
+            const deduction = await deductReshippingFeeFromBalance(order.cliente.celular, tarifa, orderId);
+            coveredByBalance = deduction.success;
+            if (!deduction.success) {
+                console.warn(`[ProcessDeliveryException] No se pudo descontar del saldo (${deduction.message}); se cobra normal en el pedido.`);
+            }
+        }
+        // Si se cubrió con el saldo de referidos, el cliente no vuelve a pagar ese valor en el pedido
+        const nuevoFlete = coveredByBalance ? (order.envio || 0) : (order.envio || 0) + tarifa;
+        const nuevoTotal = coveredByBalance ? (order.total || 0) : (order.total || 0) + tarifa;
 
         const updatedCustomer: OrderCustomer = {
             ...order.cliente,

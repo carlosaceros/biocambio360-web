@@ -44,6 +44,8 @@ export interface ReferralProfile {
     blacklistReason?: string; // Motivo de sanción (ej: 'Múltiples pedidos recogidos por la misma persona sin recompra')
     fraudAlert?: boolean; // Bandera de advertencia de auditoría
     blockedAt?: Timestamp; // Fecha de bloqueo
+    /** Regla 2026 #4: código suspendido (isActive=false) por novedad de pago sin resolver en un pedido propio */
+    suspendedReason?: string;
 
     // Balances financieros (en COP)
     balancePending: number; // Por pedidos aún en preparación/camino

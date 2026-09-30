@@ -63,6 +63,7 @@ export default function DeliveryExceptionModal({
     const [fechaReintento, setFechaReintento] = useState('');
     const [franjaHoraria, setFranjaHoraria] = useState<'manana' | 'tarde' | 'todo_el_dia'>('todo_el_dia');
     const [tarifaEspecial, setTarifaEspecial] = useState<number>(0);
+    const [descontarDeSaldo, setDescontarDeSaldo] = useState(false);
     const [transportadora, setTransportadora] = useState(TRANSPORTADORAS_OPTIONS[0]);
     
     // Dirección updates
@@ -141,6 +142,7 @@ export default function DeliveryExceptionModal({
                 fechaReintentoProgramada: resolucion === 'reintento_programado' ? fechaReintento : undefined,
                 franjaHoraria: resolucion === 'reintento_programado' ? franjaHoraria : undefined,
                 tarifaEspecialReintento: resolucion === 'reintento_programado' ? tarifaEspecial : 0,
+                descontarDeSaldoReferido: resolucion === 'reintento_programado' ? descontarDeSaldo : false,
                 transportadoraReintento: resolucion === 'reintento_programado' ? transportadora : undefined,
                 nuevaDireccion: direccion.trim() !== order.cliente?.direccion ? direccion.trim() : undefined,
                 nuevoBarrio: barrio.trim() !== order.cliente?.barrio ? barrio.trim() : undefined,
@@ -422,12 +424,26 @@ export default function DeliveryExceptionModal({
                                             Cobro anterior: <strong>${currentTotal.toLocaleString('es-CO')}</strong>
                                         </span>
                                         <span className="text-slate-900 font-black flex items-center gap-1">
-                                            Nuevo Total Contraentrega a Cobrar: 
-                                            <span className="text-emerald-700 text-sm">
+                                            Nuevo Total Contraentrega a Cobrar:
+                                            <span className={descontarDeSaldo ? 'text-slate-400 line-through text-xs' : 'text-emerald-700 text-sm'}>
                                                 ${newTotalCalculated.toLocaleString('es-CO')} COP
                                             </span>
                                         </span>
                                     </div>
+
+                                    {tarifaEspecial > 0 && (
+                                        <label className="mt-2.5 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={descontarDeSaldo}
+                                                onChange={(e) => setDescontarDeSaldo(e.target.checked)}
+                                                className="mt-0.5"
+                                            />
+                                            <span>
+                                                <strong>Caso especial (recompra):</strong> en vez de cobrarle de nuevo el flete, descontar ${tarifaEspecial.toLocaleString('es-CO')} de su saldo de referidos disponible y reenviar sin cobrar de más. Solo funciona si el cliente tiene saldo suficiente; si no, se cobra normal.
+                                            </span>
+                                        </label>
+                                    )}
                                 </div>
 
                                 {/* Transportadora Asignada para el Reintento */}
