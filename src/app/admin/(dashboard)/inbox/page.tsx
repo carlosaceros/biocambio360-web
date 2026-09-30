@@ -107,6 +107,17 @@ export default function InboxPage() {
     // Conversations state
     const [conversations, setConversations] = useState<ConversationDoc[]>([]);
     const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+
+    // Deep link (?conv=<id>) desde otras pantallas (ej. pre-pedidos del Agente IA en el Cockpit de
+    // Asesores) para abrir directo la conversación exacta, sin tener que buscarla a mano.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const convId = params.get('conv');
+        if (convId) {
+            setSelectedConvId(convId);
+            setShowMobileList(false);
+        }
+    }, []);
     const [loading, setLoading] = useState(true);
     const [totalUnread, setTotalUnread] = useState(0);
 

@@ -53,6 +53,8 @@ import OrderTimingAnalyticsPanel from '@/components/admin/OrderTimingAnalyticsPa
 import { ORDER_STATUS_CONFIG, OrderStatus, Order } from '@/types/order';
 import { subscribeToAdminUsers } from '@/lib/users-service';
 import { getDraftOrdersByAdvisor, discardDraftOrder, getFailedDeliveryOrders, safeToArray } from '@/lib/orders-service';
+import { getConfirmedAiPreOrders } from '@/lib/inbox-service';
+import type { ConversationDoc } from '@/types/inbox';
 
 const DEFAULT_ADVISORS = ['Karen', 'Katherine', 'Andrea', 'Diego', 'Laura', 'Camilo'];
 
@@ -72,6 +74,7 @@ export default function AsesoresCockpitPage() {
     const [portfolio, setPortfolio] = useState<AdvisorPortfolioSummary | null>(null);
     const [draftOrders, setDraftOrders] = useState<(Order & { id: string })[]>([]);
     const [failedOrders, setFailedOrders] = useState<(Order & { id: string })[]>([]);
+    const [confirmedPreOrders, setConfirmedPreOrders] = useState<ConversationDoc[]>([]);
     const [selectedDraftForModal, setSelectedDraftForModal] = useState<(Order & { id: string }) | null>(null);
     const [selectedOrderForException, setSelectedOrderForException] = useState<(Order & { id: string }) | null>(null);
     const [isDiscardingDraft, setIsDiscardingDraft] = useState<string | null>(null);
@@ -81,7 +84,7 @@ export default function AsesoresCockpitPage() {
     // Fast order modal & tab state
     const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
     const [preloadedClientForOrder, setPreloadedClientForOrder] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores' | 'novedades' | 'alertas' | 'tiempos'>('tareas');
+    const [activeTab, setActiveTab] = useState<'tareas' | 'pedidos' | 'borradores' | 'novedades' | 'alertas' | 'tiempos' | 'prepedidos'>('tareas');
 
     // Protocolo de Alertas y Copilot IA
     const [alertsData, setAlertsData] = useState<AdvisorAlertsData | null>(null);
@@ -150,11 +153,12 @@ export default function AsesoresCockpitPage() {
     const loadData = async (advName: string) => {
         setIsLoading(true);
         try {
-            const [data, drafts, failed, alerts] = await Promise.all([
+            const [data, drafts, failed, alerts, preOrders] = await Promise.all([
                 getAdvisorPortfolio(advName),
                 getDraftOrdersByAdvisor(advName),
                 getFailedDeliveryOrders(advName),
-                getAdvisorAlertsData(advName)
+                getAdvisorAlertsData(advName),
+                getConfirmedAiPreOrders().catch(() => [])
             ]);
             setPortfolio(data);
             const sanitizedDrafts = (drafts || []).map(d => ({
@@ -164,6 +168,7 @@ export default function AsesoresCockpitPage() {
             setDraftOrders(sanitizedDrafts);
             setFailedOrders(failed);
             setAlertsData(alerts);
+            setConfirmedPreOrders(preOrders);
         } finally {
             setIsLoading(false);
         }
@@ -503,9 +508,50 @@ export default function AsesoresCockpitPage() {
                     </div>
                 )}
 
+                {/* Banner de pre-pedidos del Agente IA: visible SIEMPRE, en cualquier pestaña, para que no se olviden */}
+                {confirmedPreOrders.length > 0 && activeTab !== 'prepedidos' && (
+                    <button
+                        onClick={() => setActiveTab('prepedidos')}
+                        className="w-full text-left bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl px-5 py-3.5 flex items-center justify-between gap-3 shadow-md transition-colors cursor-pointer"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Sparkles size={20} className="shrink-0" />
+                            <div>
+                                <p className="font-black text-sm">
+                                    {confirmedPreOrders.length} pre-pedido{confirmedPreOrders.length === 1 ? '' : 's'} del Agente IA confirmado{confirmedPreOrders.length === 1 ? '' : 's'}, sin convertir a pedido real
+                                </p>
+                                <p className="text-[11px] text-emerald-100">No dejes que se enfríen — el cliente ya dijo que sí</p>
+                            </div>
+                        </div>
+                        <span className="text-xs font-black bg-white text-emerald-700 px-3 py-1.5 rounded-xl shrink-0">
+                            Ver ahora
+                        </span>
+                    </button>
+                )}
+
                 {/* Selector de Pestañas: Tareas Diarias vs Mis Pedidos del Mes */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
                     <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        <button
+                            data-tour="asesor-tab-prepedidos"
+                            onClick={() => setActiveTab('prepedidos')}
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                                activeTab === 'prepedidos'
+                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                        >
+                            <Sparkles size={14} className={activeTab === 'prepedidos' ? 'text-white' : 'text-emerald-600'} />
+                            <span>Pre-pedidos IA ({confirmedPreOrders.length})</span>
+                            {confirmedPreOrders.length > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    activeTab === 'prepedidos' ? 'bg-white text-emerald-700' : 'bg-emerald-100 text-emerald-800'
+                                }`}>
+                                    {confirmedPreOrders.length}
+                                </span>
+                            )}
+                        </button>
+
                         <button
                             data-tour="asesor-clientes-prioritarios"
                             onClick={() => setActiveTab('tareas')}
@@ -843,6 +889,75 @@ export default function AsesoresCockpitPage() {
                 )}
 
                 {/* TAB 3: Borradores & Cotizaciones Pendientes */}
+                {activeTab === 'prepedidos' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
+                        <div>
+                            <h2 className="text-base font-black text-slate-900">Pre-pedidos confirmados por el Agente IA</h2>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                El cliente ya confirmó producto, dirección y forma de pago con el Agente IA fuera de horario — el sistema NO crea el pedido real por su cuenta, así que si no se convierte aquí, se pierde. Ordenados del más reciente al más antiguo.
+                            </p>
+                        </div>
+
+                        {confirmedPreOrders.length === 0 ? (
+                            <div className="text-center py-12 text-slate-400">
+                                <Sparkles size={28} className="mx-auto mb-2 text-slate-300" />
+                                <p className="text-sm">No hay pre-pedidos del Agente IA pendientes de convertir. 🎉</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                                {confirmedPreOrders.map(conv => {
+                                    const pre = conv.preOrder;
+                                    if (!pre) return null;
+                                    const itemsSummary = (pre.items || [])
+                                        .map(it => `${it.cantidad}x ${it.producto}${it.presentacion ? ` (${it.presentacion})` : ''}`)
+                                        .join(', ');
+                                    return (
+                                        <div key={conv.id} className="bg-emerald-50/60 rounded-xl border border-emerald-200 p-4 flex flex-col justify-between gap-3">
+                                            <div className="space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="font-bold text-sm text-slate-900">{conv.contactName || 'Cliente'}</h3>
+                                                    <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Confirmado</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 font-mono">+{conv.contactPhone}</p>
+                                                {itemsSummary && <p className="text-xs text-slate-700">{itemsSummary}</p>}
+                                                {pre.direccion && <p className="text-[11px] text-slate-500">📍 {pre.direccion}{pre.ciudad ? `, ${pre.ciudad}` : ''}</p>}
+                                                {pre.metodoPago && <p className="text-[11px] text-slate-500">💳 {pre.metodoPago}</p>}
+                                                {pre.notas && <p className="text-[11px] text-slate-400 italic">&ldquo;{pre.notas}&rdquo;</p>}
+                                                {conv.assignedToName && <p className="text-[11px] text-indigo-600 font-bold">Asignado a {conv.assignedToName}</p>}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <a
+                                                    href={`/admin/inbox?conv=${conv.id}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="flex-1 text-center px-3 py-1.5 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-black transition-all"
+                                                >
+                                                    Abrir chat
+                                                </a>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedDraftForModal(null);
+                                                        setPreloadedClientForOrder({
+                                                            nombre: pre.nombreCliente || conv.contactName,
+                                                            celular: conv.contactPhone,
+                                                            direccion: pre.direccion,
+                                                            ciudad: pre.ciudad,
+                                                        });
+                                                        setIsFastOrderOpen(true);
+                                                    }}
+                                                    className="flex-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black shadow-2xs transition-all cursor-pointer"
+                                                >
+                                                    Crear pedido
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {activeTab === 'borradores' && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
                         <div className="flex items-center justify-between">

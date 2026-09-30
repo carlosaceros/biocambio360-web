@@ -390,6 +390,26 @@ export async function confirmPreOrder(conversationId: string): Promise<void> {
     });
 }
 
+/**
+ * Pre-pedidos confirmados por el Agente IA que TODAVÍA no se han convertido en un pedido real —
+ * viven solo dentro de la conversación (confirmPreOrder solo cambia un estado, no crea un Order).
+ * Sin esta consulta, la única forma de verlos es abrir esa conversación puntual en el inbox: fácil de
+ * olvidar. Se listan todos (asignados o no) para que cualquier asesor los vea al iniciar turno.
+ */
+export async function getConfirmedAiPreOrders(): Promise<ConversationDoc[]> {
+    const q = query(
+        collection(db, 'conversations'),
+        where('preOrder.estado', '==', 'confirmado')
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as ConversationDoc))
+        .sort((a, b) => {
+            const toMs = (v: unknown) => (v as { toMillis?: () => number })?.toMillis?.() ?? 0;
+            return toMs(b.updatedAt) - toMs(a.updatedAt);
+        });
+}
+
 /** Live on/off switch of the after-hours AI agent (default: on). */
 export function subscribeToAgentEnabled(callback: (enabled: boolean) => void): Unsubscribe {
     return onSnapshot(
