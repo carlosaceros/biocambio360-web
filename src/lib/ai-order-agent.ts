@@ -67,8 +67,10 @@ import type { PreOrder } from '@/types/inbox';
 export const AI_AGENT_ID = 'ai-agent';
 export const AI_AGENT_NAME = 'Asistente IA';
 
-const MAX_TURNS_PER_NIGHT = 30;
-const MAX_STRIKES_PER_NIGHT = 3;
+// Subidos para no dejar clientes a medias en una noche activa (ej. varias preguntas de un mismo
+// cliente indeciso) ni cortar por falsos positivos del filtro de mensajes sospechosos/inyección.
+const MAX_TURNS_PER_NIGHT = 60;
+const MAX_STRIKES_PER_NIGHT = 8;
 const HISTORY_MESSAGES = 14;
 /** Bump when the prompt/presentation changes so cached first replies are regenerated. */
 const AGENT_VERSION = 'v8';
@@ -462,22 +464,43 @@ async function sendMessages(
         // The link button can carry the last message's text when there are no reply options
         const withLink = isLast && webButton && options.length === 0;
 
-        let messageId: string;
+        let messageId: string | null = null;
         if (withLink) {
             try {
                 messageId = (await sendCtaUrlButton(phoneId, to, messages[i], WEB_BUTTON_LABEL, SITE_URL)).messageId;
             } catch (err) {
                 console.warn('[ai-agent] CTA button failed, sending plain text:', err instanceof Error ? err.message : err);
-                messageId = (await sendTextMessage(phoneId, to, `${messages[i]}\n${SITE_URL}`)).messageId;
+                try {
+                    messageId = (await sendTextMessage(phoneId, to, `${messages[i]}\n${SITE_URL}`)).messageId;
+                } catch (err2) {
+                    console.error(`[ai-agent] Message ${i + 1}/${messages.length} failed twice (CTA + plain text):`, err2 instanceof Error ? err2.message : err2);
+                }
             }
         } else {
-            messageId = await sendOne(phoneId, to, messages[i], isLast ? options : []);
+            try {
+                messageId = await sendOne(phoneId, to, messages[i], isLast ? options : []);
+            } catch (err) {
+                // Un fallo transitorio de WhatsApp (rate limit, red) no debe silenciar el resto de la
+                // respuesta: sin este reintento, si el mensaje 2 de 3 fallaba, el cliente se quedaba
+                // solo con el saludo del mensaje 1 y nunca recibía la info prometida (ej. precios).
+                console.warn(`[ai-agent] Message ${i + 1}/${messages.length} failed, retrying once:`, err instanceof Error ? err.message : err);
+                await sleep(1200);
+                try {
+                    messageId = await sendOne(phoneId, to, messages[i], isLast ? options : []);
+                } catch (err2) {
+                    console.error(`[ai-agent] Message ${i + 1}/${messages.length} failed twice, continuing with the rest of the reply:`, err2 instanceof Error ? err2.message : err2);
+                }
+            }
         }
 
-        await store(messages[i], messageId, {
-            ...(isLast && options.length > 0 ? { options } : {}),
-            ...(withLink ? linkExtra : {}),
-        });
+        // Si ambos intentos fallaron, no se guarda este mensaje (no hay metaMessageId real), pero se
+        // sigue con los siguientes en vez de abortar toda la respuesta restante.
+        if (messageId) {
+            await store(messages[i], messageId, {
+                ...(isLast && options.length > 0 ? { options } : {}),
+                ...(withLink ? linkExtra : {}),
+            });
+        }
         if (!isLast || (webButton && options.length > 0)) await sleep(SEND_DELAY_MS);
     }
 

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { X, Minus, Plus, ShoppingBag, ArrowRight, Truck, Sparkles, Ticket } from 'lucide-react';
 import Link from 'next/link';
 import { useCart } from '@/lib/cart-context';
@@ -33,6 +34,29 @@ export default function CartDrawer() {
     const [couponError, setCouponError] = useState('');
     const [couponSuccess, setCouponSuccess] = useState('');
     const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+    // Bloquea el scroll del body con position:fixed (no solo overflow:hidden) mientras el carrito
+    // está abierto: en Safari/Chrome móvil, dejar que el fondo pueda scrollear detrás de un overlay
+    // fixed hace que la barra de direcciones se expanda/colapse a mitad de la animación de apertura,
+    // lo que se percibe como un salto o parpadeo justo al abrir.
+    useEffect(() => {
+        if (!isCartOpen) return;
+
+        const scrollY = window.scrollY;
+        const { body } = document;
+        const prevStyle = { position: body.style.position, top: body.style.top, width: body.style.width };
+
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollY}px`;
+        body.style.width = '100%';
+
+        return () => {
+            body.style.position = prevStyle.position;
+            body.style.top = prevStyle.top;
+            body.style.width = prevStyle.width;
+            window.scrollTo(0, scrollY);
+        };
+    }, [isCartOpen]);
 
     const handleApplyCoupon = async () => {
         if (!couponCodeInput.trim()) return;
@@ -111,30 +135,29 @@ export default function CartDrawer() {
                                 </motion.div>
                             ) : (
                                 <AnimatePresence mode="popLayout">
-                                    {cart.filter(item => item && item.product && item.product.id).map((item, idx) => (
+                                    {cart.filter(item => item && item.product && item.product.id).map((item) => (
                                         <motion.div
                                             key={`${item.product.id}-${item.size}`}
-                                            layout
-                                            initial={{ opacity: 0, scale: 0.8, x: -50 }}
-                                            animate={{ opacity: 1, scale: 1, x: 0 }}
-                                            exit={{ opacity: 0, scale: 0.8, x: 50 }}
-                                            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                                            layout="position"
+                                            initial={{ opacity: 0, y: 12 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.18 }}
                                             className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:shadow-lg hover:border-[var(--brand-blue)]/20 transition-all"
                                         >
                                             <div className="flex gap-4">
-                                                <motion.div
-                                                    whileHover={{ scale: 1.05, rotate: 2 }}
-                                                    className="w-24 h-24 bg-gradient-to-br from-gray-50 to-[var(--brand-blue-50)]/50 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-                                                >
-                                                    <img
+                                                <div className="w-24 h-24 bg-gradient-to-br from-gray-50 to-[var(--brand-blue-50)]/50 rounded-xl flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden">
+                                                    <Image
                                                         src={`/images/${getProductImage(item.product, item.size)}`}
                                                         alt={item.product?.nombre || 'Producto'}
+                                                        width={96}
+                                                        height={96}
                                                         className="w-full h-full object-contain p-2"
                                                         onError={(e) => {
                                                             (e.target as HTMLImageElement).src = '/images/placeholder.png';
                                                         }}
                                                     />
-                                                </motion.div>
+                                                </div>
 
                                                 <div className="flex-1 min-w-0">
                                                     <h3 className="font-extrabold text-[var(--brand-dark)] text-sm mb-1 truncate">
@@ -146,57 +169,38 @@ export default function CartDrawer() {
 
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-1 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-1 border border-gray-200">
-                                                            <motion.button
-                                                                whileHover={{ scale: 1.1 }}
-                                                                whileTap={{ scale: 0.9 }}
+                                                            <button
                                                                 onClick={() => updateQuantity(item.product.id, item.size, item.cantidad - 1)}
-                                                                className="p-2 hover:bg-white rounded-lg transition-colors text-gray-600 hover:text-[var(--brand-pink)]"
+                                                                className="p-2 hover:bg-white active:scale-90 rounded-lg transition-transform text-gray-600 hover:text-[var(--brand-pink)]"
                                                             >
                                                                 <Minus size={16} />
-                                                            </motion.button>
-                                                            <motion.span
-                                                                key={item.cantidad}
-                                                                initial={{ scale: 1.5, color: 'var(--brand-blue)' }}
-                                                                animate={{ scale: 1, color: 'var(--brand-dark)' }}
-                                                                className="text-sm font-extrabold w-8 text-center"
-                                                            >
+                                                            </button>
+                                                            <span className="text-sm font-extrabold w-8 text-center text-[var(--brand-dark)]">
                                                                 {item.cantidad}
-                                                            </motion.span>
-                                                            <motion.button
-                                                                whileHover={{ scale: 1.1 }}
-                                                                whileTap={{ scale: 0.9 }}
+                                                            </span>
+                                                            <button
                                                                 onClick={() => updateQuantity(item.product.id, item.size, item.cantidad + 1)}
-                                                                className="p-2 hover:bg-white rounded-lg transition-colors text-gray-600 hover:text-[var(--brand-success)]"
+                                                                className="p-2 hover:bg-white active:scale-90 rounded-lg transition-transform text-gray-600 hover:text-[var(--brand-success)]"
                                                             >
                                                                 <Plus size={16} />
-                                                            </motion.button>
+                                                            </button>
                                                         </div>
-                                                        <motion.button
-                                                            whileHover={{ scale: 1.05 }}
-                                                            whileTap={{ scale: 0.95 }}
+                                                        <button
                                                             onClick={() => removeFromCart(item.product.id, item.size)}
-                                                            className="text-xs text-[var(--brand-pink)] hover:text-[var(--brand-pink-dark)] font-bold px-3 py-1 hover:bg-[var(--brand-pink-50)] rounded-lg transition-colors"
+                                                            className="text-xs text-[var(--brand-pink)] hover:text-[var(--brand-pink-dark)] active:scale-95 font-bold px-3 py-1 hover:bg-[var(--brand-pink-50)] rounded-lg transition-all"
                                                         >
                                                             Eliminar
-                                                        </motion.button>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <motion.div
-                                                layout
-                                                className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center"
-                                            >
+                                            <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
                                                 <span className="text-xs text-gray-500 font-medium">Subtotal:</span>
-                                                <motion.span
-                                                    key={item.cantidad}
-                                                    initial={{ scale: 1.2, color: 'var(--brand-blue)' }}
-                                                    animate={{ scale: 1, color: 'var(--brand-dark)' }}
-                                                    className="font-extrabold text-lg"
-                                                >
+                                                <span className="font-extrabold text-lg text-[var(--brand-dark)]">
                                                     {formatCurrency(item.price * item.cantidad)}
-                                                </motion.span>
-                                            </motion.div>
+                                                </span>
+                                            </div>
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>

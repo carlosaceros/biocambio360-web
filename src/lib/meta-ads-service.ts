@@ -150,6 +150,7 @@ export interface AdsPerformanceReport {
         revenue: number;
         roas: number | null;
         roiPct: number | null;
+        desglose: RevenueBreakdown;
     };
 }
 
@@ -163,7 +164,30 @@ export interface AdsPerformanceReport {
  * (un número dentro del mapa) en vez de comparar directo contra un Timestamp/Date, que nunca haría
  * match. `pos_sales.createdAt` sí es un string ISO consistente, así que ese rango se compara como texto.
  */
-async function getTotalBusinessRevenue(since: string, until: string): Promise<number> {
+const CANAL_LABELS: Record<string, string> = {
+    tienda_virtual: 'Tienda Virtual (checkout web)',
+    call_center: 'Call Center (asesor)',
+    whatsapp: 'WhatsApp (asesor)',
+    pos: 'Punto de Venta (en colección orders)',
+    b2b: 'B2B',
+    sistema_externo: 'Sistema Externo (integración)',
+};
+
+export interface RevenueBreakdownRow {
+    fuente: string;
+    coleccion: 'orders' | 'pos_sales';
+    pedidos: number;
+    total: number;
+}
+
+export interface RevenueBreakdown {
+    total: number;
+    filas: RevenueBreakdownRow[];
+    /** Pedidos excluidos del total por estar cancelados, para que la tabla explique cualquier diferencia. */
+    canceladosExcluidos: { pedidos: number; total: number };
+}
+
+async function getTotalBusinessRevenue(since: string, until: string): Promise<RevenueBreakdown> {
     const db = getAdminDB();
 
     const sinceSeconds = Math.floor(new Date(`${since}T00:00:00-05:00`).getTime() / 1000);
@@ -174,16 +198,51 @@ async function getTotalBusinessRevenue(since: string, until: string): Promise<nu
         db.collection('pos_sales').where('createdAt', '>=', `${since}T00:00:00`).where('createdAt', '<=', `${until}T23:59:59`).get(),
     ]);
 
-    let total = 0;
+    const porCanal = new Map<string, { pedidos: number; total: number }>();
+    let canceladosPedidos = 0;
+    let canceladosTotal = 0;
+
     for (const doc of ordersSnap.docs) {
         const data = doc.data();
-        if (data.status === 'cancelado') continue;
-        total += Number(data.total) || 0;
+        const monto = Number(data.total) || 0;
+        if (data.status === 'cancelado') {
+            canceladosPedidos++;
+            canceladosTotal += monto;
+            continue;
+        }
+        const canal = String(data.canal || 'tienda_virtual');
+        const prev = porCanal.get(canal) ?? { pedidos: 0, total: 0 };
+        prev.pedidos += 1;
+        prev.total += monto;
+        porCanal.set(canal, prev);
     }
-    for (const doc of posSnap.docs) {
-        total += Number(doc.data().total) || 0;
+
+    const filas: RevenueBreakdownRow[] = [...porCanal.entries()]
+        .map(([canal, v]) => ({
+            fuente: CANAL_LABELS[canal] ?? `Canal: ${canal}`,
+            coleccion: 'orders' as const,
+            pedidos: v.pedidos,
+            total: v.total,
+        }))
+        .sort((a, b) => b.total - a.total);
+
+    if (posSnap.size > 0) {
+        const posTotal = posSnap.docs.reduce((acc, d) => acc + (Number(d.data().total) || 0), 0);
+        filas.push({
+            fuente: 'Mostrador POS (colección pos_sales)',
+            coleccion: 'pos_sales',
+            pedidos: posSnap.size,
+            total: posTotal,
+        });
     }
-    return total;
+
+    const total = filas.reduce((acc, f) => acc + f.total, 0);
+
+    return {
+        total,
+        filas,
+        canceladosExcluidos: { pedidos: canceladosPedidos, total: canceladosTotal },
+    };
 }
 
 /**
@@ -196,10 +255,11 @@ export async function getAdsPerformanceReport(since: string, until: string): Pro
     const sinceTs = new Date(`${since}T00:00:00-05:00`);
     const untilTs = new Date(`${until}T23:59:59-05:00`);
 
-    const [spendByCampaign, negocioTotalRevenue] = await Promise.all([
+    const [spendByCampaign, negocioTotalDesglose] = await Promise.all([
         getCampaignSpend(since, until),
         getTotalBusinessRevenue(since, until),
     ]);
+    const negocioTotalRevenue = negocioTotalDesglose.total;
 
     // Ventas reales cerradas en el rango, en conversaciones que llegaron por un anuncio
     const salesSnap = await db
@@ -280,6 +340,7 @@ export async function getAdsPerformanceReport(since: string, until: string): Pro
             revenue: negocioTotalRevenue,
             roas: totalSpend > 0 ? Number((negocioTotalRevenue / totalSpend).toFixed(2)) : null,
             roiPct: totalSpend > 0 ? Number((((negocioTotalRevenue - totalSpend) / totalSpend) * 100).toFixed(1)) : null,
+            desglose: negocioTotalDesglose,
         },
     };
 }

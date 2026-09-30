@@ -10,6 +10,8 @@ import {
     RefreshCw,
     DollarSign,
     Target,
+    Info,
+    X,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency } from '@/lib/checkout-utils';
@@ -25,13 +27,26 @@ interface CampaignPerformance {
     metaPurchaseValue: number | null;
 }
 
+interface RevenueBreakdownRow {
+    fuente: string;
+    coleccion: 'orders' | 'pos_sales';
+    pedidos: number;
+    total: number;
+}
+
+interface RevenueBreakdown {
+    total: number;
+    filas: RevenueBreakdownRow[];
+    canceladosExcluidos: { pedidos: number; total: number };
+}
+
 interface AdsPerformanceReport {
     since: string;
     until: string;
     campanas: CampaignPerformance[];
     totales: { spend: number; revenue: number; ventas: number; roas: number | null; roiPct: number | null };
     sinAtribuir: { revenue: number; ventas: number };
-    negocioTotal: { revenue: number; roas: number | null; roiPct: number | null };
+    negocioTotal: { revenue: number; roas: number | null; roiPct: number | null; desglose: RevenueBreakdown };
 }
 
 const toISODate = (d: Date) => d.toISOString().slice(0, 10);
@@ -46,6 +61,7 @@ export default function RendimientoPautaPage() {
     const [report, setReport] = useState<AdsPerformanceReport | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [showDesglose, setShowDesglose] = useState(false);
 
     const load = useCallback(async () => {
         if (!user) return;
@@ -140,8 +156,22 @@ export default function RendimientoPautaPage() {
                                     <p className="text-xl font-black mt-0.5">{formatCurrency(report.totales.spend)}</p>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-indigo-200 uppercase">Ingreso total del negocio</p>
-                                    <p className="text-xl font-black mt-0.5">{formatCurrency(report.negocioTotal.revenue)}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDesglose(true)}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-indigo-200 uppercase hover:text-white cursor-pointer"
+                                        title="Ver de dónde sale esta cifra"
+                                    >
+                                        Ingreso total del negocio
+                                        <Info size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDesglose(true)}
+                                        className="text-xl font-black mt-0.5 hover:underline decoration-dotted underline-offset-4 cursor-pointer text-left"
+                                    >
+                                        {formatCurrency(report.negocioTotal.revenue)}
+                                    </button>
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-bold text-indigo-200 uppercase">ROAS del negocio</p>
@@ -237,6 +267,68 @@ export default function RendimientoPautaPage() {
                     </>
                 )}
             </div>
+
+            {showDesglose && report && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setShowDesglose(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                            <div>
+                                <h2 className="font-black text-sm text-gray-900">¿De dónde sale el ingreso total del negocio?</h2>
+                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                    {since} a {until} · suma de <code className="bg-gray-100 px-1 rounded">orders</code> (por canal) + <code className="bg-gray-100 px-1 rounded">pos_sales</code>
+                                </p>
+                            </div>
+                            <button onClick={() => setShowDesglose(false)} className="text-gray-400 hover:text-gray-700 shrink-0">
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1">
+                            <table className="w-full text-xs">
+                                <thead className="bg-gray-50 text-gray-500 text-[10px] uppercase font-extrabold sticky top-0">
+                                    <tr>
+                                        <th className="text-left py-2.5 px-5">Fuente</th>
+                                        <th className="text-right py-2.5 px-5">Pedidos</th>
+                                        <th className="text-right py-2.5 px-5">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {report.negocioTotal.desglose.filas.map(f => (
+                                        <tr key={f.fuente}>
+                                            <td className="py-2.5 px-5">
+                                                <span className="font-bold text-gray-800">{f.fuente}</span>
+                                                <span className="block text-[10px] text-gray-400">colección: {f.coleccion}</span>
+                                            </td>
+                                            <td className="py-2.5 px-5 text-right text-gray-500">{f.pedidos}</td>
+                                            <td className="py-2.5 px-5 text-right font-bold text-gray-900">{formatCurrency(f.total)}</td>
+                                        </tr>
+                                    ))}
+                                    {report.negocioTotal.desglose.filas.length === 0 && (
+                                        <tr><td colSpan={3} className="text-center py-8 text-gray-400">Sin pedidos en este rango</td></tr>
+                                    )}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t-2 border-gray-200 bg-gray-50">
+                                        <td className="py-3 px-5 font-black text-gray-900">Total</td>
+                                        <td className="py-3 px-5 text-right font-black text-gray-900">
+                                            {report.negocioTotal.desglose.filas.reduce((a, f) => a + f.pedidos, 0)}
+                                        </td>
+                                        <td className="py-3 px-5 text-right font-black text-indigo-700">
+                                            {formatCurrency(report.negocioTotal.desglose.total)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            {report.negocioTotal.desglose.canceladosExcluidos.pedidos > 0 && (
+                                <p className="text-[11px] text-gray-400 px-5 py-3 border-t border-gray-100">
+                                    No incluye {report.negocioTotal.desglose.canceladosExcluidos.pedidos} pedido(s) cancelado(s) por {formatCurrency(report.negocioTotal.desglose.canceladosExcluidos.total)} en este rango.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
