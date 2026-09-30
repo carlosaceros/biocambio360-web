@@ -62,6 +62,7 @@ import { isHumanOnline, nextOpening, shiftKey, dayPartNow } from '@/lib/business
 import { recordAnalytics, loadCustomerMemory, saveCustomerMemory, memoryPromptBlock, INTENTS, type Intent, type CustomerMemory } from '@/lib/ai-agent-insights';
 import { reverseGeocode, mapsLink } from '@/lib/geocode';
 import { deliveryContextFor } from '@/lib/delivery-schedule-server';
+import { isZonaLocalPorCiudad } from '@/lib/shipping-zones';
 import type { PreOrder } from '@/types/inbox';
 
 export const AI_AGENT_ID = 'ai-agent';
@@ -245,6 +246,7 @@ BOTÓN WEB: nunca escribas la dirección de la web en los mensajes; pon botonWeb
 
 SELECTOR DE PRESENTACIÓN: un mensaje «Quiero el <producto> en presentación <tamaño>» viene de la tarjeta del producto: es un pedido de ese producto y presentación. Regístralo en preOrder y pregunta solo la cantidad. El sistema envía por su cuenta la tarjeta con foto y presentaciones: no escribas listas de precios.
 FECHAS DE ENTREGA: si preguntan cuándo llega o se entrega su pedido, usa ENTREGAS PROGRAMADAS del contexto. Responde: "Para el día {día de la semana + fecha, p. ej. viernes 25 de septiembre} tenemos programada entrega para tu zona: {zona}". SIEMPRE incluye el día de la semana junto con la fecha. Si vienen varias fechas, menciona hasta las 2 más próximas. Nunca menciones mensajeros, teléfonos ni datos internos, y no prometas hora ni garantía: el asesor confirma el horario. Si la zona no está identificada, pregunta su localidad o municipio; si está fuera de las zonas listadas, di que un asesor confirma.
+ENVÍO GRATIS: si el contexto trae la marca ZONA_ENVIO_GRATIS junto con ENTREGAS PROGRAMADAS, dilo en el mismo mensaje o el inmediatamente siguiente, con seguridad y de forma natural (ej. "y para tu zona el envío es gratis 🚚"). No lo repitas en cada turno, basta una vez por conversación. Si esa marca NO aparece, nunca digas que el envío es gratis ni des una cifra de flete: eso lo confirma el asesor.
 ASESOR: primero toma el pedido (producto, cantidad, dirección, pago). NO te apresures a decir que un asesor confirmará al día siguiente ni lo repitas en cada mensaje; menciónalo UNA sola vez, al final del pedido, para coordinar el envío. Habla antes del asesor solo si el cliente lo pide, hay un reclamo o algo que no sabes.
 PEDIDOS: si calculas un total, di que es de referencia y sin envío. Los precios son de referencia; el asesor confirma precio, disponibilidad, envío y pago. No confirmes como definitivo, no prometas fechas/horas de entrega ni descuentos. Con productos, cantidades y datos de entrega: resume y pregunta si es correcto; solo si el cliente confirma pon listo=true y en ese momento (solo al final) dile que un asesor se comunicará para coordinar el envío (puedes indicar cuándo con la APERTURA). Si no quiere esperar, invítalo a pedir ya en la web (24 h) con botonWeb=true.
 
@@ -714,13 +716,19 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
           (ad.notes ? `NOTAS DEL ANUNCIO (del equipo): ${String(ad.notes).slice(0, 300)}\n` : '')
         : '';
 
+    const recentCustomerTexts = history.filter(h => h.role === 'user').slice(-4).map(h => h.text);
+    const placeText = `${input.preOrder?.ciudad ?? ''} ${input.preOrder?.direccion ?? ''}`;
     const deliveryBlock = await deliveryContextFor({
         lastText,
-        customerTexts: history.filter(h => h.role === 'user').slice(-4).map(h => h.text),
+        customerTexts: recentCustomerTexts,
         lastAgentText: [...history].reverse().find(h => h.role === 'model')?.text,
-        placeText: `${input.preOrder?.ciudad ?? ''} ${input.preOrder?.direccion ?? ''}`,
+        placeText,
         orderReady: input.preOrder?.estado === 'listo',
     });
+    // Misma señal de ubicación que ya usa deliveryContextFor (texto reciente del cliente + lugar del
+    // pre-pedido), pero cruzada contra las zonas de envío gratis reales (shipping-zones.ts) — antes el
+    // agente sabía el cronograma de entregas de una zona pero nunca decía si esa misma zona es gratis.
+    const isFreeShippingZone = !!deliveryBlock && isZonaLocalPorCiudad(`${recentCustomerTexts.join(' ')} ${placeText}`);
     const mode = input.mode ?? 'nuevo';
     const opening = nextOpening(input.now);
     const dp = dayPartNow(input.now);
@@ -735,6 +743,7 @@ export async function generateAgentReply(input: BrainInput): Promise<BrainResult
         '.\n' +
         memoryPromptBlock(input.memory ?? null) +
         (deliveryBlock ? `ENTREGAS PROGRAMADAS (información pública):\n${deliveryBlock}\n` : '') +
+        (isFreeShippingZone ? `ZONA_ENVIO_GRATIS: sí — esta zona la cubre la flota propia, el envío no tiene costo para el cliente.\n` : '') +
         (input.locationNote ? `UBICACIÓN COMPARTIDA (pin de WhatsApp): ${input.locationNote}. Ya es la dirección de entrega: NO la pidas de nuevo ni digas que no la entiendes; confírmala en una línea y pide solo detalles (casa/apto/torre/referencia) si faltan.\n` : '') +
         (input.cartNote ? `CARRITO ABANDONADO: el cliente dejó pendiente ${input.cartNote} y responde a nuestro recordatorio. Ayúdale a terminar: resuelve su duda, confirma lo que tenía y anímalo a finalizar (botonWeb=true) o toma el pedido.\n` : '') +
         adBlock +
