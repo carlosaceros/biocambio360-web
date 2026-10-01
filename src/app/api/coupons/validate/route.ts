@@ -54,10 +54,13 @@ export async function POST(request: Request) {
             });
         }
 
-        // Si falló en ambos, devolver el motivo del cupón o del referido
+        // Si falló en ambos, prioriza el motivo del cupón: es el campo donde el cliente escribió el
+        // código, así que si existe como cupón (inactivo, vencido, límite alcanzado, etc.) ese motivo
+        // específico es el que debe verse — no el genérico "código de referido no encontrado", que
+        // antes siempre ganaba porque validateReferralCodeForOrder nunca devuelve mensaje vacío.
         return NextResponse.json({
             valid: false,
-            reason: refResult.message || couponResult.reason || 'El código no es válido.'
+            reason: couponResult.reason || refResult.message || 'El código no es válido.'
         }, { status: 400 });
 
     } catch (error: any) {
