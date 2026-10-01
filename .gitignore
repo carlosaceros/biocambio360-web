@@ -48,14 +48,17 @@ Fotos_productos/
 resumen_estrategia_y_tienda.html
 fidelizacion/
 
-# internal audit reports and generator scripts
+# internal audit reports (generated output, not code — keep these out of git)
 INFORME_TECNICO_*.pdf
 MANUAL_*.pdf
-scripts/*
-!scripts/etl_migrate_excels.py
-!scripts/etl_industrial_production_big_data.py
 *.csv
 EXCELS POR INTEGRAR/
+
+# scripts/: the code (.ts/.py/.js) IS tracked on purpose — these are one-time or repeatable
+# production data migrations (Kommo, ventas, schema fixes) and need git history/audit trail.
+# Only the raw data dumps they read/write stay out, since those are large, regenerable, and
+# often contain full customer exports that don't belong in version control.
+scripts/data/
 
 
 
