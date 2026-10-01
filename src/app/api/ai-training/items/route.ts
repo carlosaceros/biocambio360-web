@@ -1,6 +1,8 @@
 /**
  * Training rules and example conversations for the AI agent.
- * GET list · POST create · PATCH update · DELETE remove. Directors and super admins only.
+ * GET list (any director/superadmin) · POST create / PATCH edit (Fernando/Diego only — always lands
+ * as a pending proposal, never active) · DELETE (Julian/Danilo/superadmin only).
+ * Approving a proposal so it actually goes live happens at /api/ai-training/items/approve.
  */
 
 export const runtime = 'nodejs';
@@ -8,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB } from '@/lib/firebase-admin';
-import { requireTrainer } from '@/lib/ai-training-auth';
+import { requireTrainer, requireTrainingMaker, requireTrainingApprover } from '@/lib/ai-training-auth';
 import {
     LIMITS,
     signItem,
@@ -39,13 +41,21 @@ export async function GET(req: NextRequest) {
             createdBy: data.createdBy ?? '',
             createdAt: data.createdAt ?? '',
             verified: verifyItem(d.id, data), // false = tampered/unsigned: the agent ignores it
+            approvalStatus: data.approvalStatus ?? 'approved', // items created before this feature existed
+            requestedActive: data.requestedActive,
+            proposedBy: data.proposedBy ?? '',
+            proposedAt: data.proposedAt ?? '',
+            approvedBy: data.approvedBy ?? '',
+            approvedAt: data.approvedAt ?? '',
+            rejectedBy: data.rejectedBy ?? '',
+            rejectedAt: data.rejectedAt ?? '',
         };
     });
     return NextResponse.json({ items, limits: LIMITS });
 }
 
 export async function POST(req: NextRequest) {
-    const trainer = await requireTrainer(req);
+    const trainer = await requireTrainingMaker(req);
     if (trainer instanceof NextResponse) return trainer;
 
     const body = await req.json().catch(() => ({}));
@@ -63,14 +73,22 @@ export async function POST(req: NextRequest) {
 
     const ref = db.collection(COLLECTION).doc();
     const now = new Date().toISOString();
-    const item = { kind, ...valid.fields, active: body.active !== false, createdBy: trainer.email, createdAt: now, updatedAt: now };
-    await ref.set({ ...item, sig: signItem({ id: ref.id, ...item }) });
+    // Nunca queda activo al crearlo, sin importar lo que pida el body: necesita aprobación primero.
+    const item = { kind, ...valid.fields, active: false, createdBy: trainer.email, createdAt: now, updatedAt: now };
+    await ref.set({
+        ...item,
+        sig: signItem({ id: ref.id, ...item }),
+        approvalStatus: 'pending',
+        requestedActive: body.active !== false,
+        proposedBy: trainer.email,
+        proposedAt: now,
+    });
     invalidateTrainingCache();
-    return NextResponse.json({ id: ref.id });
+    return NextResponse.json({ id: ref.id, approvalStatus: 'pending' });
 }
 
 export async function PATCH(req: NextRequest) {
-    const trainer = await requireTrainer(req);
+    const trainer = await requireTrainingMaker(req);
     if (trainer instanceof NextResponse) return trainer;
 
     const body = await req.json().catch(() => ({}));
@@ -92,14 +110,30 @@ export async function PATCH(req: NextRequest) {
     });
     if ('error' in valid) return NextResponse.json({ error: valid.error }, { status: 400 });
 
-    const item = { kind, ...valid.fields, active: body.active !== undefined ? !!body.active : !!current.active };
-    await ref.update({ ...item, updatedAt: new Date().toISOString(), updatedBy: trainer.email, sig: signItem({ id, ...item }) });
+    // Cualquier edición de contenido vuelve a pedir aprobación — se desactiva de inmediato
+    // (re-firmado con active:false) hasta que un aprobador la revise de nuevo.
+    const now = new Date().toISOString();
+    const item = { kind, ...valid.fields, active: false };
+    await ref.update({
+        ...item,
+        updatedAt: now,
+        updatedBy: trainer.email,
+        sig: signItem({ id, ...item }),
+        approvalStatus: 'pending',
+        requestedActive: body.active !== undefined ? !!body.active : !!current.active,
+        proposedBy: trainer.email,
+        proposedAt: now,
+        approvedBy: null,
+        approvedAt: null,
+        rejectedBy: null,
+        rejectedAt: null,
+    });
     invalidateTrainingCache();
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, approvalStatus: 'pending' });
 }
 
 export async function DELETE(req: NextRequest) {
-    const trainer = await requireTrainer(req);
+    const trainer = await requireTrainingApprover(req);
     if (trainer instanceof NextResponse) return trainer;
 
     const id = req.nextUrl.searchParams.get('id') ?? '';

@@ -18,6 +18,7 @@ import {
     X,
 } from 'lucide-react';
 import { auth } from '@/lib/firebase';
+import { useAuth } from '@/lib/auth-context';
 import { BASE_RULES } from '@/lib/ai-agent-base-rules';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,7 +57,15 @@ interface TrainingItem {
     active: boolean;
     createdBy: string;
     verified: boolean;
+    approvalStatus?: 'pending' | 'approved' | 'rejected';
+    requestedActive?: boolean;
+    proposedBy?: string;
+    approvedBy?: string;
+    rejectedBy?: string;
 }
+
+const MAKER_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
+const APPROVER_EMAILS = new Set(['julian@biocambio360.com', 'danilo@biocambio360.com']);
 
 interface AdItem {
     id: string;
@@ -85,6 +94,10 @@ const HORARIO: Record<string, string> = { manana: 'En la mañana', tarde: 'En la
 
 export default function EntrenamientoIAPage() {
     const router = useRouter();
+    const { user, role } = useAuth();
+    const myEmail = (user?.email || '').toLowerCase();
+    const isMaker = MAKER_EMAILS.has(myEmail);
+    const isApprover = APPROVER_EMAILS.has(myEmail) || role === 'superadmin';
     const [tab, setTab] = useState<'sim' | 'reglas' | 'anuncios' | 'base'>('sim');
     const [forbidden, setForbidden] = useState('');
     const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
@@ -232,6 +245,16 @@ export default function EntrenamientoIAPage() {
         if (!confirm('¿Eliminar este elemento del entrenamiento?')) return;
         await api(`/api/ai-training/items?id=${item.id}`, { method: 'DELETE' }).catch(e => notify(e.message, false));
         loadItems();
+    };
+    const approveItem = async (item: TrainingItem, decision: 'approve' | 'reject') => {
+        if (decision === 'reject' && !confirm('¿Rechazar esta propuesta? Quedará inactiva.')) return;
+        try {
+            await api('/api/ai-training/items/approve', { method: 'POST', body: JSON.stringify({ id: item.id, decision }) });
+            notify(decision === 'approve' ? 'Propuesta aprobada: ya está en vigencia.' : 'Propuesta rechazada.');
+            loadItems();
+        } catch (e) {
+            notify(e instanceof Error ? e.message : 'No se pudo procesar', false);
+        }
     };
 
     // ── Ads tab ──
@@ -441,56 +464,89 @@ export default function EntrenamientoIAPage() {
             {tab === 'reglas' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div className="space-y-3">
-                        <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
-                            <p className="font-black text-sm text-gray-900">Nueva regla</p>
-                            <p className="text-[11px] text-gray-500">Instrucción general que el agente sigue siempre. Ej: “Si preguntan por envío a Bogotá, dile que un asesor calcula el flete según la zona.”</p>
-                            <textarea value={newRule} onChange={e => setNewRule(e.target.value)} rows={3} maxLength={300} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" placeholder="Escribe la regla…" />
-                            <button onClick={() => createItem({ kind: 'rule', text: newRule }, () => setNewRule(''))} disabled={newRule.trim().length < 8} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1 cursor-pointer">
-                                <Plus size={13} /> Añadir regla
-                            </button>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
-                            <p className="font-black text-sm text-gray-900">Nuevo escenario</p>
-                            <p className="text-[11px] text-gray-500">Un caso concreto: qué dice el cliente y cómo debe responder el agente.</p>
-                            <input value={newScenario.customer} onChange={e => setNewScenario({ ...newScenario, customer: e.target.value })} placeholder="El cliente dice…" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" />
-                            <textarea value={newScenario.ideal} onChange={e => setNewScenario({ ...newScenario, ideal: e.target.value })} rows={3} placeholder="Respuesta ideal…" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" />
-                            <input value={newScenario.note} onChange={e => setNewScenario({ ...newScenario, note: e.target.value })} placeholder="Nota / por qué (opcional)" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" />
-                            <button onClick={() => createItem({ kind: 'example', ...newScenario }, () => setNewScenario({ customer: '', ideal: '', note: '' }))} disabled={newScenario.customer.trim().length < 2 || newScenario.ideal.trim().length < 2} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1 cursor-pointer">
-                                <Plus size={13} /> Añadir escenario
-                            </button>
-                        </div>
+                        {isMaker ? (
+                            <>
+                                <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
+                                    <p className="font-black text-sm text-gray-900">Nueva regla</p>
+                                    <p className="text-[11px] text-gray-500">Instrucción general que el agente sigue siempre. Ej: “Si preguntan por envío a Bogotá, dile que un asesor calcula el flete según la zona.”</p>
+                                    <textarea value={newRule} onChange={e => setNewRule(e.target.value)} rows={3} maxLength={300} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" placeholder="Escribe la regla…" />
+                                    <button onClick={() => createItem({ kind: 'rule', text: newRule }, () => setNewRule(''))} disabled={newRule.trim().length < 8} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1 cursor-pointer">
+                                        <Plus size={13} /> Proponer regla
+                                    </button>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
+                                    <p className="font-black text-sm text-gray-900">Nuevo escenario</p>
+                                    <p className="text-[11px] text-gray-500">Un caso concreto: qué dice el cliente y cómo debe responder el agente.</p>
+                                    <input value={newScenario.customer} onChange={e => setNewScenario({ ...newScenario, customer: e.target.value })} placeholder="El cliente dice…" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" />
+                                    <textarea value={newScenario.ideal} onChange={e => setNewScenario({ ...newScenario, ideal: e.target.value })} rows={3} placeholder="Respuesta ideal…" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" />
+                                    <input value={newScenario.note} onChange={e => setNewScenario({ ...newScenario, note: e.target.value })} placeholder="Nota / por qué (opcional)" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2" />
+                                    <button onClick={() => createItem({ kind: 'example', ...newScenario }, () => setNewScenario({ customer: '', ideal: '', note: '' }))} disabled={newScenario.customer.trim().length < 2 || newScenario.ideal.trim().length < 2} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1 cursor-pointer">
+                                        <Plus size={13} /> Proponer escenario
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-gray-400 px-1">Toda propuesta queda pendiente hasta que Julian, Danilo o un superadmin la apruebe — no afecta al agente hasta entonces.</p>
+                            </>
+                        ) : (
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900">
+                                <p className="font-black mb-1">Solo Fernando o Diego pueden proponer reglas o escenarios nuevos.</p>
+                                {isApprover && <p>Como aprobador, puedes revisar las propuestas pendientes a la derecha y aprobarlas o rechazarlas.</p>}
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3 max-h-[75vh] overflow-y-auto">
                         <p className="font-black text-sm text-gray-900">Lo que el agente ha aprendido</p>
                         {items.length === 0 && <p className="text-xs text-gray-400">Todavía nada. Prueba el simulador y guarda ejemplos.</p>}
-                        {items.map(item => (
-                            <div key={item.id} className={`border rounded-xl p-3 text-xs space-y-1.5 ${item.active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${item.kind === 'rule' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.kind === 'rule' ? 'Regla' : 'Ejemplo'}</span>
-                                    {!item.verified && <span className="text-[10px] font-black text-red-600">No verificado (ignorado)</span>}
-                                    <span className="ml-auto text-[10px] text-gray-400">{item.createdBy}</span>
+                        {items.map(item => {
+                            const status = item.approvalStatus ?? 'approved';
+                            const statusBadge = status === 'pending'
+                                ? <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Pendiente de aprobación</span>
+                                : status === 'rejected'
+                                ? <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700">Rechazado</span>
+                                : <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Aprobado{item.active ? ' · activo' : ' · inactivo'}</span>;
+                            return (
+                                <div key={item.id} className={`border rounded-xl p-3 text-xs space-y-1.5 ${item.active ? 'border-gray-200' : 'border-gray-100 opacity-70'}`}>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${item.kind === 'rule' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.kind === 'rule' ? 'Regla' : 'Ejemplo'}</span>
+                                        {statusBadge}
+                                        {!item.verified && <span className="text-[10px] font-black text-red-600">No verificado (ignorado)</span>}
+                                        <span className="ml-auto text-[10px] text-gray-400">{item.proposedBy || item.createdBy}</span>
+                                    </div>
+                                    {item.kind === 'rule' ? (
+                                        <p className="text-gray-800">{item.text}</p>
+                                    ) : (
+                                        <>
+                                            <p><strong>Cliente:</strong> {item.customer}</p>
+                                            {item.badReply && <p className="text-red-600/80"><strong>Respondió mal:</strong> {item.badReply}</p>}
+                                            <p className="text-emerald-700"><strong>Ideal:</strong> {item.ideal}</p>
+                                            {item.note && <p className="text-gray-500">{item.note}</p>}
+                                        </>
+                                    )}
+                                    <div className="flex gap-2 pt-1 flex-wrap">
+                                        {status === 'pending' && isApprover && (
+                                            <>
+                                                <button onClick={() => approveItem(item, 'approve')} className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer">
+                                                    <Check size={11} /> Aprobar
+                                                </button>
+                                                <button onClick={() => approveItem(item, 'reject')} className="text-[11px] font-bold text-red-600 hover:text-red-800 flex items-center gap-1 cursor-pointer">
+                                                    <X size={11} /> Rechazar
+                                                </button>
+                                            </>
+                                        )}
+                                        {isMaker && (
+                                            <button onClick={() => toggleItem(item)} className="text-[11px] font-bold text-gray-600 hover:text-gray-900 flex items-center gap-1 cursor-pointer">
+                                                {item.active ? <><X size={11} /> Proponer desactivar</> : <><Check size={11} /> Proponer activar</>}
+                                            </button>
+                                        )}
+                                        {isApprover && (
+                                            <button onClick={() => removeItem(item)} className="text-[11px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer">
+                                                <Trash2 size={11} /> Eliminar
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                {item.kind === 'rule' ? (
-                                    <p className="text-gray-800">{item.text}</p>
-                                ) : (
-                                    <>
-                                        <p><strong>Cliente:</strong> {item.customer}</p>
-                                        {item.badReply && <p className="text-red-600/80"><strong>Respondió mal:</strong> {item.badReply}</p>}
-                                        <p className="text-emerald-700"><strong>Ideal:</strong> {item.ideal}</p>
-                                        {item.note && <p className="text-gray-500">{item.note}</p>}
-                                    </>
-                                )}
-                                <div className="flex gap-2 pt-1">
-                                    <button onClick={() => toggleItem(item)} className="text-[11px] font-bold text-gray-600 hover:text-gray-900 flex items-center gap-1 cursor-pointer">
-                                        {item.active ? <><X size={11} /> Desactivar</> : <><Check size={11} /> Activar</>}
-                                    </button>
-                                    <button onClick={() => removeItem(item)} className="text-[11px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer">
-                                        <Trash2 size={11} /> Eliminar
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}

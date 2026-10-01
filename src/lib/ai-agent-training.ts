@@ -16,6 +16,8 @@ import { leaksSensitive } from '@/lib/ai-agent-guard';
 
 export type TrainingKind = 'rule' | 'example';
 
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 export interface TrainingItem {
     id: string;
     kind: TrainingKind;
@@ -28,10 +30,21 @@ export interface TrainingItem {
     /** example: what the agent answered wrongly (optional, for context) */
     badReply?: string;
     note?: string;
+    /** Whether the agent actually honors this item right now — only true once approved. */
     active: boolean;
     createdBy: string;
     createdAt: string;
     updatedAt?: string;
+    /** Maker-checker: Fernando/Diego propose, Julian/Danilo/superadmin approve before it goes live. */
+    approvalStatus?: ApprovalStatus;
+    /** What the maker wants `active` to become once approved (applied on approval, not before). */
+    requestedActive?: boolean;
+    proposedBy?: string;
+    proposedAt?: string;
+    approvedBy?: string;
+    approvedAt?: string;
+    rejectedBy?: string;
+    rejectedAt?: string;
 }
 
 export const LIMITS = { rule: 300, customer: 300, ideal: 500, badReply: 400, note: 300, maxRules: 40, maxExamples: 200 };
