@@ -3,9 +3,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Orders collection
+    // Orders collection. El checkout anónimo SÍ necesita crear pedidos (siempre arrancan en
+    // 'pendiente' -- src/app/checkout/page.tsx), así que `create` se queda público pero forzado
+    // a ese estado inicial: evita que alguien escriba directo un pedido ya 'confirmado' (fraude
+    // de referidos/stock/prueba social) sin pasar por Wompi. Un pedido autenticado desde /admin
+    // (FastOrderModal: 'borrador'/'confirmado'/'guardado'/'descartado' para ventas telefónicas)
+    // sigue permitido vía el OR de `request.auth != null`.
+    //
+    // `update` se restringe a solo-autenticado: ya NO depende de que el checkout anónimo pueda
+    // reescribir el pedido (nunca lo hizo), y los 5 llamadores de servidor que sí necesitan
+    // cambiar el estado sin sesión de navegador (webhooks de Wompi/Addi/99 Envíos, importación de
+    // reportes de envío, y el fallback /api/admin/wompi-status que consulta la página de
+    // confirmación) ya fueron migrados a Admin SDK, que no depende de estas reglas. Antes, un
+    // `updateDoc` anónimo directo podía forjar `status: 'confirmado'` en cualquier pedido
+    // existente sin haber pagado.
     match /orders/{orderId} {
-      allow create, read, update: if true;
+      allow read: if true;
+      allow create: if request.auth != null || request.resource.data.status == 'pendiente';
+      allow update: if request.auth != null;
       allow delete: if request.auth != null;
     }
     
