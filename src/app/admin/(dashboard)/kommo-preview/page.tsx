@@ -15,6 +15,12 @@ interface PreviewMeta {
     withDireccion: number;
     withObservacion: number;
     withApellido: number;
+    withCedula?: number;
+    withTipoCliente?: number;
+    withTelefono2?: number;
+    matchedByTelefono2?: number;
+    withLeadNota?: number;
+    unsortedChats?: number;
 }
 
 interface MatchedItem {
@@ -23,6 +29,7 @@ interface MatchedItem {
     kommoContactIdNum: number;
     customerId: string;
     celular: string;
+    emparejadoPorTelefono2?: boolean;
     clienteActualNombre: string;
     clienteActualDireccion: string;
     clienteActualCiudad: string;
@@ -36,6 +43,9 @@ interface MatchedItem {
     kommoLocalidad: string;
     kommoDireccion: string;
     kommoObservacion: string;
+    kommoTipoCliente?: string;
+    kommoCedula?: string;
+    kommoLeadNota?: string;
 }
 
 interface UnmatchedItem {
@@ -51,6 +61,9 @@ interface UnmatchedItem {
     localidad: string;
     direccion: string;
     observacion: string;
+    tipoCliente?: string;
+    cedula?: string;
+    leadNota?: string;
     motivoSinMatch: 'sin_cliente_con_ese_celular' | 'sin_celular_utilizable';
 }
 
@@ -195,6 +208,12 @@ export default function KommoPreviewPage() {
                         <MetaCard label="Con Localidad" value={meta.withLocalidad} />
                         <MetaCard label="Con Dirección" value={meta.withDireccion} />
                         <MetaCard label="Con Observación" value={meta.withObservacion} />
+                        <MetaCard label="Con Tipo de cliente" value={meta.withTipoCliente || 0} />
+                        <MetaCard label="Con Cédula" value={meta.withCedula || 0} />
+                        <MetaCard label="Con Teléfono 2" value={meta.withTelefono2 || 0} />
+                        <MetaCard label="Match solo por Tel. 2" value={meta.matchedByTelefono2 || 0} />
+                        <MetaCard label="Con Nota de Lead" value={meta.withLeadNota || 0} />
+                        <MetaCard label="Chats sin clasificar" value={meta.unsortedChats || 0} highlight="amber" />
                     </div>
                 )}
 
@@ -324,7 +343,7 @@ function EmptyOrLoading({ loading, colSpan, emptyText }: { loading: boolean; col
 
 function MatchedTable({ items, loading }: { items: MatchedItem[]; loading: boolean }) {
     return (
-        <table className="w-full text-left text-xs text-slate-600 min-w-[1700px]">
+        <table className="w-full text-left text-xs text-slate-600 min-w-[2100px]">
             <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider sticky top-0">
                 <tr>
                     <th className="px-3 py-3">Kommo ID</th>
@@ -340,17 +359,25 @@ function MatchedTable({ items, loading }: { items: MatchedItem[]; loading: boole
                     <th className="px-3 py-3 bg-emerald-50">+ Localidad</th>
                     <th className="px-3 py-3 bg-emerald-50">+ Dirección (Kommo)</th>
                     <th className="px-3 py-3 bg-emerald-50">+ Observación</th>
+                    <th className="px-3 py-3 bg-emerald-50">+ Tipo de cliente</th>
+                    <th className="px-3 py-3 bg-emerald-50">+ Cédula</th>
+                    <th className="px-3 py-3 bg-emerald-50">+ Nota de Lead</th>
                     <th className="px-3 py-3 bg-emerald-50">+ Etiquetas nuevas</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
                 {items.length === 0 ? (
-                    <EmptyOrLoading loading={loading} colSpan={14} emptyText="No hay más registros en esta página." />
+                    <EmptyOrLoading loading={loading} colSpan={17} emptyText="No hay más registros en esta página." />
                 ) : (
                     items.map((it) => (
                         <tr key={it.id} className="hover:bg-slate-50/80">
                             <td className="px-3 py-2.5 font-mono text-slate-400">#{it.kommoContactId}</td>
-                            <td className="px-3 py-2.5 font-mono">{it.celular || '—'}</td>
+                            <td className="px-3 py-2.5 font-mono">
+                                {it.celular || '—'}
+                                {it.emparejadoPorTelefono2 && (
+                                    <span className="ml-1 text-[9px] font-black bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded">Tel. 2</span>
+                                )}
+                            </td>
                             <td className="px-3 py-2.5">
                                 <div className="font-bold text-slate-900">{it.clienteActualNombre || '—'}</div>
                                 <div className="text-[10px] text-slate-400 font-mono">id: {it.customerId}</div>
@@ -365,6 +392,9 @@ function MatchedTable({ items, loading }: { items: MatchedItem[]; loading: boole
                             <td className="px-3 py-2.5 bg-emerald-50/40">{it.kommoLocalidad || <span className="text-slate-300">—</span>}</td>
                             <td className="px-3 py-2.5 bg-emerald-50/40 max-w-[220px] truncate" title={it.kommoDireccion}>{it.kommoDireccion || <span className="text-slate-300">—</span>}</td>
                             <td className="px-3 py-2.5 bg-emerald-50/40 max-w-[220px] truncate" title={it.kommoObservacion}>{it.kommoObservacion || <span className="text-slate-300">—</span>}</td>
+                            <td className="px-3 py-2.5 bg-emerald-50/40">{it.kommoTipoCliente || <span className="text-slate-300">—</span>}</td>
+                            <td className="px-3 py-2.5 bg-emerald-50/40 font-mono">{it.kommoCedula || <span className="text-slate-300">—</span>}</td>
+                            <td className="px-3 py-2.5 bg-emerald-50/40 max-w-[220px] truncate" title={it.kommoLeadNota}>{it.kommoLeadNota || <span className="text-slate-300">—</span>}</td>
                             <td className="px-3 py-2.5 bg-emerald-50/40"><TagPills tags={it.kommoEtiquetasNuevas} /></td>
                         </tr>
                     ))
@@ -376,7 +406,7 @@ function MatchedTable({ items, loading }: { items: MatchedItem[]; loading: boole
 
 function UnmatchedTable({ items, loading }: { items: UnmatchedItem[]; loading: boolean }) {
     return (
-        <table className="w-full text-left text-xs text-slate-600 min-w-[1500px]">
+        <table className="w-full text-left text-xs text-slate-600 min-w-[1900px]">
             <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider sticky top-0">
                 <tr>
                     <th className="px-3 py-3">Kommo ID</th>
@@ -389,12 +419,15 @@ function UnmatchedTable({ items, loading }: { items: UnmatchedItem[]; loading: b
                     <th className="px-3 py-3">Localidad</th>
                     <th className="px-3 py-3">Dirección</th>
                     <th className="px-3 py-3">Observación</th>
+                    <th className="px-3 py-3">Tipo de cliente</th>
+                    <th className="px-3 py-3">Cédula</th>
+                    <th className="px-3 py-3">Nota de Lead</th>
                     <th className="px-3 py-3">Etiquetas</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
                 {items.length === 0 ? (
-                    <EmptyOrLoading loading={loading} colSpan={11} emptyText="No hay más registros en esta página." />
+                    <EmptyOrLoading loading={loading} colSpan={14} emptyText="No hay más registros en esta página." />
                 ) : (
                     items.map((it) => (
                         <tr key={it.id} className="hover:bg-slate-50/80">
@@ -414,6 +447,9 @@ function UnmatchedTable({ items, loading }: { items: UnmatchedItem[]; loading: b
                             <td className="px-3 py-2.5">{it.localidad || '—'}</td>
                             <td className="px-3 py-2.5 max-w-[220px] truncate" title={it.direccion}>{it.direccion || '—'}</td>
                             <td className="px-3 py-2.5 max-w-[220px] truncate" title={it.observacion}>{it.observacion || '—'}</td>
+                            <td className="px-3 py-2.5">{it.tipoCliente || '—'}</td>
+                            <td className="px-3 py-2.5 font-mono">{it.cedula || '—'}</td>
+                            <td className="px-3 py-2.5 max-w-[220px] truncate" title={it.leadNota}>{it.leadNota || '—'}</td>
                             <td className="px-3 py-2.5"><TagPills tags={it.etiquetas} /></td>
                         </tr>
                     ))

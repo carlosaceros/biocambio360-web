@@ -34,6 +34,9 @@ export interface Customer {
     kommoLocalidad?: string;
     kommoDireccion?: string;
     kommoObservacion?: string;
+    kommoTipoCliente?: string;
+    kommoCedula?: string;
+    kommoLeadNota?: string;
 
     // Metadata
     createdAt: Timestamp | any;
