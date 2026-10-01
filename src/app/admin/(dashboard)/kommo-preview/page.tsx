@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, AlertCircle, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Users, UserPlus } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Users, UserPlus, Check, Undo2, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import FastOrderModal from '@/components/admin/FastOrderModal';
 
 interface PreviewMeta {
     totalContacts: number;
@@ -21,6 +22,7 @@ interface PreviewMeta {
     matchedByTelefono2?: number;
     withLeadNota?: number;
     unsortedChats?: number;
+    unmatchedPendientes?: number;
 }
 
 interface MatchedItem {
@@ -52,9 +54,8 @@ interface UnmatchedItem {
     id: string;
     kommoContactId: string;
     kommoContactIdNum: number;
-    kommoNombre: string;
-    kommoApellido: string;
-    nombreCompletoKommo: string;
+    nombre: string;
+    apellido: string;
     celular: string;
     etiquetas: string[];
     etapa: string;
@@ -64,7 +65,8 @@ interface UnmatchedItem {
     tipoCliente?: string;
     cedula?: string;
     leadNota?: string;
-    motivoSinMatch: 'sin_cliente_con_ese_celular' | 'sin_celular_utilizable';
+    revisadoManualmente?: boolean;
+    revisadoPor?: string;
 }
 
 const PAGE_SIZE = 50;
@@ -86,6 +88,10 @@ export default function KommoPreviewPage() {
     const [hasMore, setHasMore] = useState(false);
     const [searchInput, setSearchInput] = useState('');
     const [activeSearch, setActiveSearch] = useState('');
+    const [hideReviewed, setHideReviewed] = useState(true);
+    const [markingId, setMarkingId] = useState<string | null>(null);
+    const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
+    const [preloadedCustomer, setPreloadedCustomer] = useState<{ nombre: string; celular: string; direccion?: string } | null>(null);
 
     const fetchPage = useCallback(async (cursor: number | null, search: string) => {
         if (!user) return;
@@ -148,6 +154,29 @@ export default function KommoPreviewPage() {
         setActiveSearch('');
     };
 
+    const handleMarkReviewed = async (kommoContactId: string, value: boolean) => {
+        if (!user) return;
+        setMarkingId(kommoContactId);
+        try {
+            const idToken = await user.getIdToken();
+            await fetch('/api/admin/kommo-preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ kommoContactId, revisadoManualmente: value }),
+            });
+            setItems(prev => prev.map(it => (it as UnmatchedItem).kommoContactId === kommoContactId
+                ? { ...it, revisadoManualmente: value } as UnmatchedItem
+                : it));
+        } finally {
+            setMarkingId(null);
+        }
+    };
+
+    const handleCreateCustomer = (it: UnmatchedItem) => {
+        setPreloadedCustomer({ nombre: it.nombre || '', celular: it.celular || '', direccion: it.direccion || '' });
+        setIsFastOrderOpen(true);
+    };
+
     if (authLoading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -202,6 +231,7 @@ export default function KommoPreviewPage() {
                         <MetaCard label="Contactos Kommo" value={meta.totalContacts} />
                         <MetaCard label="Se agrega a existentes" value={meta.matched} highlight="emerald" />
                         <MetaCard label="Para revisión (nuevo)" value={meta.unmatched} highlight="amber" />
+                        <MetaCard label="Pendientes de revisar" value={meta.unmatchedPendientes ?? meta.unmatched} highlight="amber" />
                         <MetaCard label="Sin celular" value={meta.noPhone} />
                         <MetaCard label="Con Apellido" value={meta.withApellido} />
                         <MetaCard label="Con Etapa" value={meta.withEtapa} />
@@ -235,30 +265,43 @@ export default function KommoPreviewPage() {
                             }`}
                         >
                             <UserPlus size={14} />
-                            Contactos nuevos para revisión{meta ? ` (${(meta.unmatched + meta.noPhone).toLocaleString('es-CO')})` : ''}
+                            Contactos nuevos para revisión{meta ? ` (${meta.unmatched.toLocaleString('es-CO')})` : ''}
                         </button>
                     </div>
 
-                    <form onSubmit={handleSearch} className="flex items-center gap-2">
-                        <div className="relative">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                placeholder="Buscar por celular exacto..."
-                                className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs w-56 focus:outline-hidden"
-                            />
-                        </div>
-                        <button type="submit" className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer">
-                            Buscar
-                        </button>
-                        {activeSearch && (
-                            <button type="button" onClick={clearSearch} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold cursor-pointer">
-                                Limpiar
-                            </button>
+                    <div className="flex items-center gap-3">
+                        {tab === 'unmatched' && (
+                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={hideReviewed}
+                                    onChange={(e) => setHideReviewed(e.target.checked)}
+                                    className="cursor-pointer"
+                                />
+                                Ocultar ya revisados
+                            </label>
                         )}
-                    </form>
+                        <form onSubmit={handleSearch} className="flex items-center gap-2">
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    placeholder="Buscar por celular exacto..."
+                                    className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs w-56 focus:outline-hidden"
+                                />
+                            </div>
+                            <button type="submit" className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer">
+                                Buscar
+                            </button>
+                            {activeSearch && (
+                                <button type="button" onClick={clearSearch} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold cursor-pointer">
+                                    Limpiar
+                                </button>
+                            )}
+                        </form>
+                    </div>
                 </div>
 
                 {error && (
@@ -270,7 +313,13 @@ export default function KommoPreviewPage() {
                         {tab === 'matched' ? (
                             <MatchedTable items={items as MatchedItem[]} loading={loading} />
                         ) : (
-                            <UnmatchedTable items={items as UnmatchedItem[]} loading={loading} />
+                            <UnmatchedTable
+                                items={(items as UnmatchedItem[]).filter(it => !hideReviewed || !it.revisadoManualmente)}
+                                loading={loading}
+                                markingId={markingId}
+                                onMarkReviewed={handleMarkReviewed}
+                                onCreateCustomer={handleCreateCustomer}
+                            />
                         )}
                     </div>
 
@@ -297,6 +346,12 @@ export default function KommoPreviewPage() {
                     </div>
                 </div>
             </main>
+
+            <FastOrderModal
+                isOpen={isFastOrderOpen}
+                onClose={() => { setIsFastOrderOpen(false); setPreloadedCustomer(null); }}
+                preloadedCustomer={preloadedCustomer || undefined}
+            />
         </div>
     );
 }
@@ -404,17 +459,24 @@ function MatchedTable({ items, loading }: { items: MatchedItem[]; loading: boole
     );
 }
 
-function UnmatchedTable({ items, loading }: { items: UnmatchedItem[]; loading: boolean }) {
+function UnmatchedTable({
+    items, loading, markingId, onMarkReviewed, onCreateCustomer,
+}: {
+    items: UnmatchedItem[];
+    loading: boolean;
+    markingId: string | null;
+    onMarkReviewed: (kommoContactId: string, value: boolean) => void;
+    onCreateCustomer: (it: UnmatchedItem) => void;
+}) {
     return (
-        <table className="w-full text-left text-xs text-slate-600 min-w-[1900px]">
+        <table className="w-full text-left text-xs text-slate-600 min-w-[1800px]">
             <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider sticky top-0">
                 <tr>
+                    <th className="px-3 py-3">Acciones</th>
                     <th className="px-3 py-3">Kommo ID</th>
                     <th className="px-3 py-3">Nombre completo (Kommo)</th>
-                    <th className="px-3 py-3">Nombre</th>
                     <th className="px-3 py-3">Apellido</th>
                     <th className="px-3 py-3">Celular</th>
-                    <th className="px-3 py-3">Motivo sin match</th>
                     <th className="px-3 py-3">Etapa</th>
                     <th className="px-3 py-3">Localidad</th>
                     <th className="px-3 py-3">Dirección</th>
@@ -427,22 +489,35 @@ function UnmatchedTable({ items, loading }: { items: UnmatchedItem[]; loading: b
             </thead>
             <tbody className="divide-y divide-slate-100">
                 {items.length === 0 ? (
-                    <EmptyOrLoading loading={loading} colSpan={14} emptyText="No hay más registros en esta página." />
+                    <EmptyOrLoading loading={loading} colSpan={13} emptyText="No hay más registros en esta página." />
                 ) : (
                     items.map((it) => (
-                        <tr key={it.id} className="hover:bg-slate-50/80">
-                            <td className="px-3 py-2.5 font-mono text-slate-400">#{it.kommoContactId}</td>
-                            <td className="px-3 py-2.5 font-bold text-slate-900">{it.nombreCompletoKommo || '—'}</td>
-                            <td className="px-3 py-2.5">{it.kommoNombre || '—'}</td>
-                            <td className="px-3 py-2.5">{it.kommoApellido || '—'}</td>
-                            <td className="px-3 py-2.5 font-mono">{it.celular || '—'}</td>
+                        <tr key={it.id} className={`hover:bg-slate-50/80 ${it.revisadoManualmente ? 'opacity-50' : ''}`}>
                             <td className="px-3 py-2.5">
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                                    it.motivoSinMatch === 'sin_celular_utilizable' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                    {it.motivoSinMatch === 'sin_celular_utilizable' ? 'Sin celular utilizable' : 'Sin cliente con ese celular'}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => onMarkReviewed(it.kommoContactId, !it.revisadoManualmente)}
+                                        disabled={markingId === it.kommoContactId}
+                                        title={it.revisadoManualmente ? 'Marcar como pendiente' : 'Marcar como revisado'}
+                                        className={`p-1.5 rounded-lg cursor-pointer disabled:opacity-40 ${
+                                            it.revisadoManualmente ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {it.revisadoManualmente ? <Undo2 size={13} /> : <Check size={13} />}
+                                    </button>
+                                    <button
+                                        onClick={() => onCreateCustomer(it)}
+                                        title="Crear pedido/cliente con estos datos precargados"
+                                        className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 cursor-pointer"
+                                    >
+                                        <ShoppingBag size={13} />
+                                    </button>
+                                </div>
                             </td>
+                            <td className="px-3 py-2.5 font-mono text-slate-400">#{it.kommoContactId}</td>
+                            <td className="px-3 py-2.5 font-bold text-slate-900">{it.nombre || '—'}</td>
+                            <td className="px-3 py-2.5">{it.apellido || '—'}</td>
+                            <td className="px-3 py-2.5 font-mono">{it.celular || '—'}</td>
                             <td className="px-3 py-2.5">{it.etapa || '—'}</td>
                             <td className="px-3 py-2.5">{it.localidad || '—'}</td>
                             <td className="px-3 py-2.5 max-w-[220px] truncate" title={it.direccion}>{it.direccion || '—'}</td>

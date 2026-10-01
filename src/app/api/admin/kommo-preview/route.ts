@@ -49,7 +49,10 @@ export async function GET(req: NextRequest) {
 
     try {
         const db = getAdminDB();
-        const collectionName = tab === 'matched' ? 'kommo_migration_preview_matched' : 'kommo_migration_preview_unmatched';
+        // "matched" sigue leyendo el registro histórico del dry-run (ya ejecutado, es auditoría).
+        // "unmatched" ahora lee la colección REAL escrita por --execute, que es la que de verdad
+        // hay que revisar (incluye revisadoManualmente para marcar avance).
+        const collectionName = tab === 'matched' ? 'kommo_migration_preview_matched' : 'kommo_migration_unmatched';
 
         let query: FirebaseFirestore.Query = db.collection(collectionName).orderBy('kommoContactIdNum');
 
@@ -69,14 +72,67 @@ export async function GET(req: NextRequest) {
         const metaSnap = await db.collection('kommo_migration_preview_meta').doc('summary').get();
         const meta = metaSnap.exists ? metaSnap.data() : null;
 
+        // El conteo real de unmatched/revisados vive en la colección real, no en el meta del dry-run.
+        const unmatchedTotal = (await db.collection('kommo_migration_unmatched').count().get()).data().count;
+        const unmatchedPendientes = (
+            await db.collection('kommo_migration_unmatched').where('revisadoManualmente', '==', false).count().get()
+        ).data().count;
+
         return NextResponse.json({
             items,
             nextCursor,
             hasMore: snap.docs.length === pageSize && !searchDigits,
-            meta,
+            meta: { ...meta, unmatched: unmatchedTotal, unmatchedPendientes },
         });
     } catch (err) {
         console.error('[api/admin/kommo-preview] Error:', err instanceof Error ? err.message : err);
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Error leyendo la revisión' }, { status: 500 });
+    }
+}
+
+/**
+ * POST /api/admin/kommo-preview — marca un contacto de kommo_migration_unmatched como revisado
+ * (o revierte la marca). Mismo criterio de acceso que el GET.
+ */
+export async function POST(req: NextRequest) {
+    const authorization = req.headers.get('Authorization') ?? '';
+    const idToken = authorization.replace('Bearer ', '');
+    if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    let decoded: { uid: string; email?: string };
+    try {
+        decoded = await getAdminAuth().verifyIdToken(idToken);
+    } catch {
+        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const email = (decoded.email || '').toLowerCase();
+    let isSuperAdmin = email === ROOT_ACCOUNT_EMAIL;
+    try {
+        const snap = await getAdminDB().collection('admin_users').doc(email).get();
+        isSuperAdmin = isSuperAdmin || (snap.exists && snap.data()?.rol === 'superadmin');
+    } catch {
+        // si falla, se mantiene lo ya resuelto arriba
+    }
+    if (!isSuperAdmin && !ALLOWED_EMAILS.has(email)) {
+        return NextResponse.json({ error: 'No tienes permiso para hacer esto' }, { status: 403 });
+    }
+
+    try {
+        const body = await req.json();
+        const { kommoContactId, revisadoManualmente } = body as { kommoContactId?: string; revisadoManualmente?: boolean };
+        if (!kommoContactId || typeof revisadoManualmente !== 'boolean') {
+            return NextResponse.json({ error: 'Faltan kommoContactId o revisadoManualmente' }, { status: 400 });
+        }
+        const db = getAdminDB();
+        await db.collection('kommo_migration_unmatched').doc(kommoContactId).set({
+            revisadoManualmente,
+            revisadoPor: email,
+            revisadoAt: new Date().toISOString(),
+        }, { merge: true });
+        return NextResponse.json({ success: true });
+    } catch (err) {
+        console.error('[api/admin/kommo-preview] Error marcando revisado:', err instanceof Error ? err.message : err);
+        return NextResponse.json({ error: 'No se pudo actualizar' }, { status: 500 });
     }
 }
