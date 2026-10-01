@@ -121,6 +121,20 @@ export async function cotizarEnvio(
         }
 
         const data: Record<string, QuoteCarrier> = await res.json();
+
+        // El campo `valor` que devuelve la API NO incluye el seguro obligatorio (seguro99) ni el
+        // sobreflete -- ambos se facturan igual aunque se envíe seguro99:false (confirmado contra
+        // una liquidación real de 99 Envíos: el "Flete" efectivamente cobrado por guía = valor +
+        // seguro99 + sobreflete, no solo 'valor'; el cálculo coincidió centavo a centavo en varias
+        // guías reales). Se corrige aquí, en el único punto de entrada, para que tanto el bulto
+        // único (cheapest.valor) como el multi-bulto (que lee 'all[nombre].valor' directo en
+        // /api/envios/cotizar) reflejen el costo real sin duplicar esta lógica en cada consumidor.
+        for (const carrier of Object.values(data)) {
+            if (carrier.exito) {
+                carrier.valor = carrier.valor + (carrier.seguro99 || 0) + (carrier.sobreflete || 0);
+            }
+        }
+
         let cheapestName = 'interrapidisimo';
         let cheapestVal = Infinity;
 
