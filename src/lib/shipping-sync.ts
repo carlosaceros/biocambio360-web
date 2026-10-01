@@ -7,7 +7,7 @@
  */
 
 import { getAdminDB } from '@/lib/firebase-admin';
-import { updateOrderStatus } from '@/lib/orders-service';
+import { updateOrderStatusAdmin } from '@/lib/orders-service-admin';
 import { classifyShippingEvent } from '@/lib/99envios-status';
 
 export interface ShipmentStatusRow {
@@ -139,7 +139,7 @@ export async function syncShipmentStatuses(
                     { merge: true }
                 );
             }
-            await updateOrderStatus(change.orderId, change.to, note, {
+            await updateOrderStatusAdmin(change.orderId, change.to, note, {
                 email: 'importacion@99envios.app',
                 nombre: 'Sistema (reporte 99 Envíos)',
                 role: 'sistema',

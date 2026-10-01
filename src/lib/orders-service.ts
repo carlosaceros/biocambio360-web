@@ -297,59 +297,20 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
 }
 
 /**
- * Update order status with optional note and user attribution
+ * Efectos secundarios compartidos de un cambio de estado (audit log, descuento de inventario,
+ * notificación por correo, sincronización de referidos). Se usan sin cambios desde ambas
+ * variantes de abajo -- sus colecciones ya aceptan estas escrituras anónimas donde hace falta
+ * (products: solo stock/updatedAt; referral_*: create/update públicos), así que no requieren
+ * Admin SDK para funcionar igual desde un webhook que desde /admin autenticado.
  */
-export async function updateOrderStatus(
+export async function applyOrderStatusSideEffects(
     orderId: string,
+    order: Order,
+    previousStatus: OrderStatus,
     newStatus: OrderStatus,
-    note?: string,
+    note: string | undefined,
     userContext?: { email?: string; nombre?: string; role?: string }
 ): Promise<void> {
-    const orderRef = doc(db, 'orders', orderId);
-    const orderSnap = await getDoc(orderRef);
-
-    if (!orderSnap.exists()) {
-        throw new Error('Order not found');
-    }
-
-    const order = orderSnap.data() as Order;
-    const previousStatus = order.status;
-    const now = Timestamp.now();
-    const nowIso = new Date().toISOString();
-
-    const newTimelineEvent = removeUndefined({
-        status: newStatus,
-        timestamp: now,
-        user: userContext?.nombre || userContext?.email || 'Sistema / Gestor',
-        userEmail: userContext?.email,
-        userRole: userContext?.role,
-        note
-    } as TimelineEvent);
-
-    const updatePayload: Record<string, any> = {
-        status: newStatus,
-        timeline: arrayUnion(newTimelineEvent),
-        updatedAt: now
-    };
-
-    if (note && note.trim()) {
-        const internalNote: OrderInternalNote = {
-            id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-            text: note.trim(),
-            authorEmail: userContext?.email || 'logistica@biocambio360.com',
-            authorName: userContext?.nombre || (userContext?.role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
-            authorRole: userContext?.role || 'logistico',
-            createdAt: nowIso,
-            stageAtCreation: newStatus,
-            isStatusChangeNote: true,
-            previousStatus,
-            newStatus
-        };
-        updatePayload.notasInternas = arrayUnion(removeUndefined(internalNote));
-    }
-
-    await updateDoc(orderRef, updatePayload);
-
     // Registrar en bitácora de auditoría ISO 9001
     try {
         const { recordAuditLog } = await import('./audit-service');
@@ -424,6 +385,79 @@ export async function updateOrderStatus(
     } catch (refErr) {
         console.warn('[Orders] Error al sincronizar recompensa de referido:', refErr);
     }
+}
+
+export function buildOrderStatusUpdatePayload(
+    newStatus: OrderStatus,
+    previousStatus: OrderStatus,
+    note: string | undefined,
+    userContext: { email?: string; nombre?: string; role?: string } | undefined,
+    now: Timestamp,
+    nowIso: string,
+    arrayUnionFn: (...elements: unknown[]) => unknown
+): Record<string, any> {
+    const newTimelineEvent = removeUndefined({
+        status: newStatus,
+        timestamp: now,
+        user: userContext?.nombre || userContext?.email || 'Sistema / Gestor',
+        userEmail: userContext?.email,
+        userRole: userContext?.role,
+        note
+    } as TimelineEvent);
+
+    const updatePayload: Record<string, any> = {
+        status: newStatus,
+        timeline: arrayUnionFn(newTimelineEvent),
+        updatedAt: now
+    };
+
+    if (note && note.trim()) {
+        const internalNote: OrderInternalNote = {
+            id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            text: note.trim(),
+            authorEmail: userContext?.email || 'logistica@biocambio360.com',
+            authorName: userContext?.nombre || (userContext?.role === 'superadmin' ? 'Super Admin' : 'Rol Logístico'),
+            authorRole: userContext?.role || 'logistico',
+            createdAt: nowIso,
+            stageAtCreation: newStatus,
+            isStatusChangeNote: true,
+            previousStatus,
+            newStatus
+        };
+        updatePayload.notasInternas = arrayUnionFn(removeUndefined(internalNote));
+    }
+
+    return updatePayload;
+}
+
+/**
+ * Update order status with optional note and user attribution.
+ * Usa el SDK de cliente -- solo es seguro llamarla desde el navegador con una sesión de
+ * Firebase Auth real (ej. /admin autenticado). Para webhooks y rutas de servidor sin sesión
+ * de navegador, usar updateOrderStatusAdmin() en su lugar.
+ */
+export async function updateOrderStatus(
+    orderId: string,
+    newStatus: OrderStatus,
+    note?: string,
+    userContext?: { email?: string; nombre?: string; role?: string }
+): Promise<void> {
+    const orderRef = doc(db, 'orders', orderId);
+    const orderSnap = await getDoc(orderRef);
+
+    if (!orderSnap.exists()) {
+        throw new Error('Order not found');
+    }
+
+    const order = orderSnap.data() as Order;
+    const previousStatus = order.status;
+    const now = Timestamp.now();
+    const nowIso = new Date().toISOString();
+
+    const updatePayload = buildOrderStatusUpdatePayload(newStatus, previousStatus, note, userContext, now, nowIso, arrayUnion);
+    await updateDoc(orderRef, updatePayload);
+
+    await applyOrderStatusSideEffects(orderId, order, previousStatus, newStatus, note, userContext);
 }
 
 /**

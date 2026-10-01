@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { getAdminDB } from '@/lib/firebase-admin';
-import { updateOrderStatus } from '@/lib/orders-service';
+import { updateOrderStatusAdmin } from '@/lib/orders-service-admin';
 import { classifyShippingEvent } from '@/lib/99envios-status';
 import { Order } from '@/types/order';
 
@@ -301,7 +301,7 @@ export async function POST(request: Request) {
             const internalNote = `Actualización automática: 99 Envíos confirmó entrega exitosa de la guía ${guia || orderData.guiaTransportadora || 'N/A'}.${receptorTxt} Transportadora: ${transNombre}. Fecha de entrega: ${fechaTxt}`;
 
             // Ejecutar la actualización de estado oficial
-            await updateOrderStatus(
+            await updateOrderStatusAdmin(
                 matchedOrderId,
                 'entregado',
                 internalNote,
@@ -368,7 +368,7 @@ export async function POST(request: Request) {
             const noteText = `Novedad reportada por 99 Envíos para la guía ${guia || 'N/A'}: ${novedad || status || event}`;
 
             if (currentStatus !== 'no_entregado') {
-                await updateOrderStatus(
+                await updateOrderStatusAdmin(
                     matchedOrderId,
                     'no_entregado',
                     noteText,

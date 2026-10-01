@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { validateWebhookDynamicSignature } from '@/lib/wompi-service';
-import { updateOrderStatus } from '@/lib/orders-service';
+import { updateOrderStatusAdmin } from '@/lib/orders-service-admin';
 import { OrderStatus } from '@/types/order';
 import { sendAdminPushNotification } from '@/lib/fcm-service';
 import { sendPaymentConfirmedEmail, sendOrderStatusUpdateEmailToAdmin } from '@/lib/email-service';
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         if (newStatus) {
             try {
                 // The reference is assumed to be the Firestore orderId
-                await updateOrderStatus(transaction.reference, newStatus, internalNote);
+                await updateOrderStatusAdmin(transaction.reference, newStatus, internalNote);
                 console.log(`Successfully updated order ${transaction.reference} to ${newStatus}`);
 
                 // Guardar detalles completos de la transacción Wompi

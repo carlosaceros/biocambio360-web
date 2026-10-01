@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { validateAddiBasicAuth } from '@/lib/addi-service';
-import { updateOrderStatus } from '@/lib/orders-service';
+import { updateOrderStatusAdmin } from '@/lib/orders-service-admin';
 import { OrderStatus } from '@/types/order';
 import { sendAdminPushNotification } from '@/lib/fcm-service';
 import { sendPaymentConfirmedEmail, sendOrderStatusUpdateEmailToAdmin } from '@/lib/email-service';
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         if (resolvedOrderId) {
             try {
                 if (newStatus) {
-                    await updateOrderStatus(resolvedOrderId, newStatus, internalNote);
+                    await updateOrderStatusAdmin(resolvedOrderId, newStatus, internalNote);
                 }
 
                 // Guardar detalles completos de la transacción Addi
