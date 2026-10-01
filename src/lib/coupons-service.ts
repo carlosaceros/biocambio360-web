@@ -279,40 +279,6 @@ export async function validateCouponCode(
 }
 
 /**
- * Records coupon redemption in Firestore after successful order placement
- */
-export async function recordCouponRedemption(
-    code: string,
-    orderId: string,
-    customerEmail: string,
-    customerPhone: string,
-    discountAmount: number
-): Promise<void> {
-    const coupons = await getAllCoupons();
-    const coupon = coupons.find(c => c.code.toUpperCase() === code.toUpperCase());
-
-    if (!coupon) return;
-
-    const newRedemptionsCount = (coupon.redemptionsCount || 0) + 1;
-    const newUsageHistory = [
-        ...(coupon.usageHistory || []),
-        {
-            orderId,
-            customerEmail,
-            customerPhone,
-            discountAmount,
-            usedAt: new Date().toISOString()
-        }
-    ];
-
-    await saveCoupon({
-        ...coupon,
-        redemptionsCount: newRedemptionsCount,
-        usageHistory: newUsageHistory
-    });
-}
-
-/**
  * Gets Wheel of Fortune Config.
  * Returns null if the document doesn't exist or an error occurs.
  * This ensures the wheel stays hidden if admin hasn't configured it

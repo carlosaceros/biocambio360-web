@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ShoppingBag, MapPin, CreditCard, Loader, Ticket } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { useCart } from '@/lib/cart-context';
-import { recordCouponRedemption } from '@/lib/coupons-service';
 import {
     DEPARTAMENTOS,
     CIUDADES_POR_DEPARTAMENTO,
@@ -467,13 +466,17 @@ export default function CheckoutPage() {
             // Record coupon usage in database for analytics & security limits
             if (appliedCoupon && orderId) {
                 try {
-                    await recordCouponRedemption(
-                        appliedCoupon.code,
-                        orderId,
-                        formData.email || 'sin-email@biocambio360.com',
-                        formData.celular,
-                        discountAmount
-                    );
+                    await fetch('/api/coupons/redeem', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            code: appliedCoupon.code,
+                            orderId,
+                            customerEmail: formData.email || 'sin-email@biocambio360.com',
+                            customerPhone: formData.celular,
+                            discountAmount
+                        })
+                    });
                 } catch (cErr) {
                     console.warn('Error al registrar redención de cupón:', cErr);
                 }
