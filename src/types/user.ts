@@ -1,11 +1,22 @@
-export type SystemRole = 
-    | 'superadmin' 
-    | 'director' 
-    | 'gestor' 
-    | 'produccion_calidad' 
-    | 'asesor' 
+export type SystemRole =
+    | 'superadmin'
+    | 'director'
+    | 'gestor'
+    | 'produccion_calidad'
+    | 'asesor'
     | 'cajero'
     | 'mensajero';
+
+/**
+ * gestor_pedidos/logistico/logistica no existen como SystemRole (solo 'gestor') pero siempre se
+ * trataron como el mismo rol operativo. Compartido entre cliente (auth-context.tsx) y servidor
+ * (api-auth.ts) para no mantener dos copias de este mapeo -- ya pasó una vez con canAccess/hasCap.
+ */
+export function toSystemRole(role: string): SystemRole | null {
+    if (role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') return 'gestor';
+    if (!role || role === 'user') return null;
+    return role as SystemRole;
+}
 
 export interface UserModuleCapabilities {
     pedidos: boolean;

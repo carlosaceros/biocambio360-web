@@ -31,7 +31,8 @@ import {
     ShieldAlert,
     Megaphone,
     GraduationCap,
-    LineChart
+    LineChart,
+    MessageSquareText
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -631,6 +632,29 @@ export default function AdminDashboard() {
                                         </p>
                                         <span className="text-xs font-bold text-green-700 flex items-center gap-1">
                                             Abrir Bandeja <ArrowUpRight size={14} />
+                                        </span>
+                                    </motion.button>
+                                )}
+
+                                {/* Plantillas de WhatsApp — crear/editar plantillas HSM, aprobación gestionada por Meta */}
+                                {hasCap('mensajeria') && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => router.push('/admin/plantillas-whatsapp')}
+                                        className="bg-white rounded-2xl p-5 shadow-sm border-2 border-emerald-200 text-left hover:border-emerald-500 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                                <MessageSquareText size={22} />
+                                            </div>
+                                        </div>
+                                        <h3 className="text-base font-black text-gray-900 mb-1">Plantillas WhatsApp</h3>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Crea y edita plantillas HSM, revisa el estado de aprobación de Meta.
+                                        </p>
+                                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                            Gestionar <ArrowUpRight size={14} />
                                         </span>
                                     </motion.button>
                                 )}

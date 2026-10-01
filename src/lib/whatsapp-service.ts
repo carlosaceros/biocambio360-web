@@ -210,6 +210,142 @@ export async function getApprovedTemplates(wabaId: string): Promise<unknown[]> {
     return data?.data ?? [];
 }
 
+export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+
+export interface TemplateButtonInput {
+    type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
+    text: string;
+    url?: string;
+    phone_number?: string;
+    /** Valores de ejemplo para los {{1}} dentro de la url (Meta los exige si la url tiene variables). */
+    example?: string[];
+}
+
+export interface TemplateContentInput {
+    headerText?: string;
+    bodyText: string;
+    /** Valores de ejemplo, en orden, para los {{1}}, {{2}}... del body (formato posicional). */
+    bodyExamples?: string[];
+    footerText?: string;
+    buttons?: TemplateButtonInput[];
+}
+
+export interface TemplateCreateInput extends TemplateContentInput {
+    name: string;
+    category: TemplateCategory;
+    language: string;
+}
+
+/**
+ * Construye el array `components` que espera la API de Meta a partir de un formulario simple.
+ * Alcance deliberadamente limitado a lo que cubre la pantalla de /admin: header de solo texto
+ * (no imagen/video/documento -- esos requieren subir un media handle vía el Resumable Upload API
+ * aparte, que es un flujo bastante más largo) y tres tipos de botón (quick_reply/url/phone_number,
+ * sin copy_code ni los botones específicos de autenticación con OTP).
+ */
+function buildTemplateComponents(input: TemplateContentInput): Record<string, unknown>[] {
+    const components: Record<string, unknown>[] = [];
+
+    if (input.headerText && input.headerText.trim()) {
+        components.push({ type: 'HEADER', format: 'TEXT', text: input.headerText.trim() });
+    }
+
+    const bodyComponent: Record<string, unknown> = { type: 'BODY', text: input.bodyText };
+    if (input.bodyExamples && input.bodyExamples.length > 0) {
+        bodyComponent.example = { body_text: [input.bodyExamples] };
+    }
+    components.push(bodyComponent);
+
+    if (input.footerText && input.footerText.trim()) {
+        components.push({ type: 'FOOTER', text: input.footerText.trim() });
+    }
+
+    if (input.buttons && input.buttons.length > 0) {
+        components.push({
+            type: 'BUTTONS',
+            buttons: input.buttons.map((b) => {
+                if (b.type === 'URL') {
+                    return {
+                        type: 'URL', text: b.text, url: b.url,
+                        ...(b.example && b.example.length > 0 ? { example: b.example } : {}),
+                    };
+                }
+                if (b.type === 'PHONE_NUMBER') {
+                    return { type: 'PHONE_NUMBER', text: b.text, phone_number: b.phone_number };
+                }
+                return { type: 'QUICK_REPLY', text: b.text };
+            }),
+        });
+    }
+
+    return components;
+}
+
+function templateApiErrorMessage(data: { error?: { error_user_msg?: string; message?: string } }, status: number): string {
+    return data?.error?.error_user_msg || data?.error?.message || `Error de la API de Meta (HTTP ${status})`;
+}
+
+/** Lista TODAS las plantillas (cualquier estado -- a diferencia de getApprovedTemplates). */
+export async function listAllTemplates(wabaId: string): Promise<unknown[]> {
+    const url = `${GRAPH_API_BASE}/${wabaId}/message_templates?fields=id,name,status,category,language,components,rejected_reason,quality_score&limit=200`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(templateApiErrorMessage(data, res.status));
+    return data?.data ?? [];
+}
+
+/**
+ * Crea una plantilla nueva (POST /{waba-id}/message_templates). Queda en estado PENDING hasta
+ * que Meta la revisa -- el webhook (message_template_status_update) actualiza el estado después.
+ */
+export async function createTemplate(wabaId: string, input: TemplateCreateInput): Promise<{ id: string; status: string; category: string }> {
+    const res = await fetch(`${GRAPH_API_BASE}/${wabaId}/message_templates`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: input.name,
+            category: input.category,
+            language: input.language,
+            components: buildTemplateComponents(input),
+        }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(templateApiErrorMessage(data, res.status));
+    return { id: data.id, status: data.status, category: data.category };
+}
+
+/**
+ * Edita una plantilla existente (POST /{template-id}). Meta solo permite editar cuando el estado
+ * actual es APPROVED, REJECTED o PAUSED (no mientras está PENDING), como máximo 1 vez al día y 10
+ * veces al mes por plantilla, y SIEMPRE vuelve a PENDING para re-revisión. `name` e `language` no
+ * son editables -- si hace falta cambiarlos, Meta exige crear una plantilla nueva.
+ */
+export async function editTemplate(
+    templateId: string,
+    input: Partial<TemplateContentInput> & { category?: TemplateCategory }
+): Promise<{ success: boolean }> {
+    const body: Record<string, unknown> = {};
+    if (input.category) body.category = input.category;
+    if (input.bodyText !== undefined) {
+        body.components = buildTemplateComponents({
+            bodyText: input.bodyText,
+            bodyExamples: input.bodyExamples,
+            headerText: input.headerText,
+            footerText: input.footerText,
+            buttons: input.buttons,
+        });
+    }
+
+    const res = await fetch(`${GRAPH_API_BASE}/${templateId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(templateApiErrorMessage(data, res.status));
+    return { success: !!data.success };
+}
+
 /**
  * Sends a bulk batch of template messages with rate limiting (50 msg/min for Tier 1).
  * Returns detailed results for each recipient.

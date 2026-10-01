@@ -13,18 +13,7 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { recordUserLogin, recordUserHeartbeat, recordUserLogout } from './user-sessions-service';
-import { ROLE_DEFINITIONS, type SystemRole, type UserModuleCapabilities } from '@/types/user';
-
-/**
- * gestor_pedidos/logistico/logistica no existen en ROLE_DEFINITIONS (solo tiene 'gestor') pero
- * siempre se trataron como el mismo rol operativo — este alias preserva ese comportamiento al
- * resolver capacidades por defecto, en vez de dejarlos sin ninguna.
- */
-function toSystemRole(role: UserRole): SystemRole | null {
-    if (role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') return 'gestor';
-    if (role === 'user') return null;
-    return role;
-}
+import { ROLE_DEFINITIONS, toSystemRole, type UserModuleCapabilities } from '@/types/user';
 
 export type UserRole = 
     | 'superadmin' 
