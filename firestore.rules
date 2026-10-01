@@ -59,6 +59,25 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // Referral program: perfil, transacciones y auditoría de saldo. El checkout anónimo
+    // necesita crear/actualizar el perfil y registrar la transacción al aplicar un código de
+    // referido — quedó sin regla propia al cerrar el catch-all abierto (commit 0e1ba61), lo
+    // que rompió en producción la validación y el registro de referidos (confirmado en vivo:
+    // /api/referrals/lookup devolvía "Missing or insufficient permissions"). Mismo criterio
+    // que orders/customers: público para create/update, solo auth para delete.
+    match /referral_profiles/{profileId} {
+      allow read, create, update: if true;
+      allow delete: if request.auth != null;
+    }
+    match /referral_transactions/{transactionId} {
+      allow read, create, update: if true;
+      allow delete: if request.auth != null;
+    }
+    match /referral_balance_audit_logs/{logId} {
+      allow read, create, update: if true;
+      allow delete: if request.auth != null;
+    }
+
     // Coupons collection
     match /coupons/{couponId} {
       allow read, create, update: if true;
