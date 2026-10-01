@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, Timestamp, arrayUnion } from 'firebase/firestore';
+import { getAdminDB } from '@/lib/firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { OrderStatus, TimelineEvent } from '@/types/order';
 import { rateLimit, getClientIp } from '@/lib/rate-limiter';
 
@@ -25,14 +25,15 @@ export async function GET(request: Request) {
         }
 
         // 2. Obtener el pedido actual en Firestore PRIMERO (evita llamadas externas innecesarias)
-        const orderRef = doc(db, 'orders', orderId);
-        const orderSnap = await getDoc(orderRef);
+        const adminDb = getAdminDB();
+        const orderRef = adminDb.collection('orders').doc(orderId);
+        const orderSnap = await orderRef.get();
 
-        if (!orderSnap.exists()) {
+        if (!orderSnap.exists) {
             return NextResponse.json({ error: 'Pedido no encontrado en base de datos' }, { status: 404 });
         }
 
-        const currentOrder = orderSnap.data();
+        const currentOrder = orderSnap.data()!;
 
         // 3. Si el pedido ya está APROBADO o CONFIRMADO, retornar de inmediato sin consultar a Wompi nuevamente
         if (currentOrder.wompiTransaction?.status === 'APPROVED' || currentOrder.status === 'confirmado') {
@@ -129,10 +130,10 @@ export async function GET(request: Request) {
                 note
             };
 
-            await updateDoc(orderRef, {
+            await orderRef.update({
                 wompiTransaction: wompiDetails,
                 status: updatedStatus,
-                timeline: arrayUnion(newTimelineEvent),
+                timeline: FieldValue.arrayUnion(newTimelineEvent),
                 updatedAt: now
             });
 
