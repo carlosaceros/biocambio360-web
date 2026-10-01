@@ -379,6 +379,47 @@ export async function getConversation(id: string): Promise<ConversationDoc | nul
     return docToConversation(snap.id, snap.data());
 }
 
+/**
+ * Busca la conversación de WhatsApp de un cliente por su celular (para mostrarle el historial a un
+ * asesor que solo tiene acceso a su cartera, no a la bandeja completa). Prueba las variantes de
+ * formato de número que ya se usan en el resto del código (con/sin 57).
+ */
+export async function getConversationHistoryByPhone(
+    phone: string,
+    maxMessages: number = 200
+): Promise<{ conversation: ConversationDoc; messages: MessageDoc[] } | null> {
+    const digits = phone.replace(/\D/g, '');
+    const last10 = digits.slice(-10);
+    const variants = Array.from(new Set([digits, last10, `57${last10}`]));
+
+    const q = query(
+        conversationsRef(),
+        where('channel', '==', 'whatsapp'),
+        where('contactPhone', 'in', variants)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+
+    // Si hay más de una (ej. dos cuentas de WhatsApp distintas), se toma la de actividad más reciente.
+    const conversations = snap.docs.map(d => docToConversation(d.id, d.data()));
+    conversations.sort((a, b) => {
+        const toMillis = (v: ConversationDoc['lastMessageAt']) => {
+            if (!v) return 0;
+            if (typeof v === 'string') return new Date(v).getTime();
+            if (v instanceof Date) return v.getTime();
+            return v.toMillis?.() ?? 0;
+        };
+        return toMillis(b.lastMessageAt) - toMillis(a.lastMessageAt);
+    });
+    const conversation = conversations[0];
+
+    const messagesQ = query(messagesRef(conversation.id), orderBy('timestamp', 'desc'), limit(maxMessages));
+    const messagesSnap = await getDocs(messagesQ);
+    const messages = messagesSnap.docs.map(d => docToMessage(d.id, d.data())).reverse();
+
+    return { conversation, messages };
+}
+
 
 // ─── AI agent (after-hours pre-orders) ───────────────────────────────────────
 

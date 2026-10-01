@@ -37,6 +37,7 @@ import {
     Users2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import ClientConversationHistoryModal from '@/components/admin/ClientConversationHistoryModal';
 import { getCustomers, getCustomersWithPagination, syncCustomersFromOrders } from '@/lib/customers-service';
 import { CUSTOMERS_MACRO_STATS } from '@/lib/integrated-customers-summary';
 import SalesScriptsBankModal from '@/components/admin/SalesScriptsBankModal';
@@ -120,6 +121,7 @@ export default function ClientesPage() {
 
     // Selected customer for slideover panel
     const [selectedCustomer, setSelectedCustomer] = useState<CustomerCRM | null>(null);
+    const [showConversationHistory, setShowConversationHistory] = useState(false);
     const [customerOrders, setCustomerOrders] = useState<(Order & { id: string })[]>([]);
     const [customerActivities, setCustomerActivities] = useState<CRMActivity[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(false);
@@ -1012,6 +1014,13 @@ export default function ClientesPage() {
                                             </a>
                                         </div>
                                         <button
+                                            onClick={() => setShowConversationHistory(true)}
+                                            className="w-full flex items-center justify-center gap-2 p-2.5 bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                        >
+                                            <MessageCircle className="w-3.5 h-3.5" />
+                                            Ver historial de conversación de WhatsApp
+                                        </button>
+                                        <button
                                             onClick={() => {
                                                 setPreloadedClientForScripts({
                                                     name: selectedCustomer.nombre || '',
@@ -1275,6 +1284,14 @@ export default function ClientesPage() {
                 initialClientPhone={preloadedClientForScripts.phone}
                 initialAdvisorName={userProfile?.nombre || user?.displayName || 'Asesor Biocambio360'}
             />
+
+            {showConversationHistory && selectedCustomer && (
+                <ClientConversationHistoryModal
+                    phone={selectedCustomer.celular}
+                    customerName={selectedCustomer.nombre}
+                    onClose={() => setShowConversationHistory(false)}
+                />
+            )}
         </div>
     );
 }
