@@ -323,10 +323,17 @@ export function crossCheckCityDepartment(
     // 5. Coincidencia exacta en catálogo de 99 Envíos
     const exactMatches = citiesByName.get(cCity) || [];
     if (exactMatches.length > 0) {
-        const matchWithDept = exactMatches.find(m => {
-            const canNorm = normStr(m.departamentoCanonico);
-            return m.departamentoNorm === cDept || canNorm === cDept || cDept.includes(canNorm) || canNorm.includes(cDept);
-        });
+        // Si cDept viene vacío, `canNorm.includes('')` es SIEMPRE true -- sin esta guarda, cualquier
+        // candidato "calificaba" como coincidencia de departamento y el .find() terminaba devolviendo
+        // el primero del catálogo por orden de inserción, no necesariamente el correcto. Con nombres
+        // de ciudad duplicados en departamentos distintos (ej. "Suárez" existe en Cauca Y en Tolima)
+        // esto podía cotizar en silencio contra el municipio equivocado.
+        const matchWithDept = cDept
+            ? exactMatches.find(m => {
+                const canNorm = normStr(m.departamentoCanonico);
+                return m.departamentoNorm === cDept || canNorm === cDept || cDept.includes(canNorm) || canNorm.includes(cDept);
+            })
+            : undefined;
 
         const chosen = matchWithDept || exactMatches[0];
         const isCorregido = !matchWithDept;
