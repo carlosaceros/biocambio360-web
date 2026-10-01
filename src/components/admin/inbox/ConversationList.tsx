@@ -177,6 +177,14 @@ export default function ConversationList({
                                         </span>
                                     </>
                                 )}
+                                {conv.tags?.includes('venta-cerrada') && (
+                                    <>
+                                        <span className="text-[10px] text-gray-300">·</span>
+                                        <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1 rounded font-semibold" title="Este cliente tiene venta cerrada registrada">
+                                            ✅ Venta
+                                        </span>
+                                    </>
+                                )}
                                 {conv.preOrder?.horarioContacto && (
                                     <>
                                         <span className="text-[10px] text-gray-300">·</span>
