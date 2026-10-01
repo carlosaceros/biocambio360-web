@@ -46,6 +46,15 @@ const balanceAuditCollection = collection(db, 'referral_balance_audit_logs');
 const configDocRef = doc(db, 'referral_config', 'main');
 
 /**
+ * Estados que implican un pago real ya confirmado (el webhook de Wompi movió el pedido de
+ * 'pendiente' a 'confirmado' y de ahí en adelante). 'pendiente' y 'borrador' quedan afuera a
+ * propósito: como `orders` acepta create/update públicos en Firestore, cualquiera puede forjar
+ * un pedido con `status: 'pendiente'` y un total alto sin pagar nada — contarlo aquí permitía
+ * calificar como embajador sin haber comprado.
+ */
+const PAID_ORDER_STATUSES = new Set(['confirmado', 'preparacion', 'enviado', 'en_camino', 'no_entregado', 'entregado']);
+
+/**
  * Saneador recursivo para evitar que Firestore falle ante campos con valor undefined
  */
 function removeUndefined<T>(obj: T): T {
@@ -410,8 +419,8 @@ export async function checkReferrerQualifiedPurchase(phone: string, minSpend = 5
 
         ordersSnap.forEach(d => {
             const data = d.data();
-            // Descartar pedidos cancelados
-            if (data.status !== 'cancelado') {
+            // Solo contar pedidos con pago real confirmado (ver PAID_ORDER_STATUSES)
+            if (PAID_ORDER_STATUSES.has(data.status)) {
                 const val = data.subtotal || data.total || 0;
                 total += val;
                 count++;
