@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, AlertCircle, Loader2, GraduationCap } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useApiResource } from '@/hooks/useApiResource';
 
 const ALLOWED_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
 
@@ -14,32 +14,11 @@ export default function CapacitacionPage() {
     const email = (user?.email || userProfile?.email || '').toLowerCase();
     const isAllowed = role === 'superadmin' || ALLOWED_EMAILS.has(email);
 
-    const [html, setHtml] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (authLoading || !isAllowed || !user) return;
-        let cancelled = false;
-        (async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const idToken = await user.getIdToken();
-                const res = await fetch('/api/admin/capacitacion', {
-                    headers: { Authorization: `Bearer ${idToken}` },
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error ?? 'No se pudo cargar el material');
-                if (!cancelled) setHtml(data.html);
-            } catch (err) {
-                if (!cancelled) setError(err instanceof Error ? err.message : 'No se pudo cargar el material');
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [authLoading, isAllowed, user]);
+    const { data, loading, error } = useApiResource<{ html: string }>(
+        '/api/admin/capacitacion',
+        { enabled: !authLoading && isAllowed }
+    );
+    const html = data?.html ?? null;
 
     if (authLoading) {
         return (
