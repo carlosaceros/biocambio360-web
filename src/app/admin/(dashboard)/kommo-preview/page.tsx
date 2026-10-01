@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, AlertCircle, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Users, UserPlus, Check, Undo2, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
+import { StatCard, Button } from '@/components/ui';
 
 interface PreviewMeta {
     totalContacts: number;
@@ -215,35 +216,35 @@ export default function KommoPreviewPage() {
                             <h1 className="text-xl font-black text-slate-900">Revisión antes de --execute</h1>
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="secondary"
                         onClick={() => fetchPage(cursorStack[pageIndex], activeSearch)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                        icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                         Recargar
-                    </button>
+                    </Button>
                 </div>
             </header>
 
             <main className="max-w-[1600px] mx-auto px-4 md:px-6 py-6 space-y-5">
                 {meta && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3">
-                        <MetaCard label="Contactos Kommo" value={meta.totalContacts} />
-                        <MetaCard label="Se agrega a existentes" value={meta.matched} highlight="emerald" />
-                        <MetaCard label="Para revisión (nuevo)" value={meta.unmatched} highlight="amber" />
-                        <MetaCard label="Pendientes de revisar" value={meta.unmatchedPendientes ?? meta.unmatched} highlight="amber" />
-                        <MetaCard label="Sin celular" value={meta.noPhone} />
-                        <MetaCard label="Con Apellido" value={meta.withApellido} />
-                        <MetaCard label="Con Etapa" value={meta.withEtapa} />
-                        <MetaCard label="Con Localidad" value={meta.withLocalidad} />
-                        <MetaCard label="Con Dirección" value={meta.withDireccion} />
-                        <MetaCard label="Con Observación" value={meta.withObservacion} />
-                        <MetaCard label="Con Tipo de cliente" value={meta.withTipoCliente || 0} />
-                        <MetaCard label="Con Cédula" value={meta.withCedula || 0} />
-                        <MetaCard label="Con Teléfono 2" value={meta.withTelefono2 || 0} />
-                        <MetaCard label="Match solo por Tel. 2" value={meta.matchedByTelefono2 || 0} />
-                        <MetaCard label="Con Nota de Lead" value={meta.withLeadNota || 0} />
-                        <MetaCard label="Chats sin clasificar" value={meta.unsortedChats || 0} highlight="amber" />
+                        <StatCard label="Contactos Kommo" value={meta.totalContacts} />
+                        <StatCard label="Se agrega a existentes" value={meta.matched} color="emerald" />
+                        <StatCard label="Para revisión (nuevo)" value={meta.unmatched} color="amber" />
+                        <StatCard label="Pendientes de revisar" value={meta.unmatchedPendientes ?? meta.unmatched} color="amber" />
+                        <StatCard label="Sin celular" value={meta.noPhone} />
+                        <StatCard label="Con Apellido" value={meta.withApellido} />
+                        <StatCard label="Con Etapa" value={meta.withEtapa} />
+                        <StatCard label="Con Localidad" value={meta.withLocalidad} />
+                        <StatCard label="Con Dirección" value={meta.withDireccion} />
+                        <StatCard label="Con Observación" value={meta.withObservacion} />
+                        <StatCard label="Con Tipo de cliente" value={meta.withTipoCliente || 0} />
+                        <StatCard label="Con Cédula" value={meta.withCedula || 0} />
+                        <StatCard label="Con Teléfono 2" value={meta.withTelefono2 || 0} />
+                        <StatCard label="Match solo por Tel. 2" value={meta.matchedByTelefono2 || 0} />
+                        <StatCard label="Con Nota de Lead" value={meta.withLeadNota || 0} />
+                        <StatCard label="Chats sin clasificar" value={meta.unsortedChats || 0} color="amber" />
                     </div>
                 )}
 
@@ -292,13 +293,9 @@ export default function KommoPreviewPage() {
                                     className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs w-56 focus:outline-hidden"
                                 />
                             </div>
-                            <button type="submit" className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer">
-                                Buscar
-                            </button>
+                            <Button type="submit">Buscar</Button>
                             {activeSearch && (
-                                <button type="button" onClick={clearSearch} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold cursor-pointer">
-                                    Limpiar
-                                </button>
+                                <Button type="button" variant="secondary" onClick={clearSearch}>Limpiar</Button>
                             )}
                         </form>
                     </div>
@@ -328,20 +325,12 @@ export default function KommoPreviewPage() {
                             Página {pageIndex + 1} · {items.length} registros en esta página · {PAGE_SIZE} por página
                         </span>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={goPrev}
-                                disabled={pageIndex === 0 || loading}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 cursor-pointer"
-                            >
-                                <ChevronLeft size={14} /> Anterior
-                            </button>
-                            <button
-                                onClick={goNext}
-                                disabled={!hasMore || loading}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 cursor-pointer"
-                            >
+                            <Button variant="ghost" size="sm" onClick={goPrev} disabled={pageIndex === 0 || loading} icon={<ChevronLeft size={14} />}>
+                                Anterior
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={goNext} disabled={!hasMore || loading}>
                                 Siguiente <ChevronRight size={14} />
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -356,17 +345,6 @@ export default function KommoPreviewPage() {
     );
 }
 
-function MetaCard({ label, value, highlight }: { label: string; value: number; highlight?: 'emerald' | 'amber' }) {
-    const color = highlight === 'emerald' ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-        : highlight === 'amber' ? 'text-amber-800 bg-amber-50 border-amber-200'
-        : 'text-slate-900 bg-white border-slate-200';
-    return (
-        <div className={`rounded-xl border p-3 ${color}`}>
-            <p className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</p>
-            <p className="text-lg font-black mt-0.5">{value.toLocaleString('es-CO')}</p>
-        </div>
-    );
-}
 
 function TagPills({ tags }: { tags?: string[] }) {
     if (!tags || tags.length === 0) return <span className="text-slate-300">—</span>;
