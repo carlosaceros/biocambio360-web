@@ -41,11 +41,10 @@ import { Order, OrderStatus } from '@/types/order';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import NotificationBell from '@/components/NotificationBell';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
-import { UserModuleCapabilities, SystemRole, ROLE_DEFINITIONS } from '@/types/user';
 import { getConfirmedAiPreOrders } from '@/lib/inbox-service';
 
 export default function AdminDashboard() {
-    const { user, userProfile, role, signOut } = useAuth();
+    const { user, userProfile, role, signOut, canAccess: hasCap } = useAuth();
     const router = useRouter();
     const advisorName = userProfile?.asesorAsignado || userProfile?.nombre || user?.displayName || undefined;
     const { notifications, unreadCount, permissionGranted, markAllAsRead, markAsRead, requestPermission } = useAdminNotifications({ role, advisorName });
@@ -211,31 +210,9 @@ export default function AdminDashboard() {
     const canSeeCapacitacion = isSuperAdmin || email === 'fernando@biocambio360.com' || email === 'diego@biocambio360.com';
     const canSeeAdsPerformance = isSuperAdmin || role === 'director';
 
-    // Verificador de capacidades específicas asignadas al usuario
-    const hasCap = (capKey: keyof UserModuleCapabilities) => {
-        if (isSuperAdmin) return true;
-        if (userProfile?.capacidades) {
-            return !!userProfile.capacidades[capKey];
-        }
-        const roleDef = ROLE_DEFINITIONS[role as SystemRole];
-        if (roleDef?.defaultCapabilities?.[capKey]) return true;
-        if (role === 'asesor') {
-            return ['asesores', 'clientes', 'reabastecimiento'].includes(capKey);
-        }
-        if (role === 'cajero') {
-            return ['pos'].includes(capKey);
-        }
-        if (role === 'produccion_calidad') {
-            return ['produccion'].includes(capKey);
-        }
-        if (role === 'gestor' || role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
-            return ['pedidos', 'clientes', 'reabastecimiento', 'envios', 'mensajeria'].includes(capKey);
-        }
-        if (role === 'mensajero') {
-            return ['mensajeria'].includes(capKey);
-        }
-        return false;
-    };
+    // hasCap es canAccess() de auth-context.tsx (ver ahí: única fuente de verdad contra
+    // ROLE_DEFINITIONS). Antes esta página tenía su propia copia que respondía distinto para
+    // gestor/mensajero que la de auth-context.tsx — unificado en la auditoría de arquitectura.
 
     const roleDisplayName = isSuperAdmin
         ? 'Super Administrador'

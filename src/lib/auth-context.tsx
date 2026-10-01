@@ -13,6 +13,18 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { recordUserLogin, recordUserHeartbeat, recordUserLogout } from './user-sessions-service';
+import { ROLE_DEFINITIONS, type SystemRole, type UserModuleCapabilities } from '@/types/user';
+
+/**
+ * gestor_pedidos/logistico/logistica no existen en ROLE_DEFINITIONS (solo tiene 'gestor') pero
+ * siempre se trataron como el mismo rol operativo — este alias preserva ese comportamiento al
+ * resolver capacidades por defecto, en vez de dejarlos sin ninguna.
+ */
+function toSystemRole(role: UserRole): SystemRole | null {
+    if (role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') return 'gestor';
+    if (role === 'user') return null;
+    return role;
+}
 
 export type UserRole = 
     | 'superadmin' 
@@ -45,7 +57,7 @@ interface AuthContextType {
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     changePassword: (newPassword: string) => Promise<void>;
-    canAccess: (module: string) => boolean;
+    canAccess: (module: keyof UserModuleCapabilities) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -202,31 +214,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const canAccess = (module: string): boolean => {
+    /**
+     * Única fuente de verdad para "¿puede este usuario ver/usar el módulo X?". Antes coexistía con
+     * una copia casi-igual (hasCap, en admin/(dashboard)/page.tsx) que respondía DISTINTO para los
+     * mismos roles — ej. gestor/logístico tenía una lista de módulos totalmente distinta en cada una.
+     * Ahora ambas resuelven aquí, y aquí mismo contra ROLE_DEFINITIONS (types/user.ts), que ya es el
+     * registro mantenido y correcto de qué puede hacer cada rol — no una lista aparte a mano.
+     */
+    const canAccess = (module: keyof UserModuleCapabilities): boolean => {
         if (role === 'superadmin') return true;
+        // Decisión explícita: director tiene acceso total automático, incluso a módulos que
+        // ROLE_DEFINITIONS.director marca en false (ej. `usuarios`) — es una cuenta de confianza
+        // (Fernando/Danilo/Julián), no sujeta a la matriz de capacidades por defecto.
         if (role === 'director') return true;
 
-        // Comprobación granular si el usuario tiene capacidades explícitas configuradas
+        // Capacidad explícita configurada para este usuario puntual, si existe
         if (userProfile?.capacidades && typeof userProfile.capacidades[module] === 'boolean') {
             return userProfile.capacidades[module];
         }
 
-        if (role === 'gestor' || role === 'gestor_pedidos' || role === 'logistico' || role === 'logistica') {
-            return ['pedidos', 'cotizaciones-b2b', 'auditoria-envios', 'inventario', 'dashboard', 'carritos-abandonados', 'finanzas', 'productos', 'clientes', 'reabastecimiento'].includes(module);
-        }
-        if (role === 'produccion_calidad') {
-            return ['produccion', 'inventario'].includes(module);
-        }
-        if (role === 'asesor') {
-            return ['asesores', 'clientes', 'reabastecimiento'].includes(module);
-        }
-        if (role === 'cajero') {
-            return ['pos'].includes(module);
-        }
-        if (role === 'mensajero') {
-            return ['mensajero', 'mensajeros'].includes(module);
-        }
-        return false;
+        const systemRole = toSystemRole(role);
+        if (!systemRole) return false;
+        return !!ROLE_DEFINITIONS[systemRole]?.defaultCapabilities[module];
     };
 
     return (
