@@ -9,31 +9,12 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminAuth, getAdminDB } from '@/lib/firebase-admin';
+import { requireRole } from '@/lib/api-auth';
 import { getAdsPerformanceReport } from '@/lib/meta-ads-service';
 
 export async function GET(req: NextRequest) {
-    const authorization = req.headers.get('Authorization') ?? '';
-    const idToken = authorization.replace('Bearer ', '');
-    if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    let decoded: { uid: string; email?: string };
-    try {
-        decoded = await getAdminAuth().verifyIdToken(idToken);
-    } catch {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const email = (decoded.email || '').toLowerCase();
-    let allowed = email === 'thinktic.thinktic@gmail.com';
-    try {
-        const snap = await getAdminDB().collection('admin_users').doc(email).get();
-        const rol = snap.data()?.rol;
-        allowed = allowed || rol === 'superadmin' || rol === 'director';
-    } catch {
-        // si falla, se mantiene lo ya resuelto arriba
-    }
-    if (!allowed) return NextResponse.json({ error: 'No tienes permiso para ver este reporte' }, { status: 403 });
+    const user = await requireRole(req, ['superadmin', 'director']);
+    if (user instanceof NextResponse) return user;
 
     const { searchParams } = new URL(req.url);
     const now = new Date();

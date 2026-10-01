@@ -11,39 +11,15 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminAuth, getAdminDB } from '@/lib/firebase-admin';
+import { requireEmailAllowlist } from '@/lib/api-auth';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const ALLOWED_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
-// Cuenta raíz del sistema (ver isRootAccount en src/lib/auth-context.tsx): es superadmin aunque no
-// tenga documento propio en `admin_users` — sin este caso especial, esta cuenta queda fuera.
-const ROOT_ACCOUNT_EMAIL = 'thinktic.thinktic@gmail.com';
+const checkAccess = requireEmailAllowlist(new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']));
 
 export async function GET(req: NextRequest) {
-    const authorization = req.headers.get('Authorization') ?? '';
-    const idToken = authorization.replace('Bearer ', '');
-    if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    let decoded: { uid: string; email?: string };
-    try {
-        decoded = await getAdminAuth().verifyIdToken(idToken);
-    } catch {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const email = (decoded.email || '').toLowerCase();
-    let isSuperAdmin = email === ROOT_ACCOUNT_EMAIL;
-    try {
-        const snap = await getAdminDB().collection('admin_users').doc(email).get();
-        isSuperAdmin = isSuperAdmin || (snap.exists && snap.data()?.rol === 'superadmin');
-    } catch {
-        // si falla la consulta, seguimos: el chequeo por email explícito abajo igual aplica
-    }
-
-    if (!ALLOWED_EMAILS.has(email) && !isSuperAdmin) {
-        return NextResponse.json({ error: 'No tienes permiso para ver este material' }, { status: 403 });
-    }
+    const user = await checkAccess(req);
+    if (user instanceof NextResponse) return user;
 
     try {
         const dir = join(process.cwd(), 'capacitacion');

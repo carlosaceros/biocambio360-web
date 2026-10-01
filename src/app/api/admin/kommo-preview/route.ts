@@ -11,34 +11,14 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminAuth, getAdminDB } from '@/lib/firebase-admin';
+import { getAdminDB } from '@/lib/firebase-admin';
+import { requireEmailAllowlist } from '@/lib/api-auth';
 
-const ROOT_ACCOUNT_EMAIL = 'thinktic.thinktic@gmail.com';
-const ALLOWED_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
+const checkAccess = requireEmailAllowlist(new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']));
 
 export async function GET(req: NextRequest) {
-    const authorization = req.headers.get('Authorization') ?? '';
-    const idToken = authorization.replace('Bearer ', '');
-    if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    let decoded: { uid: string; email?: string };
-    try {
-        decoded = await getAdminAuth().verifyIdToken(idToken);
-    } catch {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const email = (decoded.email || '').toLowerCase();
-    let isSuperAdmin = email === ROOT_ACCOUNT_EMAIL;
-    try {
-        const snap = await getAdminDB().collection('admin_users').doc(email).get();
-        isSuperAdmin = isSuperAdmin || (snap.exists && snap.data()?.rol === 'superadmin');
-    } catch {
-        // si falla, se mantiene lo ya resuelto arriba
-    }
-    if (!isSuperAdmin && !ALLOWED_EMAILS.has(email)) {
-        return NextResponse.json({ error: 'No tienes permiso para ver esta revisión' }, { status: 403 });
-    }
+    const user = await checkAccess(req);
+    if (user instanceof NextResponse) return user;
 
     const { searchParams } = new URL(req.url);
     const tab = searchParams.get('tab') === 'unmatched' ? 'unmatched' : 'matched';
@@ -95,28 +75,8 @@ export async function GET(req: NextRequest) {
  * (o revierte la marca). Mismo criterio de acceso que el GET.
  */
 export async function POST(req: NextRequest) {
-    const authorization = req.headers.get('Authorization') ?? '';
-    const idToken = authorization.replace('Bearer ', '');
-    if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    let decoded: { uid: string; email?: string };
-    try {
-        decoded = await getAdminAuth().verifyIdToken(idToken);
-    } catch {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const email = (decoded.email || '').toLowerCase();
-    let isSuperAdmin = email === ROOT_ACCOUNT_EMAIL;
-    try {
-        const snap = await getAdminDB().collection('admin_users').doc(email).get();
-        isSuperAdmin = isSuperAdmin || (snap.exists && snap.data()?.rol === 'superadmin');
-    } catch {
-        // si falla, se mantiene lo ya resuelto arriba
-    }
-    if (!isSuperAdmin && !ALLOWED_EMAILS.has(email)) {
-        return NextResponse.json({ error: 'No tienes permiso para hacer esto' }, { status: 403 });
-    }
+    const user = await checkAccess(req);
+    if (user instanceof NextResponse) return user;
 
     try {
         const body = await req.json();
@@ -127,7 +87,7 @@ export async function POST(req: NextRequest) {
         const db = getAdminDB();
         await db.collection('kommo_migration_unmatched').doc(kommoContactId).set({
             revisadoManualmente,
-            revisadoPor: email,
+            revisadoPor: user.email,
             revisadoAt: new Date().toISOString(),
         }, { merge: true });
         return NextResponse.json({ success: true });
