@@ -49,6 +49,7 @@ export default function MensajeroAppPage() {
     const [recipientName, setRecipientName] = useState<string>('');
     const [recipientDoc, setRecipientDoc] = useState<string>('');
     const [codCollected, setCodCollected] = useState<number>(0);
+    const [metodoRecaudo, setMetodoRecaudo] = useState<'efectivo' | 'transferencia'>('efectivo');
     const [deliveryNotes, setDeliveryNotes] = useState<string>('');
     const [isSubmittingDelivery, setIsSubmittingDelivery] = useState<boolean>(false);
 
@@ -122,7 +123,8 @@ export default function MensajeroAppPage() {
         setDeliveryModalOrder(ord);
         setRecipientName(ord.cliente?.nombre || '');
         setRecipientDoc('');
-        setCodCollected(ord.metodoPago === 'contraentrega' ? ord.total : 0);
+        setCodCollected(ord.metodoPago === 'contraentrega' && !ord.pagoConfirmado ? ord.total : 0);
+        setMetodoRecaudo('efectivo');
         setDeliveryNotes('');
     };
 
@@ -142,6 +144,7 @@ export default function MensajeroAppPage() {
                     recibidoPor: recipientName.trim(),
                     documentoRecibido: recipientDoc.trim(),
                     recaudoEfectivo: codCollected,
+                    metodoRecaudo,
                     notas: deliveryNotes.trim(),
                 },
                 {
@@ -358,7 +361,7 @@ export default function MensajeroAppPage() {
                             const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(fullAddress)}`;
                             const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
 
-                            const whatsappText = `¡Hola ${ord.cliente?.nombre || 'Cliente'}! Te saluda ${selectedMessenger?.nombre || 'el mensajero'} de Biocambio360 🚚. Voy en camino a entregarte tu pedido de aseo y llego en aproximadamente 15 a 20 minutos a tu dirección: *${ord.cliente?.direccion || ''}*. ${isCod ? `Total a cobrar en efectivo: *${formatMoney(ord.total)}*.` : 'Tu pedido ya está pagado.'} Por favor confirma si estás atento/a para recibir. ¡Muchas gracias!`;
+                            const whatsappText = `¡Hola ${ord.cliente?.nombre || 'Cliente'}! Te saluda ${selectedMessenger?.nombre || 'el mensajero'} de Biocambio360 🚚. Voy en camino a entregarte tu pedido de aseo y llego en aproximadamente 15 a 20 minutos a tu dirección: *${ord.cliente?.direccion || ''}*. ${isCod && !ord.pagoConfirmado ? `Total a cobrar en efectivo o transferencia: *${formatMoney(ord.total)}*.` : 'Tu pedido ya está pagado.'} Por favor confirma si estás atento/a para recibir. ¡Muchas gracias!`;
 
                             const ventasPhone = '573027504568';
                             const ventasNoContestaText = `Hola equipo de ventas Biocambio360 👋, les saluda el domiciliario ${selectedMessenger?.nombre || 'de ruta'}. Me encuentro en la dirección ${ord.cliente?.direccion || ''} para entregar el pedido #${ord.id.slice(-6).toUpperCase()} a ${ord.cliente?.nombre || 'cliente'} (${ord.cliente?.celular || ''}) pero no responde al llamado ni timbres. ¿Me ayudan a contactarlo para culminar la entrega y no devolver el pedido?`;
@@ -422,16 +425,16 @@ export default function MensajeroAppPage() {
 
                                         {/* CAJA DESTACADA DE COBRO */}
                                         <div className={`p-3 rounded-xl border-2 flex items-center justify-between ${
-                                            isCod
+                                            isCod && !ord.pagoConfirmado
                                                 ? 'bg-amber-50 border-amber-300 text-amber-900'
                                                 : 'bg-blue-50 border-blue-300 text-blue-900'
                                         }`}>
                                             <div>
                                                 <span className="text-[10px] font-black uppercase tracking-wider block">
-                                                    {isCod ? '💵 Cobrar en Efectivo (Contraentrega):' : '✅ Pagado en Línea:'}
+                                                    {isCod && !ord.pagoConfirmado ? '💵 Cobrar en Efectivo (Contraentrega):' : ord.pagoConfirmado ? '✅ Pago Confirmado por Asesor:' : '✅ Pagado en Línea:'}
                                                 </span>
                                                 <span className="text-xl font-black">
-                                                    {isCod ? formatMoney(ord.total) : '$0 COP'}
+                                                    {isCod && !ord.pagoConfirmado ? formatMoney(ord.total) : '$0 COP'}
                                                 </span>
                                             </div>
                                             <div className="text-right text-[10px] font-bold">
@@ -571,6 +574,11 @@ export default function MensajeroAppPage() {
                         </div>
 
                         <div className="space-y-3">
+                            {deliveryModalOrder.pagoConfirmado && (
+                                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3 text-emerald-900 text-xs font-bold flex items-center gap-2">
+                                    ✅ El asesor ya confirmó este pago (ej. transferencia verificada en el chat) -- no vuelvas a cobrar.
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">
                                     ¿Quién recibe el pedido? *
@@ -605,14 +613,45 @@ export default function MensajeroAppPage() {
                                     type="number"
                                     value={codCollected}
                                     onChange={(e) => setCodCollected(Number(e.target.value) || 0)}
-                                    className="w-full bg-emerald-50 border-2 border-emerald-300 text-emerald-950 rounded-xl px-3 py-2.5 text-lg font-black focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    disabled={!!deliveryModalOrder.pagoConfirmado}
+                                    className="w-full bg-emerald-50 border-2 border-emerald-300 text-emerald-950 rounded-xl px-3 py-2.5 text-lg font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                                 <p className="text-[11px] text-slate-500 mt-1">
-                                    {deliveryModalOrder.metodoPago === 'contraentrega'
-                                        ? `Valor de la orden: ${formatMoney(deliveryModalOrder.total)}`
-                                        : 'Esta orden ya fue pagada en línea (recaudo sugerido: $0)'}
+                                    {deliveryModalOrder.pagoConfirmado
+                                        ? 'El asesor ya confirmó este pago -- no hay nada que recaudar.'
+                                        : deliveryModalOrder.metodoPago === 'contraentrega'
+                                            ? `Valor de la orden: ${formatMoney(deliveryModalOrder.total)}`
+                                            : 'Esta orden ya fue pagada en línea (recaudo sugerido: $0)'}
                                 </p>
                             </div>
+
+                            {deliveryModalOrder.metodoPago === 'contraentrega' && codCollected > 0 && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        ¿Cómo recibiste el dinero? *
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setMetodoRecaudo('efectivo')}
+                                            className={`py-2.5 rounded-xl text-xs font-black border-2 cursor-pointer transition-colors ${
+                                                metodoRecaudo === 'efectivo' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                            }`}
+                                        >
+                                            💵 Efectivo
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setMetodoRecaudo('transferencia')}
+                                            className={`py-2.5 rounded-xl text-xs font-black border-2 cursor-pointer transition-colors ${
+                                                metodoRecaudo === 'transferencia' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                            }`}
+                                        >
+                                            📱 Transferencia
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">

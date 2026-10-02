@@ -120,7 +120,15 @@ export interface Order {
     subtotal: number;
     envio: number;
     total: number;
-    metodoPago: 'contraentrega' | 'wompi' | 'addi' | 'transferencia' | 'efectivo_pos' | 'sistecredito' | string;
+    metodoPago: 'contraentrega' | 'wompi' | 'addi' | 'transferencia' | 'efectivo_pos' | 'sistecredito' | 'credito' | string;
+    // Forma en que el mensajero recaudó el dinero contraentrega -- distinto de metodoPago:
+    // 'contraentrega' solo dice QUE se paga al entregar, no CÓMO (efectivo vs. Nequi/transferencia).
+    metodoRecaudo?: 'efectivo' | 'transferencia';
+    // El asesor confirma manualmente (ej. verificó un comprobante de transferencia en el chat) que
+    // ya no hay nada que cobrar contraentrega -- evita que el mensajero cobre dos veces.
+    pagoConfirmado?: boolean;
+    pagoConfirmadoAt?: string;   // ISO date string
+    pagoConfirmadoPor?: string;  // email del asesor
     status: OrderStatus;
     cuponAplicado?: {
         code: string;

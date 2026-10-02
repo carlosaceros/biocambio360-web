@@ -303,6 +303,7 @@ export async function markMessengerDelivered(
         recibidoPor: string;
         documentoRecibido?: string;
         recaudoEfectivo?: number;
+        metodoRecaudo?: 'efectivo' | 'transferencia';
         parentesco?: string;
         notas?: string;
     },
@@ -314,16 +315,24 @@ export async function markMessengerDelivered(
 
     const orderData = orderSnap.data() as Order;
     const nowIso = new Date().toISOString();
-    const efectivo = data.recaudoEfectivo ?? (orderData.metodoPago === 'contraentrega' ? orderData.total : 0);
+    // Si el asesor ya confirmó el pago (ej. transferencia verificada en el chat), nunca hay nada
+    // que recaudar contraentrega -- se ignora cualquier valor recibido para evitar un doble cobro
+    // contable, incluso si un futuro llamador olvida chequear esto antes de llamar la función.
+    const efectivo = orderData.pagoConfirmado
+        ? 0
+        : data.recaudoEfectivo ?? (orderData.metodoPago === 'contraentrega' ? orderData.total : 0);
+    const metodoRecaudo = data.metodoRecaudo || 'efectivo';
 
     const updatePayload: Record<string, any> = {
         estadoMensajeria: 'entregado',
         recaudoEfectivoRecibido: efectivo,
+        metodoRecaudo,
         pruebaEntrega: {
             recibidoPor: data.recibidoPor,
             documentoRecibido: data.documentoRecibido || 'N/A',
             parentesco: data.parentesco || 'Titular / Residente',
             recaudadoEfectivo: efectivo,
+            metodoRecaudo,
             fecha: nowIso,
             origen: 'mensajero_flota_propia',
         },
@@ -333,7 +342,8 @@ export async function markMessengerDelivered(
     await updateDoc(orderDocRef, updatePayload);
 
     const docInfo = data.documentoRecibido ? ` (Doc: ${data.documentoRecibido})` : '';
-    const noteText = `Entrega exitosa confirmada por mensajero ${orderData.mensajeroNombre || messengerId}. Recibió: ${data.recibidoPor}${docInfo}. Efectivo recaudado contraentrega (COD): $${efectivo.toLocaleString('es-CO')} COP.${data.notas ? ` Observaciones: ${data.notas}` : ''}`;
+    const recaudoLabel = metodoRecaudo === 'transferencia' ? 'Transferencia' : 'Efectivo';
+    const noteText = `Entrega exitosa confirmada por mensajero ${orderData.mensajeroNombre || messengerId}. Recibió: ${data.recibidoPor}${docInfo}. Recaudo contraentrega (COD) por ${recaudoLabel}: $${efectivo.toLocaleString('es-CO')} COP.${data.notas ? ` Observaciones: ${data.notas}` : ''}`;
 
     await updateOrderStatus(
         orderId,

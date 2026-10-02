@@ -496,6 +496,36 @@ export async function addOrderInternalNote(
     return internalNote;
 }
 
+/**
+ * Marca (o desmarca) que el pago de un pedido contraentrega ya fue confirmado por un asesor --
+ * ej. verificó un comprobante de transferencia en el chat antes de que llegue el mensajero.
+ * No es un cambio de estado del pedido (por eso no usa updateOrderStatus): es solo una bandera
+ * informativa para que el mensajero no vuelva a cobrar.
+ */
+export async function updateOrderPaymentConfirmation(
+    orderId: string,
+    confirmed: boolean,
+    userContext?: { email?: string; nombre?: string; role?: string },
+    currentStage?: OrderStatus
+): Promise<void> {
+    const orderRef = doc(db, 'orders', orderId);
+    const nowIso = new Date().toISOString();
+
+    await updateDoc(orderRef, {
+        pagoConfirmado: confirmed,
+        pagoConfirmadoAt: confirmed ? nowIso : null,
+        pagoConfirmadoPor: confirmed ? (userContext?.email || 'admin@biocambio360.com') : null,
+        updatedAt: Timestamp.now(),
+    });
+
+    await addOrderInternalNote(
+        orderId,
+        confirmed ? 'Pago confirmado manualmente por el asesor (ej. comprobante de transferencia verificado en el chat).' : 'Se revirtió la confirmación manual de pago.',
+        userContext,
+        currentStage
+    );
+}
+
 export interface SubscribeOrdersOptions {
     statusFilter?: OrderStatus[];
     limitCount?: number;

@@ -50,7 +50,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { subscribeToOrders, updateOrderStatus, addOrderInternalNote, searchOrdersRemotely } from '@/lib/orders-service';
+import { subscribeToOrders, updateOrderStatus, addOrderInternalNote, searchOrdersRemotely, updateOrderPaymentConfirmation } from '@/lib/orders-service';
 import { Order, OrderStatus, ORDER_STATUS_CONFIG, TimelineEvent, OrderInternalNote } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -495,6 +495,7 @@ export default function PedidosPage() {
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [isCheckingWompi, setIsCheckingWompi] = useState(false);
+    const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
     const [wompiStatusFeedback, setWompiStatusFeedback] = useState<string | null>(null);
     const [deliveryExceptionOrder, setDeliveryExceptionOrder] = useState<(Order & { id: string }) | null>(null);
 
@@ -540,6 +541,31 @@ export default function PedidosPage() {
             setRemoteSearchMessage(`❌ Error en búsqueda remota: ${e.message}`);
         } finally {
             setIsSearchingRemote(false);
+        }
+    };
+
+    const handleTogglePaymentConfirmed = async (order: Order & { id: string }) => {
+        setIsConfirmingPayment(true);
+        try {
+            const nextConfirmed = !order.pagoConfirmado;
+            await updateOrderPaymentConfirmation(
+                order.id,
+                nextConfirmed,
+                { email: user?.email || 'admin@biocambio360.com', nombre: userProfile?.nombre || user?.displayName || 'Asesor', role },
+                order.status
+            );
+            const nowIso = new Date().toISOString();
+            setActiveOrder(prev => prev && prev.id === order.id ? {
+                ...prev,
+                pagoConfirmado: nextConfirmed,
+                pagoConfirmadoAt: nextConfirmed ? nowIso : undefined,
+                pagoConfirmadoPor: nextConfirmed ? (user?.email || 'admin@biocambio360.com') : undefined,
+            } : prev);
+        } catch (e) {
+            console.error('Error confirming payment:', e);
+            alert('No se pudo actualizar la confirmación de pago.');
+        } finally {
+            setIsConfirmingPayment(false);
         }
     };
 
@@ -2258,13 +2284,35 @@ export default function PedidosPage() {
 
                                                 {/* Detalle Contraentrega */}
                                                 {activeOrder.metodoPago === 'contraentrega' && (
-                                                    <div className="bg-white rounded-lg p-3 border border-amber-100 text-xs text-amber-900 space-y-1">
+                                                    <div className="bg-white rounded-lg p-3 border border-amber-100 text-xs text-amber-900 space-y-2">
                                                         <p className="font-bold flex items-center gap-1">
                                                             ⚠️ Cobro en destino: {formatCurrency(activeOrder.total)}
                                                         </p>
                                                         <p className="text-gray-600 text-[11px]">
                                                             El transportador o domiciliario recaudará este valor al entregar la mercancía al cliente.
                                                         </p>
+                                                        {activeOrder.pagoConfirmado ? (
+                                                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center justify-between gap-2">
+                                                                <span className="text-emerald-800 font-bold text-[11px]">
+                                                                    ✅ Pago ya confirmado por el asesor{activeOrder.pagoConfirmadoAt ? ` · ${new Date(activeOrder.pagoConfirmadoAt).toLocaleDateString('es-CO')}` : ''}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => handleTogglePaymentConfirmed(activeOrder)}
+                                                                    disabled={isConfirmingPayment}
+                                                                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer disabled:opacity-40"
+                                                                >
+                                                                    Revertir
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleTogglePaymentConfirmed(activeOrder)}
+                                                                disabled={isConfirmingPayment}
+                                                                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-lg font-bold text-[11px] transition-colors cursor-pointer"
+                                                            >
+                                                                {isConfirmingPayment ? 'Guardando...' : '✓ Marcar pago ya confirmado (ej. transferencia verificada en el chat)'}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
