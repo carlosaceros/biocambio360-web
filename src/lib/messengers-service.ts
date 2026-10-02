@@ -575,6 +575,39 @@ export function recommendVehicleAndZone(
     };
 }
 
+/**
+ * Sugiere un mensajero específico (no solo tipo de vehículo) para un pedido, combinando la
+ * zona (recommendVehicleAndZone) con balanceo de carga simple: entre los mensajeros activos del
+ * tipo de vehículo recomendado, prioriza al que menos pedidos tenga asignados ese día. Es solo
+ * una sugerencia -- el despachador siempre puede elegir otro mensajero en el selector.
+ */
+export function suggestMessengerForOrder(
+    direccion: string,
+    ciudad: string,
+    messengers: Messenger[],
+    ordersForDate: Order[]
+): { messengerId: string; messengerNombre: string; reason: string } | null {
+    const { recommendedType, zoneLabel } = recommendVehicleAndZone(direccion, ciudad);
+    const candidates = messengers.filter((m) => m.activo && m.tipoVehiculo === recommendedType);
+    if (candidates.length === 0) return null;
+
+    const loadByMessenger = new Map<string, number>();
+    for (const ord of ordersForDate) {
+        if (ord.status === 'cancelado') continue;
+        if (ord.mensajeroId) loadByMessenger.set(ord.mensajeroId, (loadByMessenger.get(ord.mensajeroId) || 0) + 1);
+    }
+
+    const sorted = [...candidates].sort((a, b) => (loadByMessenger.get(a.id) || 0) - (loadByMessenger.get(b.id) || 0));
+    const chosen = sorted[0];
+    const load = loadByMessenger.get(chosen.id) || 0;
+
+    return {
+        messengerId: chosen.id,
+        messengerNombre: chosen.nombre,
+        reason: `${zoneLabel} -> ${recommendedType === 'moto' ? 'moto' : 'carro'} · ${chosen.nombre} tiene ${load} pedido(s) asignado(s) ese día`,
+    };
+}
+
 export interface WeeklySettlementConsolidated {
     messengerId: string;
     messengerNombre: string;

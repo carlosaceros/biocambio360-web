@@ -44,6 +44,7 @@ import {
     saveMessengerSettlement,
     getMessengerSettlements,
     recommendVehicleAndZone,
+    suggestMessengerForOrder,
     getWeeklySettlementsConsolidated,
     WeeklySettlementConsolidated,
 } from '@/lib/messengers-service';
@@ -93,6 +94,7 @@ export default function MensajerosAdminPage() {
     });
     const [selectedFranjaForAssign, setSelectedFranjaForAssign] = useState<string>('todo_el_dia');
     const [isAssigning, setIsAssigning] = useState<boolean>(false);
+    const [messengerSuggestion, setMessengerSuggestion] = useState<{ messengerId: string; messengerNombre: string; reason: string } | null>(null);
 
     // Estado para módulo de liquidación
     const [settlementSubTab, setSettlementSubTab] = useState<'diaria' | 'semanal'>('diaria');
@@ -195,8 +197,12 @@ export default function MensajerosAdminPage() {
     // Handlers
     const handleOpenAssignModal = (order: Order) => {
         setAssigningOrder(order);
-        setSelectedMessengerForAssign(order.mensajeroId || (messengers[0]?.id || ''));
-        setSelectedDateForAssign(order.fechaProgramadaEntrega || filterDate);
+        const targetDate = order.fechaProgramadaEntrega || filterDate;
+        const ordersSameDate = orders.filter((o) => o.fechaProgramadaEntrega === targetDate);
+        const suggestion = suggestMessengerForOrder(order.cliente?.direccion || '', order.cliente?.ciudad || '', messengers, ordersSameDate);
+        setMessengerSuggestion(suggestion);
+        setSelectedMessengerForAssign(order.mensajeroId || suggestion?.messengerId || (messengers[0]?.id || ''));
+        setSelectedDateForAssign(targetDate);
         setSelectedFranjaForAssign(order.franjaHorariaEntrega || 'todo_el_dia');
     };
 
@@ -1080,6 +1086,21 @@ export default function MensajerosAdminPage() {
                         </div>
 
                         <div className="space-y-3">
+                            {messengerSuggestion && (
+                                <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-[11px] text-indigo-900">
+                                    <span className="font-black">💡 Sugerido por zona: {messengerSuggestion.messengerNombre}</span>
+                                    <p className="text-indigo-700 mt-0.5">{messengerSuggestion.reason}</p>
+                                    {selectedMessengerForAssign !== messengerSuggestion.messengerId && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedMessengerForAssign(messengerSuggestion.messengerId)}
+                                            className="mt-1.5 text-[11px] font-bold text-indigo-700 underline cursor-pointer"
+                                        >
+                                            Usar sugerencia
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">
                                     Seleccionar Mensajero Flota Propia:
@@ -1091,7 +1112,7 @@ export default function MensajerosAdminPage() {
                                 >
                                     {messengers.filter(m => m.activo).map(m => (
                                         <option key={m.id} value={m.id}>
-                                            {m.nombre} - {m.tipoVehiculo} ({m.placaVehiculo})
+                                            {m.nombre} - {m.tipoVehiculo} ({m.placaVehiculo}){messengerSuggestion?.messengerId === m.id ? ' · Sugerido' : ''}
                                         </option>
                                     ))}
                                 </select>
