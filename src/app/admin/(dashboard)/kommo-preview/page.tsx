@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, AlertCircle, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Users, UserPlus, Check, Undo2, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Users, UserPlus, Check, Undo2, ShoppingBag, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
 import { StatCard, Button } from '@/components/ui';
@@ -73,6 +73,25 @@ interface UnmatchedItem {
 const PAGE_SIZE = 50;
 const ALLOWED_EMAILS = new Set(['fernando@biocambio360.com', 'diego@biocambio360.com']);
 
+// Debe reflejar las mismas claves que FILTER_FIELD_MAP en /api/admin/kommo-preview/route.ts
+const FIELD_FILTER_LABELS: Record<string, string> = {
+    apellido: 'Apellido',
+    etapa: 'Etapa',
+    localidad: 'Localidad',
+    direccion: 'Dirección',
+    observacion: 'Observación',
+    tipoCliente: 'Tipo de cliente',
+    cedula: 'Cédula',
+    leadNota: 'Nota de Lead',
+    matchedByTelefono2: 'Emparejado solo por Teléfono 2',
+};
+
+interface FilterRow {
+    id: string;
+    _source: 'matched' | 'unmatched';
+    [key: string]: unknown;
+}
+
 export default function KommoPreviewPage() {
     const router = useRouter();
     const { user, userProfile, role, loading: authLoading } = useAuth();
@@ -93,6 +112,7 @@ export default function KommoPreviewPage() {
     const [markingId, setMarkingId] = useState<string | null>(null);
     const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
     const [preloadedCustomer, setPreloadedCustomer] = useState<{ nombre: string; celular: string; direccion?: string } | null>(null);
+    const [activeFilterKey, setActiveFilterKey] = useState<string | null>(null);
 
     const fetchPage = useCallback(async (cursor: number | null, search: string) => {
         if (!user) return;
@@ -230,20 +250,20 @@ export default function KommoPreviewPage() {
                 {meta && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3">
                         <StatCard label="Contactos Kommo" value={meta.totalContacts} />
-                        <StatCard label="Se agrega a existentes" value={meta.matched} color="emerald" />
-                        <StatCard label="Para revisión (nuevo)" value={meta.unmatched} color="amber" />
-                        <StatCard label="Pendientes de revisar" value={meta.unmatchedPendientes ?? meta.unmatched} color="amber" />
+                        <StatCard label="Se agrega a existentes" value={meta.matched} color="emerald" onClick={() => setTab('matched')} />
+                        <StatCard label="Para revisión (nuevo)" value={meta.unmatched} color="amber" onClick={() => setTab('unmatched')} />
+                        <StatCard label="Pendientes de revisar" value={meta.unmatchedPendientes ?? meta.unmatched} color="amber" onClick={() => setTab('unmatched')} />
                         <StatCard label="Sin celular" value={meta.noPhone} />
-                        <StatCard label="Con Apellido" value={meta.withApellido} />
-                        <StatCard label="Con Etapa" value={meta.withEtapa} />
-                        <StatCard label="Con Localidad" value={meta.withLocalidad} />
-                        <StatCard label="Con Dirección" value={meta.withDireccion} />
-                        <StatCard label="Con Observación" value={meta.withObservacion} />
-                        <StatCard label="Con Tipo de cliente" value={meta.withTipoCliente || 0} />
-                        <StatCard label="Con Cédula" value={meta.withCedula || 0} />
+                        <StatCard label="Con Apellido" value={meta.withApellido} onClick={() => setActiveFilterKey('apellido')} />
+                        <StatCard label="Con Etapa" value={meta.withEtapa} onClick={() => setActiveFilterKey('etapa')} />
+                        <StatCard label="Con Localidad" value={meta.withLocalidad} onClick={() => setActiveFilterKey('localidad')} />
+                        <StatCard label="Con Dirección" value={meta.withDireccion} onClick={() => setActiveFilterKey('direccion')} />
+                        <StatCard label="Con Observación" value={meta.withObservacion} onClick={() => setActiveFilterKey('observacion')} />
+                        <StatCard label="Con Tipo de cliente" value={meta.withTipoCliente || 0} onClick={() => setActiveFilterKey('tipoCliente')} />
+                        <StatCard label="Con Cédula" value={meta.withCedula || 0} onClick={() => setActiveFilterKey('cedula')} />
                         <StatCard label="Con Teléfono 2" value={meta.withTelefono2 || 0} />
-                        <StatCard label="Match solo por Tel. 2" value={meta.matchedByTelefono2 || 0} />
-                        <StatCard label="Con Nota de Lead" value={meta.withLeadNota || 0} />
+                        <StatCard label="Match solo por Tel. 2" value={meta.matchedByTelefono2 || 0} onClick={() => setActiveFilterKey('matchedByTelefono2')} />
+                        <StatCard label="Con Nota de Lead" value={meta.withLeadNota || 0} onClick={() => setActiveFilterKey('leadNota')} />
                         <StatCard label="Chats sin clasificar" value={meta.unsortedChats || 0} color="amber" />
                     </div>
                 )}
@@ -341,6 +361,125 @@ export default function KommoPreviewPage() {
                 onClose={() => { setIsFastOrderOpen(false); setPreloadedCustomer(null); }}
                 preloadedCustomer={preloadedCustomer || undefined}
             />
+
+            {activeFilterKey && (
+                <FieldCoverageModal
+                    filterKey={activeFilterKey}
+                    label={FIELD_FILTER_LABELS[activeFilterKey] || activeFilterKey}
+                    onClose={() => setActiveFilterKey(null)}
+                />
+            )}
+        </div>
+    );
+}
+
+function FieldCoverageModal({ filterKey, label, onClose }: { filterKey: string; label: string; onClose: () => void }) {
+    const { user } = useAuth();
+    const [rows, setRows] = useState<FilterRow[]>([]);
+    const [total, setTotal] = useState(0);
+    const [truncated, setTruncated] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            if (!user) return;
+            setLoading(true);
+            setError(null);
+            try {
+                const idToken = await user.getIdToken();
+                const res = await fetch(`/api/admin/kommo-preview?filter=${encodeURIComponent(filterKey)}`, {
+                    headers: { Authorization: `Bearer ${idToken}` },
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Error cargando el filtro');
+                if (cancelled) return;
+                setRows(data.filterRows || []);
+                setTotal(data.filterTotal || 0);
+                setTruncated(!!data.truncated);
+            } catch (err) {
+                if (!cancelled) setError(err instanceof Error ? err.message : 'Error cargando el filtro');
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [filterKey, user]);
+
+    const fieldFor = (row: FilterRow) => {
+        // matchedByTelefono2 no sigue el patrón kommo<Capitalizado> -- su campo real es emparejadoPorTelefono2
+        // (debe reflejar FILTER_FIELD_MAP en /api/admin/kommo-preview/route.ts)
+        const candidates = filterKey === 'matchedByTelefono2'
+            ? ['emparejadoPorTelefono2']
+            : [`kommo${filterKey.charAt(0).toUpperCase()}${filterKey.slice(1)}`, filterKey];
+        for (const key of candidates) {
+            const val = row[key];
+            if (typeof val === 'string' && val.trim()) return val;
+            if (typeof val === 'boolean') return val ? 'Sí' : 'No';
+        }
+        return '—';
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Cobertura de campo</p>
+                        <h2 className="font-black text-lg">Con {label}{!loading ? ` · ${total.toLocaleString('es-CO')}` : ''}</h2>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 cursor-pointer">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1">
+                    {loading ? (
+                        <div className="py-16 flex items-center justify-center">
+                            <Loader2 className="animate-spin text-slate-300" size={24} />
+                        </div>
+                    ) : error ? (
+                        <div className="p-6 text-sm text-red-600">{error}</div>
+                    ) : rows.length === 0 ? (
+                        <div className="p-6 text-sm text-slate-400 text-center">Sin registros para este filtro.</div>
+                    ) : (
+                        <table className="w-full text-left text-xs text-slate-600">
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider sticky top-0">
+                                <tr>
+                                    <th className="px-4 py-2.5">Kommo ID</th>
+                                    <th className="px-4 py-2.5">Fuente</th>
+                                    <th className="px-4 py-2.5">Celular</th>
+                                    <th className="px-4 py-2.5">{label}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {rows.map((row) => (
+                                    <tr key={row.id} className="hover:bg-slate-50/80">
+                                        <td className="px-4 py-2 font-mono text-slate-400">#{row.kommoContactId as string}</td>
+                                        <td className="px-4 py-2">
+                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${row._source === 'matched' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                                                {row._source === 'matched' ? 'Existente' : 'Nuevo'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2 font-mono">{(row.celular as string) || '—'}</td>
+                                        <td className="px-4 py-2 max-w-[320px] truncate" title={fieldFor(row)}>{fieldFor(row)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                {truncated && (
+                    <div className="px-5 py-2.5 border-t border-slate-100 bg-amber-50 text-amber-800 text-[11px] font-bold">
+                        Mostrando los primeros {rows.length} de {total.toLocaleString('es-CO')} registros.
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

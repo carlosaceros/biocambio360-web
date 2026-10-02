@@ -14,6 +14,8 @@ interface StatCardProps {
     color?: StatCardColor;
     /** Ej. "pedidos", "clientes" — se muestra chico debajo del valor. */
     hint?: string;
+    /** Si se pasa, la tarjeta se vuelve un botón clickeable (ej. abrir un detalle/filtro). */
+    onClick?: () => void;
 }
 
 /**
@@ -21,13 +23,18 @@ interface StatCardProps {
  * en /admin (pedidos, kpis-ia, entrenamiento-ia, kommo-preview) antes de centralizarla aquí.
  * Formatea el número en es-CO automáticamente si es numérico.
  */
-export default function StatCard({ label, value, color = 'default', hint }: StatCardProps) {
+export default function StatCard({ label, value, color = 'default', hint, onClick }: StatCardProps) {
     const display = typeof value === 'number' ? value.toLocaleString('es-CO') : value;
-    return (
-        <div className={`rounded-xl border p-3 ${COLOR_CLASSES[color]}`}>
+    const className = `rounded-xl border p-3 text-left w-full ${COLOR_CLASSES[color]} ${onClick ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`;
+    const content = (
+        <>
             <p className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</p>
             <p className="text-lg font-black mt-0.5">{display}</p>
             {hint && <p className="text-[10px] opacity-60 mt-0.5">{hint}</p>}
-        </div>
+        </>
     );
+    if (onClick) {
+        return <button type="button" onClick={onClick} className={className}>{content}</button>;
+    }
+    return <div className={className}>{content}</div>;
 }
