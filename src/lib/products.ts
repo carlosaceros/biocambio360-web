@@ -66,7 +66,7 @@ export interface Product {
     shortDescription?: string;
     manualContentKey?: string;
     stock?: Record<string, number>; // Existencias por tamaño (ej: { '3.8L': 30, '10L': 5 })
-    minStockThreshold?: number; // Umbral de alerta para stock bajo (default: 5)
+    minStockThreshold?: number; // Umbral de alerta para stock bajo (default: 10, ver DEFAULT_LOW_STOCK_THRESHOLD)
     sku?: string; // Código de referencia único de inventario
     isFeatured?: boolean; // Destacado en vitrina o catálogo principal
     status?: 'active' | 'draft' | 'archived'; // Estado de publicación
@@ -142,3 +142,19 @@ export const formatCurrency = (val: number): string => {
         minimumFractionDigits: 0
     }).format(val);
 };
+
+// Umbral por defecto para mostrar "últimas unidades" en tienda cuando un producto no define su propio minStockThreshold
+export const DEFAULT_LOW_STOCK_THRESHOLD = 10;
+
+// Si el producto no trae `stock` para ese tamaño, no se rastrea inventario -> no se muestra ningún badge
+export function isLowStock(product: Product, size: string): boolean {
+    const qty = product.stock?.[size];
+    if (qty === undefined) return false;
+    const threshold = product.minStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD;
+    return qty > 0 && qty <= threshold;
+}
+
+export function isOutOfStock(product: Product, size: string): boolean {
+    const qty = product.stock?.[size];
+    return qty !== undefined && qty <= 0;
+}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ShoppingCart, Search, Plus, Minus } from 'lucide-react';
-import { Product, ProductSize, calcularAhorro, formatCurrency, isDisallowedSize } from '@/lib/products';
+import { Product, ProductSize, calcularAhorro, formatCurrency, isDisallowedSize, isLowStock, isOutOfStock } from '@/lib/products';
 import { generateProductSlug, getProductImage } from '@/lib/product-utils';
 
 interface ProductCardProps {
@@ -79,10 +79,14 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
         ? selectedSize
         : (displaySizes[0] || selectedSize);
 
-    const currentPrice = product.precios?.[effectiveSize] 
-        || product.precios?.[displaySizes[0]] 
-        || Object.values(product.precios || {})[0] 
+    const currentPrice = product.precios?.[effectiveSize]
+        || product.precios?.[displaySizes[0]]
+        || Object.values(product.precios || {})[0]
         || 0;
+
+    const outOfStock = isOutOfStock(product, effectiveSize);
+    const lowStock = !outOfStock && isLowStock(product, effectiveSize);
+    const unitsLeft = product.stock?.[effectiveSize];
 
     // Dynamically resolve image for selected size on-demand
     const imgSrc = `/images/${getProductImage(product, selectedSize)}`;
@@ -195,16 +199,32 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
                                 {formatCurrency(currentPrice)}
                             </span>
                         </div>
+                        {outOfStock && (
+                            <p className="text-[10px] font-black text-red-600 uppercase tracking-wide mt-1">
+                                Agotado
+                            </p>
+                        )}
+                        {lowStock && (
+                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-wide mt-1">
+                                ¡Quedan {unitsLeft} unidades!
+                            </p>
+                        )}
                     </div>
 
                     <button
                         type="button"
+                        disabled={outOfStock}
                         onClick={(e) => {
                             e.stopPropagation();
+                            if (outOfStock) return;
                             onAddToCart?.(product, effectiveSize, currentPrice, 1);
                         }}
-                        className="w-10 h-10 rounded-2xl bg-[var(--brand-blue-50)] text-[var(--brand-blue)] flex items-center justify-center hover:bg-[var(--brand-blue)] hover:text-white transition-all duration-300 shadow-sm hover:shadow-[var(--brand-blue)]/20 cursor-pointer"
-                        title="Agregar al carrito"
+                        className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm ${
+                            outOfStock
+                                ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                : 'bg-[var(--brand-blue-50)] text-[var(--brand-blue)] hover:bg-[var(--brand-blue)] hover:text-white hover:shadow-[var(--brand-blue)]/20 cursor-pointer'
+                        }`}
+                        title={outOfStock ? 'Agotado' : 'Agregar al carrito'}
                     >
                         <Plus size={20} strokeWidth={3} />
                     </button>

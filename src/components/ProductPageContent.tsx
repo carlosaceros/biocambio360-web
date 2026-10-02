@@ -19,7 +19,7 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Product, formatCurrency, calcularAhorro, isDisallowedSize } from '@/lib/products';
+import { Product, formatCurrency, calcularAhorro, isDisallowedSize, isLowStock, isOutOfStock } from '@/lib/products';
 import { useCart } from '@/lib/cart-context';
 import ProductCard from '@/components/ProductCard';
 import Toast from '@/components/Toast';
@@ -165,7 +165,12 @@ export default function ProductPageContent({ product, relatedProducts }: Product
         );
     }, [price, selectedSize, product.competidorPromedio]);
 
+    const outOfStock = isOutOfStock(product, selectedSize);
+    const lowStock = !outOfStock && isLowStock(product, selectedSize);
+    const unitsLeft = product.stock?.[selectedSize];
+
     const handleAddToCart = () => {
+        if (outOfStock) return;
         addToCart(product, selectedSize as any, price, quantity);
         setToastData({ name: product.nombre, size: selectedSize });
         setShowToast(true);
@@ -480,6 +485,21 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                         </div>
                                     )}
 
+                                    {outOfStock && (
+                                        <div className="mt-3 pt-3 border-t border-gray-200">
+                                            <span className="text-sm font-black text-red-600 flex items-center gap-2">
+                                                ⛔ Agotado temporalmente en esta presentación
+                                            </span>
+                                        </div>
+                                    )}
+                                    {lowStock && (
+                                        <div className="mt-3 pt-3 border-t border-gray-200">
+                                            <span className="text-sm font-black text-amber-600 flex items-center gap-2">
+                                                ⚠️ ¡Quedan solo {unitsLeft} unidades disponibles!
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {/* Widget oficial Addi: Cuotas sin interés con cálculo dinámico */}
                                     <div className="mt-3 pt-3 border-t border-gray-200/70">
                                         <AddiWidget
@@ -523,13 +543,18 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 {/* CTA Buttons */}
                                 <div ref={ctaRef} className="order-6 lg:order-none space-y-3">
                                     <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
+                                        whileHover={outOfStock ? undefined : { scale: 1.02 }}
+                                        whileTap={outOfStock ? undefined : { scale: 0.98 }}
                                         onClick={handleAddToCart}
-                                        className="w-full bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white font-black py-4 rounded-xl shadow-lg shadow-[var(--brand-blue-light)] transition-all flex items-center justify-center gap-2"
+                                        disabled={outOfStock}
+                                        className={`w-full font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                                            outOfStock
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                                                : 'bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white shadow-lg shadow-[var(--brand-blue-light)]'
+                                        }`}
                                     >
                                         <ShoppingCart size={20} />
-                                        AGREGAR AL CARRITO
+                                        {outOfStock ? 'AGOTADO' : 'AGREGAR AL CARRITO'}
                                     </motion.button>
                                     <button
                                         onClick={() => setIsCartOpen(true)}
@@ -993,12 +1018,17 @@ export default function ProductPageContent({ product, relatedProducts }: Product
                                 </div>
                             </div>
                             <motion.button
-                                whileTap={{ scale: 0.97 }}
+                                whileTap={outOfStock ? undefined : { scale: 0.97 }}
                                 onClick={handleAddToCart}
-                                className="ml-auto shrink-0 flex items-center justify-center gap-2 bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white font-black px-6 py-3 rounded-xl shadow-lg shadow-[var(--brand-blue-light)] transition-all"
+                                disabled={outOfStock}
+                                className={`ml-auto shrink-0 flex items-center justify-center gap-2 font-black px-6 py-3 rounded-xl transition-all ${
+                                    outOfStock
+                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                                        : 'bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white shadow-lg shadow-[var(--brand-blue-light)]'
+                                }`}
                             >
                                 <ShoppingCart size={18} />
-                                AGREGAR
+                                {outOfStock ? 'AGOTADO' : 'AGREGAR'}
                             </motion.button>
                         </div>
                     </motion.div>
