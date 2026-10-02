@@ -45,10 +45,15 @@ import {
 } from 'firebase/firestore';
 import { AbandonedCartRecord, AbandonedCartItem } from '@/lib/abandoned-cart-service';
 import { formatCurrency } from '@/lib/checkout-utils';
+import { useAuth } from '@/lib/auth-context';
 
 export default function CarritosAbandonadosPage() {
     const router = useRouter();
+    const { user } = useAuth();
     const [carts, setCarts] = useState<AbandonedCartRecord[]>([]);
+    const [selectedCartTokens, setSelectedCartTokens] = useState<Set<string>>(new Set());
+    const [isSendingBulk, setIsSendingBulk] = useState(false);
+    const [bulkSendResult, setBulkSendResult] = useState<string | null>(null);
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -302,6 +307,39 @@ export default function CarritosAbandonadosPage() {
         window.open(waUrl, '_blank');
     };
 
+    const toggleCartSelected = (cartToken: string) => {
+        setSelectedCartTokens(prev => {
+            const next = new Set(prev);
+            if (next.has(cartToken)) next.delete(cartToken); else next.add(cartToken);
+            return next;
+        });
+    };
+
+    // Envía la plantilla aprobada de WhatsApp (Cloud API) a varios carritos seleccionados de una vez --
+    // distinto de handleWhatsAppRecovery, que abre un wa.me de un solo clic con texto libre por carrito.
+    const handleBulkSendTemplate = async () => {
+        if (!user || selectedCartTokens.size === 0) return;
+        if (!confirm(`¿Enviar la plantilla de recuperación de carrito a ${selectedCartTokens.size} cliente(s) ahora?`)) return;
+        setIsSendingBulk(true);
+        setBulkSendResult(null);
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/admin/abandoned-carts/bulk-send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ cartTokens: Array.from(selectedCartTokens) }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al enviar');
+            setBulkSendResult(`✅ Enviados: ${data.sent} · Omitidos: ${data.skipped} · Fallidos: ${data.failed}`);
+            setSelectedCartTokens(new Set());
+        } catch (err) {
+            setBulkSendResult(`❌ ${err instanceof Error ? err.message : 'Error al enviar'}`);
+        } finally {
+            setIsSendingBulk(false);
+        }
+    };
+
     const handleSendEmail = async (cart: AbandonedCartRecord, contactNumber: number = 1) => {
         setSendingEmailToken(cart.cartToken);
         try {
@@ -496,6 +534,23 @@ export default function CarritosAbandonadosPage() {
                     </div>
                 </div>
 
+                {selectedCartTokens.size > 0 && (
+                    <div className="flex items-center justify-between gap-3 bg-indigo-50 border border-indigo-200 rounded-2xl px-4 py-2.5">
+                        <span className="text-xs font-bold text-indigo-900">{selectedCartTokens.size} carrito(s) seleccionado(s)</span>
+                        <div className="flex items-center gap-2">
+                            {bulkSendResult && <span className="text-[11px] font-bold text-indigo-800">{bulkSendResult}</span>}
+                            <button
+                                onClick={handleBulkSendTemplate}
+                                disabled={isSendingBulk}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold cursor-pointer"
+                            >
+                                <Send size={13} />
+                                {isSendingBulk ? 'Enviando...' : 'Enviar plantilla WhatsApp'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Main Table / List */}
                 <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                     {loading ? (
@@ -526,6 +581,7 @@ export default function CarritosAbandonadosPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-black text-gray-400 uppercase tracking-wider">
+                                        <th className="py-3.5 pl-4 pr-1 w-8"></th>
                                         <th className="py-3.5 px-4">Cliente & Contacto</th>
                                         <th className="py-3.5 px-4">Productos en Carrito</th>
                                         <th className="py-3.5 px-4 text-right">Total</th>
@@ -547,6 +603,16 @@ export default function CarritosAbandonadosPage() {
                                                 key={cart.cartToken}
                                                 className="hover:bg-blue-50/30 transition-colors group"
                                             >
+                                                <td className="py-4 pl-4 pr-1 align-top">
+                                                    {!isRecovered && hasPhone && (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedCartTokens.has(cart.cartToken)}
+                                                            onChange={() => toggleCartSelected(cart.cartToken)}
+                                                            className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                                                        />
+                                                    )}
+                                                </td>
                                                 {/* Cliente & Contacto */}
                                                 <td className="py-4 px-4 align-top">
                                                     <div className="flex flex-col">

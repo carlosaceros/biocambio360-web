@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { collection, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
-import { Truck } from 'lucide-react';
+import { Truck, Send } from 'lucide-react';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/auth-context';
 
 const tomorrow = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date(Date.now() + 86400000));
 
@@ -20,11 +21,46 @@ interface Row {
 }
 
 export default function DeliveryAlertsPanel() {
+    const { user } = useAuth();
     const [enabled, setEnabled] = useState(false);
     const [rows, setRows] = useState<Row[]>([]);
     const date = tomorrow();
     const [open, setOpen] = useState<Array<{ id: string; nombre: string; ciudad: string; status: string; total: number }>>([]);
     const [showOpen, setShowOpen] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isSendingBulk, setIsSendingBulk] = useState(false);
+    const [bulkResult, setBulkResult] = useState<string | null>(null);
+
+    const toggleSelected = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const handleBulkSend = async () => {
+        if (!user || selectedIds.size === 0) return;
+        if (!confirm(`¿Enviar la alerta de entrega de mañana a ${selectedIds.size} cliente(s) ahora mismo?`)) return;
+        setIsSendingBulk(true);
+        setBulkResult(null);
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/admin/delivery-alerts/bulk-send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ orderIds: Array.from(selectedIds) }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al enviar');
+            setBulkResult(`✅ Enviadas: ${data.sent} · Omitidas: ${data.skipped} · Fallidas: ${data.failed}`);
+            setSelectedIds(new Set());
+        } catch (err) {
+            setBulkResult(`❌ ${err instanceof Error ? err.message : 'Error al enviar'}`);
+        } finally {
+            setIsSendingBulk(false);
+        }
+    };
 
     // Active orders that do not have a delivery date yet: the team marks the ones that go out tomorrow
     useEffect(
@@ -115,35 +151,62 @@ export default function DeliveryAlertsPanel() {
             {rows.length === 0 ? (
                 <p className="text-xs text-gray-400">No hay pedidos programados para mañana.</p>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                        <thead>
-                            <tr className="text-left text-gray-500 border-b border-gray-100">
-                                <th className="py-1.5 pr-2 font-bold">Cliente</th>
-                                <th className="py-1.5 px-2 font-bold">Ciudad</th>
-                                <th className="py-1.5 px-2 font-bold">Pago</th>
-                                <th className="py-1.5 px-2 font-bold">Alerta</th>
-                                <th className="py-1.5 pl-2 font-bold">Respuesta del cliente</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map(r => (
-                                <tr key={r.id} className="border-b border-gray-50">
-                                    <td className="py-1.5 pr-2 text-gray-800">{r.nombre}</td>
-                                    <td className="py-1.5 px-2">{r.ciudad}</td>
-                                    <td className="py-1.5 px-2">{r.metodoPago} {!r.alertado && <button onClick={() => schedule(r.id, null)} className="ml-1 text-[10px] text-red-500 underline cursor-pointer">quitar fecha</button>}</td>
-                                    <td className="py-1.5 px-2">{r.alertado ? '✅ Enviada' : 'Pendiente'}</td>
-                                    <td className="py-1.5 pl-2">
-                                        {r.confirmado && <span className="text-emerald-700 font-bold">Confirmó </span>}
-                                        {r.modificar && <span className="text-amber-700 font-bold">Pidió modificar </span>}
-                                        {r.ubicacion && <span className="text-sky-700 font-bold">📍 Ubicación</span>}
-                                        {!r.confirmado && !r.modificar && !r.ubicacion && <span className="text-gray-400">—</span>}
-                                    </td>
+                <>
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-gray-500 font-medium">
+                            Selecciona pedidos pendientes para enviar la alerta ahora, sin esperar al envío automático de las 4pm.
+                        </span>
+                        <button
+                            onClick={handleBulkSend}
+                            disabled={selectedIds.size === 0 || isSendingBulk}
+                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                        >
+                            <Send size={12} />
+                            {isSendingBulk ? 'Enviando...' : `Enviar ahora (${selectedIds.size})`}
+                        </button>
+                    </div>
+                    {bulkResult && <p className="text-[11px] font-bold text-gray-700">{bulkResult}</p>}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="text-left text-gray-500 border-b border-gray-100">
+                                    <th className="py-1.5 pr-2 font-bold w-6"></th>
+                                    <th className="py-1.5 pr-2 font-bold">Cliente</th>
+                                    <th className="py-1.5 px-2 font-bold">Ciudad</th>
+                                    <th className="py-1.5 px-2 font-bold">Pago</th>
+                                    <th className="py-1.5 px-2 font-bold">Alerta</th>
+                                    <th className="py-1.5 pl-2 font-bold">Respuesta del cliente</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {rows.map(r => (
+                                    <tr key={r.id} className="border-b border-gray-50">
+                                        <td className="py-1.5 pr-2">
+                                            {!r.alertado && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(r.id)}
+                                                    onChange={() => toggleSelected(r.id)}
+                                                    className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
+                                                />
+                                            )}
+                                        </td>
+                                        <td className="py-1.5 pr-2 text-gray-800">{r.nombre}</td>
+                                        <td className="py-1.5 px-2">{r.ciudad}</td>
+                                        <td className="py-1.5 px-2">{r.metodoPago} {!r.alertado && <button onClick={() => schedule(r.id, null)} className="ml-1 text-[10px] text-red-500 underline cursor-pointer">quitar fecha</button>}</td>
+                                        <td className="py-1.5 px-2">{r.alertado ? '✅ Enviada' : 'Pendiente'}</td>
+                                        <td className="py-1.5 pl-2">
+                                            {r.confirmado && <span className="text-emerald-700 font-bold">Confirmó </span>}
+                                            {r.modificar && <span className="text-amber-700 font-bold">Pidió modificar </span>}
+                                            {r.ubicacion && <span className="text-sky-700 font-bold">📍 Ubicación</span>}
+                                            {!r.confirmado && !r.modificar && !r.ubicacion && <span className="text-gray-400">—</span>}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
         </div>
     );
