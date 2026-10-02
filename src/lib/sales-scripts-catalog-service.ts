@@ -18,6 +18,12 @@ export interface SalesScriptTemplate {
     template: string;
     referenciaWord?: string;
     destacado?: boolean;
+    /** true si lo creó un admin desde cero (no viene del catálogo base RAW_SALES_SCRIPTS_CATALOG). */
+    isCustom?: boolean;
+    /** Soft-delete: oculta un guion del catálogo base sin perder el original -- se puede restaurar. */
+    hidden?: boolean;
+    updatedAt?: string;
+    updatedBy?: string;
 }
 
 export interface ScriptVariables {
