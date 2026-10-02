@@ -11,6 +11,11 @@ function findBaseScript(id: string): SalesScriptTemplate | undefined {
     return RAW_SALES_SCRIPTS_CATALOG.find((s) => s.id === id);
 }
 
+/** El Admin SDK rechaza `undefined` en un .set() -- a diferencia del SDK de cliente, que lo ignora. */
+function removeUndefined<T extends Record<string, unknown>>(obj: T): T {
+    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const auth = await requireAuth(req);
     if (auth instanceof NextResponse) return auth;
@@ -52,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         updated.updatedAt = new Date().toISOString();
         updated.updatedBy = auth.email;
 
-        await docRef.set(updated, { merge: false });
+        await docRef.set(removeUndefined(updated as unknown as Record<string, unknown>));
         return NextResponse.json({ ok: true, script: updated });
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Error al editar el guion';
@@ -79,7 +84,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         if (base) {
             const existingSnap = await docRef.get();
             const current = existingSnap.exists ? (existingSnap.data() as SalesScriptTemplate) : base;
-            await docRef.set({ ...current, id, hidden: true, updatedAt: new Date().toISOString(), updatedBy: auth.email }, { merge: false });
+            await docRef.set(removeUndefined({ ...current, id, hidden: true, updatedAt: new Date().toISOString(), updatedBy: auth.email } as unknown as Record<string, unknown>));
             return NextResponse.json({ ok: true, softDeleted: true });
         }
 

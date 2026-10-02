@@ -6,6 +6,12 @@ import { RAW_SALES_SCRIPTS_CATALOG, SALES_SCRIPT_CATEGORIES, SalesScriptTemplate
 const VALID_CATEGORIES = new Set(SALES_SCRIPT_CATEGORIES.map((c) => c.id));
 const COLLECTION = 'sales_scripts';
 
+/** El Admin SDK rechaza `undefined` en un .set() ("Cannot use 'undefined' as a Firestore value") --
+ *  a diferencia del SDK de cliente, que simplemente lo ignora. Se limpia antes de cada escritura. */
+function removeUndefined<T extends Record<string, unknown>>(obj: T): T {
+    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
 /**
  * El catálogo de guiones vive en dos capas, igual que coupons-service.ts con INITIAL_COUPONS:
  * RAW_SALES_SCRIPTS_CATALOG (defaults en código, ~40 guiones ya escritos) + overrides en Firestore
@@ -82,7 +88,7 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-        await db.collection(COLLECTION).doc(id).set(script);
+        await db.collection(COLLECTION).doc(id).set(removeUndefined(script as unknown as Record<string, unknown>));
         return NextResponse.json({ ok: true, script });
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Error al crear el guion';
