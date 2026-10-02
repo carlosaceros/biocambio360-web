@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import type { Marker as LeafletMarker, LeafletEvent } from 'leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -16,9 +17,13 @@ L.Icon.Default.mergeOptions({
 interface CheckoutMapProps {
     lat: number;
     lng: number;
+    /** Si se pasa, el marcador se puede arrastrar -- el ajuste es siempre opcional, nunca bloquea el checkout. */
+    onPositionChange?: (lat: number, lng: number) => void;
 }
 
-// Recentra el mapa cuando cambian las coordenadas (ej. el cliente ajusta la dirección)
+// Recentra el mapa cuando cambian las coordenadas (ej. el cliente ajusta la dirección escrita).
+// No se dispara por un arrastre del marcador (eso lo maneja DraggableMarker localmente, sin
+// tocar esta prop), así que arrastrar no "salta" de vuelta al centro.
 function Recenter({ lat, lng }: { lat: number; lng: number }) {
     const map = useMap();
     useEffect(() => {
@@ -27,7 +32,26 @@ function Recenter({ lat, lng }: { lat: number; lng: number }) {
     return null;
 }
 
-export default function CheckoutMap({ lat, lng }: CheckoutMapProps) {
+function DraggableMarker({ lat, lng, onPositionChange }: { lat: number; lng: number; onPositionChange?: (lat: number, lng: number) => void }) {
+    const markerRef = useRef<LeafletMarker | null>(null);
+
+    return (
+        <Marker
+            position={[lat, lng]}
+            draggable={!!onPositionChange}
+            ref={markerRef}
+            eventHandlers={{
+                dragend: (e: LeafletEvent) => {
+                    const marker = e.target as LeafletMarker;
+                    const pos = marker.getLatLng();
+                    onPositionChange?.(pos.lat, pos.lng);
+                },
+            }}
+        />
+    );
+}
+
+export default function CheckoutMap({ lat, lng, onPositionChange }: CheckoutMapProps) {
     return (
         <div className="rounded-xl overflow-hidden border border-gray-200 h-48 w-full">
             <MapContainer
@@ -40,7 +64,7 @@ export default function CheckoutMap({ lat, lng }: CheckoutMapProps) {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
-                <Marker position={[lat, lng]} />
+                <DraggableMarker lat={lat} lng={lng} onPositionChange={onPositionChange} />
                 <Recenter lat={lat} lng={lng} />
             </MapContainer>
         </div>

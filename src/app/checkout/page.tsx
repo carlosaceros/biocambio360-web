@@ -88,6 +88,11 @@ export default function CheckoutPage() {
     const [citySearch, setCitySearch] = useState('');
     const [citySearchOpen, setCitySearchOpen] = useState(false);
     const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
+    // Si el cliente arrastra el marcador para corregirlo, se guarda aparte de mapCoords (la posición
+    // automática) -- nunca se valida ni se exige: si nunca lo toca, el checkout funciona exactamente
+    // igual que antes de este campo existir. Se limpia cada vez que vuelve a geocodificar una
+    // dirección distinta, para no dejar un ajuste manual pegado a una dirección que ya cambió.
+    const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
 
     // Geocodifica la dirección en vivo (debounced) para mostrar el marcador en el mapa -- falla
     // silencioso: si Nominatim no resuelve o fluctúa la red, el checkout sigue funcionando igual,
@@ -95,6 +100,7 @@ export default function CheckoutPage() {
     useEffect(() => {
         if (!formData.direccion.trim() || formData.direccion.trim().length < 5 || !formData.ciudad) {
             setMapCoords(null);
+            setAdjustedCoords(null);
             return;
         }
         const controller = new AbortController();
@@ -102,7 +108,10 @@ export default function CheckoutPage() {
             const params = new URLSearchParams({ direccion: formData.direccion, ciudad: formData.ciudad, departamento: formData.departamento });
             fetch(`/api/geocode?${params.toString()}`, { signal: controller.signal })
                 .then(res => res.json())
-                .then(data => setMapCoords(data?.found ? { lat: data.lat, lng: data.lng } : null))
+                .then(data => {
+                    setMapCoords(data?.found ? { lat: data.lat, lng: data.lng } : null);
+                    setAdjustedCoords(null);
+                })
                 .catch(() => {});
         }, 900);
         return () => { clearTimeout(timer); controller.abort(); };
@@ -478,7 +487,11 @@ export default function CheckoutPage() {
                     value: appliedCoupon.value,
                     discountAmount
                 } : undefined,
-                origen: getStoredTrafficAttribution() || undefined
+                origen: getStoredTrafficAttribution() || undefined,
+                // Totalmente opcional: solo viaja si el cliente arrastró el marcador del mapa para
+                // corregirlo. Nunca se exige ni se valida -- si no lo toca, este campo ni se envía,
+                // el pedido se crea exactamente igual que antes de que existiera el mapa.
+                ...(adjustedCoords ? { ubicacionEntrega: { lat: adjustedCoords.lat, lng: adjustedCoords.lng, at: new Date().toISOString() } } : {})
             };
 
             const orderId = await createOrder(orderData as any);
@@ -971,9 +984,24 @@ export default function CheckoutPage() {
                                         {errors.direccion && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.direccion}</p>}
                                         {mapCoords && (
                                             <div className="mt-2">
-                                                <CheckoutMap lat={mapCoords.lat} lng={mapCoords.lng} />
-                                                <p className="text-[11px] text-gray-400 mt-1">
-                                                    📍 Ubicación aproximada según la dirección escrita — verifica que el marcador esté en el lugar correcto.
+                                                <CheckoutMap
+                                                    lat={adjustedCoords?.lat ?? mapCoords.lat}
+                                                    lng={adjustedCoords?.lng ?? mapCoords.lng}
+                                                    onPositionChange={(lat, lng) => setAdjustedCoords({ lat, lng })}
+                                                />
+                                                <p className="text-[11px] text-gray-400 mt-1 flex items-center justify-between gap-2">
+                                                    <span>
+                                                        📍 {adjustedCoords ? 'Ubicación ajustada por ti.' : 'Ubicación aproximada — arrastra el marcador si no está en el lugar correcto (opcional).'}
+                                                    </span>
+                                                    {adjustedCoords && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setAdjustedCoords(null)}
+                                                            className="shrink-0 text-red-600 font-bold underline cursor-pointer"
+                                                        >
+                                                            Restablecer
+                                                        </button>
+                                                    )}
                                                 </p>
                                             </div>
                                         )}
