@@ -181,8 +181,26 @@ service cloud.firestore {
     // de /admin). Ninguna colección genuinamente pública depende de este catch-all: todas las que
     // de verdad necesitan escritura anónima (orders, customers, abandoned_carts, b2b_proposals,
     // customer_replenishments, coupons, wheel_spins) tienen su propia regla explícita arriba.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    //
+    // IMPORTANTE: Firestore evalúa TODOS los `match` que coincidan con una ruta y permite la
+    // operación si CUALQUIERA de ellos la permite (no es "la regla más específica gana"). Un
+    // `match /{document=**}` de verdad coincide también con `orders/{id}`, `conversations/{id}`,
+    // etc. -- un catch-all sin excluirlos anula en silencio cualquier restricción más estricta
+    // que esas colecciones definan arriba, incluido un `allow create: if false` explícito. Se
+    // detectó así: una prueba en vivo con un token autenticado normal logró escribir
+    // pagoConfirmado pese a la regla de la línea 32-33, porque este catch-all de abajo lo permitía
+    // igual -- el mismo problema ya afectaba en silencio, desde antes de esta sesión, a los
+    // `if false` de conversations/bulk_reminder_logs/whatsapp_alerts (documentados como
+    // "solo Admin SDK/webhook" pero en realidad escribibles por cualquier sesión autenticada).
+    // Las colecciones de la lista de abajo son las únicas cuya regla de arriba es MÁS RESTRICTIVA
+    // que "cualquier autenticado" -- si se agrega una nueva colección así en el futuro, su nombre
+    // tiene que sumarse aquí también, o este catch-all la va a seguir abriendo por debajo.
+    match /{collectionId}/{rest=**} {
+      allow read, write: if request.auth != null
+        && !(collectionId in [
+          'orders', 'messenger_locations', 'messenger_location_history',
+          'conversations', 'bulk_reminder_logs', 'whatsapp_alerts'
+        ]);
     }
   }
 }
