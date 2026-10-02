@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ShoppingBag, MapPin, CreditCard, Loader, Ticket } from 'lucide-react';
+
+// Leaflet usa `window` -- debe cargarse solo en el navegador, nunca en el render de servidor.
+const CheckoutMap = dynamic(() => import('@/components/CheckoutMap'), { ssr: false });
 import { Timestamp } from 'firebase/firestore';
 import { useCart } from '@/lib/cart-context';
 import {
@@ -83,6 +87,26 @@ export default function CheckoutPage() {
     const [destinoCodigo, setDestinoCodigo] = useState('');
     const [citySearch, setCitySearch] = useState('');
     const [citySearchOpen, setCitySearchOpen] = useState(false);
+    const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+    // Geocodifica la dirección en vivo (debounced) para mostrar el marcador en el mapa -- falla
+    // silencioso: si Nominatim no resuelve o fluctúa la red, el checkout sigue funcionando igual,
+    // solo no se muestra el mapa.
+    useEffect(() => {
+        if (!formData.direccion.trim() || formData.direccion.trim().length < 5 || !formData.ciudad) {
+            setMapCoords(null);
+            return;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+            const params = new URLSearchParams({ direccion: formData.direccion, ciudad: formData.ciudad, departamento: formData.departamento });
+            fetch(`/api/geocode?${params.toString()}`, { signal: controller.signal })
+                .then(res => res.json())
+                .then(data => setMapCoords(data?.found ? { lat: data.lat, lng: data.lng } : null))
+                .catch(() => {});
+        }, 900);
+        return () => { clearTimeout(timer); controller.abort(); };
+    }, [formData.direccion, formData.ciudad, formData.departamento]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<'contraentrega' | 'wompi' | 'addi'>('contraentrega');
 
@@ -945,6 +969,14 @@ export default function CheckoutPage() {
                                             placeholder="Calle 123 #45-67, Apto 301"
                                         />
                                         {errors.direccion && <p className="text-red-600 text-xs mt-1 font-bold">⚠️ {errors.direccion}</p>}
+                                        {mapCoords && (
+                                            <div className="mt-2">
+                                                <CheckoutMap lat={mapCoords.lat} lng={mapCoords.lng} />
+                                                <p className="text-[11px] text-gray-400 mt-1">
+                                                    📍 Ubicación aproximada según la dirección escrita — verifica que el marcador esté en el lugar correcto.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="md:col-span-2">
