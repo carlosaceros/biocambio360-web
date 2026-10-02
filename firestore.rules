@@ -157,7 +157,23 @@ service cloud.firestore {
       allow create: if false;
       allow delete: if false;
     }
-    
+
+    // GPS de mensajeros: última posición (un doc por mensajero) + historial del turno. Solo la
+    // sesión del mensajero dueño de esa ubicación puede escribirla -- se valida con el custom
+    // claim `messengerId` (seteado en /api/admin/messengers/create-login al crear su login
+    // individual), NUNCA con "cualquier autenticado", porque esto se escribe cada pocos segundos
+    // durante el turno y antes de esto /mensajero era una sesión compartida sin esa distinción.
+    // Lectura abierta a cualquier sesión admin (el mapa en vivo lo usa cualquier supervisor).
+    match /messenger_locations/{messengerId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.messengerId == messengerId;
+    }
+    match /messenger_location_history/{messengerId}/pings/{pingId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.token.messengerId == messengerId;
+      allow update, delete: if false; // un ping histórico nunca se edita, solo se limpia por el cron de retención con Admin SDK
+    }
+
     // Default para TODO lo demás (admin_users, ai_training, referral_*, pos_sales, audit_logs,
     // user_sessions, las colecciones de staging de migración de Kommo/ventas, crm_activities,
     // etc.): antes era "if true" — abierto a cualquiera en internet sin sesión, sin importar el

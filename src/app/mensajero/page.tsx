@@ -27,10 +27,13 @@ import {
     markMessengerDelivered,
     reportMessengerException,
 } from '@/lib/messengers-service';
+import { isWithinShift, reportMessengerLocation, recordGpsConsent } from '@/lib/messenger-location-service';
 import { subscribeToOrders } from '@/lib/orders-service';
 import { Order, OrderStatus } from '@/types/order';
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
+
+const LOCATION_WRITE_INTERVAL_MS = 25000;
 
 export default function MensajeroAppPage() {
     const { user, userProfile } = useAuth();
@@ -58,14 +61,29 @@ export default function MensajeroAppPage() {
     const [exceptionDetail, setExceptionDetail] = useState<string>('');
     const [isSubmittingException, setIsSubmittingException] = useState<boolean>(false);
 
+    // GPS -- solo para una sesión de mensajero individual (nunca para un supervisor navegando
+    // por otros), solo dentro de su turno configurado, y solo tras consentimiento explícito.
+    const [withinShiftNow, setWithinShiftNow] = useState(false);
+    const [gpsConsentGiven, setGpsConsentGiven] = useState(false);
+    const [showGpsConsentModal, setShowGpsConsentModal] = useState(false);
+    const [gpsError, setGpsError] = useState<string | null>(null);
+    const [isSharingLocation, setIsSharingLocation] = useState(false);
+
+    // Si el usuario logueado ES un mensajero (login individual, ver /admin/mensajeros > Directorio),
+    // su sesión queda bloqueada a su propia identidad -- nunca puede ver/actuar como otro mensajero.
+    // Solo roles de supervisión (sin messengerId propio) ven el selector libre de abajo.
+    const isLockedToOwnMessenger = userProfile?.role === 'mensajero' && !!userProfile?.messengerId;
+
     // Cargar mensajeros
     useEffect(() => {
         async function loadData() {
             try {
                 const list = await getMessengers();
                 setMessengers(list);
-                if (list.length > 0) {
-                    // Si el usuario logueado coincide con algún mensajero por email o nombre, preseleccionarlo
+                if (isLockedToOwnMessenger) {
+                    setSelectedMessengerId(userProfile!.messengerId!);
+                } else if (list.length > 0) {
+                    // Supervisor sin messengerId propio: heurística anterior solo como conveniencia de UI
                     const matched = list.find(m =>
                         (user?.email && m.email === user.email) ||
                         (userProfile?.nombre && m.nombre.toLowerCase().includes(userProfile.nombre.toLowerCase()))
@@ -79,7 +97,7 @@ export default function MensajeroAppPage() {
             }
         }
         loadData();
-    }, [user, userProfile]);
+    }, [user, userProfile, isLockedToOwnMessenger]);
 
     // Suscribirse en tiempo real a los pedidos
     useEffect(() => {
@@ -90,6 +108,80 @@ export default function MensajeroAppPage() {
     }, []);
 
     const selectedMessenger = messengers.find(m => m.id === selectedMessengerId);
+
+    // Sincroniza el consentimiento ya dado (persistido en admin_users) al cargar el perfil
+    useEffect(() => {
+        setGpsConsentGiven(!!userProfile?.gpsConsentAcceptedAt);
+    }, [userProfile?.gpsConsentAcceptedAt]);
+
+    // Recalcula si está dentro de turno cada minuto -- el turno puede terminar mientras la pestaña sigue abierta
+    useEffect(() => {
+        if (!isLockedToOwnMessenger || !selectedMessenger?.turno) {
+            setWithinShiftNow(false);
+            return;
+        }
+        const check = () => setWithinShiftNow(isWithinShift(selectedMessenger.turno));
+        check();
+        const interval = setInterval(check, 60000);
+        return () => clearInterval(interval);
+    }, [isLockedToOwnMessenger, selectedMessenger]);
+
+    // Pide consentimiento una sola vez (hasta que se acepte) cuando entra en turno
+    useEffect(() => {
+        if (isLockedToOwnMessenger && withinShiftNow && !gpsConsentGiven) {
+            setShowGpsConsentModal(true);
+        }
+    }, [isLockedToOwnMessenger, withinShiftNow, gpsConsentGiven]);
+
+    const handleAcceptGpsConsent = async () => {
+        if (!user?.email) return;
+        try {
+            await recordGpsConsent(user.email);
+            setGpsConsentGiven(true);
+            setShowGpsConsentModal(false);
+        } catch (err) {
+            console.error('Error guardando consentimiento GPS:', err);
+            alert('No se pudo guardar tu aceptación, intenta de nuevo.');
+        }
+    };
+
+    // Reporta ubicación mientras: es tu propia sesión de mensajero + estás en turno + ya aceptaste.
+    // Se apaga solo (deja de escribir) en cuanto cualquiera de esas tres deja de cumplirse.
+    useEffect(() => {
+        const shouldTrack = isLockedToOwnMessenger && withinShiftNow && gpsConsentGiven && selectedMessenger;
+        if (!shouldTrack || typeof navigator === 'undefined' || !navigator.geolocation) {
+            setIsSharingLocation(false);
+            return;
+        }
+
+        let lastWriteAt = 0;
+        setGpsError(null);
+        const watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                setIsSharingLocation(true);
+                const now = Date.now();
+                if (now - lastWriteAt < LOCATION_WRITE_INTERVAL_MS) return;
+                lastWriteAt = now;
+                reportMessengerLocation(
+                    selectedMessenger.id,
+                    selectedMessenger.nombre,
+                    pos.coords.latitude,
+                    pos.coords.longitude,
+                    pos.coords.accuracy
+                ).catch((err) => console.warn('No se pudo reportar la ubicación:', err));
+            },
+            (err) => {
+                setIsSharingLocation(false);
+                setGpsError(err.code === err.PERMISSION_DENIED ? 'Activa el permiso de ubicación del navegador para compartir tu ruta.' : 'No se pudo obtener tu ubicación.');
+            },
+            { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+        );
+
+        return () => {
+            navigator.geolocation.clearWatch(watchId);
+            setIsSharingLocation(false);
+        };
+    }, [isLockedToOwnMessenger, withinShiftNow, gpsConsentGiven, selectedMessenger]);
 
     // Filtrar pedidos asignados al mensajero para la fecha seleccionada
     const myOrders = orders.filter(ord => {
@@ -235,17 +327,23 @@ export default function MensajeroAppPage() {
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">
                             Mensajero:
                         </label>
-                        <select
-                            value={selectedMessengerId}
-                            onChange={(e) => setSelectedMessengerId(e.target.value)}
-                            className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        >
-                            {messengers.map(m => (
-                                <option key={m.id} value={m.id}>
-                                    {m.nombre} ({m.placaVehiculo})
-                                </option>
-                            ))}
-                        </select>
+                        {isLockedToOwnMessenger ? (
+                            <div className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-black">
+                                {selectedMessenger?.nombre || '...'}
+                            </div>
+                        ) : (
+                            <select
+                                value={selectedMessengerId}
+                                onChange={(e) => setSelectedMessengerId(e.target.value)}
+                                className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            >
+                                {messengers.map(m => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.nombre} ({m.placaVehiculo})
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     <div>
@@ -287,6 +385,20 @@ export default function MensajeroAppPage() {
                                 {selectedMessenger.activo ? 'En Turno' : 'Inactivo'}
                             </span>
                         </div>
+                    </div>
+                )}
+
+                {isLockedToOwnMessenger && (
+                    <div className={`rounded-xl px-3 py-2 text-[11px] font-bold flex items-center gap-1.5 ${
+                        isSharingLocation ? 'bg-sky-50 text-sky-800 border border-sky-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                    }`}>
+                        <Navigation size={12} />
+                        {isSharingLocation
+                            ? 'Compartiendo tu ubicación con logística (dentro de tu turno)'
+                            : withinShiftNow
+                                ? 'Esperando señal de GPS...'
+                                : 'Fuera de turno -- no se comparte tu ubicación'}
+                        {gpsError && <span className="text-red-600 ml-1">· {gpsError}</span>}
                     </div>
                 )}
 
@@ -764,6 +876,41 @@ export default function MensajeroAppPage() {
                                 className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-black text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                             >
                                 {isSubmittingException ? 'Guardando...' : '⚠️ Registrar Novedad'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CONSENTIMIENTO GPS -- se pide una sola vez, al entrar en turno. Sin aceptar, la app
+                sigue funcionando normal (entregas, novedades, cobro) solo que sin compartir ubicación. */}
+            {showGpsConsentModal && (
+                <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 shadow-2xl">
+                        <div className="w-12 h-12 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center mx-auto">
+                            <Navigation size={24} />
+                        </div>
+                        <h3 className="text-base font-black text-slate-900 text-center">
+                            Compartir tu ubicación con logística
+                        </h3>
+                        <p className="text-xs text-slate-600 text-center leading-relaxed">
+                            Para ayudar a coordinar mejor las rutas, logística puede ver tu ubicación en un mapa
+                            <strong> solo mientras estés dentro de tu turno laboral</strong> ({selectedMessenger?.turno?.horaInicio || '--'} a {selectedMessenger?.turno?.horaFin || '--'}).
+                            Fuera de turno, nunca se comparte ni se guarda tu ubicación. Puedes seguir usando la app
+                            normalmente aunque no aceptes -- solo no se mostrará tu posición en el mapa.
+                        </p>
+                        <div className="flex flex-col gap-2 pt-1">
+                            <button
+                                onClick={handleAcceptGpsConsent}
+                                className="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-black text-sm cursor-pointer"
+                            >
+                                Acepto compartir mi ubicación en turno
+                            </button>
+                            <button
+                                onClick={() => setShowGpsConsentModal(false)}
+                                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs cursor-pointer"
+                            >
+                                Ahora no
                             </button>
                         </div>
                     </div>

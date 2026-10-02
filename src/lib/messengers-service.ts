@@ -15,6 +15,17 @@ import { db } from './firebase';
 import { Order, OrderStatus } from '@/types/order';
 import { updateOrderStatus } from './orders-service';
 
+/**
+ * Turno laboral del mensajero -- define la ventana en la que su sesión puede reportar GPS
+ * (ver messenger-location-service.ts). diasSemana usa el mismo índice que Date.getDay()
+ * (0=domingo..6=sábado). horaInicio/horaFin en formato 'HH:mm', hora de Bogotá.
+ */
+export interface MessengerTurno {
+    diasSemana: number[];
+    horaInicio: string;
+    horaFin: string;
+}
+
 export interface Messenger {
     id: string;
     nombre: string;
@@ -27,6 +38,7 @@ export interface Messenger {
     fechaIngreso: string;
     email?: string;
     notas?: string;
+    turno?: MessengerTurno;
 }
 
 export interface MessengerRateConfig {

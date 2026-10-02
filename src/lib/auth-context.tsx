@@ -36,6 +36,8 @@ export interface AdminUserProfile {
     estado?: 'activo' | 'inactivo';
     capacidades?: Record<string, boolean>;
     permissions?: Record<string, string>;
+    messengerId?: string;
+    gpsConsentAcceptedAt?: string;
 }
 
 interface AuthContextType {
@@ -97,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             estado: data.estado || 'activo',
                             capacidades: data.capacidades || undefined,
                             permissions: data.permissions || (finalRole === 'superadmin' ? { all: 'full' } : { pedidos: 'full' }),
+                            messengerId: data.messengerId || undefined,
+                            gpsConsentAcceptedAt: data.gpsConsentAcceptedAt || undefined,
                         };
                         setUserProfile(profile);
                         setRole(finalRole);

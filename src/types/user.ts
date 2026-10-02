@@ -44,6 +44,11 @@ export interface AdminUserRecord {
     createdAt: string;
     updatedAt: string;
     ultimoIngreso?: string;
+    // Solo rol 'mensajero': vincula este login al documento messengers/{messengerId} que le
+    // corresponde -- necesario para el GPS en tiempo real (custom claim del mismo valor, ver
+    // /api/admin/messengers/create-login) y para que /mensajero bloquee la sesión a su propia ruta.
+    messengerId?: string;
+    gpsConsentAcceptedAt?: string; // ISO date string -- consentimiento explícito de compartir ubicación
 }
 
 export const ROLE_DEFINITIONS: Record<SystemRole, {

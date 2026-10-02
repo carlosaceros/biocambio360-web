@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/sync-99envios-novedades",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-messenger-locations",
+      "schedule": "0 8 * * *"
     }
   ]
 }

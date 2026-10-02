@@ -52,10 +52,29 @@ import { subscribeToOrders } from '@/lib/orders-service';
 import { Order } from '@/types/order';
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+// Leaflet usa `window` -- debe cargarse solo en el navegador, nunca en el render de servidor.
+const MessengerLiveMap = dynamic(() => import('@/components/admin/MessengerLiveMap'), { ssr: false });
+
+const DIAS_SEMANA = [
+    { value: 1, label: 'Lun' },
+    { value: 2, label: 'Mar' },
+    { value: 3, label: 'Mié' },
+    { value: 4, label: 'Jue' },
+    { value: 5, label: 'Vie' },
+    { value: 6, label: 'Sáb' },
+    { value: 0, label: 'Dom' },
+];
 
 export default function MensajerosAdminPage() {
     const { user, userProfile } = useAuth();
-    const [activeTab, setActiveTab] = useState<'asignacion' | 'directorio' | 'liquidacion' | 'tarifas'>('asignacion');
+    const [activeTab, setActiveTab] = useState<'asignacion' | 'directorio' | 'mapa' | 'liquidacion' | 'tarifas'>('asignacion');
+    const [creatingLoginFor, setCreatingLoginFor] = useState<Messenger | null>(null);
+    const [loginEmail, setLoginEmail] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
+    const [isCreatingLogin, setIsCreatingLogin] = useState(false);
+    const [createLoginResult, setCreateLoginResult] = useState<string | null>(null);
 
     const [messengers, setMessengers] = useState<Messenger[]>([]);
     const [rates, setRates] = useState<MessengerRateConfig | null>(null);
@@ -251,6 +270,8 @@ export default function MensajerosAdminPage() {
                 activo: editingMessenger.activo ?? true,
                 fechaIngreso: editingMessenger.fechaIngreso || new Date().toISOString().split('T')[0],
                 notas: editingMessenger.notas || '',
+                turno: editingMessenger.turno,
+                email: editingMessenger.email,
             };
 
             await saveMessenger(messengerToSave);
@@ -261,6 +282,36 @@ export default function MensajerosAdminPage() {
             alert(`Error guardando mensajero: ${err?.message || err}`);
         } finally {
             setIsSavingMessenger(false);
+        }
+    };
+
+    const handleOpenCreateLogin = (m: Messenger) => {
+        setCreatingLoginFor(m);
+        setLoginEmail(m.email || `${m.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')}@biocambio360.com`);
+        setLoginPassword('');
+        setCreateLoginResult(null);
+    };
+
+    const handleCreateLogin = async () => {
+        if (!creatingLoginFor || !user || !loginEmail || loginPassword.length < 6) return;
+        setIsCreatingLogin(true);
+        setCreateLoginResult(null);
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/admin/messengers/create-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ messengerId: creatingLoginFor.id, email: loginEmail, password: loginPassword, nombre: creatingLoginFor.nombre }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al crear el login');
+            setCreateLoginResult(`✅ Login listo: ${data.email} -- entrégale esta contraseña al mensajero por un canal seguro (no quedó guardada aquí).`);
+            setMessengers(prev => prev.map(mm => mm.id === creatingLoginFor.id ? { ...mm, email: data.email } : mm));
+            if (editingMessenger?.id === creatingLoginFor.id) setEditingMessenger(prev => prev ? { ...prev, email: data.email } : prev);
+        } catch (err) {
+            setCreateLoginResult(`❌ ${err instanceof Error ? err.message : 'Error al crear el login'}`);
+        } finally {
+            setIsCreatingLogin(false);
         }
     };
 
@@ -407,6 +458,18 @@ export default function MensajerosAdminPage() {
                 >
                     <Users size={15} />
                     <span>Directorio ({messengers.length})</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('mapa')}
+                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        activeTab === 'mapa'
+                            ? 'bg-white text-orange-700 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                    <Navigation size={15} />
+                    <span>Mapa en Vivo</span>
                 </button>
 
                 <button
@@ -620,6 +683,16 @@ export default function MensajerosAdminPage() {
             )}
 
             {/* TAB 2: DIRECTORIO DE MENSAJEROS */}
+            {activeTab === 'mapa' && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                    <h3 className="text-sm font-black text-slate-900 mb-1">Ubicación en vivo de la flota</h3>
+                    <p className="text-xs text-slate-500 mb-3">
+                        Solo se reporta ubicación de mensajeros con login individual, dentro de su turno configurado y que hayan aceptado el aviso de consentimiento en su app.
+                    </p>
+                    <MessengerLiveMap />
+                </div>
+            )}
+
             {activeTab === 'directorio' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {messengers.map(m => (
@@ -1263,6 +1336,82 @@ export default function MensajerosAdminPage() {
                                 />
                             </div>
 
+                            <div className="pt-2 border-t border-slate-100">
+                                <label className="block text-xs font-black text-slate-700 mb-1.5">
+                                    Turno Laboral (define cuándo puede reportar GPS -- ver pestaña Mapa en Vivo)
+                                </label>
+                                <div className="flex flex-wrap gap-1 mb-2">
+                                    {DIAS_SEMANA.map((dia) => {
+                                        const selected = editingMessenger.turno?.diasSemana?.includes(dia.value) ?? false;
+                                        return (
+                                            <button
+                                                key={dia.value}
+                                                type="button"
+                                                onClick={() => {
+                                                    const current = editingMessenger.turno?.diasSemana || [];
+                                                    const next = selected ? current.filter((d) => d !== dia.value) : [...current, dia.value];
+                                                    setEditingMessenger({
+                                                        ...editingMessenger,
+                                                        turno: { diasSemana: next, horaInicio: editingMessenger.turno?.horaInicio || '07:00', horaFin: editingMessenger.turno?.horaFin || '17:00' },
+                                                    });
+                                                }}
+                                                className={`w-9 h-8 rounded-lg text-[10px] font-black cursor-pointer transition-colors ${
+                                                    selected ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-500'
+                                                }`}
+                                            >
+                                                {dia.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Hora inicio</label>
+                                        <input
+                                            type="time"
+                                            value={editingMessenger.turno?.horaInicio || '07:00'}
+                                            onChange={(e) => setEditingMessenger({
+                                                ...editingMessenger,
+                                                turno: { diasSemana: editingMessenger.turno?.diasSemana || [], horaInicio: e.target.value, horaFin: editingMessenger.turno?.horaFin || '17:00' },
+                                            })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-orange-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Hora fin</label>
+                                        <input
+                                            type="time"
+                                            value={editingMessenger.turno?.horaFin || '17:00'}
+                                            onChange={(e) => setEditingMessenger({
+                                                ...editingMessenger,
+                                                turno: { diasSemana: editingMessenger.turno?.diasSemana || [], horaInicio: editingMessenger.turno?.horaInicio || '07:00', horaFin: e.target.value },
+                                            })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-orange-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {editingMessenger.id && (
+                                <div className="pt-2 border-t border-slate-100">
+                                    <label className="block text-xs font-black text-slate-700 mb-1.5">
+                                        Acceso individual (login propio, requerido para el GPS)
+                                    </label>
+                                    <p className="text-[11px] text-slate-500 mb-1.5">
+                                        {editingMessenger.email
+                                            ? `Ya tiene login: ${editingMessenger.email}`
+                                            : 'Este mensajero aún no tiene un login propio -- sin esto no puede reportar GPS.'}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenCreateLogin(editingMessenger as Messenger)}
+                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs cursor-pointer"
+                                    >
+                                        {editingMessenger.email ? 'Resetear contraseña de acceso' : 'Crear login de acceso'}
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="pt-2 flex items-center gap-2">
                                 <button
                                     type="button"
@@ -1283,6 +1432,62 @@ export default function MensajerosAdminPage() {
                     </div>
                 </div>
             )}
+
+            {creatingLoginFor && (
+                <div className="fixed inset-0 z-[60] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-sm rounded-3xl p-5 space-y-3 shadow-2xl border border-slate-200">
+                        <div className="flex items-center justify-between border-b pb-3">
+                            <h3 className="text-sm font-black text-slate-900">
+                                Login de acceso: {creatingLoginFor.nombre}
+                            </h3>
+                            <button onClick={() => setCreatingLoginFor(null)} className="text-slate-400 hover:text-slate-600">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                            Este login es individual -- es lo que permite restringir el GPS para que cada mensajero solo pueda reportar su propia ubicación. Entrégale la contraseña por un canal seguro (no por este mismo chat/pantalla compartida).
+                        </p>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Email</label>
+                            <input
+                                type="email"
+                                value={loginEmail}
+                                onChange={(e) => setLoginEmail(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Contraseña temporal (mín. 6 caracteres)</label>
+                            <input
+                                type="text"
+                                value={loginPassword}
+                                onChange={(e) => setLoginPassword(e.target.value)}
+                                placeholder="Genera una contraseña temporal"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
+                        {createLoginResult && (
+                            <p className="text-[11px] font-bold text-slate-700 bg-slate-50 rounded-xl p-2.5">{createLoginResult}</p>
+                        )}
+                        <div className="flex items-center gap-2 pt-1">
+                            <button
+                                onClick={() => setCreatingLoginFor(null)}
+                                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs cursor-pointer"
+                            >
+                                Cerrar
+                            </button>
+                            <button
+                                onClick={handleCreateLogin}
+                                disabled={isCreatingLogin || loginPassword.length < 6 || !loginEmail}
+                                className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-black text-xs cursor-pointer"
+                            >
+                                {isCreatingLogin ? 'Creando...' : 'Crear / Actualizar login'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL DE IMPRESIÓN DE COMPROBANTES Y HOJA DE RUTA */}
             {printModalOpen && (() => {
                 const currentPrintMessenger = messengers.find(m => m.id === printMessengerId) || messengers[0];
