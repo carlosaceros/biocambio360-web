@@ -50,7 +50,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { subscribeToOrders, updateOrderStatus, addOrderInternalNote, searchOrdersRemotely, updateOrderPaymentConfirmation } from '@/lib/orders-service';
+import { subscribeToOrders, updateOrderStatus, addOrderInternalNote, searchOrdersRemotely } from '@/lib/orders-service';
 import { Order, OrderStatus, ORDER_STATUS_CONFIG, TimelineEvent, OrderInternalNote } from '@/types/order';
 import { formatCurrency } from '@/lib/checkout-utils';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -545,15 +545,20 @@ export default function PedidosPage() {
     };
 
     const handleTogglePaymentConfirmed = async (order: Order & { id: string }) => {
+        if (!user) return;
         setIsConfirmingPayment(true);
         try {
             const nextConfirmed = !order.pagoConfirmado;
-            await updateOrderPaymentConfirmation(
-                order.id,
-                nextConfirmed,
-                { email: user?.email || 'admin@biocambio360.com', nombre: userProfile?.nombre || user?.displayName || 'Asesor', role },
-                order.status
-            );
+            const idToken = await user.getIdToken();
+            const res = await fetch(`/api/admin/orders/${order.id}/payment-confirmation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ confirmed: nextConfirmed }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'No se pudo actualizar la confirmación de pago.');
+            }
             const nowIso = new Date().toISOString();
             setActiveOrder(prev => prev && prev.id === order.id ? {
                 ...prev,
@@ -563,7 +568,7 @@ export default function PedidosPage() {
             } : prev);
         } catch (e) {
             console.error('Error confirming payment:', e);
-            alert('No se pudo actualizar la confirmación de pago.');
+            alert(e instanceof Error ? e.message : 'No se pudo actualizar la confirmación de pago.');
         } finally {
             setIsConfirmingPayment(false);
         }

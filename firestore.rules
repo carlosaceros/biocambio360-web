@@ -20,7 +20,17 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if true;
       allow create: if request.auth != null || request.resource.data.status == 'pendiente';
-      allow update: if request.auth != null;
+      // pagoConfirmado/pagoConfirmadoAt/pagoConfirmadoPor NUNCA se escriben desde el SDK de
+      // cliente -- antes cualquier sesión autenticada (incluida la de un mensajero) podía
+      // escribirlos, ya que esta regla solo exigía auth != null sin distinguir rol. Ahora solo
+      // se escriben vía /api/admin/orders/[id]/payment-confirmation (Admin SDK, valida rol antes
+      // de escribir), que bypassea estas reglas por completo. Deliberadamente NO se intenta
+      // replicar el chequeo de rol aquí mismo (requeriría un get() a admin_users, indexado por
+      // email en minúscula con un caso especial para la cuenta raíz -- lógica frágil de
+      // mantener en dos lugares); bloquear el campo del todo es más simple y más seguro de
+      // verificar que acertar esa réplica.
+      allow update: if request.auth != null
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pagoConfirmado', 'pagoConfirmadoAt', 'pagoConfirmadoPor']);
       allow delete: if request.auth != null;
     }
     
