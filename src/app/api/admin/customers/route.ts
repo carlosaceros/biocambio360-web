@@ -4,7 +4,16 @@ import path from 'path';
 import { CUSTOMERS_MACRO_STATS, COMPACT_CUSTOMERS_TOP_INDEX } from '@/lib/integrated-customers-summary';
 import { getAdminDB } from '@/lib/firebase-admin';
 
-const KOMMO_FIELDS = ['kommoContactId', 'kommoLeadNota', 'kommoObservacion', 'kommoEtapa', 'kommoTipoCliente'] as const;
+// Campos que SÍ viven en vivo en Firestore pero NUNCA están en el snapshot estático (ver abajo) --
+// cualquier campo nuevo que un asesor pueda editar desde /admin/clientes (calificación, checklist
+// de recompra, etc.) tiene que agregarse aquí, o se verá bien en la sesión actual (el estado local
+// queda "optimistamente" actualizado) y luego desaparecerá en el siguiente refresh/recarga de la
+// lista -- exactamente el bug que tenían los campos kommo* antes de agregarse a esta whitelist.
+const LIVE_FIRESTORE_FIELDS = [
+    'kommoContactId', 'kommoLeadNota', 'kommoObservacion', 'kommoEtapa', 'kommoTipoCliente',
+    'advisorRating', 'advisorRatingNote', 'advisorRatingAt', 'advisorRatingBy',
+    'recompraChecklist',
+] as const;
 
 /**
  * El dataset base de esta ruta es un snapshot estático (integrated-customers-data.json,
@@ -28,7 +37,7 @@ async function enrichWithLiveKommoData(items: Record<string, unknown>[]): Promis
             const data = snap.data() as Record<string, unknown>;
             const kommoData: Record<string, unknown> = {};
             let hasAny = false;
-            for (const field of KOMMO_FIELDS) {
+            for (const field of LIVE_FIRESTORE_FIELDS) {
                 if (data[field]) {
                     kommoData[field] = data[field];
                     hasAny = true;

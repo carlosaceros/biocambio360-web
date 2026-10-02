@@ -279,6 +279,189 @@ export async function updateCustomerTags(
     }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Calificación manual del asesor
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Guarda la calificación manual (1-5) que un asesor le da a un cliente -- percepción de
+ * calidad/potencial comercial del asesor, no un NPS respondido por el cliente.
+ */
+export async function setCustomerRating(
+    customerId: string,
+    rating: number,
+    note: string | undefined,
+    authorEmail?: string,
+    authorName?: string
+): Promise<void> {
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        throw new Error('La calificación debe ser un entero entre 1 y 5.');
+    }
+    try {
+        const customerDocRef = doc(customersRef, customerId);
+        const nowIso = new Date().toISOString();
+        await updateDoc(customerDocRef, {
+            advisorRating: rating,
+            advisorRatingNote: note || '',
+            advisorRatingAt: nowIso,
+            advisorRatingBy: authorEmail || '',
+            updatedAt: serverTimestamp(),
+        });
+        await addCRMActivity({
+            customerId,
+            type: 'calificacion',
+            description: `Calificación del asesor: ${rating}/5${note ? ` -- ${note}` : ''}`,
+            authorEmail,
+            authorName,
+            metadata: { rating, note: note || '' },
+        });
+    } catch (error) {
+        console.error('[CRM] Error setting customer rating:', error);
+        throw error;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Checklist de seguimiento de recompra (15/30/45/60/90/120 días)
+// ─────────────────────────────────────────────────────────────
+
+type FlexibleTimestamp = Timestamp | { toMillis?: () => number; seconds?: number } | string | number | null | undefined;
+
+function toMillisSafe(value: FlexibleTimestamp): number {
+    if (!value) return 0;
+    if (typeof value === 'object') {
+        if (typeof value.toMillis === 'function') return value.toMillis();
+        if (value.seconds) return value.seconds * 1000;
+        return 0;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+        const ms = new Date(value).getTime();
+        return Number.isNaN(ms) ? 0 : ms;
+    }
+    return 0;
+}
+
+export interface RecompraMilestoneView {
+    day: 15 | 30 | 45 | 60 | 90 | 120;
+    dueDate: Date;
+    isDue: boolean;       // ya llegó o pasó la fecha del hito
+    isOverdue: boolean;   // pasó la fecha Y no está marcado como hecho
+    done: boolean;
+    doneAt?: string;
+    doneBy?: string;
+}
+
+/**
+ * Deriva el estado del checklist de recompra (hitos fijos en días desde la última compra)
+ * cruzando la fecha real del último pedido con lo que el asesor ya marcó como hecho.
+ * Función pura -- no toca Firestore, se puede recalcular en el cliente sin esperar red.
+ */
+export function computeRecompraChecklist(
+    lastOrderDate: FlexibleTimestamp,
+    checklist?: import('@/types/crm').RecompraChecklist
+): RecompraMilestoneView[] {
+    const lastOrderMs = toMillisSafe(lastOrderDate);
+    const now = Date.now();
+    const milestones: Array<15 | 30 | 45 | 60 | 90 | 120> = [15, 30, 45, 60, 90, 120];
+    return milestones.map((day) => {
+        const dueDate = new Date(lastOrderMs + day * 24 * 60 * 60 * 1000);
+        const state = checklist?.[`d${day}`];
+        const isDue = lastOrderMs > 0 && now >= dueDate.getTime();
+        return {
+            day,
+            dueDate,
+            isDue,
+            isOverdue: isDue && !state?.done,
+            done: !!state?.done,
+            doneAt: state?.doneAt,
+            doneBy: state?.doneBy,
+        };
+    });
+}
+
+/**
+ * Marca (o desmarca) un hito del checklist de recompra como completado por el asesor.
+ */
+export async function toggleRecompraMilestone(
+    customerId: string,
+    day: 15 | 30 | 45 | 60 | 90 | 120,
+    done: boolean,
+    authorEmail?: string,
+    authorName?: string
+): Promise<void> {
+    try {
+        const customerDocRef = doc(customersRef, customerId);
+        const nowIso = new Date().toISOString();
+        const fieldPath = `recompraChecklist.d${day}`;
+        await updateDoc(customerDocRef, {
+            [fieldPath]: done
+                ? { done: true, doneAt: nowIso, doneBy: authorEmail || '' }
+                : { done: false },
+            updatedAt: serverTimestamp(),
+        });
+        if (done) {
+            await addCRMActivity({
+                customerId,
+                type: 'checklist_milestone',
+                description: `Seguimiento de recompra completado: hito de ${day} días`,
+                authorEmail,
+                authorName,
+                metadata: { day },
+            });
+        }
+    } catch (error) {
+        console.error('[CRM] Error toggling recompra milestone:', error);
+        throw error;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Promedio de recompra real y detección de negocio (heurística, solo sugerencia)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Promedio de días entre compras consecutivas, calculado del historial REAL de pedidos del
+ * cliente (a diferencia de estimatedCycleDays, que es una estimación por volumen del último
+ * pedido). Requiere al menos 2 pedidos; si no, no hay ciclo que promediar.
+ */
+export function computeAverageRepurchaseCycleDays(orderDates: FlexibleTimestamp[]): number | null {
+    const sortedMs = orderDates
+        .map(toMillisSafe)
+        .filter((ms) => ms > 0)
+        .sort((a, b) => a - b);
+    if (sortedMs.length < 2) return null;
+    const gaps: number[] = [];
+    for (let i = 1; i < sortedMs.length; i++) {
+        gaps.push((sortedMs[i] - sortedMs[i - 1]) / (1000 * 60 * 60 * 24));
+    }
+    const avg = gaps.reduce((sum, g) => sum + g, 0) / gaps.length;
+    return Math.round(avg);
+}
+
+export interface BusinessDetectionResult {
+    isLikely: boolean;
+    reason: string;
+}
+
+/**
+ * Heurística de sugerencia (NUNCA aplica el tag automáticamente) para detectar si un cliente
+ * "hogar" en realidad podría ser un negocio/revendedor: compra con frecuencia alta y sostenida.
+ * El asesor decide si aplicar el tag -- evita falsos positivos silenciosos en la segmentación.
+ */
+export function detectPossibleBusiness(
+    tags: CustomerTag[] | undefined,
+    ordersCount: number,
+    avgCycleDays: number | null
+): BusinessDetectionResult | null {
+    const alreadyTagged = (tags || []).some((t) => ['b2b', 'empresa', 'revendedor', 'suministradora', 'institucional'].includes(t));
+    if (alreadyTagged) return null;
+    if (ordersCount < 4 || avgCycleDays === null) return null;
+    if (avgCycleDays <= 20) {
+        return { isLikely: true, reason: `${ordersCount} pedidos con un ciclo de recompra de ~${avgCycleDays} días -- un ritmo típico de reventa, no de consumo en hogar.` };
+    }
+    return null;
+}
+
 /**
  * Asigna un asesor a un cliente.
  */

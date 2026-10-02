@@ -66,7 +66,13 @@ import {
     assignCustomerToAdvisor,
     reassignCustomerAdvisor,
     bulkReassignCustomers,
-    toggleCustomerReferrerStatus
+    toggleCustomerReferrerStatus,
+    setCustomerRating,
+    computeRecompraChecklist,
+    toggleRecompraMilestone,
+    computeAverageRepurchaseCycleDays,
+    detectPossibleBusiness,
+    RecompraMilestoneView
 } from '@/lib/crm-service';
 import { subscribeToAdminUsers } from '@/lib/users-service';
 import { runSARLAFTCheck } from '@/lib/sarlaft-service';
@@ -128,6 +134,11 @@ export default function ClientesPage() {
     const [isLoadingOrders, setIsLoadingOrders] = useState(false);
     const [newNoteText, setNewNoteText] = useState('');
     const [isSavingNote, setIsSavingNote] = useState(false);
+    const [ratingInput, setRatingInput] = useState(0);
+    const [ratingNoteInput, setRatingNoteInput] = useState('');
+    const [isSavingRating, setIsSavingRating] = useState(false);
+    const [togglingMilestone, setTogglingMilestone] = useState<number | null>(null);
+    const [isApplyingBusinessTag, setIsApplyingBusinessTag] = useState(false);
     const [isCheckingSarlaft, setIsCheckingSarlaft] = useState(false);
     const [reassignReason, setReassignReason] = useState('');
     const [isReassigningSingle, setIsReassigningSingle] = useState(false);
@@ -205,10 +216,27 @@ export default function ClientesPage() {
         }));
     }, [rawCustomers]);
 
+    const recompraMilestones = useMemo(() => {
+        if (!selectedCustomer) return [];
+        return computeRecompraChecklist(selectedCustomer.lastOrderDate, selectedCustomer.recompraChecklist);
+    }, [selectedCustomer]);
+
+    const avgCycleDays = useMemo(() => {
+        if (customerOrders.length < 2) return null;
+        return computeAverageRepurchaseCycleDays(customerOrders.map(o => o.createdAt));
+    }, [customerOrders]);
+
+    const businessSuggestion = useMemo(() => {
+        if (!selectedCustomer) return null;
+        return detectPossibleBusiness(selectedCustomer.tags, selectedCustomer.ordersCount, avgCycleDays);
+    }, [selectedCustomer, avgCycleDays]);
+
     // Handle customer selection
     const handleCustomerClick = async (customer: CustomerCRM) => {
         setSelectedCustomer(customer);
         setReassignReason('');
+        setRatingInput(customer.advisorRating || 0);
+        setRatingNoteInput(customer.advisorRatingNote || '');
         setIsLoadingOrders(true);
         try {
             const [orders, activities] = await Promise.all([
@@ -285,6 +313,77 @@ export default function ClientesPage() {
             console.error('Error saving note:', e);
         } finally {
             setIsSavingNote(false);
+        }
+    };
+
+    // Guarda la calificación manual (1-5) del asesor para el cliente seleccionado
+    const handleSaveRating = async () => {
+        if (!selectedCustomer || ratingInput < 1) return;
+        setIsSavingRating(true);
+        try {
+            const authorEmail = user?.email || 'admin@biocambio360.com';
+            const authorName = userProfile?.nombre || user?.displayName || 'Asesor Comercial';
+            await setCustomerRating(selectedCustomer.id, ratingInput, ratingNoteInput.trim() || undefined, authorEmail, authorName);
+            const nowIso = new Date().toISOString();
+            const patch = { advisorRating: ratingInput, advisorRatingNote: ratingNoteInput.trim(), advisorRatingAt: nowIso, advisorRatingBy: authorEmail };
+            setSelectedCustomer(prev => prev ? { ...prev, ...patch } : null);
+            setRawCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, ...patch } : c));
+            setCustomerActivities(await getCustomerActivities(selectedCustomer.id));
+            setActionFeedback({ message: '⭐ Calificación guardada.', type: 'success' });
+            setTimeout(() => setActionFeedback(null), 3000);
+        } catch (e) {
+            console.error('Error saving rating:', e);
+            setActionFeedback({ message: 'Error al guardar la calificación', type: 'error' });
+            setTimeout(() => setActionFeedback(null), 4000);
+        } finally {
+            setIsSavingRating(false);
+        }
+    };
+
+    // Marca/desmarca un hito del checklist de seguimiento de recompra
+    const handleToggleMilestone = async (milestone: RecompraMilestoneView) => {
+        if (!selectedCustomer) return;
+        setTogglingMilestone(milestone.day);
+        try {
+            const authorEmail = user?.email || 'admin@biocambio360.com';
+            const authorName = userProfile?.nombre || user?.displayName || 'Asesor Comercial';
+            const nextDone = !milestone.done;
+            await toggleRecompraMilestone(selectedCustomer.id, milestone.day, nextDone, authorEmail, authorName);
+            const key = `d${milestone.day}` as const;
+            const nextState = nextDone ? { done: true, doneAt: new Date().toISOString(), doneBy: authorEmail } : { done: false };
+            const patch = { recompraChecklist: { ...(selectedCustomer.recompraChecklist || {}), [key]: nextState } };
+            setSelectedCustomer(prev => prev ? { ...prev, ...patch } : null);
+            setRawCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, ...patch } : c));
+            if (nextDone) setCustomerActivities(await getCustomerActivities(selectedCustomer.id));
+        } catch (e) {
+            console.error('Error toggling recompra milestone:', e);
+            setActionFeedback({ message: 'Error al actualizar el checklist', type: 'error' });
+            setTimeout(() => setActionFeedback(null), 4000);
+        } finally {
+            setTogglingMilestone(null);
+        }
+    };
+
+    // Aplica la etiqueta sugerida por la heurística de detección de negocio (nunca automático)
+    const handleApplyBusinessTag = async (tag: CustomerTag) => {
+        if (!selectedCustomer) return;
+        setIsApplyingBusinessTag(true);
+        try {
+            const authorEmail = user?.email || 'admin@biocambio360.com';
+            const authorName = userProfile?.nombre || user?.displayName || 'Asesor Comercial';
+            const nextTags = [...new Set([...(selectedCustomer.tags || []), tag])];
+            await updateCustomerTags(selectedCustomer.id, nextTags, authorEmail, authorName);
+            setSelectedCustomer(prev => prev ? { ...prev, tags: nextTags } : null);
+            setRawCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, tags: nextTags } as any : c));
+            setCustomerActivities(await getCustomerActivities(selectedCustomer.id));
+            setActionFeedback({ message: `🏷️ Etiqueta "${CUSTOMER_TAG_CONFIG[tag].label}" aplicada.`, type: 'success' });
+            setTimeout(() => setActionFeedback(null), 3000);
+        } catch (e) {
+            console.error('Error applying business tag:', e);
+            setActionFeedback({ message: 'Error al aplicar la etiqueta', type: 'error' });
+            setTimeout(() => setActionFeedback(null), 4000);
+        } finally {
+            setIsApplyingBusinessTag(false);
         }
     };
 
@@ -1051,6 +1150,108 @@ export default function ClientesPage() {
                                             <p className="text-base font-black text-slate-900 mt-1">
                                                 {formatCurrency(Math.round(selectedCustomer.totalSpent / Math.max(1, selectedCustomer.ordersCount)))}
                                             </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Calificación manual del asesor: percepción de calidad/potencial comercial del
+                                        cliente -- no es un NPS respondido por el cliente, es criterio del asesor. */}
+                                    <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                                                <Star className="w-3.5 h-3.5 text-amber-500" /> Calificación del Asesor
+                                            </span>
+                                            {selectedCustomer.advisorRatingAt && (
+                                                <span className="text-[10px] text-slate-400">
+                                                    {format(parseSafeDate(selectedCustomer.advisorRatingAt), "d MMM yyyy", { locale: es })}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {[1, 2, 3, 4, 5].map((n) => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    onClick={() => setRatingInput(n)}
+                                                    className="cursor-pointer"
+                                                    title={`${n}/5`}
+                                                >
+                                                    <Star
+                                                        className={`w-5 h-5 ${n <= ratingInput ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`}
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <textarea
+                                            value={ratingNoteInput}
+                                            onChange={(e) => setRatingNoteInput(e.target.value)}
+                                            placeholder="Nota opcional sobre esta calificación..."
+                                            rows={2}
+                                            className="w-full text-xs p-2 rounded-lg border border-amber-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-300"
+                                        />
+                                        <button
+                                            onClick={handleSaveRating}
+                                            disabled={ratingInput < 1 || isSavingRating}
+                                            className="w-full py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                        >
+                                            {isSavingRating ? 'Guardando...' : 'Guardar calificación'}
+                                        </button>
+                                    </div>
+
+                                    {/* Promedio de recompra real (del historial de pedidos, no una estimación por volumen)
+                                        + sugerencia de detección de negocio -- nunca aplica el tag sola, solo sugiere. */}
+                                    <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2">
+                                        <span className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                                            <RefreshCw className="w-3.5 h-3.5 text-indigo-600" /> Ciclo de Recompra
+                                        </span>
+                                        <p className="text-xs text-slate-600">
+                                            {avgCycleDays !== null
+                                                ? <>Promedio real: <strong className="text-indigo-700">cada {avgCycleDays} días</strong> (basado en {customerOrders.length} pedidos)</>
+                                                : 'Aún no hay suficientes pedidos para calcular un promedio real (se necesitan al menos 2).'}
+                                        </p>
+                                        {businessSuggestion && (
+                                            <div className="mt-1 p-2.5 bg-white border border-indigo-200 rounded-xl space-y-1.5">
+                                                <p className="text-[11px] text-indigo-900 font-semibold">
+                                                    💡 Posible negocio/revendedor: {businessSuggestion.reason}
+                                                </p>
+                                                <button
+                                                    onClick={() => handleApplyBusinessTag('revendedor')}
+                                                    disabled={isApplyingBusinessTag}
+                                                    className="text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3 py-1.5 rounded-lg cursor-pointer"
+                                                >
+                                                    {isApplyingBusinessTag ? 'Aplicando...' : 'Etiquetar como Revendedor'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Checklist de seguimiento de recompra -- hitos fijos en días desde la última
+                                        compra, para que el asesor marque en qué punto del ciclo ya contactó al cliente. */}
+                                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                                        <span className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-slate-600" /> Checklist de Seguimiento
+                                        </span>
+                                        <div className="grid grid-cols-3 gap-1.5">
+                                            {recompraMilestones.map((m) => (
+                                                <button
+                                                    key={m.day}
+                                                    type="button"
+                                                    onClick={() => handleToggleMilestone(m)}
+                                                    disabled={togglingMilestone === m.day}
+                                                    title={format(m.dueDate, "d MMM yyyy", { locale: es })}
+                                                    className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl border text-[10px] font-bold transition-colors cursor-pointer disabled:opacity-50 ${
+                                                        m.done
+                                                            ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                                                            : m.isOverdue
+                                                                ? 'bg-red-50 border-red-300 text-red-700'
+                                                                : m.isDue
+                                                                    ? 'bg-amber-50 border-amber-300 text-amber-700'
+                                                                    : 'bg-white border-slate-200 text-slate-400'
+                                                    }`}
+                                                >
+                                                    <span>{m.day}d</span>
+                                                    <span>{m.done ? '✓' : m.isOverdue ? '⚠️' : m.isDue ? '•' : '—'}</span>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
 

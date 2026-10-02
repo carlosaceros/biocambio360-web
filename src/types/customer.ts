@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { RecompraChecklist } from './crm';
 
 export interface Customer {
     id: string; // Will use phone number as ID for uniqueness
@@ -37,6 +38,14 @@ export interface Customer {
     kommoTipoCliente?: string;
     kommoCedula?: string;
     kommoLeadNota?: string;
+
+    // Calificación manual del asesor (percepción de calidad/potencial, no NPS del cliente)
+    advisorRating?: number;          // 1-5
+    advisorRatingNote?: string;
+    advisorRatingAt?: string;        // ISO date string
+    advisorRatingBy?: string;        // email del asesor
+    // Checklist de seguimiento de recompra (hitos 15/30/45/60/90/120 días desde la última compra)
+    recompraChecklist?: RecompraChecklist;
 
     // Metadata
     createdAt: Timestamp | any;

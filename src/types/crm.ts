@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import { Customer } from './customer';
+import type { Customer } from './customer';
 
 // ─────────────────────────────────────────────────────────────
 // CRM Pipeline Stages
@@ -80,7 +80,9 @@ export type CRMActivityType =
     | 'tag_change'
     | 'stage_change'
     | 'referral_activated'
-    | 'advisor_reassigned';
+    | 'advisor_reassigned'
+    | 'calificacion'
+    | 'checklist_milestone';
 
 export interface CRMActivity {
     id: string;
@@ -105,7 +107,24 @@ export const CRM_ACTIVITY_ICONS: Record<CRMActivityType, string> = {
     stage_change:        '📊',
     referral_activated:  '🌟',
     advisor_reassigned:  '🔄',
+    calificacion:        '⭐',
+    checklist_milestone: '✅',
 };
+
+// ─────────────────────────────────────────────────────────────
+// Checklist de seguimiento de recompra (hitos fijos en días desde la última compra)
+// ─────────────────────────────────────────────────────────────
+
+export const RECOMPRA_CHECKLIST_MILESTONES = [15, 30, 45, 60, 90, 120] as const;
+export type RecompraMilestoneDay = typeof RECOMPRA_CHECKLIST_MILESTONES[number];
+
+export interface RecompraMilestoneState {
+    done: boolean;
+    doneAt?: string;   // ISO date string
+    doneBy?: string;   // email del asesor
+}
+
+export type RecompraChecklist = Partial<Record<`d${RecompraMilestoneDay}`, RecompraMilestoneState>>;
 
 // ─────────────────────────────────────────────────────────────
 // Extended Customer (con CRM fields)
@@ -130,6 +149,8 @@ export interface CustomerCRM extends Customer {
     referralActivatedManually?: boolean;
     referralActivatedBy?: string;
     referralActivatedAt?: string;
+    // advisorRating*/recompraChecklist viven en Customer (types/customer.ts) para sobrevivir el
+    // spread ...customer de enrichCustomerWithCRM, igual que los campos kommo*.
 }
 
 // ─────────────────────────────────────────────────────────────
