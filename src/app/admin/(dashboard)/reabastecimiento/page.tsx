@@ -34,8 +34,16 @@ import {
 import { formatCurrency } from '@/lib/checkout-utils';
 import { auth } from '@/lib/firebase';
 
-// Reminder line: Biocambio360 Total Limpieza (+57 323 6045330); the approved templates live in its account
-const BIOCAMBIO_PHONE_ID = '879282705263185';
+// Línea de envío del recordatorio de recompra: el admin elige desde cuál de las dos cuentas de
+// WhatsApp enviarlo (la plantilla aprobada debe existir en la cuenta elegida -- /admin/plantillas-whatsapp
+// permite crearla ahí si todavía no existe). El servidor resuelve el phoneId/wabaId real a partir
+// de este accountKey, nunca se exponen los IDs numéricos aquí.
+type ReminderAccountKey = 'biocambio360' | 'totalLimpieza';
+// Fallback de texto libre (paso 2 más abajo) si el envío por plantilla aprobada falla -- se queda
+// fijo en Total Limpieza sin importar la línea elegida arriba, porque /api/inbox/send necesita un
+// phoneId directo (no resuelve accountKey como /api/inbox/bulk-reminder). Es un último recurso que
+// solo corre si el paso 1 ya falló, no el camino principal.
+const FALLBACK_TEXT_PHONE_ID = '879282705263185';
 const COST_PER_MARKETING_MSG = 0.0125; // USD — Colombia +57, Meta pricing 2025
 
 export default function ReabastecimientoBIAdminPage() {
@@ -49,6 +57,11 @@ export default function ReabastecimientoBIAdminPage() {
     // 1-clic individual
     const [sendingId, setSendingId] = useState<string | null>(null);
     const [emailAuto, setEmailAuto] = useState(true);
+
+    // Línea de WhatsApp desde la que se envía el recordatorio de recompra (plantilla aprobada).
+    // Total Limpieza por defecto -- es donde vive la plantilla hoy; cambia solo si ya se creó la
+    // misma plantilla en la cuenta de Biocambio360 (ver /admin/plantillas-whatsapp).
+    const [reminderAccount, setReminderAccount] = useState<ReminderAccountKey>('totalLimpieza');
 
     // Daily automatic e-mail (9 a.m.) can be paused; the WhatsApp buttons are independent
     useEffect(
@@ -129,7 +142,7 @@ export default function ReabastecimientoBIAdminPage() {
                     body: JSON.stringify({
                         customerIds: [r.id],
                         customers: [toPayload(r)],
-                        phoneId: BIOCAMBIO_PHONE_ID,
+                        accountKey: reminderAccount,
                         templateName: 'reabastecimiento_recordatorio',
                         templateType: 'marketing',
                     }),
@@ -149,11 +162,11 @@ export default function ReabastecimientoBIAdminPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
-                    conversationId: `wa_${BIOCAMBIO_PHONE_ID}_${phone}`,
+                    conversationId: `wa_${FALLBACK_TEXT_PHONE_ID}_${phone}`,
                     contactName: r.customerName,
                     channel: 'whatsapp',
                     to: phone,
-                    phoneId: BIOCAMBIO_PHONE_ID,
+                    phoneId: FALLBACK_TEXT_PHONE_ID,
                     type: 'text',
                     text: r.customerType === 'b2c'
                         ? `Hola ${r.customerName} 👋. En Biocambio360 queremos que tu hogar nunca se quede sin *${r.itemsSummary}*. Tu fecha sugerida de reabastecimiento es el ${dueDateStr}. ¿Te programamos el despacho directo de fábrica? 👉 https://biocambio360.com/`
@@ -192,7 +205,7 @@ export default function ReabastecimientoBIAdminPage() {
                 body: JSON.stringify({
                     customerIds: criticalCustomers.map(r => r.id).filter(Boolean),
                     customers: criticalCustomers.map(toPayload),
-                    phoneId: BIOCAMBIO_PHONE_ID,
+                    accountKey: reminderAccount,
                     templateName: 'reabastecimiento_recordatorio',
                     templateType: 'marketing',
                     dryRun: true,
@@ -222,7 +235,7 @@ export default function ReabastecimientoBIAdminPage() {
                 body: JSON.stringify({
                     customerIds: criticalCustomers.map(r => r.id).filter(Boolean),
                     customers: criticalCustomers.map(toPayload),
-                    phoneId: BIOCAMBIO_PHONE_ID,
+                    accountKey: reminderAccount,
                     templateName: 'reabastecimiento_recordatorio',
                     templateType: 'marketing',
                     dryRun: false,
@@ -286,6 +299,23 @@ export default function ReabastecimientoBIAdminPage() {
                 </div>
 
                 <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <div
+                        className="flex items-center gap-1 px-1 py-1 bg-white border border-gray-200 rounded-xl text-xs"
+                        title="Línea de WhatsApp desde la que se envía el recordatorio de recompra. La plantilla aprobada debe existir en la cuenta elegida (créala en /admin/plantillas-whatsapp si hace falta)."
+                    >
+                        {(['totalLimpieza', 'biocambio360'] as const).map((key) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setReminderAccount(key)}
+                                className={`px-2.5 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
+                                    reminderAccount === key ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'
+                                }`}
+                            >
+                                {key === 'totalLimpieza' ? 'Total Limpieza' : 'Biocambio360'}
+                            </button>
+                        ))}
+                    </div>
                     <label
                         className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 cursor-pointer"
                         title="Correo automático diario a las 9 a.m. a clientes en alerta o críticos (máx. 1 cada 7 días). Los botones de WhatsApp son independientes."

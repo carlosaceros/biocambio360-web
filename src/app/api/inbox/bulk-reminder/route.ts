@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     const {
         customerIds,
         phoneId: requestedPhoneId,
+        accountKey: requestedAccountKey, // 'biocambio360' | 'totalLimpieza' -- which line to send the reminder from
         templateName,
         templateLanguage = 'es',
         templateType = 'marketing', // 'marketing' | 'utility'
@@ -44,9 +45,15 @@ export async function POST(req: NextRequest) {
         customers: provided, // records computed by the page (they have no Firestore document until a reminder is sent)
     } = body;
 
-    // The replenishment template is sent from the reminder line (its templates live in that line's account)
+    // The replenishment template can live in either line's WhatsApp Business Account -- the caller
+    // picks which one to send from (accountKey) instead of this route assuming it's always the
+    // reminder/Total Limpieza line. Default to Total Limpieza for backward compatibility with any
+    // caller that doesn't send accountKey yet.
     const isReminder = templateName === REMINDER_TEMPLATE_NAME;
-    const phoneId: string = isReminder ? REMINDER_PHONE_ID : requestedPhoneId;
+    const accountKey: 'biocambio360' | 'totalLimpieza' = requestedAccountKey === 'biocambio360' ? 'biocambio360' : 'totalLimpieza';
+    const reminderPhoneId = accountKey === 'biocambio360' ? process.env.WHATSAPP_PHONE_ID_BIOCAMBIO : REMINDER_PHONE_ID;
+    const reminderWabaId = accountKey === 'biocambio360' ? process.env.WHATSAPP_BUSINESS_ACCOUNT_ID : REMINDER_WABA_ID;
+    const phoneId: string = isReminder ? (reminderPhoneId || REMINDER_PHONE_ID) : requestedPhoneId;
 
     if (!customerIds?.length || !phoneId || !templateName) {
         return NextResponse.json(
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     // Dry run: return estimate without sending
     if (dryRun) {
-        const found = await findTemplate(templateName, isReminder ? REMINDER_WABA_ID : undefined).catch(() => []);
+        const found = await findTemplate(templateName, isReminder ? reminderWabaId : undefined).catch(() => []);
         return NextResponse.json({
             dryRun: true,
             template: { name: templateName, found: found.length > 0, languages: found.map(f => `${f.language} (${f.status})`) },
