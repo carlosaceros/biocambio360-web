@@ -19,7 +19,13 @@ const checkAccess = requireEmailAllowlist(new Set(['fernando@biocambio360.com', 
 // Las tarjetas de cobertura de campos (meta.withX) cuentan sobre TODOS los contactos procesados
 // (matched + unmatched combinados, ver scripts/kommo-migrate-tags.ts líneas 613-622) -- cada
 // colección guarda el mismo dato bajo un nombre de campo distinto (prefijo "kommo" en matched).
-const FILTER_FIELD_MAP: Record<string, { matched?: string; unmatched?: string; equalsTrue?: boolean }> = {
+//
+// Un contacto SIN celular utilizable nunca llega a kommo_migration_unmatched (el script hace
+// `continue` antes de ese write, porque sin teléfono no puede convertirse en cliente) -- solo
+// queda registrado en kommo_migration_preview_unmatched (la auditoría del dry-run). Antes esta
+// ruta no consultaba esa tercera colección: cada conteo por campo (Con Etapa, Con Cédula, etc.)
+// subestimaba ligeramente, y el filtro de "Sin celular" no tenía NINGÚN dato que mostrar.
+const FILTER_FIELD_MAP: Record<string, { matched?: string; unmatched?: string; equalsTrue?: boolean; emptyString?: boolean }> = {
     apellido: { matched: 'kommoApellido', unmatched: 'apellido' },
     etapa: { matched: 'kommoEtapa', unmatched: 'etapa' },
     localidad: { matched: 'kommoLocalidad', unmatched: 'localidad' },
@@ -30,31 +36,82 @@ const FILTER_FIELD_MAP: Record<string, { matched?: string; unmatched?: string; e
     leadNota: { matched: 'kommoLeadNota', unmatched: 'leadNota' },
     // Solo existe en matched -- emparejar por tel. 2 no aplica a un contacto sin cliente existente
     matchedByTelefono2: { matched: 'emparejadoPorTelefono2', equalsTrue: true },
+    // Solo existe en la auditoría de "sin celular" (kommo_migration_preview_unmatched) -- por
+    // definición un contacto ahí nunca tiene celular, así que basta con traer todos esos docs.
+    sinCelular: { unmatched: 'celular', emptyString: true },
 };
 const MAX_FILTER_RESULTS = 500;
 
+function rowMatches(row: Record<string, unknown>, fieldName: string, mapping: { equalsTrue?: boolean; emptyString?: boolean }): boolean {
+    const val = row[fieldName];
+    if (mapping.equalsTrue) return val === true;
+    if (mapping.emptyString) return typeof val === 'string' && val.trim().length === 0;
+    return typeof val === 'string' && val.trim().length > 0;
+}
+
 async function fetchFilteredRows(filterKey: string) {
-    const mapping = FILTER_FIELD_MAP[filterKey];
-    if (!mapping) return null;
     const db = getAdminDB();
 
-    const collect = async (collectionName: string, fieldName?: string) => {
+    // "seguimiento" es la unión de observación (campo del contacto) y nota de lead (nota + nota 1
+    // + observación del embudo) -- antes el admin solo veía "Con Observación" (17), que es apenas
+    // el campo de contacto; la cobertura real de texto de seguimiento es mucho mayor contando
+    // también las notas del lead, que viven en un campo de Kommo totalmente distinto.
+    if (filterKey === 'seguimiento') {
+        const snaps = await Promise.all([
+            db.collection('kommo_migration_preview_matched').get(),
+            db.collection('kommo_migration_unmatched').get(),
+            db.collection('kommo_migration_preview_unmatched').get(),
+        ]);
+        const sources: Array<'matched' | 'unmatched'> = ['matched', 'unmatched', 'unmatched'];
+        const all: Array<Record<string, unknown>> = [];
+        snaps.forEach((snap, i) => {
+            const source = sources[i];
+            // El 3er snap (kommo_migration_preview_unmatched) mezcla contactos sin celular (hay
+            // que sumarlos) con contactos con celular no emparejado (ya contados en el 2do snap,
+            // kommo_migration_unmatched -- sumarlos de nuevo duplicaría el conteo).
+            const isPreviewUnmatchedExtra = i === 2;
+            snap.docs.forEach((d) => {
+                const data = d.data();
+                if (isPreviewUnmatchedExtra && data.motivoSinMatch !== 'sin_celular_utilizable') return;
+                const observacion = source === 'matched' ? data.kommoObservacion : data.observacion;
+                const leadNota = source === 'matched' ? data.kommoLeadNota : data.leadNota;
+                const hasObs = typeof observacion === 'string' && observacion.trim().length > 0;
+                const hasNota = typeof leadNota === 'string' && leadNota.trim().length > 0;
+                if (hasObs || hasNota) {
+                    all.push({ id: d.id, _source: source, ...data, _observacion: observacion || '', _leadNota: leadNota || '' });
+                }
+            });
+        });
+        return { total: all.length, rows: all.slice(0, MAX_FILTER_RESULTS) };
+    }
+
+    const mapping = FILTER_FIELD_MAP[filterKey];
+    if (!mapping) return null;
+
+    const collect = async (collectionName: string, fieldName?: string, extra?: (row: Record<string, unknown>) => boolean) => {
         if (!fieldName) return [] as Array<Record<string, unknown>>;
         const snap = await db.collection(collectionName).get();
+        const source = collectionName === 'kommo_migration_preview_matched' ? 'matched' : 'unmatched';
         return snap.docs
-            .map((d) => ({ id: d.id, _source: collectionName === 'kommo_migration_preview_matched' ? 'matched' : 'unmatched', ...d.data() }))
-            .filter((row) => {
-                const val = (row as Record<string, unknown>)[fieldName];
-                return mapping.equalsTrue ? val === true : typeof val === 'string' && val.trim().length > 0;
-            });
+            .map((d) => ({ id: d.id, _source: source, ...d.data() }))
+            .filter((row) => rowMatches(row as Record<string, unknown>, fieldName, mapping))
+            .filter((row) => !extra || extra(row as Record<string, unknown>));
     };
 
-    const [matchedRows, unmatchedRows] = await Promise.all([
-        collect('kommo_migration_preview_matched', mapping.matched),
-        collect('kommo_migration_unmatched', mapping.unmatched),
+    // kommo_migration_preview_unmatched mezcla dos motivos distintos (ver script): contactos SIN
+    // celular (nunca llegan a kommo_migration_unmatched -- hay que sumarlos aquí) y contactos CON
+    // celular que no encontraron cliente existente (esos YA están contados via kommo_migration_
+    // unmatched -- sumarlos de nuevo aquí los contaría dos veces). Se filtra solo por el primer
+    // motivo, salvo que el filtro activo sea literalmente "sinCelular".
+    const onlyNoPhoneReason = (row: Record<string, unknown>) => row.motivoSinMatch === 'sin_celular_utilizable';
+
+    const [matchedRows, unmatchedRows, noPhoneRows] = await Promise.all([
+        filterKey === 'sinCelular' ? Promise.resolve([]) : collect('kommo_migration_preview_matched', mapping.matched),
+        filterKey === 'sinCelular' ? Promise.resolve([]) : collect('kommo_migration_unmatched', mapping.unmatched),
+        collect('kommo_migration_preview_unmatched', mapping.unmatched, filterKey === 'sinCelular' ? undefined : onlyNoPhoneReason),
     ]);
 
-    const all = [...matchedRows, ...unmatchedRows];
+    const all = [...matchedRows, ...unmatchedRows, ...noPhoneRows];
     return { total: all.length, rows: all.slice(0, MAX_FILTER_RESULTS) };
 }
 

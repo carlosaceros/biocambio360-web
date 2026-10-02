@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, AlertCircle, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Users, UserPlus, Check, Undo2, ShoppingBag, X } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Loader2, RefreshCw, Search, ChevronLeft, ChevronRight, Users, UserPlus, Eye, EyeOff, ShoppingBag, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import FastOrderModal from '@/components/admin/FastOrderModal';
 import { StatCard, Button } from '@/components/ui';
@@ -84,6 +84,8 @@ const FIELD_FILTER_LABELS: Record<string, string> = {
     cedula: 'Cédula',
     leadNota: 'Nota de Lead',
     matchedByTelefono2: 'Emparejado solo por Teléfono 2',
+    sinCelular: 'Sin celular utilizable',
+    seguimiento: 'Observación o Nota de Seguimiento',
 };
 
 interface FilterRow {
@@ -113,6 +115,11 @@ export default function KommoPreviewPage() {
     const [isFastOrderOpen, setIsFastOrderOpen] = useState(false);
     const [preloadedCustomer, setPreloadedCustomer] = useState<{ nombre: string; celular: string; direccion?: string } | null>(null);
     const [activeFilterKey, setActiveFilterKey] = useState<string | null>(null);
+    // meta.withObservacion/meta.noPhone vienen del resumen de la última corrida del script (campos
+    // crudos, sin combinar) -- se recalculan aquí con el conteo real y deduplicado que usa el modal,
+    // para que la tarjeta no muestre un número más bajo/engañoso que lo que el modal realmente tiene.
+    const [seguimientoTotal, setSeguimientoTotal] = useState<number | null>(null);
+    const [sinCelularTotal, setSinCelularTotal] = useState<number | null>(null);
 
     const fetchPage = useCallback(async (cursor: number | null, search: string) => {
         if (!user) return;
@@ -147,6 +154,26 @@ export default function KommoPreviewPage() {
         fetchPage(null, activeSearch);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab, activeSearch, authLoading, isAllowed, user]);
+
+    // Totales reales (deduplicados) para las tarjetas "Sin celular" y "Con Observación/Nota" --
+    // una sola vez al entrar, independiente de la paginación/búsqueda de la tabla principal.
+    useEffect(() => {
+        if (authLoading || !isAllowed || !user) return;
+        (async () => {
+            try {
+                const idToken = await user.getIdToken();
+                const [seguimientoRes, sinCelularRes] = await Promise.all([
+                    fetch('/api/admin/kommo-preview?filter=seguimiento', { headers: { Authorization: `Bearer ${idToken}` } }),
+                    fetch('/api/admin/kommo-preview?filter=sinCelular', { headers: { Authorization: `Bearer ${idToken}` } }),
+                ]);
+                const [seguimientoData, sinCelularData] = await Promise.all([seguimientoRes.json(), sinCelularRes.json()]);
+                if (seguimientoRes.ok) setSeguimientoTotal(seguimientoData.filterTotal);
+                if (sinCelularRes.ok) setSinCelularTotal(sinCelularData.filterTotal);
+            } catch {
+                // Si falla, las tarjetas simplemente muestran el número crudo del resumen -- no bloquea la pantalla.
+            }
+        })();
+    }, [authLoading, isAllowed, user]);
 
     const goNext = () => {
         const last = items[items.length - 1];
@@ -253,12 +280,12 @@ export default function KommoPreviewPage() {
                         <StatCard label="Se agrega a existentes" value={meta.matched} color="emerald" onClick={() => setTab('matched')} />
                         <StatCard label="Para revisión (nuevo)" value={meta.unmatched} color="amber" onClick={() => setTab('unmatched')} />
                         <StatCard label="Pendientes de revisar" value={meta.unmatchedPendientes ?? meta.unmatched} color="amber" onClick={() => setTab('unmatched')} />
-                        <StatCard label="Sin celular" value={meta.noPhone} />
+                        <StatCard label="Sin celular" value={sinCelularTotal ?? meta.noPhone} onClick={() => setActiveFilterKey('sinCelular')} />
                         <StatCard label="Con Apellido" value={meta.withApellido} onClick={() => setActiveFilterKey('apellido')} />
                         <StatCard label="Con Etapa" value={meta.withEtapa} onClick={() => setActiveFilterKey('etapa')} />
                         <StatCard label="Con Localidad" value={meta.withLocalidad} onClick={() => setActiveFilterKey('localidad')} />
                         <StatCard label="Con Dirección" value={meta.withDireccion} onClick={() => setActiveFilterKey('direccion')} />
-                        <StatCard label="Con Observación" value={meta.withObservacion} onClick={() => setActiveFilterKey('observacion')} />
+                        <StatCard label="Con Observación o Nota" value={seguimientoTotal ?? meta.withObservacion} color="indigo" onClick={() => setActiveFilterKey('seguimiento')} hint="Observación de contacto + nota/nota 1 del lead" />
                         <StatCard label="Con Tipo de cliente" value={meta.withTipoCliente || 0} onClick={() => setActiveFilterKey('tipoCliente')} />
                         <StatCard label="Con Cédula" value={meta.withCedula || 0} onClick={() => setActiveFilterKey('cedula')} />
                         <StatCard label="Con Teléfono 2" value={meta.withTelefono2 || 0} />
@@ -446,6 +473,54 @@ function FieldCoverageModal({ filterKey, label, onClose }: { filterKey: string; 
                         <div className="p-6 text-sm text-red-600">{error}</div>
                     ) : rows.length === 0 ? (
                         <div className="p-6 text-sm text-slate-400 text-center">Sin registros para este filtro.</div>
+                    ) : filterKey === 'seguimiento' ? (
+                        <table className="w-full text-left text-xs text-slate-600">
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider sticky top-0">
+                                <tr>
+                                    <th className="px-4 py-2.5">Kommo ID</th>
+                                    <th className="px-4 py-2.5">Fuente</th>
+                                    <th className="px-4 py-2.5">Celular</th>
+                                    <th className="px-4 py-2.5">Observación (contacto)</th>
+                                    <th className="px-4 py-2.5">Nota de Lead (nota + nota 1)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {rows.map((row) => (
+                                    <tr key={row.id} className="hover:bg-slate-50/80">
+                                        <td className="px-4 py-2 font-mono text-slate-400">#{row.kommoContactId as string}</td>
+                                        <td className="px-4 py-2">
+                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${row._source === 'matched' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                                                {row._source === 'matched' ? 'Existente' : 'Nuevo'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2 font-mono">{(row.celular as string) || '—'}</td>
+                                        <td className="px-4 py-2 max-w-[260px] truncate" title={(row._observacion as string) || ''}>{(row._observacion as string) || '—'}</td>
+                                        <td className="px-4 py-2 max-w-[260px] truncate" title={(row._leadNota as string) || ''}>{(row._leadNota as string) || '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : filterKey === 'sinCelular' ? (
+                        <table className="w-full text-left text-xs text-slate-600">
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider sticky top-0">
+                                <tr>
+                                    <th className="px-4 py-2.5">Kommo ID</th>
+                                    <th className="px-4 py-2.5">Nombre</th>
+                                    <th className="px-4 py-2.5">Apellido</th>
+                                    <th className="px-4 py-2.5">Etapa</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {rows.map((row) => (
+                                    <tr key={row.id} className="hover:bg-slate-50/80">
+                                        <td className="px-4 py-2 font-mono text-slate-400">#{row.kommoContactId as string}</td>
+                                        <td className="px-4 py-2">{(row.kommoNombre as string) || (row.nombre as string) || '—'}</td>
+                                        <td className="px-4 py-2">{(row.kommoApellido as string) || (row.apellido as string) || '—'}</td>
+                                        <td className="px-4 py-2">{(row.etapa as string) || '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : (
                         <table className="w-full text-left text-xs text-slate-600">
                             <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider sticky top-0">
@@ -615,16 +690,16 @@ function UnmatchedTable({
                                     <button
                                         onClick={() => onMarkReviewed(it.kommoContactId, !it.revisadoManualmente)}
                                         disabled={markingId === it.kommoContactId}
-                                        title={it.revisadoManualmente ? 'Marcar como pendiente' : 'Marcar como revisado'}
+                                        title={it.revisadoManualmente ? 'Revisado -- clic para volver a pendiente (solo este registro)' : 'Marcar este registro como revisado'}
                                         className={`p-1.5 rounded-lg cursor-pointer disabled:opacity-40 ${
                                             it.revisadoManualmente ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                                         }`}
                                     >
-                                        {it.revisadoManualmente ? <Undo2 size={13} /> : <Check size={13} />}
+                                        {it.revisadoManualmente ? <Eye size={13} /> : <EyeOff size={13} />}
                                     </button>
                                     <button
                                         onClick={() => onCreateCustomer(it)}
-                                        title="Crear pedido/cliente con estos datos precargados"
+                                        title="Crear pedido/cliente con los datos de ESTE registro (no afecta a otros)"
                                         className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 cursor-pointer"
                                     >
                                         <ShoppingBag size={13} />
