@@ -42,6 +42,8 @@ interface FormErrors {
     [key: string]: string;
 }
 
+const MIN_CONTRAENTREGA = 50000;
+
 export default function CheckoutPage() {
     const router = useRouter();
     const { 
@@ -111,6 +113,16 @@ export default function CheckoutPage() {
     const discountAmount = getDiscountAmount();
     const effectiveShippingCost = appliedCoupon?.type === 'free_shipping' ? 0 : shippingCost;
     const total = Math.max(0, subtotal - discountAmount) + effectiveShippingCost;
+    const belowContraentregaMinimo = subtotal < MIN_CONTRAENTREGA;
+
+    // Si el carrito baja del mínimo de contraentrega mientras ese método ya estaba elegido
+    // (ej. el cliente quita un producto), cambiar automáticamente a Wompi para no dejar
+    // seleccionado un método que el formulario ya no permite enviar.
+    useEffect(() => {
+        if (paymentMethod === 'contraentrega' && belowContraentregaMinimo) {
+            setPaymentMethod('wompi');
+        }
+    }, [belowContraentregaMinimo, paymentMethod]);
 
     // Cotizar envío con 99 Envíos cuando cambia la ciudad destino, método de pago o carrito
     useEffect(() => {
@@ -357,6 +369,10 @@ export default function CheckoutPage() {
 
         if (!formData.direccion.trim() || formData.direccion.length < 10) {
             newErrors.direccion = 'Dirección completa es requerida (mín. 10 caracteres)';
+        }
+
+        if (paymentMethod === 'contraentrega' && subtotal < MIN_CONTRAENTREGA) {
+            newErrors.metodoPago = `El pedido mínimo para pago contraentrega es ${formatCurrency(MIN_CONTRAENTREGA)}. Agrega más productos o elige otro método de pago.`;
         }
 
         setErrors(newErrors);
@@ -956,11 +972,13 @@ export default function CheckoutPage() {
                                 <div className="space-y-4">
                                     {/* Contraentrega */}
                                     <div
-                                        className={`border-2 rounded-xl p-4 cursor-pointer transition-colors ${paymentMethod === 'contraentrega'
-                                                ? 'bg-blue-50 border-blue-400'
-                                                : 'bg-white border-gray-200 hover:border-blue-200'
+                                        className={`border-2 rounded-xl p-4 transition-colors ${belowContraentregaMinimo
+                                                ? 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+                                                : paymentMethod === 'contraentrega'
+                                                    ? 'bg-blue-50 border-blue-400 cursor-pointer'
+                                                    : 'bg-white border-gray-200 hover:border-blue-200 cursor-pointer'
                                             }`}
-                                        onClick={() => setPaymentMethod('contraentrega')}
+                                        onClick={() => !belowContraentregaMinimo && setPaymentMethod('contraentrega')}
                                     >
                                         <div className="flex items-start gap-3">
                                             <input
@@ -969,16 +987,22 @@ export default function CheckoutPage() {
                                                 name="paymentMethod"
                                                 value="contraentrega"
                                                 checked={paymentMethod === 'contraentrega'}
+                                                disabled={belowContraentregaMinimo}
                                                 onChange={(e) => setPaymentMethod(e.target.value as 'contraentrega' | 'wompi')}
                                                 className="mt-1"
                                             />
                                             <div>
-                                                <label htmlFor="contraentrega" className="font-bold text-gray-900 cursor-pointer">
+                                                <label htmlFor="contraentrega" className={`font-bold cursor-pointer ${belowContraentregaMinimo ? 'text-gray-400' : 'text-gray-900'}`}>
                                                     Pago Contraentrega
                                                 </label>
                                                 <p className="text-sm text-gray-600 mt-1">
                                                     Paga cuando recibas tu pedido. Aceptamos efectivo o Nequi al momento de la entrega.
                                                 </p>
+                                                {belowContraentregaMinimo && (
+                                                    <p className="text-xs text-amber-600 font-semibold mt-1">
+                                                        Pedido mínimo para contraentrega: {formatCurrency(MIN_CONTRAENTREGA)} (te faltan {formatCurrency(MIN_CONTRAENTREGA - subtotal)})
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

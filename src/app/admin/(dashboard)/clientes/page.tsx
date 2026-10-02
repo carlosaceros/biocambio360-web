@@ -34,7 +34,8 @@ import {
     Check,
     Star,
     ArrowRightLeft,
-    Users2
+    Users2,
+    Archive
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import ClientConversationHistoryModal from '@/components/admin/ClientConversationHistoryModal';
@@ -1052,6 +1053,53 @@ export default function ClientesPage() {
                                             </p>
                                         </div>
                                     </div>
+
+                                    {/* Historial migrado de Kommo -- observación de contacto y notas del embudo (lead),
+                                        son dos campos distintos en Kommo y antes ninguno se mostraba aquí: un asesor
+                                        no tenía forma de ver el seguimiento que quedó registrado en Kommo para este
+                                        cliente, aunque la migración sí lo haya traído a Firestore. */}
+                                    {(selectedCustomer.kommoObservacion || selectedCustomer.kommoLeadNota || selectedCustomer.kommoEtapa || selectedCustomer.kommoTipoCliente) && (
+                                        <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                                                    <Archive className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <span className="font-black text-slate-900 text-xs block">Historial Kommo</span>
+                                                    <span className="text-[10px] text-emerald-900/80 font-medium">Seguimiento migrado del CRM anterior</span>
+                                                </div>
+                                            </div>
+
+                                            {(selectedCustomer.kommoEtapa || selectedCustomer.kommoTipoCliente) && (
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {selectedCustomer.kommoEtapa && (
+                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white border border-emerald-200 text-emerald-800">
+                                                            Etapa: {selectedCustomer.kommoEtapa}
+                                                        </span>
+                                                    )}
+                                                    {selectedCustomer.kommoTipoCliente && (
+                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white border border-emerald-200 text-emerald-800">
+                                                            Tipo: {selectedCustomer.kommoTipoCliente}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {selectedCustomer.kommoLeadNota && (
+                                                <div className="bg-white px-3 py-2 rounded-xl border border-emerald-200">
+                                                    <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Notas del embudo (lead)</span>
+                                                    <p className="text-xs text-slate-700 whitespace-pre-line">{selectedCustomer.kommoLeadNota}</p>
+                                                </div>
+                                            )}
+
+                                            {selectedCustomer.kommoObservacion && (
+                                                <div className="bg-white px-3 py-2 rounded-xl border border-emerald-200">
+                                                    <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Observación (contacto)</span>
+                                                    <p className="text-xs text-slate-700 whitespace-pre-line">{selectedCustomer.kommoObservacion}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* 1. Tarjeta Comunidad Biocambio360 (Referidos / Embajador) */}
                                     <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
