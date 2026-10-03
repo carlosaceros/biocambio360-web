@@ -19,6 +19,7 @@ import {
     UserCircle2,
     ShoppingCart,
     UserPlus,
+    Link2,
 } from 'lucide-react';
 import EmojiPicker from './EmojiPicker';
 import ShippingQuoteButton from './ShippingQuoteButton';
@@ -86,6 +87,7 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
     const [inputText, setInputText] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [sendError, setSendError] = useState<string | null>(null);
+    const [linkCopied, setLinkCopied] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -221,6 +223,27 @@ export default function ChatWindow({ conversation, onOpenTemplates, currentUserN
                             </span>
                         )}
                     </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const url = `${window.location.origin}/admin/inbox?conv=${conversation.id}`;
+                            navigator.clipboard.writeText(url).then(() => {
+                                setLinkCopied(true);
+                                setTimeout(() => setLinkCopied(false), 2000);
+                            }).catch(() => {});
+                        }}
+                        title="Copiar link directo a esta conversación (solo abre para admins ya logueados)"
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                            linkCopied
+                                ? 'text-green-700 border-green-200 bg-green-50'
+                                : 'text-gray-500 border-gray-200 bg-gray-50 hover:bg-gray-100'
+                        }`}
+                    >
+                        {linkCopied ? <Check size={14} /> : <Link2 size={14} />}
+                        <span className="hidden sm:inline">{linkCopied ? 'Copiado' : 'Copiar link'}</span>
+                    </button>
                 </div>
                 {(onOpenCustomerCard || onOpenQuickOrder) && (
                     <div className="flex items-center gap-1.5 shrink-0">

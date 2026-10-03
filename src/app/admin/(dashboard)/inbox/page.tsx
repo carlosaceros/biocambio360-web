@@ -380,6 +380,8 @@ export default function InboxPage() {
         setSelectedConvId(conv.id);
         setShowMobileList(false);
         markConversationAsRead(conv.id).catch(() => {});
+        // Mantiene la URL sincronizada con la conversación abierta para poder copiarla y compartirla.
+        window.history.replaceState(null, '', `/admin/inbox?conv=${conv.id}`);
     }, []);
 
     const refreshAdvisors = useCallback(async (token: string) => {
