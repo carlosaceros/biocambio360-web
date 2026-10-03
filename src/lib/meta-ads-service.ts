@@ -192,10 +192,15 @@ async function getTotalBusinessRevenue(since: string, until: string): Promise<Re
 
     const sinceSeconds = Math.floor(new Date(`${since}T00:00:00-05:00`).getTime() / 1000);
     const untilSeconds = Math.floor(new Date(`${until}T23:59:59-05:00`).getTime() / 1000);
+    // pos_sales.createdAt se guarda como string ISO en UTC (new Date().toISOString()), no como
+    // Timestamp -- hay que convertir los mismos límites de Bogotá a ISO UTC para comparar como
+    // string, en vez de truncar a medianoche UTC (eso contaba ventas del día anterior en Bogotá).
+    const sincePosIso = new Date(sinceSeconds * 1000).toISOString();
+    const untilPosIso = new Date(untilSeconds * 1000).toISOString();
 
     const [ordersSnap, posSnap] = await Promise.all([
         db.collection('orders').where('createdAt.seconds', '>=', sinceSeconds).where('createdAt.seconds', '<=', untilSeconds).get(),
-        db.collection('pos_sales').where('createdAt', '>=', `${since}T00:00:00`).where('createdAt', '<=', `${until}T23:59:59`).get(),
+        db.collection('pos_sales').where('createdAt', '>=', sincePosIso).where('createdAt', '<=', untilPosIso).get(),
     ]);
 
     const porCanal = new Map<string, { pedidos: number; total: number }>();

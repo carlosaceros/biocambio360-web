@@ -161,11 +161,11 @@ export async function createPosSale(data: {
 
     try {
         const salesCol = collection(db, POS_SALES_REF);
-        const docRef = await addDoc(salesCol, {
-            ...salePayload,
-            fecha: serverTimestamp(),
-            createdAt: serverTimestamp(),
-        });
+        // createdAt se guarda como string ISO (no Timestamp) a propósito: los reportes de ingresos
+        // (meta-ads-service.ts) y la sincronización offline filtran/comparan pos_sales.createdAt como
+        // string. Si aquí se guardara como Timestamp, esas ventas quedarían invisibles en esos reportes
+        // porque Firestore no compara tipos distintos en un mismo filtro de rango.
+        const docRef = await addDoc(salesCol, salePayload);
 
         // Descontar inventario de mostrador en segundo plano (fire-and-forget seguro)
         for (const item of data.items) {
