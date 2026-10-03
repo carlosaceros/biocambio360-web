@@ -196,6 +196,26 @@ export async function findTemplate(name: string, wabaId: string = process.env.WH
 }
 
 /**
+ * Fetches the approved BODY text (with {{1}}, {{2}}, ... placeholders, exactly as Meta approved it)
+ * of a single template, for reconstructing what the customer actually saw in internal logs. Returns
+ * null if the template/body isn't found so callers can fall back to a safe default.
+ */
+export async function getTemplateBodyText(name: string, wabaId: string = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? ''): Promise<string | null> {
+    if (!wabaId) return null;
+    try {
+        const res = await fetch(`${GRAPH_API_BASE}/${wabaId}/message_templates?name=${encodeURIComponent(name)}&fields=name,components`, {
+            headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        const template = (data?.data ?? []).find((t: { name: string }) => t.name === name);
+        const bodyComponent = template?.components?.find((c: { type: string }) => c.type === 'BODY');
+        return bodyComponent?.text ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Fetches the list of approved templates for a WhatsApp Business Account.
  */
 export async function getApprovedTemplates(wabaId: string): Promise<unknown[]> {

@@ -38,6 +38,17 @@ export function reminderProduct(itemsSummary: string | undefined): string {
     return first.length > 60 ? `${first.slice(0, 57).trimEnd()}...` : first;
 }
 
+/**
+ * Rellena el texto aprobado de la plantilla (tal como viene de la API de Meta, con {{1}}/{{2}})
+ * con las mismas variables que se le mandaron a WhatsApp -- para que el registro interno del
+ * inbox muestre exactamente lo que vio el cliente, en vez de la etiqueta técnica.
+ */
+export function renderReminderText(approvedBodyText: string, customerName: string | undefined, itemsSummary: string | undefined): string {
+    return approvedBodyText
+        .replace(/\{\{1\}\}/g, reminderFirstName(customerName))
+        .replace(/\{\{2\}\}/g, reminderProduct(itemsSummary));
+}
+
 export function reminderComponents(customerName: string | undefined, itemsSummary: string | undefined, buttonToken?: string) {
     const components: Array<Record<string, unknown>> = [
         {

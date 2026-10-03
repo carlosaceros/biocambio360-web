@@ -6,13 +6,13 @@
 
 export const runtime = 'nodejs';
 
-import { REMINDER_TEMPLATE_NAME, reminderComponents, reminderProduct } from '@/lib/reminder-template';
+import { REMINDER_TEMPLATE_NAME, reminderComponents, reminderProduct, renderReminderText } from '@/lib/reminder-template';
 import { buildConversationId } from '@/lib/inbox-service';
 import { REMINDER_PHONE_ID, REMINDER_WABA_ID } from '@/lib/whatsapp-sender';
 import { createReminderCart, FALLBACK_BUTTON_TOKEN } from '@/lib/reminder-cart';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDB, getAdminAuth } from '@/lib/firebase-admin';
-import { sendBulkTemplateMessages, findTemplate } from '@/lib/whatsapp-service';
+import { sendBulkTemplateMessages, findTemplate, getTemplateBodyText } from '@/lib/whatsapp-service';
 import { FieldValue } from 'firebase-admin/firestore';
 import { isOptedOut } from '@/lib/wa-optout';
 
@@ -142,15 +142,21 @@ export async function POST(req: NextRequest) {
         templateLanguage
     );
 
-    // Every delivered reminder is recorded in the inbox, so the customer's reply lands in the same chat
+    // Every delivered reminder is recorded in the inbox, so the customer's reply lands in the same chat.
+    // Para reabastecimiento_recordatorio se trae el texto real aprobado por Meta UNA vez (es el mismo
+    // para todo el envío masivo) y se rellena con las variables de cada cliente, para que el registro
+    // interno muestre lo que el cliente realmente vio -- no una etiqueta técnica tipo "📋 Plantilla: ...".
     const reminderTag = templateName === REMINDER_TEMPLATE_NAME ? 'reabastecimiento' : null;
+    const reminderBodyText = isReminder ? await getTemplateBodyText(templateName, reminderWabaId) : null;
     for (let i = 0; i < results.length; i++) {
         if (!results[i].success || !customers[i]) continue;
         try {
             const c = customers[i];
             const convRef = db.collection('conversations').doc(buildConversationId('whatsapp', phoneId, c.phone));
             const existing = await convRef.get();
-            const preview = `📋 Plantilla: ${templateName}${c.itemsSummary ? ` · ${reminderProduct(c.itemsSummary)}` : ''}`;
+            const preview = reminderBodyText
+                ? renderReminderText(reminderBodyText, c.name, c.itemsSummary)
+                : `📋 Plantilla: ${templateName}${c.itemsSummary ? ` · ${reminderProduct(c.itemsSummary)}` : ''}`;
             if (existing.exists) {
                 await convRef.update({ lastMessage: preview, lastMessageAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), ...(reminderTag ? { tags: FieldValue.arrayUnion(reminderTag) } : {}) });
             } else {
