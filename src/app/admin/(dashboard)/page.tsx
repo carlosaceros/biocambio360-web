@@ -1267,6 +1267,17 @@ export default function AdminDashboard() {
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
+                                    onClick={() => router.push('/admin/mensajeros')}
+                                    className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-orange-200 transition-colors"
+                                >
+                                    <Truck className="text-orange-700 mb-3" size={24} />
+                                    <p className="font-black text-gray-900 mb-1">Mensajeros & Flota</p>
+                                    <p className="text-xs text-gray-600">GPS en vivo, recaudo COD y liquidación de fletes</p>
+                                </motion.button>
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => router.push('/admin/auditoria-envios')}
                                     className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-left hover:border-indigo-200 transition-colors"
                                 >
