@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     TrendingUp,
@@ -99,10 +99,12 @@ export default function AdminDashboard() {
 
     const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
 
+    // Acotado a los más recientes -- el dashboard solo necesita hoy/este mes/mes anterior para sus
+    // KPIs, no el histórico completo de la tienda (que crece indefinidamente y hacía lento el listener).
     useEffect(() => {
         const unsubscribe = subscribeToOrders((fetchedOrders) => {
             setOrders(fetchedOrders);
-        });
+        }, { limitCount: 1500 });
         return unsubscribe;
     }, []);
 
@@ -128,13 +130,43 @@ export default function AdminDashboard() {
             date.getFullYear() === today.getFullYear();
     };
 
-    // Calculate dynamic stats
-    const calculateStats = () => {
+    const isYesterday = (date: Date) => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        return date.getDate() === yesterday.getDate() &&
+            date.getMonth() === yesterday.getMonth() &&
+            date.getFullYear() === yesterday.getFullYear();
+    };
+
+    const isLastMonth = (date: Date) => {
+        const today = new Date();
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return date.getMonth() === lastMonth.getMonth() &&
+            date.getFullYear() === lastMonth.getFullYear();
+    };
+
+    // "+12.3%" / "-4%" / "+0%" -- previous=0 se reporta como "+0%" (no hay base para comparar) en
+    // vez de un engañoso "+100%".
+    const pctChange = (current: number, previous: number): string => {
+        if (previous <= 0) return '+0%';
+        const pct = ((current - previous) / previous) * 100;
+        const rounded = Math.round(pct * 10) / 10;
+        return `${rounded >= 0 ? '+' : ''}${rounded}%`;
+    };
+
+    const changeColorClass = (change: string) => change.startsWith('-') ? 'text-red-600' : 'text-green-600';
+
+    // Calculate dynamic stats -- memoizado porque recorre `orders` (hasta 1500 docs) y antes se
+    // recalculaba en cada render, aunque el cambio no tuviera nada que ver con pedidos.
+    const stats = useMemo(() => {
         let todaySales = 0;
         let todayOrdersCount = 0;
+        let yesterdaySales = 0;
         let monthSales = 0;
         let monthOrdersCount = 0;
-        
+        let lastMonthSales = 0;
+        let lastMonthOrdersCount = 0;
+
         const statusCounts: Record<OrderStatus, number> = {
             borrador: 0,
             pendiente: 0,
@@ -149,17 +181,22 @@ export default function AdminDashboard() {
 
         orders.forEach(order => {
             const orderDate = safeToDate(order.createdAt);
-            
+
             // Only count non-cancelled and non-draft orders for sales metrics
             if (order.status !== 'cancelado' && order.status !== 'borrador') {
                 if (isToday(orderDate)) {
                     todaySales += order.total;
                     todayOrdersCount++;
+                } else if (isYesterday(orderDate)) {
+                    yesterdaySales += order.total;
                 }
-                
+
                 if (isThisMonth(orderDate)) {
                     monthSales += order.total;
                     monthOrdersCount++;
+                } else if (isLastMonth(orderDate)) {
+                    lastMonthSales += order.total;
+                    lastMonthOrdersCount++;
                 }
             }
 
@@ -169,23 +206,24 @@ export default function AdminDashboard() {
             }
         });
 
-        // Avg Ticket calculation (this month)
-        const avgTicket = monthOrdersCount > 0 ? (monthSales / monthOrdersCount) : 0;
-        
+        // Avg Ticket calculation (this month vs. previous month)
+        const avgTicket = monthOrdersCount > 0 ? Math.round(monthSales / monthOrdersCount) : 0;
+        const lastMonthAvgTicket = lastMonthOrdersCount > 0 ? Math.round(lastMonthSales / lastMonthOrdersCount) : 0;
+
         return {
             today: {
                 sales: todaySales,
                 orders: todayOrdersCount,
-                change: '+0%'
+                change: pctChange(todaySales, yesterdaySales)
             },
             month: {
                 sales: monthSales,
                 orders: monthOrdersCount,
-                change: '+0%'
+                change: pctChange(monthSales, lastMonthSales)
             },
             metrics: {
                 avgTicket: avgTicket,
-                avgTicketChange: '+0%',
+                avgTicketChange: pctChange(avgTicket, lastMonthAvgTicket),
                 conversion: 4.2,
                 conversionChange: '+0%',
                 ltv: 124000,
@@ -193,15 +231,14 @@ export default function AdminDashboard() {
             },
             pipeline: statusCounts
         };
-    };
-
-    const stats = calculateStats();
+    }, [orders]);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('es-CO', {
             style: 'currency',
             currency: 'COP',
-            minimumFractionDigits: 0
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
         }).format(value);
     };
 
@@ -971,7 +1008,7 @@ export default function AdminDashboard() {
                                             <TrendingUp className="text-green-600" size={20} />
                                         </div>
                                     </div>
-                                    <p className="text-xs text-green-600 font-bold">{stats.metrics.avgTicketChange} vs mes anterior</p>
+                                    <p className={`text-xs font-bold ${changeColorClass(stats.metrics.avgTicketChange)}`}>{stats.metrics.avgTicketChange} vs mes anterior</p>
                                 </motion.div>
 
                                 <motion.div
