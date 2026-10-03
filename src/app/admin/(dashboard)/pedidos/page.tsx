@@ -47,6 +47,7 @@ import {
     Sparkles
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -61,6 +62,8 @@ import { Product } from '@/lib/products';
 import { getProductImage } from '@/lib/product-utils';
 import { getAllProducts } from '@/lib/products-service';
 import DeliveryExceptionModal from '@/components/admin/DeliveryExceptionModal';
+
+const CheckoutMap = dynamic(() => import('@/components/CheckoutMap'), { ssr: false });
 
 /**
  * Safely convert a Firestore Timestamp (or serialized version) to a JS Date.
@@ -1668,6 +1671,22 @@ export default function PedidosPage() {
                                                     <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mt-2">
                                                         <p className="text-xs text-yellow-800 font-bold mb-1">Notas de entrega:</p>
                                                         <p className="text-sm text-yellow-900 italic">"{activeOrder.cliente.notas}"</p>
+                                                    </div>
+                                                )}
+                                                {activeOrder.ubicacionEntrega && (
+                                                    <div>
+                                                        <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1">
+                                                            📍 Ubicación ajustada por el cliente en el mapa
+                                                        </p>
+                                                        <CheckoutMap lat={activeOrder.ubicacionEntrega.lat} lng={activeOrder.ubicacionEntrega.lng} />
+                                                        <a
+                                                            href={activeOrder.ubicacionEntrega.mapsUrl || `https://maps.google.com/?q=${activeOrder.ubicacionEntrega.lat},${activeOrder.ubicacionEntrega.lng}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs text-blue-600 underline mt-1.5 inline-block"
+                                                        >
+                                                            Abrir en Google Maps
+                                                        </a>
                                                     </div>
                                                 )}
                                             </div>
