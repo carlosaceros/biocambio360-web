@@ -43,7 +43,6 @@ import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import NotificationBell from '@/components/NotificationBell';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
 import { getConfirmedAiPreOrders } from '@/lib/inbox-service';
-import { getCustomerLtvStats } from '@/lib/customers-service';
 
 export default function AdminDashboard() {
     const { user, userProfile, role, signOut, canAccess: hasCap } = useAuth();
@@ -54,7 +53,6 @@ export default function AdminDashboard() {
     const [isSendingReport, setIsSendingReport] = useState(false);
     const [reportToast, setReportToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [pendingPreOrdersCount, setPendingPreOrdersCount] = useState(0);
-    const [ltvStats, setLtvStats] = useState<{ avgLtv: number; totalCustomers: number } | null>(null);
 
     useEffect(() => {
         if (role !== 'asesor') return;
@@ -62,13 +60,6 @@ export default function AdminDashboard() {
             .then((preOrders) => setPendingPreOrdersCount(preOrders.length))
             .catch(() => setPendingPreOrdersCount(0));
     }, [role]);
-
-    // LTV real (no hardcodeado): una sola lectura agregada del lado del servidor, no trae clientes al navegador.
-    useEffect(() => {
-        getCustomerLtvStats()
-            .then(setLtvStats)
-            .catch(() => setLtvStats(null));
-    }, []);
 
     const handleSendDailyReport = async () => {
         if (!confirm('¿Deseas generar y enviar el reporte consolidado diario a los correos de administración ahora mismo?')) {
@@ -175,6 +166,10 @@ export default function AdminDashboard() {
         let monthOrdersCount = 0;
         let lastMonthSales = 0;
         let lastMonthOrdersCount = 0;
+        let monthTiendaVirtualSales = 0;
+        let monthTiendaVirtualOrdersCount = 0;
+        let lastMonthTiendaVirtualSales = 0;
+        let lastMonthTiendaVirtualOrdersCount = 0;
 
         const statusCounts: Record<OrderStatus, number> = {
             borrador: 0,
@@ -207,6 +202,19 @@ export default function AdminDashboard() {
                     lastMonthSales += order.total;
                     lastMonthOrdersCount++;
                 }
+
+                // Solo canal "Tienda Virtual" (checkout web) -- excluye call center, WhatsApp,
+                // mostrador POS y mayoristas/B2B, que inflan el ticket promedio general.
+                const canal = order.canal || 'tienda_virtual';
+                if (canal === 'tienda_virtual') {
+                    if (isThisMonth(orderDate)) {
+                        monthTiendaVirtualSales += order.total;
+                        monthTiendaVirtualOrdersCount++;
+                    } else if (isLastMonth(orderDate)) {
+                        lastMonthTiendaVirtualSales += order.total;
+                        lastMonthTiendaVirtualOrdersCount++;
+                    }
+                }
             }
 
             // Count pipelines
@@ -218,6 +226,12 @@ export default function AdminDashboard() {
         // Avg Ticket calculation (this month vs. previous month)
         const avgTicket = monthOrdersCount > 0 ? Math.round(monthSales / monthOrdersCount) : 0;
         const lastMonthAvgTicket = lastMonthOrdersCount > 0 ? Math.round(lastMonthSales / lastMonthOrdersCount) : 0;
+
+        // Avg Ticket de Tienda Virtual únicamente (this month vs. previous month)
+        const avgTicketTiendaVirtual = monthTiendaVirtualOrdersCount > 0
+            ? Math.round(monthTiendaVirtualSales / monthTiendaVirtualOrdersCount) : 0;
+        const lastMonthAvgTicketTiendaVirtual = lastMonthTiendaVirtualOrdersCount > 0
+            ? Math.round(lastMonthTiendaVirtualSales / lastMonthTiendaVirtualOrdersCount) : 0;
 
         return {
             today: {
@@ -237,6 +251,8 @@ export default function AdminDashboard() {
                 // una tasa de conversión real (Google Analytics se acaba de integrar en el sitio público).
                 conversion: 4.2,
                 conversionChange: '+0%',
+                avgTicketTiendaVirtual: avgTicketTiendaVirtual,
+                avgTicketTiendaVirtualChange: pctChange(avgTicketTiendaVirtual, lastMonthAvgTicketTiendaVirtual),
             },
             pipeline: statusCounts
         };
@@ -1046,16 +1062,14 @@ export default function AdminDashboard() {
                                 >
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
-                                            <p className="text-sm text-gray-600 mb-1">LTV Cliente</p>
-                                            <p className="text-2xl font-black text-gray-900">{ltvStats ? formatCurrency(ltvStats.avgLtv) : '—'}</p>
+                                            <p className="text-sm text-gray-600 mb-1">Ticket Promedio Tienda Virtual</p>
+                                            <p className="text-2xl font-black text-gray-900">{formatCurrency(stats.metrics.avgTicketTiendaVirtual)}</p>
                                         </div>
                                         <div className="bg-purple-100 rounded-lg p-2">
                                             <Users className="text-purple-600" size={20} />
                                         </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 font-bold">
-                                        {ltvStats ? `Promedio sobre ${ltvStats.totalCustomers.toLocaleString('es-CO')} clientes` : 'Calculando…'}
-                                    </p>
+                                    <p className={`text-xs font-bold ${changeColorClass(stats.metrics.avgTicketTiendaVirtualChange)}`}>{stats.metrics.avgTicketTiendaVirtualChange} vs mes anterior</p>
                                 </motion.div>
                             </div>
                         </div>
