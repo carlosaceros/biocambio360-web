@@ -111,6 +111,7 @@ const organizationSchema = {
 import { Suspense } from 'react';
 import { Barlow } from 'next/font/google';
 import MetaPixel from "@/components/MetaPixel";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import TrafficTracker from "@/components/TrafficTracker";
 import ReferralTopBanner from "@/components/ReferralTopBanner";
 import ClientModals from "@/components/ClientModals";
@@ -136,6 +137,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
         <MetaPixel />
+        <GoogleAnalytics />
       </head>
       <body suppressHydrationWarning style={{ fontFamily: '"Barlow", sans-serif' }}>
         <AuthProvider>

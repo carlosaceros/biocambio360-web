@@ -43,6 +43,7 @@ import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import NotificationBell from '@/components/NotificationBell';
 import ChangePasswordModal from '@/components/admin/ChangePasswordModal';
 import { getConfirmedAiPreOrders } from '@/lib/inbox-service';
+import { getCustomerLtvStats } from '@/lib/customers-service';
 
 export default function AdminDashboard() {
     const { user, userProfile, role, signOut, canAccess: hasCap } = useAuth();
@@ -53,6 +54,7 @@ export default function AdminDashboard() {
     const [isSendingReport, setIsSendingReport] = useState(false);
     const [reportToast, setReportToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [pendingPreOrdersCount, setPendingPreOrdersCount] = useState(0);
+    const [ltvStats, setLtvStats] = useState<{ avgLtv: number; totalCustomers: number } | null>(null);
 
     useEffect(() => {
         if (role !== 'asesor') return;
@@ -60,6 +62,13 @@ export default function AdminDashboard() {
             .then((preOrders) => setPendingPreOrdersCount(preOrders.length))
             .catch(() => setPendingPreOrdersCount(0));
     }, [role]);
+
+    // LTV real (no hardcodeado): una sola lectura agregada del lado del servidor, no trae clientes al navegador.
+    useEffect(() => {
+        getCustomerLtvStats()
+            .then(setLtvStats)
+            .catch(() => setLtvStats(null));
+    }, []);
 
     const handleSendDailyReport = async () => {
         if (!confirm('¿Deseas generar y enviar el reporte consolidado diario a los correos de administración ahora mismo?')) {
@@ -224,10 +233,10 @@ export default function AdminDashboard() {
             metrics: {
                 avgTicket: avgTicket,
                 avgTicketChange: pctChange(avgTicket, lastMonthAvgTicket),
+                // Pendiente: no hay fuente de datos de visitas/tráfico del sitio todavía para calcular
+                // una tasa de conversión real (Google Analytics se acaba de integrar en el sitio público).
                 conversion: 4.2,
                 conversionChange: '+0%',
-                ltv: 124000,
-                ltvChange: '+0%'
             },
             pipeline: statusCounts
         };
@@ -1038,13 +1047,15 @@ export default function AdminDashboard() {
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
                                             <p className="text-sm text-gray-600 mb-1">LTV Cliente</p>
-                                            <p className="text-2xl font-black text-gray-900">{formatCurrency(stats.metrics.ltv)}</p>
+                                            <p className="text-2xl font-black text-gray-900">{ltvStats ? formatCurrency(ltvStats.avgLtv) : '—'}</p>
                                         </div>
                                         <div className="bg-purple-100 rounded-lg p-2">
                                             <Users className="text-purple-600" size={20} />
                                         </div>
                                     </div>
-                                    <p className="text-xs text-green-600 font-bold">{stats.metrics.ltvChange} vs mes anterior</p>
+                                    <p className="text-xs text-gray-500 font-bold">
+                                        {ltvStats ? `Promedio sobre ${ltvStats.totalCustomers.toLocaleString('es-CO')} clientes` : 'Calculando…'}
+                                    </p>
                                 </motion.div>
                             </div>
                         </div>

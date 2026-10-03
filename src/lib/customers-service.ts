@@ -11,7 +11,10 @@ import {
     getDocs,
     limit,
     where,
-    serverTimestamp // Import serverTimestamp
+    serverTimestamp, // Import serverTimestamp
+    getAggregateFromServer,
+    average,
+    count,
 } from 'firebase/firestore';
 
 import { db } from './firebase'; // Adjust import path if needed
@@ -451,5 +454,34 @@ export async function getCustomerPurchaseHistory(
         const timeB = b.fecha?.toMillis ? b.fecha.toMillis() : b.fecha?.seconds ? b.fecha.seconds * 1000 : 0;
         return timeB - timeA;
     });
+}
+
+export interface CustomerLtvStats {
+    /** Valor de vida promedio: gasto histórico total / clientes únicos */
+    avgLtv: number;
+    totalCustomers: number;
+}
+
+/**
+ * LTV promedio real (no hardcodeado), calculado con una query de agregación del lado del
+ * servidor sobre `totalSpent` (mantenido incrementalmente en cada venta por upsertCustomerFromOrder,
+ * arriba) -- cuesta una sola lectura agregada sin importar cuántos clientes existan, nunca hay que
+ * traer la colección completa al cliente.
+ */
+export async function getCustomerLtvStats(): Promise<CustomerLtvStats> {
+    try {
+        const snap = await getAggregateFromServer(customersCollection, {
+            avgLtv: average('totalSpent'),
+            totalCustomers: count(),
+        });
+        const data = snap.data();
+        return {
+            avgLtv: Math.round(data.avgLtv || 0),
+            totalCustomers: data.totalCustomers || 0,
+        };
+    } catch (e) {
+        console.warn('[getCustomerLtvStats] Error calculando LTV promedio:', e);
+        return { avgLtv: 0, totalCustomers: 0 };
+    }
 }
 
