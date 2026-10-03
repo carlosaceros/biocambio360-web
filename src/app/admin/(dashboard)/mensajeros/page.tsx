@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Truck,
     Users,
@@ -170,20 +170,23 @@ export default function MensajerosAdminPage() {
         reloadData();
     }, []);
 
-    // Suscripción a pedidos
+    // Suscripción a pedidos -- acotada a los más recientes, no al histórico completo de la tienda,
+    // que es lo único que este módulo necesita (asignar flota propia e imprimir hoja de ruta).
     useEffect(() => {
         const unsubscribe = subscribeToOrders((allOrders) => {
             setOrders(allOrders);
-        });
+        }, { limitCount: 1500 });
         return () => unsubscribe();
     }, []);
 
-    // Actualizar resumen de liquidación cuando cambie mensajero o fecha
+    // Actualizar resumen de liquidación cuando cambie mensajero o fecha.
+    // No depende de `orders` (el listener en vivo de arriba) para no recalcular en cada escritura
+    // a cualquier pedido de la tienda -- esta vista hace su propia consulta acotada por mensajero/fecha.
     useEffect(() => {
         if (settlementMessengerId) {
             loadSettlementPreview(settlementMessengerId, settlementDate);
         }
-    }, [settlementMessengerId, settlementDate, orders]);
+    }, [settlementMessengerId, settlementDate]);
 
     const loadSettlementPreview = async (msgId: string, date: string) => {
         setIsCalculatingSettlement(true);
@@ -198,7 +201,7 @@ export default function MensajerosAdminPage() {
     };
 
     // Pedidos candidatos para flota propia (Bogotá y Sabana que estén en preparación o confirmados)
-    const candidatesForDispatch = orders.filter(ord => {
+    const candidatesForDispatch = useMemo(() => orders.filter(ord => {
         if (ord.status === 'cancelado' || ord.status === 'borrador') return false;
 
         const isLocalFleet = ord.tipoEnvio === 'flota_propia' || (!ord.tipoEnvio && !ord.guiaTransportadora);
@@ -209,7 +212,18 @@ export default function MensajerosAdminPage() {
             ord.id.toLowerCase().includes(searchOrderQuery.toLowerCase());
 
         return isLocalFleet && matchesQuery;
-    });
+    }), [orders, searchOrderQuery]);
+
+    // Pedidos del mensajero/fecha seleccionados para la hoja de ruta a imprimir
+    const printOrders = useMemo(() => {
+        const currentPrintMessenger = messengers.find(m => m.id === printMessengerId) || messengers[0];
+        return orders.filter(o => {
+            if (o.status === 'cancelado' || o.status === 'borrador') return false;
+            const matchesMsg = !currentPrintMessenger || o.mensajeroId === currentPrintMessenger.id;
+            const matchesDate = !printDate || o.fechaProgramadaEntrega === printDate;
+            return matchesMsg && matchesDate;
+        });
+    }, [orders, messengers, printMessengerId, printDate]);
 
     const formatMoney = (val: number) => `$${(val || 0).toLocaleString('es-CO')}`;
 
@@ -1491,12 +1505,6 @@ export default function MensajerosAdminPage() {
             {/* MODAL DE IMPRESIÓN DE COMPROBANTES Y HOJA DE RUTA */}
             {printModalOpen && (() => {
                 const currentPrintMessenger = messengers.find(m => m.id === printMessengerId) || messengers[0];
-                const printOrders = orders.filter(o => {
-                    if (o.status === 'cancelado' || o.status === 'borrador') return false;
-                    const matchesMsg = !currentPrintMessenger || o.mensajeroId === currentPrintMessenger.id;
-                    const matchesDate = !printDate || o.fechaProgramadaEntrega === printDate;
-                    return matchesMsg && matchesDate;
-                });
 
                 const totalCod = printOrders.filter(o => o.metodoPago === 'contraentrega').reduce((acc, o) => acc + (o.total || 0), 0);
                 const totalPagadosOnline = printOrders.filter(o => o.metodoPago !== 'contraentrega').length;

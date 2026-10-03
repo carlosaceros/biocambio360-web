@@ -511,15 +511,18 @@ export async function saveMessengerSettlement(
     return id;
 }
 
-export async function getMessengerSettlements(messengerId?: string): Promise<MessengerSettlement[]> {
+export async function getMessengerSettlements(messengerId?: string, limitCount: number = 90): Promise<MessengerSettlement[]> {
     try {
         const colRef = collection(db, 'messenger_settlements');
+        // Colección de crecimiento indefinido (una liquidación por mensajero por día liquidado) --
+        // se acota a las más recientes para no traer todo el historico en cada carga de la página.
         let snap;
         if (messengerId) {
-            const q = query(colRef, where('messengerId', '==', messengerId));
+            const q = query(colRef, where('messengerId', '==', messengerId), orderBy('fecha', 'desc'), limit(limitCount));
             snap = await getDocs(q);
         } else {
-            snap = await getDocs(colRef);
+            const q = query(colRef, orderBy('fecha', 'desc'), limit(limitCount));
+            snap = await getDocs(q);
         }
         return snap.docs.map(d => ({ id: d.id, ...d.data() } as MessengerSettlement));
     } catch (e: any) {
